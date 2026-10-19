@@ -24,7 +24,7 @@ docker compose up -d db
 npm run dev
 ```
 
-Vite http://localhost:5173, API http://localhost:3013/api/health, 호스트 DB 포트 55443.
+Vite http://localhost:5183, API http://localhost:3013/api/health, 호스트 DB 포트 55443.
 
 ## 검증
 

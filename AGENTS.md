@@ -18,7 +18,7 @@
 ## 프로젝트 기준
 
 - 기술: React 19 + Vite + TypeScript, Express 5 + pg + Zod, PostgreSQL 17, npm workspaces, Docker Compose, GitHub Actions. Node 24.21.0 / npm 11.19.0.
-- 포트(127.0.0.1 바인딩): 웹 8093, 호스트 DB 55443, API 3013, Vite 5173. 사용자 요청 없이 바꾸지 않는다.
+- 포트(127.0.0.1 바인딩): 웹 8093, 호스트 DB 55443, API 3013, Vite 5183(workout-memo의 5173과 겹치지 않게). 사용자 요청 없이 바꾸지 않는다.
 - 날짜는 `YYYY-MM-DD`, 서비스 시간대는 `Asia/Seoul`. 서버의 "오늘"은 `serviceDate()`로 계산한다.
 - 입력 검증과 판정은 서버에서도 수행한다. 여러 행 변경은 트랜잭션으로 처리한다. 사용자에게 보이는 검증 오류는 한국어 메시지로 지정한다.
 - 마이그레이션은 `database/migrations` 한 곳에서 관리하고 재실행해도 안전하게 쓴다. 기존 DB 적용은 [DB 문서](database/README.md)의 `psql -f` 방식을 쓴다.

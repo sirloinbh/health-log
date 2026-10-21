@@ -5,7 +5,7 @@ description: Establish or improve the repeatable development foundation of the h
 
 # 식단·수면·건강 기록 개발 기반
 
-이 앱의 개발·검증·운영 방식을 반복 가능하게 정리한다. 먼저 프로젝트 루트의 `AGENTS.md`와 `skills/health-log-implementation/SKILL.md`를 읽고, 이슈 → 번호 기반 브랜치 → 구현 및 docs 기록 → 테스트·PR → CI 통과 후 에이전트 병합 절차로 진행한다. 이 스킬이 이슈·PR 절차나 CI 통과 조건을 생략하게 하거나 배포 권한을 부여하지 않는다.
+이 앱의 개발·검증·운영 방식을 반복 가능하게 정리한다. 먼저 프로젝트 루트의 `AGENTS.md`와 `skills/health-log-implementation/SKILL.md`를 읽고, 이슈 → 번호 기반 브랜치 → 구현 및 docs 기록 → 테스트·PR → 자동 코드 리뷰(최대 2회) → CI 통과 후 에이전트 병합 절차로 진행한다. 이 스킬이 이슈·PR 절차나 CI 통과 조건을 생략하게 하거나 배포 권한을 부여하지 않는다.
 
 ## 기준
 
@@ -21,7 +21,7 @@ description: Establish or improve the repeatable development foundation of the h
 4. 화면 변경은 디자인 토큰(`frontend/src/style.css`의 CSS 변수)과 기존 컴포넌트를 유지하면서 로딩·빈 결과·오류·키보드 접근을 해당 범위에서 정리한다.
 5. `skills/health-log-testing/SKILL.md`를 함께 적용한다. 구현과 테스트를 함께 작성하고, 버그에는 회귀 테스트를 추가하며, 실제 결과를 docs·PR에 기록한다.
 6. 배포는 사용자 요청 범위에서만 한다. 이미지 버전, health check, 비밀값 관리, 백업·복원, 이전 버전 복구를 준비한다.
-7. 각 작업 커밋에 docs 기록을 포함하고 검증한 PR을 만든다. 필수 CI가 모두 통과하면 health-log-implementation의 병합 절차대로 병합한다.
+7. 각 작업 커밋에 docs 기록을 포함하고 검증한 PR을 만든다. PR 후 자동 코드 리뷰를 최대 2회 거쳐 보완하고(큰 수정은 새 이슈), 최종 head의 필수 CI가 모두 통과하면 health-log-implementation의 병합 절차대로 병합한다.
 
 ## 완료 기준
 

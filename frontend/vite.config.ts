@@ -1,4 +1,11 @@
 import { defineConfig } from 'vite';
+import tailwindcss from '@tailwindcss/vite';
+// Ports come from the central registry (slot 03).
 export default defineConfig({
-  server: { port: 5203, strictPort: true, proxy: { '/api': 'http://127.0.0.1:3103' } },
+  plugins: [tailwindcss()],
+  server: {
+    port: 5203,
+    strictPort: true,
+    proxy: { '/api': process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3103' },
+  },
 });

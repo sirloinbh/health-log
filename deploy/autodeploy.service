@@ -1,0 +1,15 @@
+# 중앙 관리 파일. 수정은 sirloinbh/project-standards의 templates/app/deploy/에서
+[Unit]
+Description=식단·수면·건강 기록 pull-based deployment of origin/main
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=docker
+WorkingDirectory=/opt/health-log
+# Copied first: the deploy checks out a new commit while this script runs.
+ExecStart=/bin/bash -c 'cp /opt/health-log/deploy/autodeploy.sh /tmp/health-autodeploy.sh && exec /bin/bash /tmp/health-autodeploy.sh'
+TimeoutStartSec=45min
+Nice=10

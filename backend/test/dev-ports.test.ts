@@ -22,7 +22,11 @@ configTest('Vite dev server uses its own strict port and proxies the API port', 
   const port = Number(source.match(/port:\s*(\d+)/)?.[1]);
   assert.equal(port, 5203);
   assert.match(source, /strictPort:\s*true/);
-  assert.match(source, /'\/api':\s*'http:\/\/127\.0\.0\.1:3103'/);
+  // #12: API_PROXY_TARGET may point the proxy elsewhere (browser tests); the default stays 3103.
+  assert.match(
+    source,
+    /'\/api':\s*(process\.env\.API_PROXY_TARGET \?\? )?'http:\/\/127\.0\.0\.1:3103'/,
+  );
   for (const [app, other] of Object.entries(otherViteDevPorts))
     assert.notEqual(port, other, `Vite port must not collide with ${app}`);
 });

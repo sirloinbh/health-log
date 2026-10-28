@@ -1,0 +1,15 @@
+# 중앙 관리 파일. 수정은 sirloinbh/project-standards의 templates/app/deploy/에서
+[Unit]
+Description=식단·수면·건강 기록 daily database dump (and S3 copy when configured)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=docker
+WorkingDirectory=/opt/health-log
+# Copied first: a deploy may check out a new commit while this script runs.
+ExecStart=/bin/bash -c 'cp /opt/health-log/deploy/backup.sh /tmp/health-backup.sh && exec /bin/bash /tmp/health-backup.sh dump'
+TimeoutStartSec=30min
+Nice=10

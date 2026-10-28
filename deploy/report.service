@@ -1,0 +1,13 @@
+# 중앙 관리 파일. 수정은 sirloinbh/project-standards의 templates/app/deploy/에서
+[Unit]
+Description=식단·수면·건강 기록 daily server report for healthchecks.io
+After=docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=docker
+WorkingDirectory=/opt/health-log
+# Copied first: a deploy may check out a new commit while this script runs.
+ExecStart=/bin/bash -c 'cp /opt/health-log/deploy/report.sh /tmp/health-report.sh && exec /bin/bash /tmp/health-report.sh'
+TimeoutStartSec=5min

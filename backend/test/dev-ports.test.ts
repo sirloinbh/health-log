@@ -1,6 +1,6 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
+import { test } from 'node:test';
 
 // Dev ports of the sibling personal apps that may run at the same time on this PC.
 const otherViteDevPorts = {

@@ -1,5 +1,5 @@
 {
-  "centralSha": "7a47662beb53746a4bb08b2d2c7e708165eb2f70",
+  "centralSha": "f5bcc28609146d357c3af225bedc3f77868c27aa",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -80,7 +80,7 @@
     },
     ".github/workflows/ci.yml": {
       "mode": "full",
-      "sha256": "9502cf76b98009f77e1089af363f54883d8918416110c3573d97f2991ac2660d",
+      "sha256": "3b8a6a2b5e99794309293f5b023c94419f9f63692945cd493b685e795f94b8f4",
       "source": "templates/app/.github/workflows/ci.yml.tmpl"
     },
     ".gitignore": {

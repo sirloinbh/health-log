@@ -91,6 +91,43 @@ test('numbers finer than two decimals are rejected instead of rounded', async ()
   await rejects({ ...valid, servingSize: 0.001 }, '1회 제공량은 소수 둘째 자리');
   await rejects({ ...valid, sodium: 0.004 }, '나트륨은\\(는\\) 소수 둘째 자리');
   await rejects({ ...valid, protein: 12.345 }, '단백질은\\(는\\) 소수 둘째 자리');
+  // Tiny values must not slip through as "almost two decimals" and become zero in the column.
+  await rejects({ ...valid, servingSize: 5e-9 }, '1회 제공량은 소수 둘째 자리');
+  await rejects({ ...valid, calories: 1e-9 }, '칼로리은\\(는\\) 소수 둘째 자리');
+  await rejects({ ...valid, fat: 12.340000009 }, '지방은\\(는\\) 소수 둘째 자리');
+});
+
+test('two-decimal amounts that binary floating point handles badly are accepted', async () => {
+  const pool = {
+    query: async () => ({
+      rows: [{ id: '1', name: 'x', serving_size: '1', serving_unit: 'g' }],
+    }),
+  } as unknown as Pool;
+  await withApi(pool, async (call) => {
+    for (const fat of [0, 0.01, 0.07, 0.29, 1.15, 1.1, 4.35, 8.2, 1005.01, 99998.99, 99999]) {
+      const { status } = await call('/api/foods', { method: 'POST', body: { ...valid, fat } });
+      assert.equal(status, 201, `fat ${fat}`);
+    }
+  });
+});
+
+test('the checked date may be the service date itself', async () => {
+  const pool = {
+    query: async () => ({
+      rows: [
+        { id: '1', name: 'x', serving_size: '1', serving_unit: 'g', checked_on: '2026-10-31' },
+      ],
+    }),
+  } as unknown as Pool;
+  await withApi(
+    pool,
+    async (call) => {
+      const body = { ...valid, checkedOn: '2026-10-31' };
+      assert.equal((await call('/api/foods', { method: 'POST', body })).status, 201);
+      assert.equal((await call('/api/foods/1', { method: 'PUT', body })).status, 200);
+    },
+    { today: () => '2026-10-31' },
+  );
 });
 
 test('two decimals pass despite floating point, like 12.35 and 1.1', async () => {

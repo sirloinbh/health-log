@@ -7,8 +7,7 @@ import { HttpError, parseId } from './standard/http.js';
 const maxAmount = 99_999;
 
 // The columns keep two decimals; anything finer would be rounded silently, even down to zero.
-const hasTwoDecimalsAtMost = (value: number) =>
-  Math.abs(value * 100 - Math.round(value * 100)) < 1e-6;
+const hasTwoDecimalsAtMost = (value: number) => Number(value.toFixed(2)) === value;
 
 const amount = (label: string) =>
   z

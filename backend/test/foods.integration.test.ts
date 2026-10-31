@@ -109,6 +109,8 @@ test('the database refuses a claimed source without an address or date', { skip 
     );
   await assert.rejects(insert(null, '2026-10-31'), { code: '23514' });
   await assert.rejects(insert('https://example.com', null), { code: '23514' });
+  await assert.rejects(insert(null, null, 'public'), { code: '23514' });
+  await assert.rejects(insert(null, null, 'label'), { code: '23514' });
   await assert.rejects(insert('javascript:alert(1)', '2026-10-31', 'manual'), { code: '23514' });
 });
 

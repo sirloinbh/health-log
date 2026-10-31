@@ -340,6 +340,7 @@ export function FoodsPage() {
     async (search: string) => {
       // A slow older search must not overwrite a newer one.
       const request = ++latestLoad.current;
+      const previousQuery = appliedQuery.current;
       appliedQuery.current = search;
       try {
         const data = await requestJson<{ foods: Food[] }>(
@@ -349,7 +350,11 @@ export function FoodsPage() {
         clear();
         setFoods(data.foods);
       } catch (cause) {
-        if (request === latestLoad.current) error(cause);
+        if (request === latestLoad.current) {
+          // The list still shows the previous search.
+          appliedQuery.current = previousQuery;
+          error(cause);
+        }
       }
     },
     [clear, error],

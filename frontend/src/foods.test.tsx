@@ -252,6 +252,29 @@ test('saving reloads the search on screen, not words typed but not searched', as
   await vi.waitFor(() => expect(foodCalls(fetchMock).at(-1)?.[0]).toBe('/api/foods?q=applied'));
 });
 
+test('after a failed search, saving reloads the search the list still shows', async () => {
+  const fetchMock = serve((url, init) => {
+    if (init?.method === 'PUT') return json(food);
+    if (url.endsWith('q=broken')) return json({ error: '서버 오류가 발생했습니다' }, 500);
+    return json({ foods: [food] });
+  });
+  open();
+  await screen.findByRole('heading', { level: 2, name: '치즈버거' });
+  const search = screen.getByLabelText('음식 검색');
+  fireEvent.change(search, { target: { value: 'shown' } });
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  await vi.waitFor(() => expect(foodCalls(fetchMock).at(-1)?.[0]).toBe('/api/foods?q=shown'));
+  fireEvent.change(search, { target: { value: 'broken' } });
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  await screen.findByRole('alert');
+
+  fireEvent.click(screen.getByRole('button', { name: '치즈버거 수정' }));
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  await vi.waitFor(() => expect(foodCalls(fetchMock).at(-1)?.[0]).toBe('/api/foods?q=shown'));
+});
+
 test('a failed load shows the server message', async () => {
   serve(() => json({ error: '서버 오류가 발생했습니다' }, 500));
   open();

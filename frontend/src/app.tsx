@@ -24,17 +24,23 @@ const healthRefreshMs = 60_000;
 function useHealth() {
   const [health, setHealth] = useState<Health>({ state: 'loading' });
   useEffect(() => {
+    // A slow older response must not overwrite a newer one.
+    let latest = 0;
     const check = () => {
+      const request = ++latest;
+      const report = (next: Health) => {
+        if (request === latest) setHealth(next);
+      };
       fetch('/api/health')
         .then(async (response) => {
           const data = (await response.json()) as { today?: string; error?: string };
-          setHealth(
+          report(
             response.ok && data.today
               ? { state: 'ok', today: data.today }
               : { state: 'error', message: data.error ?? '서버 상태를 확인할 수 없습니다' },
           );
         })
-        .catch(() => setHealth({ state: 'error', message: '서버에 연결할 수 없습니다' }));
+        .catch(() => report({ state: 'error', message: '서버에 연결할 수 없습니다' }));
     };
     const checkWhenVisible = () => {
       if (document.visibilityState === 'visible') check();

@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 
 import { Button } from './components/ui/button';
@@ -51,6 +51,16 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
   const [draft, setDraft] = useState<string | null>(null);
   // Each typed digit can form a valid date; one edit of the field leaves one history entry.
   const editing = useRef(false);
+
+  // Back and forward do not blur the field, so they have to end the edit themselves.
+  useEffect(() => {
+    const endEdit = () => {
+      editing.current = false;
+      setDraft(null);
+    };
+    window.addEventListener('popstate', endEdit);
+    return () => window.removeEventListener('popstate', endEdit);
+  }, []);
 
   if (!isValidDate(date)) {
     return (

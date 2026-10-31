@@ -122,10 +122,58 @@ test('returning to the tab checks today again', async () => {
   );
 });
 
-test('moving to another day is announced to screen readers', () => {
+test('a slow older response does not overwrite a newer today', async () => {
+  const respond = (today: string) => new Response(JSON.stringify({ today }));
+  let finishFirst = (_response: Response) => {};
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn()
+      .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)))
+      .mockImplementation(() => Promise.resolve(respond('2026-03-16'))),
+  );
+  open('/daily/2026-03-16');
+  fireEvent(document, new Event('visibilitychange'));
+  await act(() => Promise.resolve());
+
+  await act(async () => {
+    finishFirst(respond('2026-03-15'));
+    await Promise.resolve();
+  });
+  await act(() => Promise.resolve());
+  expect(screen.queryByRole('link', { name: '오늘' })).not.toBeInTheDocument();
+});
+
+test('moving to another day is announced to screen readers', async () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  expect(screen.getByText('2026년 3월 15일 일요일')).toHaveAttribute('aria-live', 'polite');
+  // A live region announces changes only if the same element stays and its text changes.
+  const region = screen.getByText('2026년 3월 15일 일요일');
+  expect(region).toHaveAttribute('aria-live', 'polite');
+  fireEvent.click(screen.getByRole('link', { name: '다음 날' }));
+  await screen.findByText('2026년 3월 16일 월요일');
+  expect(region).toBeInTheDocument();
+  expect(region).toHaveTextContent('2026년 3월 16일 월요일');
+});
+
+test('going back ends a typed edit, so the field matches the page and history stays intact', async () => {
+  health({ today: '2026-03-15' });
+  open('/daily/2026-03-15');
+  const input = screen.getByLabelText('날짜 선택');
+  fireEvent.change(input, { target: { value: '2026-12-25' } });
+  await screen.findByText('2026년 12월 25일 금요일');
+
+  window.history.back();
+  await screen.findByText('2026년 3월 15일 일요일');
+  expect(input).toHaveValue('2026-03-15');
+
+  // A new edit must add an entry, not replace the day we came back to.
+  fireEvent.change(input, { target: { value: '2026-03-20' } });
+  await screen.findByText('2026년 3월 20일 금요일');
+  window.history.back();
+  await screen.findByText('2026년 3월 15일 일요일');
+  window.history.forward();
+  await screen.findByText('2026년 3월 20일 금요일');
 });
 
 test('the date input limits the year to four digits', () => {

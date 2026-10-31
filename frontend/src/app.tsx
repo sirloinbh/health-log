@@ -1,34 +1,57 @@
-import { LayoutDashboard, Settings2 } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, Settings2 } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 
 import { AppShell, type NavItem } from './components/layout/app-shell';
 import { EmptyState } from './components/ui/empty-state';
 import { Toaster } from './components/ui/sonner';
+import { DailyPage, TodayRedirect } from './daily';
 import { type Health, healthText } from './health';
 
 // Every page URL lives here (central docs/directory-rules.md).
-const pages = { overview: '/', settings: '/settings' } as const;
+const pages = { overview: '/', daily: '/daily', settings: '/settings' } as const;
 
 // Main menu (LNB) items, in display order.
 const nav: NavItem[] = [
   { to: pages.overview, label: '대시보드', icon: LayoutDashboard },
+  { to: pages.daily, label: '하루 기록', icon: CalendarDays },
   { to: pages.settings, label: '설정', icon: Settings2 },
 ];
+
+// An app left open past midnight must not keep yesterday as "today".
+const healthRefreshMs = 60_000;
 
 function useHealth() {
   const [health, setHealth] = useState<Health>({ state: 'loading' });
   useEffect(() => {
-    fetch('/api/health')
-      .then(async (response) => {
-        const data = (await response.json()) as { today?: string; error?: string };
-        setHealth(
-          response.ok && data.today
-            ? { state: 'ok', today: data.today }
-            : { state: 'error', message: data.error ?? '서버 상태를 확인할 수 없습니다' },
-        );
-      })
-      .catch(() => setHealth({ state: 'error', message: '서버에 연결할 수 없습니다' }));
+    // A slow older response must not overwrite a newer one.
+    let latest = 0;
+    const check = () => {
+      const request = ++latest;
+      const report = (next: Health) => {
+        if (request === latest) setHealth(next);
+      };
+      fetch('/api/health')
+        .then(async (response) => {
+          const data = (await response.json()) as { today?: string; error?: string };
+          report(
+            response.ok && data.today
+              ? { state: 'ok', today: data.today }
+              : { state: 'error', message: data.error ?? '서버 상태를 확인할 수 없습니다' },
+          );
+        })
+        .catch(() => report({ state: 'error', message: '서버에 연결할 수 없습니다' }));
+    };
+    const checkWhenVisible = () => {
+      if (document.visibilityState === 'visible') check();
+    };
+    check();
+    const timer = setInterval(check, healthRefreshMs);
+    document.addEventListener('visibilitychange', checkWhenVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', checkWhenVisible);
+    };
   }, []);
   return health;
 }
@@ -84,6 +107,14 @@ export function App() {
                 health={health}
               />
             }
+          />
+          <Route
+            path={pages.daily}
+            element={<TodayRedirect basePath={pages.daily} health={health} />}
+          />
+          <Route
+            path={`${pages.daily}/:date`}
+            element={<DailyPage basePath={pages.daily} health={health} />}
           />
           <Route
             path={pages.settings}

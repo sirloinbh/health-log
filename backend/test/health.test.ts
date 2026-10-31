@@ -20,6 +20,18 @@ test('health reports the service and the injected service date when the DB answe
   );
 });
 
+test('health counts today in Asia/Seoul when nothing is injected', async (t) => {
+  // 00:30 in Seoul is still the previous day in UTC.
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-30T15:30:00Z') });
+  await withApi(
+    pool(async () => ({ rows: [] })),
+    async (call) => {
+      const { data } = await call('/api/health');
+      assert.equal(data.today, '2026-10-31');
+    },
+  );
+});
+
 test('a DB failure becomes a Korean 500 without leaking the error', async () => {
   const original = console.error;
   console.error = () => {};

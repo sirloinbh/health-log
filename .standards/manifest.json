@@ -1,5 +1,5 @@
 {
-  "centralSha": "3f3bf8d44a5f0321c46a93ddd7d375daa96d104f",
+  "centralSha": "26495f414880976bbc65079adc7626c082bd1f78",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -359,7 +359,7 @@
         "devDependencies.jsdom": "30.1.2",
         "devDependencies.tailwindcss": "4.3.3",
         "devDependencies.typescript": "5.9.3",
-        "devDependencies.vite": "6.4.4",
+        "devDependencies.vite": "6.4.5",
         "devDependencies.vitest": "5.0.3"
       },
       "source": "templates/index.json"

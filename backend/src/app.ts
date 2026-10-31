@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import { types } from 'pg';
 
 import { foodsRouter } from './foods.js';
-import { defaultRateLimit, rateLimit, type RateLimitOptions } from './rate-limit.js';
+import { defaultRateLimit, type RateLimitSettings } from './rate-limit.js';
 import { errorHandler, notFound } from './standard/http.js';
 
 // DATE columns stay YYYY-MM-DD strings so the service time zone never shifts them.
@@ -23,7 +23,7 @@ export function serviceDate(now = new Date()) {
 
 export function createApp(
   pool: Pool,
-  options: { today?: () => string; rateLimit?: RateLimitOptions } = {},
+  options: { today?: () => string; rateLimit?: RateLimitSettings } = {},
 ) {
   const today = options.today ?? (() => serviceDate());
   const app = express();
@@ -34,8 +34,7 @@ export function createApp(
     res.json({ ok: true, service: 'health-log', today: today() });
   });
   // Not on health, so monitoring still answers while a client is being limited.
-  const rateLimiter = rateLimit(options.rateLimit ?? defaultRateLimit);
-  app.use('/api/foods', foodsRouter(pool, today, rateLimiter));
+  app.use('/api/foods', foodsRouter(pool, today, options.rateLimit ?? defaultRateLimit));
   app.use('/api', notFound);
   app.use(errorHandler);
   return app;

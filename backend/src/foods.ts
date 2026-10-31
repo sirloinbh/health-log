@@ -1,7 +1,9 @@
-import { type RequestHandler, Router } from 'express';
+import { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 
+import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError, parseId } from './standard/http.js';
 
 const maxAmount = 99_999;
@@ -186,9 +188,9 @@ const inputValues = (food: z.infer<typeof foodInput>) => [
 // A search for "100%" means those characters, not a LIKE wildcard.
 const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, '\\$&')}%`;
 
-export function foodsRouter(pool: Pool, today: () => string, rateLimiter: RequestHandler) {
+export function foodsRouter(pool: Pool, today: () => string, limits: RateLimitSettings) {
   const router = Router();
-  router.use(rateLimiter);
+  router.use(rateLimit(rateLimitOptions(limits)));
 
   const parseFood = (body: unknown) => {
     const food = foodInput.parse(body);

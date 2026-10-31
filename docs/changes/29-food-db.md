@@ -21,7 +21,7 @@
 ## 검증
 
 - 추가한 테스트: `backend/test/foods.test.ts`(입력 거부), `backend/test/foods.integration.test.ts`(실제 DB), `frontend/src/foods.test.tsx`(화면)
-- 로컬 `npm run check`: 통과. 프론트엔드 94개 통과. 백엔드 23개 통과, 10개 건너뜀. 건너뛴 10개는 `foods.integration.test.ts`이며 로컬에 `health_test`가 없어서 실행하지 못했다. 통과한 23개에는 `study_test`에서 읽기만 하는 기본 DB 테스트 1개가 들어 있다(#52).
+- 로컬 `npm run check`: 통과. 프론트엔드 94개 통과. 백엔드 28개 통과, 10개 건너뜀. 건너뛴 10개는 `foods.integration.test.ts`이며 로컬에 `health_test`가 없어서 실행하지 못했다. 통과한 28개에는 `study_test`에서 읽기만 하는 기본 DB 테스트 1개가 들어 있다(#52).
 - DB 통합 테스트: 첫 커밋(`ab9c3b2`)의 CI `ci / verify`에서 `health_test`로 실행됐다. 백엔드 23개 통과, 건너뜀 0개. 이후 커밋의 결과는 아래 리뷰 보완 절에 적는다.
 - `npm run knip`, `npm run standards:check`: 통과
 
@@ -63,10 +63,12 @@
 
 ### CodeQL 경고
 
-CodeQL이 `js/missing-rate-limiting`(요청 횟수 제한 없음) 3건을 `backend/src/foods.ts`의 새 라우트에 보고했다. 필수 검사는 아니지만 실패 상태다.
+CodeQL이 `js/missing-rate-limiting`(요청 횟수 제한 없음) 3건을 `backend/src/foods.ts`의 새 라우트에 보고했다. 필수 검사는 아니지만 실패 상태였다.
 
-- 요청 횟수 제한은 중앙 결정(`project-standards#291`)대로 `frontend/nginx.conf`의 `limit_req`(IP당 초당 10개, burst 40, 429)가 맡는다. 이 저장소의 파일에 있음을 확인했다.
-- CodeQL은 Express 안의 제한만 인식한다. 다른 앱들은 같은 경고를 사유를 남겨 해제했다.
+- 중앙 결정(`project-standards#291`)은 `frontend/nginx.conf`의 `limit_req`(IP당 초당 10개, burst 40, 429)로 제한하고 경고를 해제하는 것이다.
+- 사용자가 해제 대신 경고 내용을 반영하기로 해서 `backend/src/rate-limit.ts`를 추가했다. 패키지 설치 없는 메모리 기반 미들웨어이고, 주소당 1분에 700회까지 받는다. nginx가 1분에 통과시키는 최대 640회보다 커서 평소에는 동작하지 않고, API에 직접 접근하는 경우를 막는다.
+- `/api/health`는 제한에서 뺐다. 제한 중에도 상태 확인이 응답해야 한다.
+- 제한: 기록이 메모리에만 있어 서버를 재시작하면 초기화된다. 프록시 뒤에서는 모든 요청이 nginx 주소로 보이지만, 사용자가 한 명이라 문제가 없다.
 
 ## 제한·후속
 

@@ -18,19 +18,34 @@ const nav: NavItem[] = [
   { to: pages.settings, label: '설정', icon: Settings2 },
 ];
 
+// An app left open past midnight must not keep yesterday as "today".
+const healthRefreshMs = 60_000;
+
 function useHealth() {
   const [health, setHealth] = useState<Health>({ state: 'loading' });
   useEffect(() => {
-    fetch('/api/health')
-      .then(async (response) => {
-        const data = (await response.json()) as { today?: string; error?: string };
-        setHealth(
-          response.ok && data.today
-            ? { state: 'ok', today: data.today }
-            : { state: 'error', message: data.error ?? '서버 상태를 확인할 수 없습니다' },
-        );
-      })
-      .catch(() => setHealth({ state: 'error', message: '서버에 연결할 수 없습니다' }));
+    const check = () => {
+      fetch('/api/health')
+        .then(async (response) => {
+          const data = (await response.json()) as { today?: string; error?: string };
+          setHealth(
+            response.ok && data.today
+              ? { state: 'ok', today: data.today }
+              : { state: 'error', message: data.error ?? '서버 상태를 확인할 수 없습니다' },
+          );
+        })
+        .catch(() => setHealth({ state: 'error', message: '서버에 연결할 수 없습니다' }));
+    };
+    const checkWhenVisible = () => {
+      if (document.visibilityState === 'visible') check();
+    };
+    check();
+    const timer = setInterval(check, healthRefreshMs);
+    document.addEventListener('visibilitychange', checkWhenVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', checkWhenVisible);
+    };
   }, []);
   return health;
 }

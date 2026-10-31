@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 
 import { Button } from './components/ui/button';
@@ -14,12 +14,18 @@ const sections = ['수면', '식단', '술·담배', '하루 체크', '병원·�
 
 // Typing a year passes through values like 0002-10-31; those must not change the page.
 const earliestDate = '2000-01-01';
+// Without a max, Chrome keeps taking digits as a six-digit year instead of moving on to the month.
+const latestDate = '9999-12-31';
 
 function DailyHeader({ description }: { description?: string }) {
   return (
     <header className="flex flex-col gap-2">
       <h1 id="page-title">하루 기록</h1>
-      {description ? <p className="text-body text-muted-foreground">{description}</p> : null}
+      {description ? (
+        <p aria-live="polite" className="text-body text-muted-foreground">
+          {description}
+        </p>
+      ) : null}
     </header>
   );
 }
@@ -40,8 +46,11 @@ export function TodayRedirect({ basePath, health }: { basePath: string; health: 
 export function DailyPage({ basePath, health }: { basePath: string; health: Health }) {
   const { date = '' } = useParams();
   const navigate = useNavigate();
-  // The date input reports partial values while typing; hold them until they form a usable date.
+  // The field keeps what was typed until blur: writing a value back while typing makes the browser
+  // restart the part being typed, so "12" as a month would become 02.
   const [draft, setDraft] = useState<string | null>(null);
+  // Each typed digit can form a valid date; one edit of the field leaves one history entry.
+  const editing = useRef(false);
 
   if (!isValidDate(date)) {
     return (
@@ -75,15 +84,18 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
           aria-label="날짜 선택"
           className="w-auto"
           min={earliestDate}
+          max={latestDate}
           value={draft ?? date}
-          onBlur={() => setDraft(null)}
+          onBlur={() => {
+            editing.current = false;
+            setDraft(null);
+          }}
           onChange={(event) => {
             const value = event.target.value;
-            if (isValidDate(value) && value >= earliestDate) {
-              setDraft(null);
-              void navigate(pathOf(value));
-            } else {
-              setDraft(value);
+            setDraft(value);
+            if (isValidDate(value) && value >= earliestDate && value !== date) {
+              void navigate(pathOf(value), { replace: editing.current });
+              editing.current = true;
             }
           }}
         />

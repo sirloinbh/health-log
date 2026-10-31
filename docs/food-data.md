@@ -7,6 +7,8 @@
 - 영양성분은 **1회 제공량 기준**으로 저장한다. 제품 표기가 100g 기준이면 1회 제공량을 `100`, `g`로 적는다.
 - 칼로리는 kcal, 탄수화물·단백질·지방·당류는 g, 나트륨은 mg이다.
 - **모르는 값은 NULL로 둔다. 0으로 적지 않는다.** 0은 실제로 0일 때만 쓴다.
+- 숫자는 소수 둘째 자리까지 저장한다. 화면과 API는 더 세밀한 값을 거부한다.
+- 확인 날짜는 미래일 수 없다.
 - 같은 메뉴의 크기가 다르면 이름으로 구분한다. 예: `와퍼`, `와퍼 주니어`.
 - 음식은 이름과 브랜드의 조합으로 구분하며 중복 등록할 수 없다.
 
@@ -45,10 +47,14 @@ ON CONFLICT (name, COALESCE(brand, '')) DO UPDATE SET
   source_url = EXCLUDED.source_url,
   checked_on = EXCLUDED.checked_on,
   updated_at = now()
-WHERE foods.checked_on IS NULL OR EXCLUDED.checked_on > foods.checked_on;
+WHERE EXCLUDED.checked_on > foods.checked_on;
 ```
 
-SQL의 한글은 [DB 문서](../database/README.md)대로 `U&'\XXXX'` 이스케이프를 쓴다.
+- 위 예시는 `backend/test/foods.integration.test.ts`가 그대로 실행해 검사한다. 형식을 바꾸면 테스트도 함께 확인한다.
+- **조사 데이터에는 출처 종류와 관계없이 확인 날짜를 적는다.** 날짜가 없으면 나중에 새 조사로 갱신할 수 없다.
+- **날짜 없는 음식은 조사 데이터로 바뀌지 않는다.** 화면에서 직접 입력한 값을 지키기 위해서다. 조사값으로 바꾸려면 아래 정정 방식을 쓴다.
+- **같은 날짜로 값을 정정할 때는 위 형식을 쓰지 않는다.** 날짜가 같으면 오류 없이 무시되어 틀린 값이 남는다. 대상을 지정한 `UPDATE` 마이그레이션으로 고친다.
+- SQL의 한글은 `U&'\C608\C2DC'`(예시)처럼 코드값 앞에 백슬래시 하나를 붙여 쓴다.
 
 ## 검증
 

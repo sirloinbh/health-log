@@ -29,7 +29,7 @@ export function createApp(pool: Pool, options: { today?: () => string } = {}) {
     await pool.query('SELECT 1');
     res.json({ ok: true, service: 'health-log', today: today() });
   });
-  app.use('/api/foods', foodsRouter(pool));
+  app.use('/api/foods', foodsRouter(pool, today));
   app.use('/api', notFound);
   app.use(errorHandler);
   return app;

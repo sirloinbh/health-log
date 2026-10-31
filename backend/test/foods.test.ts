@@ -54,8 +54,65 @@ test('only http and https source addresses are stored', async () => {
   await rejects({ ...valid, sourceUrl: 'not a url' }, 'http 또는 https');
 });
 
+test('an address with no host part is rejected even though URL can parse it', async () => {
+  await rejects({ ...valid, sourceUrl: 'http:foo' }, 'http 또는 https');
+  await rejects({ ...valid, sourceUrl: 'http:/foo' }, 'http 또는 https');
+});
+
 test('a date that does not exist is rejected as the checked date', async () => {
   await rejects({ ...valid, checkedOn: '2026-02-30' }, '확인 날짜가 올바르지');
+  await rejects({ ...valid, checkedOn: '0000-01-01' }, '확인 날짜가 올바르지');
+});
+
+test('the checked date cannot be after the service date', async () => {
+  const queries: unknown[] = [];
+  const pool = {
+    query: async (...args: unknown[]) => {
+      queries.push(args);
+      return { rows: [] };
+    },
+  } as unknown as Pool;
+  await withApi(
+    pool,
+    async (call) => {
+      const { status, data } = await call('/api/foods', {
+        method: 'POST',
+        body: { ...valid, checkedOn: '2026-11-01' },
+      });
+      assert.equal(status, 400);
+      assert.equal(data.error, '확인 날짜는 오늘 이후일 수 없습니다');
+      assert.equal(queries.length, 0);
+    },
+    { today: () => '2026-10-31' },
+  );
+});
+
+test('numbers finer than two decimals are rejected instead of rounded', async () => {
+  await rejects({ ...valid, servingSize: 0.001 }, '1회 제공량은 소수 둘째 자리');
+  await rejects({ ...valid, sodium: 0.004 }, '나트륨은\\(는\\) 소수 둘째 자리');
+  await rejects({ ...valid, protein: 12.345 }, '단백질은\\(는\\) 소수 둘째 자리');
+});
+
+test('two decimals pass despite floating point, like 12.35 and 1.1', async () => {
+  const pool = {
+    query: async () => ({
+      rows: [{ id: '1', name: 'x', serving_size: '1.10', serving_unit: 'g', protein: '12.35' }],
+    }),
+  } as unknown as Pool;
+  await withApi(pool, async (call) => {
+    for (const body of [
+      { ...valid, protein: 12.35 },
+      { ...valid, servingSize: 1.1 },
+      { ...valid, fat: 0.07 },
+      { ...valid, sugars: 4.35 },
+    ]) {
+      assert.equal((await call('/api/foods', { method: 'POST', body })).status, 201);
+    }
+  });
+});
+
+test('a body that is not an object answers in Korean', async () => {
+  await rejects([], '요청 본문이 올바르지 않습니다');
 });
 
 test('an unknown source kind is rejected', async () => {

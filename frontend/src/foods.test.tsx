@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
+import { toast } from './components/ui/sonner';
 
 const food = {
   id: 1,
@@ -181,6 +182,74 @@ test('editing starts from the food and saves to its address', async () => {
     sourceType: 'official',
     sourceUrl: 'https://example.com/menu',
   });
+});
+
+test('text a number field cannot read is reported instead of saved as no value', async () => {
+  const fetchMock = serve(() => json({ foods: [] }));
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '음식 추가' }));
+  const dialog = await screen.findByRole('dialog');
+  const calories = within(dialog).getByLabelText('칼로리 (kcal)');
+  // jsdom never reports badInput; a real browser does for text like "1,200".
+  Object.defineProperty(calories, 'validity', { value: { badInput: true } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+    '칼로리 (kcal)의 입력값을 확인해 주세요',
+  );
+  expect(foodCalls(fetchMock).some(([, init]) => init?.method === 'POST')).toBe(false);
+});
+
+test('a save in progress cannot be cancelled or closed', async () => {
+  let finish = (_response: Response) => {};
+  serve((_url, init) =>
+    init?.method === 'POST' ? new Promise((resolve) => (finish = resolve)) : json({ foods: [] }),
+  );
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '음식 추가' }));
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  await within(dialog).findByRole('button', { name: '저장 중…' });
+
+  expect(within(dialog).getByRole('button', { name: '취소' })).toBeDisabled();
+  fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
+  fireEvent.keyDown(dialog, { key: 'Escape' });
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+  finish(json(food, 201));
+  await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+});
+
+test('a save is confirmed even when the current search hides the food', async () => {
+  // Toasts outlive a test in sonner's global store, so check the call rather than the text.
+  const success = vi.spyOn(toast, 'success');
+  serve((_url, init) => (init?.method === 'POST' ? json(food, 201) : json({ foods: [] })));
+  open();
+  await screen.findByText('음식이 없습니다');
+  fireEvent.click(screen.getByRole('button', { name: '음식 추가' }));
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  await vi.waitFor(() => expect(success).toHaveBeenCalledWith('저장했습니다'));
+  expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
+});
+
+test('saving reloads the search on screen, not words typed but not searched', async () => {
+  const fetchMock = serve((_url, init) =>
+    init?.method === 'POST' ? json(food, 201) : json({ foods: [] }),
+  );
+  open();
+  await screen.findByText('음식이 없습니다');
+  const search = screen.getByLabelText('음식 검색');
+  fireEvent.change(search, { target: { value: 'applied' } });
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  await vi.waitFor(() => expect(foodCalls(fetchMock).at(-1)?.[0]).toBe('/api/foods?q=applied'));
+  fireEvent.change(search, { target: { value: 'typed' } });
+
+  fireEvent.click(screen.getByRole('button', { name: '음식 추가' }));
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  await vi.waitFor(() => expect(foodCalls(fetchMock).at(-1)?.[0]).toBe('/api/foods?q=applied'));
 });
 
 test('a failed load shows the server message', async () => {

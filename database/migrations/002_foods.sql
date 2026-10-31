@@ -18,7 +18,13 @@ CREATE TABLE IF NOT EXISTS foods (
   source_url text,
   checked_on date,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  -- Researched data arrives through SQL, so the database holds the source rules too.
+  CONSTRAINT foods_source_url_is_http CHECK (source_url ~* '^https?://'),
+  CONSTRAINT foods_claimed_source_has_url
+    CHECK (source_type NOT IN ('official', 'public') OR source_url IS NOT NULL),
+  CONSTRAINT foods_claimed_source_has_date
+    CHECK (source_type NOT IN ('official', 'public', 'label') OR checked_on IS NOT NULL)
 );
 
 -- Researched data re-runs safely through ON CONFLICT on this index.

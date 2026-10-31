@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from './components/ui/select';
+import { toast } from './components/ui/sonner';
 import { requestJson } from './lib/api';
 import { useNotice } from './lib/use-notice';
 
@@ -123,7 +124,7 @@ const bodyOf = (form: Form) => ({
   checkedOn: textOrNull(form.checkedOn),
 });
 
-// The server only stores http(s) addresses, but imported rows bypass it; a link must never run script.
+// The server and database only store http(s) addresses; a link must never run script regardless.
 const isSafeLink = (url: string) => /^https?:\/\//i.test(url);
 
 function Field({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
@@ -150,8 +151,16 @@ function FoodDialog({
   const update = (key: keyof Form) => (event: { target: { value: string } }) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // A number field reports "" for text like "1,200"; saving that would turn it into "no value".
+    const unreadable = [...event.currentTarget.querySelectorAll('input')].find(
+      (input) => input.validity.badInput,
+    );
+    if (unreadable) {
+      error(`${unreadable.labels?.[0]?.textContent ?? '입력값'}의 입력값을 확인해 주세요`);
+      return;
+    }
     setSaving(true);
     try {
       await requestJson<Food>(food ? `/api/foods/${food.id}` : '/api/foods', {
@@ -166,7 +175,8 @@ function FoodDialog({
   };
 
   return (
-    <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
+    // Closing during a save would not cancel it, and its late reply would close whatever opened next.
+    <Dialog open onOpenChange={(open) => (open || saving ? undefined : onClose())}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{food ? '음식 수정' : '음식 추가'}</DialogTitle>
@@ -252,7 +262,7 @@ function FoodDialog({
           </Field>
           <Notice notice={notice} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" disabled={saving} onClick={onClose}>
               취소
             </Button>
             <Button type="submit" disabled={saving}>
@@ -323,11 +333,14 @@ export function FoodsPage() {
   const [editing, setEditing] = useState<Food | 'new' | null>(null);
   const { notice, error, clear } = useNotice();
   const latestLoad = useRef(0);
+  // What the list shows, which can differ from words typed but not yet searched.
+  const appliedQuery = useRef('');
 
   const load = useCallback(
     async (search: string) => {
       // A slow older search must not overwrite a newer one.
       const request = ++latestLoad.current;
+      appliedQuery.current = search;
       try {
         const data = await requestJson<{ foods: Food[] }>(
           `/api/foods?q=${encodeURIComponent(search)}`,
@@ -399,7 +412,9 @@ export function FoodsPage() {
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
-            void load(query);
+            // The saved food may not match the current search, so the list alone cannot confirm it.
+            toast.success('저장했습니다');
+            void load(appliedQuery.current);
           }}
         />
       ) : null}

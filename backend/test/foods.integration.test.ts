@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { after, before, test } from 'node:test';
 
 import { Pool } from 'pg';
@@ -30,18 +31,21 @@ after(async () => {
   await pool.end();
 });
 
-// The statement docs/food-data.md gives for researched data.
+// The statement docs/food-data.md tells data issues to copy, so the document itself is under test.
+const documentedSql = (() => {
+  const text = readFileSync(new URL('../../docs/food-data.md', import.meta.url), 'utf8');
+  const sql = /```sql\r?\n([\s\S]*?)```/.exec(text)?.[1];
+  if (!sql) throw new Error('docs/food-data.md has no SQL block');
+  return sql;
+})();
+
+// The documented statement with its one example row replaced by this test's values.
 const importFood = (name: string, calories: number, checkedOn: string) =>
   pool.query(
-    `INSERT INTO foods (name, brand, serving_size, serving_unit, calories, source_type, source_url, checked_on)
-     VALUES ($1, 'integration-brand', 100, 'g', $2, 'official', 'https://example.com/menu', $3)
-     ON CONFLICT (name, COALESCE(brand, '')) DO UPDATE SET
-       calories = EXCLUDED.calories,
-       source_type = EXCLUDED.source_type,
-       source_url = EXCLUDED.source_url,
-       checked_on = EXCLUDED.checked_on,
-       updated_at = now()
-     WHERE foods.checked_on IS NULL OR EXCLUDED.checked_on > foods.checked_on`,
+    documentedSql.replace(
+      /VALUES[\s\S]*?ON CONFLICT/,
+      `VALUES ($1, 'integration-brand', NULL, 100, 'g', $2, NULL, NULL, NULL, NULL, NULL, 'official', 'https://example.com/menu', $3)\nON CONFLICT`,
+    ),
     [name, calories, checkedOn],
   );
 
@@ -70,6 +74,42 @@ test('only newer research replaces a food, so a re-run keeps later edits', { ski
 
   await importFood(name, 520, '2026-11-30');
   assert.equal((await countAndCalories(name)).calories, 520);
+});
+
+test('a re-run never overwrites a food whose date was cleared by an edit', { skip }, async () => {
+  const name = `${prefix}cleared-date`;
+  await importFood(name, 500, '2026-10-31');
+  await pool.query(
+    `UPDATE foods SET calories = 510, source_type = 'manual', source_url = NULL, checked_on = NULL
+     WHERE name = $1`,
+    [name],
+  );
+  await importFood(name, 500, '2026-10-31');
+  assert.equal((await countAndCalories(name)).calories, 510);
+});
+
+test('the documented example runs as written and repeats safely', { skip }, async (t) => {
+  // Its Korean literals must decode: the escapes spell 예시 and 브랜드.
+  const example = "name = '예시' AND brand = '브랜드'";
+  const clean = () => pool.query(`DELETE FROM foods WHERE ${example}`);
+  await clean();
+  t.after(clean);
+  await pool.query(documentedSql);
+  await pool.query(documentedSql);
+  const { rows } = await pool.query(`SELECT calories FROM foods WHERE ${example}`);
+  assert.equal(rows.length, 1);
+});
+
+test('the database refuses a claimed source without an address or date', { skip }, async () => {
+  const insert = (sourceUrl: string | null, checkedOn: string | null, sourceType = 'official') =>
+    pool.query(
+      `INSERT INTO foods (name, serving_size, serving_unit, source_type, source_url, checked_on)
+       VALUES ($1, 1, 'g', $2, $3, $4)`,
+      [`${prefix}claimed`, sourceType, sourceUrl, checkedOn],
+    );
+  await assert.rejects(insert(null, '2026-10-31'), { code: '23514' });
+  await assert.rejects(insert('https://example.com', null), { code: '23514' });
+  await assert.rejects(insert('javascript:alert(1)', '2026-10-31', 'manual'), { code: '23514' });
 });
 
 test('an unknown nutrient stays "no value" and a known zero stays zero', { skip }, async () => {
@@ -120,6 +160,7 @@ test('search matches name and brand and treats % as a character', { skip }, asyn
       return (data.foods as { name: string }[]).map((food) => food.name);
     };
     assert.deepEqual(await names(`${prefix}search-100%`), [`${prefix}search-100%-grain`]);
+    assert.deepEqual(await names(`${prefix}search-%-grain`), []);
     assert.deepEqual(await names(`${prefix}search-1_0`), []);
     assert.deepEqual(await names(`${prefix}brand-match`), [`${prefix}search-plain`]);
   });

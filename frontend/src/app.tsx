@@ -1,18 +1,20 @@
-import { LayoutDashboard, Settings2 } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, Settings2 } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 
 import { AppShell, type NavItem } from './components/layout/app-shell';
 import { EmptyState } from './components/ui/empty-state';
 import { Toaster } from './components/ui/sonner';
+import { DailyPage, TodayRedirect } from './daily';
 import { type Health, healthText } from './health';
 
 // Every page URL lives here (central docs/directory-rules.md).
-const pages = { overview: '/', settings: '/settings' } as const;
+const pages = { overview: '/', daily: '/daily', settings: '/settings' } as const;
 
 // Main menu (LNB) items, in display order.
 const nav: NavItem[] = [
   { to: pages.overview, label: '대시보드', icon: LayoutDashboard },
+  { to: pages.daily, label: '하루 기록', icon: CalendarDays },
   { to: pages.settings, label: '설정', icon: Settings2 },
 ];
 
@@ -84,6 +86,14 @@ export function App() {
                 health={health}
               />
             }
+          />
+          <Route
+            path={pages.daily}
+            element={<TodayRedirect basePath={pages.daily} health={health} />}
+          />
+          <Route
+            path={`${pages.daily}/:date`}
+            element={<DailyPage basePath={pages.daily} health={health} />}
           />
           <Route
             path={pages.settings}

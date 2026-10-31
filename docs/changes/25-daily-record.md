@@ -20,7 +20,8 @@
 ## 검증
 
 - 추가한 테스트: `frontend/src/daily-date.test.ts`(날짜 판정·이동·표기), `frontend/src/daily.test.tsx`(서버 기준 오늘, 날짜 이동, 입력 중인 연도, 없는 날짜, 서버 오류, 빈 구역)
-- `npm run check`: 통과. 프론트엔드 80개 통과. 백엔드 7개 통과, 건너뜀 0개(`TEST_DATABASE_URL`을 설정한 로컬 PostgreSQL). 스킬 검사 4개 통과
+- `npm run check`: 통과. 프론트엔드 80개 통과. 백엔드 7개 통과, 건너뜀 0개. 스킬 검사 4개 통과
+- 정정(#29에서 확인): 이 PC의 `TEST_DATABASE_URL`은 다른 프로젝트의 `study_test`를 가리켰다. 위 DB 테스트와 브라우저 확인의 "실제 로컬 DB"는 `health_test`가 아니라 이 DB이고, 실행한 쿼리는 `SELECT 1`과 테이블 존재 조회뿐이라 쓰기는 없었다. 이 변경은 스키마를 바꾸지 않으며, 전용 DB 검증은 CI에서 통과했다.
 - `npm run knip`, `npm run standards:check`: 통과
 
 ### 브라우저 확인

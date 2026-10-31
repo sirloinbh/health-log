@@ -33,9 +33,9 @@ export function createApp(
     await pool.query('SELECT 1');
     res.json({ ok: true, service: 'health-log', today: today() });
   });
-  // After health, so monitoring still answers while a client is being limited.
-  app.use('/api', rateLimit(options.rateLimit ?? defaultRateLimit));
-  app.use('/api/foods', foodsRouter(pool, today));
+  // Not on health, so monitoring still answers while a client is being limited.
+  const rateLimiter = rateLimit(options.rateLimit ?? defaultRateLimit);
+  app.use('/api/foods', foodsRouter(pool, today, rateLimiter));
   app.use('/api', notFound);
   app.use(errorHandler);
   return app;

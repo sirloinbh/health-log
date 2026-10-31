@@ -11,7 +11,7 @@ export const defaultRateLimit: RateLimitOptions = { max: 700, windowMs: 60_000 }
 export function rateLimit({ max, windowMs, now = Date.now }: RateLimitOptions) {
   const windows = new Map<string, { count: number; endsAt: number }>();
 
-  return (req: Request, res: Response, next: NextFunction) => {
+  return function rateLimiter(req: Request, res: Response, next: NextFunction) {
     const time = now();
     const client = req.ip ?? 'unknown';
     let current = windows.get(client);

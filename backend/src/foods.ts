@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { type RequestHandler, Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 
@@ -186,8 +186,9 @@ const inputValues = (food: z.infer<typeof foodInput>) => [
 // A search for "100%" means those characters, not a LIKE wildcard.
 const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, '\\$&')}%`;
 
-export function foodsRouter(pool: Pool, today: () => string) {
+export function foodsRouter(pool: Pool, today: () => string, rateLimiter: RequestHandler) {
   const router = Router();
+  router.use(rateLimiter);
 
   const parseFood = (body: unknown) => {
     const food = foodInput.parse(body);

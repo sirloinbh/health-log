@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
 import { parseDate } from './dates.js';
@@ -66,10 +66,10 @@ type EntryRow = {
   servings: string;
   serving_size: string | null;
   serving_unit: string | null;
-} & Record<(typeof nutrients)[number], string | null>;
-
-type TotalsRow = Record<
-  (typeof nutrients)[number] | `${(typeof nutrients)[number]}_missing`,
+} & Record<
+  | (typeof nutrients)[number]
+  | `${(typeof nutrients)[number]}_total`
+  | `${(typeof nutrients)[number]}_missing`,
   string | null
 >;
 
@@ -78,13 +78,19 @@ const optionalNumber = (value: string | null) => (value === null ? null : Number
 
 // Multiplied in the database: NUMERIC is exact, so 1.5 × 123.45 cannot pick up binary float errors.
 const eaten = nutrients.map((key) => `round(${key} * servings, 2) AS ${key}`).join(', ');
-const entryColumns = `id, entry_date, meal, food_id, name, brand, servings, serving_size, serving_unit, ${eaten}`;
-const totalColumns = nutrients
+const totals = nutrients
   .map(
     (key) =>
-      `round(sum(${key} * servings), 2) AS ${key}, count(*) FILTER (WHERE ${key} IS NULL) AS ${key}_missing`,
+      `sum(${key}) OVER () AS ${key}_total, count(*) FILTER (WHERE ${key} IS NULL) OVER () AS ${key}_missing`,
   )
   .join(', ');
+// One statement sees one snapshot, and the totals add up the rounded rows, so a day's list and its
+// totals always agree.
+const daySql = `WITH eaten AS (
+    SELECT id, meal, food_id, name, brand, servings, serving_size, serving_unit, ${eaten}
+    FROM meal_entries WHERE entry_date = $1
+  )
+  SELECT *, ${totals} FROM eaten ORDER BY id`;
 
 const toEntry = (row: EntryRow) => ({
   id: Number(row.id),
@@ -98,11 +104,15 @@ const toEntry = (row: EntryRow) => ({
   ...Object.fromEntries(nutrients.map((key) => [key, optionalNumber(row[key])])),
 });
 
-const toTotals = (row: TotalsRow) =>
+// A day with no rows has no totals to read: no value, and nothing missing.
+const toTotals = (row: EntryRow | undefined) =>
   Object.fromEntries(
     nutrients.map((key) => [
       key,
-      { value: optionalNumber(row[key]), missing: Number(row[`${key}_missing`]) },
+      {
+        value: row ? optionalNumber(row[`${key}_total`]) : null,
+        missing: row ? Number(row[`${key}_missing`]) : 0,
+      },
     ]),
   );
 
@@ -110,56 +120,71 @@ export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
   const router = Router();
   router.use(rateLimit(rateLimitOptions(limits)));
 
-  const day = async (date: string) => {
-    const [entries, totals] = await Promise.all([
-      pool.query<EntryRow>(
-        `SELECT ${entryColumns} FROM meal_entries WHERE entry_date = $1 ORDER BY id`,
-        [date],
-      ),
-      pool.query<TotalsRow>(`SELECT ${totalColumns} FROM meal_entries WHERE entry_date = $1`, [
-        date,
-      ]),
-    ]);
-    return { entries: entries.rows.map(toEntry), totals: toTotals(totals.rows[0]) };
+  const day = async (db: Pick<Pool, 'query'> | PoolClient, date: string) => {
+    const { rows } = await db.query<EntryRow>(daySql, [date]);
+    return { entries: rows.map(toEntry), totals: toTotals(rows[0]) };
+  };
+
+  // A change and the answer about it succeed together. Otherwise a saved entry could be reported as
+  // failed, and trying again would count the food twice.
+  const inTransaction = async <T>(run: (client: PoolClient) => Promise<T>) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await run(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   };
 
   router.get('/:date', async (req, res) => {
-    res.json(await day(parseDate(req.params.date)));
+    res.json(await day(pool, parseDate(req.params.date)));
   });
 
-  // Each change answers with the whole day, so the screen's list and totals always agree.
+  // Each change answers with the whole day, so the screen needs no second request.
   router.post('/:date', async (req, res) => {
     const date = parseDate(req.params.date);
     const entry = entryInput.parse(req.body);
-    if (entry.foodId !== undefined) {
-      const { rowCount } = await pool.query(
-        `INSERT INTO meal_entries (entry_date, meal, servings, food_id, name, brand, serving_size,
-           serving_unit, calories, carbs, protein, fat, sugars, sodium)
-         SELECT $1, $2, $3, id, name, brand, serving_size, serving_unit, calories, carbs, protein,
-           fat, sugars, sodium
-         FROM foods WHERE id = $4`,
-        [date, entry.meal, entry.servings, entry.foodId],
-      );
-      if (!rowCount) throw new HttpError(404, '음식을 찾을 수 없습니다');
-    } else {
-      await pool.query(
-        `INSERT INTO meal_entries (entry_date, meal, servings, name, calories)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [date, entry.meal, entry.servings, entry.name, entry.calories],
-      );
-    }
-    res.status(201).json(await day(date));
+    const answer = await inTransaction(async (client) => {
+      if (entry.foodId !== undefined) {
+        const { rowCount } = await client.query(
+          `INSERT INTO meal_entries (entry_date, meal, servings, food_id, name, brand, serving_size,
+             serving_unit, calories, carbs, protein, fat, sugars, sodium)
+           SELECT $1, $2, $3, id, name, brand, serving_size, serving_unit, calories, carbs, protein,
+             fat, sugars, sodium
+           FROM foods WHERE id = $4`,
+          [date, entry.meal, entry.servings, entry.foodId],
+        );
+        if (!rowCount) throw new HttpError(404, '음식을 찾을 수 없습니다');
+      } else {
+        await client.query(
+          `INSERT INTO meal_entries (entry_date, meal, servings, name, calories)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [date, entry.meal, entry.servings, entry.name, entry.calories],
+        );
+      }
+      return day(client, date);
+    });
+    res.status(201).json(answer);
   });
 
   router.delete('/:date/entries/:id', async (req, res) => {
     const date = parseDate(req.params.date);
     const id = parseId(req.params.id, '식사 기록');
-    const { rowCount } = await pool.query(
-      'DELETE FROM meal_entries WHERE id = $1 AND entry_date = $2',
-      [id, date],
-    );
-    if (!rowCount) throw new HttpError(404, '식사 기록을 찾을 수 없습니다');
-    res.json(await day(date));
+    const answer = await inTransaction(async (client) => {
+      const { rowCount } = await client.query(
+        'DELETE FROM meal_entries WHERE id = $1 AND entry_date = $2',
+        [id, date],
+      );
+      if (!rowCount) throw new HttpError(404, '식사 기록을 찾을 수 없습니다');
+      return day(client, date);
+    });
+    res.json(answer);
   });
 
   return router;

@@ -73,7 +73,7 @@ const request = (fetchMock: ReturnType<typeof server>, call: number) => {
 const searchFood = async () => {
   fireEvent.change(screen.getByLabelText('음식 검색'), { target: { value: '치즈' } });
   fireEvent.click(screen.getByRole('button', { name: '검색' }));
-  return screen.findByRole('button', { name: '치즈버거 추가' });
+  return screen.findByRole('button', { name: '버거집 치즈버거 추가' });
 };
 
 test('a searched food is recorded with the chosen meal and quantity', async () => {
@@ -192,6 +192,98 @@ test('an entry in flight cannot be sent twice', async () => {
   await waitFor(() => expect(add).toBeEnabled());
 });
 
+test('the typed form also waits for its request, and shows that it is working', async () => {
+  let finish = (_response: Response) => {};
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
+    .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+  vi.stubGlobal('fetch', fetchMock);
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '떡볶이' } });
+  fireEvent.change(screen.getByLabelText('1회 칼로리 (kcal)'), { target: { value: '480' } });
+  const save = screen.getByRole('button', { name: /바로 기록/ });
+  fireEvent.click(save);
+  await waitFor(() => expect(save).toBeDisabled());
+  expect(screen.getByRole('status', { name: '기록하는 중' })).toBeInTheDocument();
+  fireEvent.click(save);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+
+  // Typed while waiting: the next entry, which finishing this one must not wipe.
+  fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '김밥' } });
+  finish(new Response(JSON.stringify(oneEntry), { status: 201 }));
+  await waitFor(() => expect(save).toBeEnabled());
+  expect(screen.getByLabelText('음식 이름')).toHaveValue('김밥');
+  expect(screen.getByLabelText('1회 칼로리 (kcal)')).toHaveValue(null);
+});
+
+test('the delete buttons wait while an entry is being recorded', async () => {
+  let finish = (_response: Response) => {};
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(oneEntry)))
+      .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve))),
+  );
+  render(<MealCard date={date} />);
+  const remove = await screen.findByRole('button', { name: '버거집 치즈버거 삭제' });
+  fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '떡볶이' } });
+  fireEvent.change(screen.getByLabelText('1회 칼로리 (kcal)'), { target: { value: '480' } });
+  fireEvent.click(screen.getByRole('button', { name: /바로 기록/ }));
+  await waitFor(() => expect(remove).toBeDisabled());
+  finish(new Response(JSON.stringify(oneEntry), { status: 201 }));
+  await waitFor(() => expect(remove).toBeEnabled());
+});
+
+test('the next attempt clears the last error', async () => {
+  server({ body: emptyDay }, { body: { foods: [food] } }, { status: 201, body: oneEntry });
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  fireEvent.click(screen.getByRole('button', { name: '바로 기록' }));
+  await screen.findByRole('alert');
+  fireEvent.click(await searchFood());
+  await screen.findByText('버거집 치즈버거');
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('a slower older search does not replace a newer one', async () => {
+  const replies: ((response: Response) => void)[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
+      .mockImplementation(() => new Promise((resolve) => replies.push(resolve))),
+  );
+  render(<MealCard date={date} />);
+  const box = await screen.findByLabelText('음식 검색');
+  const form = box.closest('form')!;
+  fireEvent.submit(form);
+  fireEvent.submit(form);
+  await waitFor(() => expect(replies).toHaveLength(2));
+  replies[1](new Response(JSON.stringify({ foods: [food] })));
+  await screen.findByRole('button', { name: '버거집 치즈버거 추가' });
+  replies[0](new Response(JSON.stringify({ foods: [] })));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(screen.getByRole('button', { name: '버거집 치즈버거 추가' })).toBeInTheDocument();
+});
+
+test('a failed search removes results that would read as its answer', async () => {
+  server(
+    { body: emptyDay },
+    { body: { foods: [food] } },
+    { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+  );
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 검색');
+  await searchFood();
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  await screen.findByRole('alert');
+  expect(screen.queryByRole('button', { name: '버거집 치즈버거 추가' })).not.toBeInTheDocument();
+});
+
 test('searching with no match points to direct entry', async () => {
   server({ body: emptyDay }, { body: { foods: [] } });
   render(<MealCard date={date} />);
@@ -212,7 +304,7 @@ test('a failed search says why', async () => {
 test('deleting asks first, updates the totals, and returns focus to the card', async () => {
   const fetchMock = server({ body: oneEntry }, { body: emptyDay });
   render(<MealCard date={date} />);
-  fireEvent.click(await screen.findByRole('button', { name: '치즈버거 삭제' }));
+  fireEvent.click(await screen.findByRole('button', { name: '버거집 치즈버거 삭제' }));
   expect(fetchMock).toHaveBeenCalledTimes(1);
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' }));
 
@@ -225,6 +317,37 @@ test('deleting asks first, updates the totals, and returns focus to the card', a
   await waitFor(() => expect(screen.getByText('식단').parentElement).toHaveFocus());
 });
 
+test('cancelling a delete returns focus to its own button', async () => {
+  server({ body: oneEntry });
+  render(<MealCard date={date} />);
+  const remove = await screen.findByRole('button', { name: '버거집 치즈버거 삭제' });
+  remove.focus();
+  fireEvent.click(remove);
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '취소' }));
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: '버거집 치즈버거 삭제' })).toHaveFocus(),
+  );
+});
+
+test('an entry gone but the day unreadable does not claim success, and offers another try', async () => {
+  const shown = vi.spyOn(toast, 'success');
+  server(
+    { body: oneEntry },
+    { status: 404, body: { error: '식사 기록을 찾을 수 없습니다' } },
+    { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+    { body: emptyDay },
+  );
+  render(<MealCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: '버거집 치즈버거 삭제' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  expect(shown).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+  expect(await screen.findByText('아직 기록한 식사가 없습니다.')).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  shown.mockRestore();
+});
+
 test('an entry already gone counts as deleted and the day is read again', async () => {
   const fetchMock = server(
     { body: oneEntry },
@@ -232,7 +355,7 @@ test('an entry already gone counts as deleted and the day is read again', async 
     { body: emptyDay },
   );
   render(<MealCard date={date} />);
-  fireEvent.click(await screen.findByRole('button', { name: '치즈버거 삭제' }));
+  fireEvent.click(await screen.findByRole('button', { name: '버거집 치즈버거 삭제' }));
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' }));
   expect(await screen.findByText('아직 기록한 식사가 없습니다.')).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -242,7 +365,7 @@ test('a failed delete says why and keeps the entry and the dialog', async () => 
   const shown = vi.spyOn(toast, 'error');
   server({ body: oneEntry }, { status: 500, body: { error: '서버 오류가 발생했습니다' } });
   render(<MealCard date={date} />);
-  fireEvent.click(await screen.findByRole('button', { name: '치즈버거 삭제' }));
+  fireEvent.click(await screen.findByRole('button', { name: '버거집 치즈버거 삭제' }));
   const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' });
   fireEvent.click(confirm);
   await waitFor(() => expect(confirm).toBeEnabled());

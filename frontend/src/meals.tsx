@@ -9,6 +9,7 @@ import { Label } from './components/ui/label';
 import { Notice } from './components/ui/notice';
 import { SkeletonText } from './components/ui/skeleton';
 import { toast } from './components/ui/sonner';
+import { Spinner } from './components/ui/spinner';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
 
@@ -57,6 +58,9 @@ type FoodOption = {
 
 const pathOf = (date: string) => `/api/meals/${date}`;
 
+const fullName = ({ brand, name }: { brand: string | null; name: string }) =>
+  brand ? `${brand} ${name}` : name;
+
 const hasTwoDecimalsAtMost = (value: number) => Number(value.toFixed(2)) === value;
 
 function Totals({ totals }: { totals: MealDay['totals'] }) {
@@ -83,11 +87,11 @@ function Totals({ totals }: { totals: MealDay['totals'] }) {
 
 function EntryRow({
   entry,
-  returnFocus,
+  disabled,
   onDelete,
 }: {
   entry: Entry;
-  returnFocus: React.RefObject<HTMLElement | null>;
+  disabled: boolean;
   onDelete: () => Promise<unknown>;
 }) {
   const serving =
@@ -95,10 +99,7 @@ function EntryRow({
   return (
     <li className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
       <div className="flex min-w-0 flex-col">
-        <span className="wrap-anywhere">
-          {entry.brand ? `${entry.brand} ` : ''}
-          {entry.name}
-        </span>
+        <span className="wrap-anywhere">{fullName(entry)}</span>
         <span className="text-caption text-muted-foreground">
           {entry.servings}회분{serving} ·{' '}
           {entry.calories === null ? '칼로리 값 없음' : `${entry.calories}kcal`}
@@ -108,9 +109,13 @@ function EntryRow({
         title="식사 기록을 삭제할까요?"
         description={<span className="wrap-anywhere">{`'${entry.name}' 기록을 지웁니다.`}</span>}
         onConfirm={onDelete}
-        returnFocusRef={returnFocus}
         trigger={
-          <Button variant="ghost" size="icon" aria-label={`${entry.name} 삭제`}>
+          <Button
+            variant="ghost"
+            size="icon"
+            disabled={disabled}
+            aria-label={`${fullName(entry)} 삭제`}
+          >
             <Trash2 aria-hidden />
           </Button>
         }
@@ -133,6 +138,7 @@ function AddEntry({
   const [searching, setSearching] = useState(false);
   const [name, setName] = useState('');
   const [calories, setCalories] = useState('');
+  const [pending, setPending] = useState<number | 'typed' | null>(null);
   const { notice, error, clear } = useNotice();
   const latestSearch = useRef(0);
   const servingsInput = useRef<HTMLInputElement>(null);
@@ -163,7 +169,11 @@ function AddEntry({
       );
       if (request === latestSearch.current) setFoods(data.foods);
     } catch (cause) {
-      if (request === latestSearch.current) error(cause);
+      if (request === latestSearch.current) {
+        // Earlier results would read as the answer to this search.
+        setFoods(null);
+        error(cause);
+      }
     } finally {
       if (request === latestSearch.current) setSearching(false);
     }
@@ -173,7 +183,9 @@ function AddEntry({
     const value = readServings();
     if (value === null) return;
     clear();
+    setPending(food.id);
     await onAdd({ meal, servings: value, foodId: food.id }).catch((cause: unknown) => error(cause));
+    setPending(null);
   };
 
   const addTyped = async (event: FormEvent<HTMLFormElement>) => {
@@ -189,14 +201,18 @@ function AddEntry({
       return;
     }
     clear();
+    setPending('typed');
     try {
       const added = await onAdd({ meal, servings: value, name, calories: Number(calories) });
       if (added) {
-        setName('');
-        setCalories('');
+        // Anything typed while waiting is the next entry, not this one.
+        setName((current) => (current === name ? '' : current));
+        setCalories((current) => (current === calories ? '' : current));
       }
     } catch (cause) {
       error(cause);
+    } finally {
+      setPending(null);
     }
   };
 
@@ -252,10 +268,7 @@ function AddEntry({
           {foods.map((food) => (
             <li key={food.id} className="flex items-center justify-between gap-3 py-2">
               <div className="flex min-w-0 flex-col">
-                <span className="wrap-anywhere">
-                  {food.brand ? `${food.brand} ` : ''}
-                  {food.name}
-                </span>
+                <span className="wrap-anywhere">{fullName(food)}</span>
                 <span className="text-caption text-muted-foreground">
                   1회 {food.servingSize}
                   {food.servingUnit} ·{' '}
@@ -266,9 +279,11 @@ function AddEntry({
                 variant="outline"
                 size="sm"
                 disabled={adding}
-                aria-label={`${food.name} 추가`}
+                aria-busy={pending === food.id || undefined}
+                aria-label={`${fullName(food)} 추가`}
                 onClick={() => void addFood(food)}
               >
+                {pending === food.id ? <Spinner size="sm" label="기록하는 중" /> : null}
                 추가
               </Button>
             </li>
@@ -296,7 +311,14 @@ function AddEntry({
             />
           </div>
         </div>
-        <Button type="submit" variant="outline" className="self-start" disabled={adding}>
+        <Button
+          type="submit"
+          variant="outline"
+          className="self-start"
+          disabled={adding}
+          aria-busy={pending === 'typed' || undefined}
+        >
+          {pending === 'typed' ? <Spinner size="sm" label="기록하는 중" /> : null}
           바로 기록
         </Button>
       </form>
@@ -309,16 +331,20 @@ export function MealCard({ date }: { date: string }) {
   const [day, setDay] = useState<MealDay | null>(null);
   const [adding, setAdding] = useState(false);
   const { notice, error, clear } = useNotice();
+  const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLDivElement>(null);
   const live = useRef(true);
 
+  /** Resolves to whether the day could be read. */
   const load = useCallback(async () => {
     clear();
     try {
       const data = await requestJson<MealDay>(pathOf(date));
       if (live.current) setDay(data);
+      return true;
     } catch (cause) {
       if (live.current) error(cause);
+      return false;
     }
   }, [clear, date, error]);
 
@@ -330,6 +356,13 @@ export function MealCard({ date }: { date: string }) {
     };
   }, [load]);
 
+  // The delete button is gone by now, and a closing dialog restores focus on a timer first.
+  useEffect(() => {
+    if (!moveFocus) return;
+    const timer = setTimeout(() => heading.current?.focus(), 0);
+    return () => clearTimeout(timer);
+  }, [moveFocus]);
+
   /** Resolves to whether it was added; a failure rejects so the form can show it next to its fields. */
   const add = async (body: object) => {
     setAdding(true);
@@ -337,6 +370,8 @@ export function MealCard({ date }: { date: string }) {
       const data = await requestJson<MealDay>(pathOf(date), { method: 'POST', body });
       if (!live.current) return false;
       setDay(data);
+      // What this answers replaces whatever an earlier failed read left on screen.
+      clear();
       toast.success('기록했습니다');
       return true;
     } catch (cause) {
@@ -362,13 +397,14 @@ export function MealCard({ date }: { date: string }) {
         throw cause;
       }
       // Already gone counts as deleted, but the list and totals are out of date.
-      if (live.current) await load();
+      if (live.current && !(await load())) return;
     }
     toast.success('삭제했습니다');
+    setMoveFocus((count) => count + 1);
   };
 
   return (
-    <Card className="md:col-span-2">
+    <Card>
       <CardHeader>
         <div ref={heading} tabIndex={-1} className="outline-none">
           <CardTitle asHeading="h2">식단</CardTitle>
@@ -376,7 +412,7 @@ export function MealCard({ date }: { date: string }) {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <Notice notice={notice} />
-        {notice && !day ? (
+        {notice ? (
           <Button variant="outline" className="self-start" onClick={() => void load()}>
             다시 시도
           </Button>
@@ -404,7 +440,7 @@ export function MealCard({ date }: { date: string }) {
                           <EntryRow
                             key={entry.id}
                             entry={entry}
-                            returnFocus={heading}
+                            disabled={adding}
                             onDelete={() => remove(entry.id)}
                           />
                         ))}

@@ -15,7 +15,16 @@ const skip =
 
 const prefix = 'meal-test-';
 // Far from any real record; each test keeps to its own day.
-const days = ['1991-01-01', '1991-01-02', '1991-01-03', '1991-01-04', '1991-01-05', '1991-01-06'];
+const days = [
+  '1991-01-01',
+  '1991-01-02',
+  '1991-01-03',
+  '1991-01-04',
+  '1991-01-05',
+  '1991-01-06',
+  '1991-01-07',
+  '1991-01-08',
+];
 
 type Total = { value: number | null; missing: number };
 type Day = {
@@ -42,12 +51,12 @@ after(async () => {
   await pool.end();
 });
 
-const addFood = async (name: string, nutrients: Record<string, number> = {}) => {
+const addFood = async (name: string, nutrients: Record<string, number> = {}, brand?: string) => {
   let id = 0;
   await withApi(pool, async (call) => {
     const { data } = await call('/api/foods', {
       method: 'POST',
-      body: { name: `${prefix}${name}`, servingSize: 100, servingUnit: 'g', ...nutrients },
+      body: { name: `${prefix}${name}`, brand, servingSize: 100, servingUnit: 'g', ...nutrients },
     });
     id = Number(data.id);
   });
@@ -93,7 +102,7 @@ test('1.5 servings count exactly in calories and every nutrient', { skip }, asyn
 });
 
 test('editing a food later leaves past days as they were', { skip }, async () => {
-  const foodId = await addFood('edited', { calories: 200, protein: 10 });
+  const foodId = await addFood('edited', { calories: 200, protein: 10 }, 'snapshot-brand');
   await withApi(pool, async (call) => {
     await call(`/api/meals/${days[2]}`, {
       method: 'POST',
@@ -108,6 +117,8 @@ test('editing a food later leaves past days as they were', { skip }, async () =>
     const { data } = await call(`/api/meals/${days[2]}`);
     const day = data as unknown as Day;
     assert.equal(day.entries[0]!.name, `${prefix}edited`);
+    assert.equal(day.entries[0]!.brand, 'snapshot-brand');
+    assert.equal(day.entries[0]!.foodId, foodId);
     assert.equal(day.entries[0]!.servingSize, 100);
     assert.equal(day.entries[0]!.servingUnit, 'g');
     assert.deepEqual(day.totals.calories, { value: 400, missing: 0 });
@@ -133,6 +144,42 @@ test('an unknown nutrient is counted as missing, and a known zero is not', { ski
     assert.deepEqual(day.totals.calories, { value: 1060, missing: 0 });
     assert.deepEqual(day.totals.sodium, { value: 0, missing: 1 });
     assert.deepEqual(day.totals.protein, { value: null, missing: 2 });
+  });
+});
+
+test('the totals add up the rows as shown, in the order recorded', { skip }, async () => {
+  await withApi(pool, async (call) => {
+    const path = `/api/meals/${days[6]}`;
+    let day = {} as Day;
+    for (const name of ['첫째', '둘째', '셋째']) {
+      const { data } = await call(path, {
+        method: 'POST',
+        body: { meal: 'snack', servings: 1.5, name, calories: 83.33 },
+      });
+      day = data as unknown as Day;
+    }
+    assert.deepEqual(
+      day.entries.map((entry) => [entry.name, entry.calories]),
+      [
+        ['첫째', 125],
+        ['둘째', 125],
+        ['셋째', 125],
+      ],
+    );
+    assert.deepEqual(day.totals.calories, { value: 375, missing: 0 });
+  });
+});
+
+test('removing a food keeps what was eaten', { skip }, async () => {
+  const foodId = await addFood('removed', { calories: 100 });
+  await withApi(pool, async (call) => {
+    const path = `/api/meals/${days[7]}`;
+    await call(path, { method: 'POST', body: { meal: 'lunch', servings: 1, foodId } });
+    await pool.query('DELETE FROM foods WHERE id = $1', [foodId]);
+    const day = (await call(path)).data as unknown as Day;
+    assert.equal(day.entries[0]!.foodId, null);
+    assert.equal(day.entries[0]!.name, `${prefix}removed`);
+    assert.deepEqual(day.totals.calories, { value: 100, missing: 0 });
   });
 });
 

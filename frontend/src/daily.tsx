@@ -122,7 +122,7 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
           </Button>
         ) : null}
       </nav>
-      <div className="grid gap-4 md:grid-flow-dense md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <SleepCard key={date} date={date} />
         <MealCard key={`meal-${date}`} date={date} />
         {sections.map((title) => (

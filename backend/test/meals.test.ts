@@ -57,6 +57,44 @@ test('an entry is either a chosen food or a typed name with calories', async () 
   await rejects(path, { ...typed, calories: -1 }, '칼로리는 0 이상이어야 합니다');
 });
 
+test('typed entries have limits of their own', async () => {
+  await rejects(
+    path,
+    { ...typed, name: 'a'.repeat(101) },
+    '음식 이름은 100자 이하로 입력해 주세요',
+  );
+  await rejects(path, { ...typed, calories: 100_000 }, '칼로리가 너무 큽니다');
+  await rejects(path, { ...typed, calories: 1.555 }, '칼로리는 소수 둘째 자리까지 입력해 주세요');
+});
+
+test('an entry whose answer cannot be read is rolled back, so a retry cannot double it', async () => {
+  const statements: string[] = [];
+  let released = false;
+  const client = {
+    query: async (sql: string) => {
+      statements.push(sql.trim().split(/\s+/)[0]!);
+      if (sql.includes('WITH eaten')) throw new Error('read failed');
+      return { rows: [], rowCount: 1 };
+    },
+    release: () => {
+      released = true;
+    },
+  };
+  const pool = { connect: async () => client } as unknown as Pool;
+  const original = console.error;
+  console.error = () => {};
+  try {
+    await withApi(pool, async (call) => {
+      const { status } = await call(path, { method: 'POST', body: typed });
+      assert.equal(status, 500);
+    });
+  } finally {
+    console.error = original;
+  }
+  assert.deepEqual(statements, ['BEGIN', 'INSERT', 'WITH', 'ROLLBACK']);
+  assert.equal(released, true);
+});
+
 test('a food id too large to be exact is rejected', async () => {
   await rejects(path, { ...fromFood, foodId: 2 ** 53 }, '음식이 올바르지 않습니다');
 });
@@ -67,9 +105,7 @@ test('a date in the path has to exist', async () => {
 });
 
 test('the meals API is rate limited', async () => {
-  const pool = {
-    query: async () => ({ rows: [{}] }),
-  } as unknown as Pool;
+  const pool = { query: async () => ({ rows: [] }) } as unknown as Pool;
   await withApi(
     pool,
     async (call) => {

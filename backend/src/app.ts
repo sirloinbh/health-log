@@ -4,6 +4,7 @@ import { types } from 'pg';
 
 import { foodsRouter } from './foods.js';
 import { defaultRateLimit, type RateLimitSettings } from './rate-limit.js';
+import { sleepRouter } from './sleep.js';
 import { errorHandler, notFound } from './standard/http.js';
 
 // DATE columns stay YYYY-MM-DD strings so the service time zone never shifts them.
@@ -35,6 +36,7 @@ export function createApp(
   });
   // Not on health, so monitoring still answers while a client is being limited.
   app.use('/api/foods', foodsRouter(pool, today, options.rateLimit ?? defaultRateLimit));
+  app.use('/api/sleep', sleepRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api', notFound);
   app.use(errorHandler);
   return app;

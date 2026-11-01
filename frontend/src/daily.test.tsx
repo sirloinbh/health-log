@@ -1,12 +1,18 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
 
+const noSleep = () => new Response(JSON.stringify({ record: null }));
+
 const health = (body: object, status = 200) =>
   vi.stubGlobal(
     'fetch',
-    vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))),
+    vi.fn((url: string) =>
+      Promise.resolve(
+        url.startsWith('/api/sleep') ? noSleep() : new Response(JSON.stringify(body), { status }),
+      ),
+    ),
   );
 
 const open = (path: string) => {
@@ -125,12 +131,16 @@ test('returning to the tab checks today again', async () => {
 test('a slow older response does not overwrite a newer today', async () => {
   const respond = (today: string) => new Response(JSON.stringify({ today }));
   let finishFirst = (_response: Response) => {};
+  let healthCalls = 0;
   vi.stubGlobal(
     'fetch',
-    vi
-      .fn()
-      .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)))
-      .mockImplementation(() => Promise.resolve(respond('2026-03-16'))),
+    vi.fn((url: string) => {
+      if (url.startsWith('/api/sleep')) return Promise.resolve(noSleep());
+      healthCalls += 1;
+      return healthCalls === 1
+        ? new Promise((resolve) => (finishFirst = resolve))
+        : Promise.resolve(respond('2026-03-16'));
+    }),
   );
   open('/daily/2026-03-16');
   fireEvent(document, new Event('visibilitychange'));
@@ -207,6 +217,62 @@ test('typing a date leaves one history entry and blur starts a new one', () => {
   fireEvent.blur(input);
   fireEvent.change(input, { target: { value: '2026-12-26' } });
   expect(window.history.length).toBe(before + 2);
+});
+
+test('each day loads its own sleep record', async () => {
+  const fetchMock = vi.fn((url: string) =>
+    Promise.resolve(
+      url.startsWith('/api/sleep')
+        ? noSleep()
+        : new Response(JSON.stringify({ today: '2026-03-15' })),
+    ),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  open('/daily/2026-03-15');
+  await screen.findByLabelText('취침 시각');
+  fireEvent.click(screen.getByRole('link', { name: '다음 날' }));
+  await screen.findByText('2026년 3월 16일 월요일');
+  await screen.findByLabelText('취침 시각');
+  const sleepCalls = fetchMock.mock.calls
+    .map(([url]) => url)
+    .filter((url) => url.startsWith('/api/sleep'));
+  expect(sleepCalls).toEqual(['/api/sleep/2026-03-15', '/api/sleep/2026-03-16']);
+});
+
+test('a slow reply for the day just left does not fill in the new day', async () => {
+  const replies = new Map<string, (response: Response) => void>();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) =>
+      url.startsWith('/api/sleep')
+        ? new Promise((resolve) => replies.set(url, resolve))
+        : Promise.resolve(new Response(JSON.stringify({ today: '2026-03-15' }))),
+    ),
+  );
+  open('/daily/2026-03-15');
+  await waitFor(() => expect(replies.has('/api/sleep/2026-03-15')).toBe(true));
+  fireEvent.click(screen.getByRole('link', { name: '다음 날' }));
+  await screen.findByText('2026년 3월 16일 월요일');
+  await waitFor(() => expect(replies.has('/api/sleep/2026-03-16')).toBe(true));
+
+  replies.get('/api/sleep/2026-03-16')?.(noSleep());
+  await screen.findByLabelText('취침 시각');
+  replies.get('/api/sleep/2026-03-15')?.(
+    new Response(
+      JSON.stringify({
+        record: {
+          date: '2026-03-15',
+          bedAt: '2026-03-14T14:30:00.000Z',
+          wakeAt: '2026-03-14T22:00:00.000Z',
+          durationMinutes: 450,
+          source: 'manual',
+        },
+      }),
+    ),
+  );
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  expect(screen.queryByText('7시간 30분')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('취침 시각')).toHaveValue('');
 });
 
 test('a day shows a place for each record kind', () => {

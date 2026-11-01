@@ -107,7 +107,9 @@ function EntryRow({
       </div>
       <ConfirmDialog
         title="식사 기록을 삭제할까요?"
-        description={<span className="wrap-anywhere">{`'${entry.name}' 기록을 지웁니다.`}</span>}
+        description={
+          <span className="wrap-anywhere">{`'${fullName(entry)}' 기록을 지웁니다.`}</span>
+        }
         onConfirm={onDelete}
         trigger={
           <Button
@@ -139,20 +141,28 @@ function AddEntry({
   const [name, setName] = useState('');
   const [calories, setCalories] = useState('');
   const [pending, setPending] = useState<number | 'typed' | null>(null);
-  const { notice, error, clear } = useNotice();
+  // A long result list sits between the two forms, so each shows its errors next to its own buttons.
+  const { notice: listNotice, error: listError, clear: clearList } = useNotice();
+  const { notice: typedNotice, error: typedError, clear: clearTyped } = useNotice();
   const latestSearch = useRef(0);
   const servingsInput = useRef<HTMLInputElement>(null);
   const caloriesInput = useRef<HTMLInputElement>(null);
 
-  const readServings = () => {
+  const clear = () => {
+    clearList();
+    clearTyped();
+  };
+
+  const readServings = (showError: (message: string) => void) => {
+    clear();
     // A number field reports "" for unreadable text such as "1,5".
     const value = Number(servings);
     if (servingsInput.current?.validity.badInput || servings.trim() === '' || !(value > 0)) {
-      error('수량을 0보다 큰 숫자로 입력해 주세요');
+      showError('수량을 0보다 큰 숫자로 입력해 주세요');
       return null;
     }
     if (!hasTwoDecimalsAtMost(value)) {
-      error('수량은 소수 둘째 자리까지 입력해 주세요');
+      showError('수량은 소수 둘째 자리까지 입력해 주세요');
       return null;
     }
     return value;
@@ -172,7 +182,7 @@ function AddEntry({
       if (request === latestSearch.current) {
         // Earlier results would read as the answer to this search.
         setFoods(null);
-        error(cause);
+        listError(cause);
       }
     } finally {
       if (request === latestSearch.current) setSearching(false);
@@ -180,27 +190,27 @@ function AddEntry({
   };
 
   const addFood = async (food: FoodOption) => {
-    const value = readServings();
+    const value = readServings(listError);
     if (value === null) return;
-    clear();
     setPending(food.id);
-    await onAdd({ meal, servings: value, foodId: food.id }).catch((cause: unknown) => error(cause));
+    await onAdd({ meal, servings: value, foodId: food.id }).catch((cause: unknown) =>
+      listError(cause),
+    );
     setPending(null);
   };
 
   const addTyped = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const value = readServings();
+    const value = readServings(typedError);
     if (value === null) return;
     if (!name.trim()) {
-      error('음식 이름을 입력해 주세요');
+      typedError('음식 이름을 입력해 주세요');
       return;
     }
     if (caloriesInput.current?.validity.badInput || calories.trim() === '') {
-      error('칼로리를 숫자로 입력해 주세요');
+      typedError('칼로리를 숫자로 입력해 주세요');
       return;
     }
-    clear();
     setPending('typed');
     try {
       const added = await onAdd({ meal, servings: value, name, calories: Number(calories) });
@@ -210,7 +220,7 @@ function AddEntry({
         setCalories((current) => (current === calories ? '' : current));
       }
     } catch (cause) {
-      error(cause);
+      typedError(cause);
     } finally {
       setPending(null);
     }
@@ -245,7 +255,6 @@ function AddEntry({
           onChange={(event) => setServings(event.target.value)}
         />
       </div>
-      <Notice notice={notice} />
       <form role="search" onSubmit={(event) => void search(event)} className="flex gap-2">
         <Input
           type="search"
@@ -254,17 +263,27 @@ function AddEntry({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <Button type="submit" variant="outline" disabled={searching}>
+        <Button
+          type="submit"
+          variant="outline"
+          disabled={searching}
+          aria-busy={searching || undefined}
+        >
+          {searching ? <Spinner size="sm" label="검색하는 중" /> : null}
           검색
         </Button>
       </form>
-      {foods?.length === 0 ? (
-        <p role="status" className="text-body-sm break-keep text-muted-foreground">
-          찾는 음식이 없습니다. 아래에 이름과 칼로리를 바로 적을 수 있습니다.
-        </p>
-      ) : null}
+      <Notice notice={listNotice} />
+      {/* Always in the page: a status region added along with its text may not be read out. */}
+      <p role="status" className="text-body-sm break-keep text-muted-foreground empty:hidden">
+        {foods === null
+          ? null
+          : foods.length === 0
+            ? '찾는 음식이 없습니다. 아래에 이름과 칼로리를 바로 적을 수 있습니다.'
+            : `검색 결과 ${foods.length}건`}
+      </p>
       {foods?.length ? (
-        <ul aria-label="검색 결과" className="flex flex-col divide-y">
+        <ul aria-label="검색 결과" className="flex max-h-80 flex-col divide-y overflow-y-auto">
           {foods.map((food) => (
             <li key={food.id} className="flex items-center justify-between gap-3 py-2">
               <div className="flex min-w-0 flex-col">
@@ -311,6 +330,7 @@ function AddEntry({
             />
           </div>
         </div>
+        <Notice notice={typedNotice} />
         <Button
           type="submit"
           variant="outline"
@@ -334,16 +354,20 @@ export function MealCard({ date }: { date: string }) {
   const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLDivElement>(null);
   const live = useRef(true);
+  // Counts changes the server has answered, so a read started before one cannot undo it on screen.
+  const changes = useRef(0);
 
   /** Resolves to whether the day could be read. */
   const load = useCallback(async () => {
     clear();
+    const seen = changes.current;
+    const stillCurrent = () => live.current && seen === changes.current;
     try {
       const data = await requestJson<MealDay>(pathOf(date));
-      if (live.current) setDay(data);
+      if (stillCurrent()) setDay(data);
       return true;
     } catch (cause) {
-      if (live.current) error(cause);
+      if (stillCurrent()) error(cause);
       return false;
     }
   }, [clear, date, error]);
@@ -368,16 +392,23 @@ export function MealCard({ date }: { date: string }) {
     setAdding(true);
     try {
       const data = await requestJson<MealDay>(pathOf(date), { method: 'POST', body });
-      if (!live.current) return false;
+      changes.current += 1;
+      if (!live.current) {
+        toast.success(`${date} 식사를 기록했습니다`);
+        return false;
+      }
       setDay(data);
       // What this answers replaces whatever an earlier failed read left on screen.
       clear();
       toast.success('기록했습니다');
       return true;
     } catch (cause) {
-      // Moving to another day removes the form, and the food still was not recorded.
       if (live.current) throw cause;
-      toast.error(`${date} 식사를 기록하지 못했습니다: ${errorText(cause)}`);
+      // Moving to another day removes the form. With no answer, the server may still have saved it.
+      const unanswered = cause instanceof RequestError && cause.status === undefined;
+      toast.error(
+        `${date} 식사를 ${unanswered ? '기록했는지 확인하지 못했습니다' : '기록하지 못했습니다'}: ${errorText(cause)}`,
+      );
       return false;
     } finally {
       if (live.current) setAdding(false);
@@ -389,6 +420,7 @@ export function MealCard({ date }: { date: string }) {
       const data = await requestJson<MealDay>(`${pathOf(date)}/entries/${id}`, {
         method: 'DELETE',
       });
+      changes.current += 1;
       if (live.current) setDay(data);
     } catch (cause) {
       if (!(cause instanceof RequestError && cause.status === 404)) {
@@ -413,7 +445,15 @@ export function MealCard({ date }: { date: string }) {
       <CardContent className="flex flex-col gap-4">
         <Notice notice={notice} />
         {notice ? (
-          <Button variant="outline" className="self-start" onClick={() => void load()}>
+          <Button
+            variant="outline"
+            className="self-start"
+            onClick={() => {
+              void load();
+              // Trying again removes this button, which would drop keyboard focus to the page.
+              setMoveFocus((count) => count + 1);
+            }}
+          >
             다시 시도
           </Button>
         ) : null}

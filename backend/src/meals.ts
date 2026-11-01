@@ -58,7 +58,6 @@ const entryInput = z
 
 type EntryRow = {
   id: string;
-  entry_date: string;
   meal: string;
   food_id: string | null;
   name: string;

@@ -384,6 +384,163 @@ test('a failed load offers another try, with no form to record into an unseen da
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
+test('each form shows its errors next to its own buttons', async () => {
+  server({ body: emptyDay }, { body: { foods: [food] } });
+  render(<MealCard date={date} />);
+  const typedForm = (await screen.findByLabelText('음식 이름')).closest('form')!;
+  fireEvent.click(screen.getByRole('button', { name: '바로 기록' }));
+  expect(within(typedForm).getByRole('alert')).toHaveTextContent('음식 이름을 입력해 주세요');
+
+  fireEvent.change(screen.getByLabelText('수량 (1회 제공량 기준)'), { target: { value: '0' } });
+  fireEvent.click(await searchFood());
+  const shown = await screen.findByRole('alert');
+  expect(shown).toHaveTextContent('수량을 0보다 큰 숫자로 입력해 주세요');
+  expect(typedForm).not.toContainElement(shown);
+  expect(shown.compareDocumentPosition(screen.getByRole('list', { name: '검색 결과' }))).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING,
+  );
+});
+
+test('a searched food the server refuses says why and can be tried again', async () => {
+  server(
+    { body: emptyDay },
+    { body: { foods: [food] } },
+    { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+  );
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 검색');
+  const add = await searchFood();
+  fireEvent.click(add);
+  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  await waitFor(() => expect(add).toBeEnabled());
+});
+
+test('a search says how many it found', async () => {
+  server({ body: emptyDay }, { body: { foods: [food] } });
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 검색');
+  await searchFood();
+  expect(screen.getByText('검색 결과 1건')).toHaveAttribute('role', 'status');
+});
+
+test('a search in progress shows that it is working', async () => {
+  let finish = (_response: Response) => {};
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
+      .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve))),
+  );
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 검색');
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  expect(await screen.findByRole('status', { name: '검색하는 중' })).toBeInTheDocument();
+  finish(new Response(JSON.stringify({ foods: [] })));
+  await waitFor(() =>
+    expect(screen.queryByRole('status', { name: '검색하는 중' })).not.toBeInTheDocument(),
+  );
+});
+
+test('the delete question names the brand, as two entries can differ only by it', async () => {
+  server({ body: oneEntry });
+  render(<MealCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: '버거집 치즈버거 삭제' }));
+  expect(within(screen.getByRole('dialog')).getByText(/'버거집 치즈버거' 기록을/)).toBeVisible();
+});
+
+test('a read started before an entry was recorded does not undo it on screen', async () => {
+  let finishRead = (_response: Response) => {};
+  const added = {
+    entries: [entry, { ...entry, id: 2, name: '떡볶이', brand: null }],
+    totals: emptyTotals,
+  };
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(oneEntry)))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: '식사 기록을 찾을 수 없습니다' }), { status: 404 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: '서버 오류가 발생했습니다' }), { status: 500 }),
+      )
+      .mockImplementationOnce(() => new Promise((resolve) => (finishRead = resolve)))
+      .mockResolvedValueOnce(new Response(JSON.stringify(added), { status: 201 })),
+  );
+  render(<MealCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: '버거집 치즈버거 삭제' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' }));
+  await screen.findByRole('alert');
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+
+  fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '떡볶이' } });
+  fireEvent.change(screen.getByLabelText('1회 칼로리 (kcal)'), { target: { value: '480' } });
+  fireEvent.click(screen.getByRole('button', { name: '바로 기록' }));
+  expect(await screen.findByRole('button', { name: '떡볶이 삭제' })).toBeInTheDocument();
+
+  finishRead(new Response(JSON.stringify(oneEntry)));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(screen.getByRole('button', { name: '떡볶이 삭제' })).toBeInTheDocument();
+});
+
+test('trying again moves focus to the card, as the button it was on goes away', async () => {
+  server({ status: 500, body: { error: '서버 오류가 발생했습니다' } }, { body: oneEntry });
+  render(<MealCard date={date} />);
+  const again = await screen.findByRole('button', { name: '다시 시도' });
+  again.focus();
+  fireEvent.click(again);
+  await screen.findByText('버거집 치즈버거');
+  await waitFor(() => expect(screen.getByText('식단').parentElement).toHaveFocus());
+});
+
+test('recording that succeeds after leaving the day still says so', async () => {
+  const shown = vi.spyOn(toast, 'success');
+  let finish = (_response: Response) => {};
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
+      .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve))),
+  );
+  const { unmount } = render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '떡볶이' } });
+  fireEvent.change(screen.getByLabelText('1회 칼로리 (kcal)'), { target: { value: '480' } });
+  fireEvent.click(screen.getByRole('button', { name: '바로 기록' }));
+  unmount();
+  finish(new Response(JSON.stringify(oneEntry), { status: 201 }));
+  await waitFor(() => expect(shown).toHaveBeenCalledWith('2026-03-15 식사를 기록했습니다'));
+  shown.mockRestore();
+});
+
+test('losing the answer after leaving the day does not claim it was not recorded', async () => {
+  const shown = vi.spyOn(toast, 'error');
+  let lose = (_cause: Error) => {};
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
+      .mockImplementationOnce(() => new Promise((_resolve, reject) => (lose = reject))),
+  );
+  const { unmount } = render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '떡볶이' } });
+  fireEvent.change(screen.getByLabelText('1회 칼로리 (kcal)'), { target: { value: '480' } });
+  fireEvent.click(screen.getByRole('button', { name: '바로 기록' }));
+  unmount();
+  lose(new TypeError('Failed to fetch'));
+  await waitFor(() =>
+    expect(shown).toHaveBeenCalledWith(
+      '2026-03-15 식사를 기록했는지 확인하지 못했습니다: 서버에 연결할 수 없습니다',
+    ),
+  );
+  shown.mockRestore();
+});
+
 test('recording that fails after leaving the day still says so', async () => {
   const shown = vi.spyOn(toast, 'error');
   let finish = (_response: Response) => {};

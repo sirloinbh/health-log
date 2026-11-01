@@ -67,7 +67,8 @@ test('typed entries have limits of their own', async () => {
   await rejects(path, { ...typed, calories: 1.555 }, '칼로리는 소수 둘째 자리까지 입력해 주세요');
 });
 
-test('an entry whose answer cannot be read is rolled back, so a retry cannot double it', async () => {
+// A change whose answer cannot be read must not stay, or a retry would repeat it.
+const rollsBack = async (target: string, method: 'POST' | 'DELETE', change: string) => {
   const statements: string[] = [];
   let released = false;
   const client = {
@@ -85,14 +86,25 @@ test('an entry whose answer cannot be read is rolled back, so a retry cannot dou
   console.error = () => {};
   try {
     await withApi(pool, async (call) => {
-      const { status } = await call(path, { method: 'POST', body: typed });
+      const { status } = await call(target, {
+        method,
+        body: method === 'POST' ? typed : undefined,
+      });
       assert.equal(status, 500);
     });
   } finally {
     console.error = original;
   }
-  assert.deepEqual(statements, ['BEGIN', 'INSERT', 'WITH', 'ROLLBACK']);
+  assert.deepEqual(statements, ['BEGIN', change, 'WITH', 'ROLLBACK']);
   assert.equal(released, true);
+};
+
+test('an entry whose answer cannot be read is rolled back, so a retry cannot double it', async () => {
+  await rollsBack(path, 'POST', 'INSERT');
+});
+
+test('a delete whose answer cannot be read is rolled back', async () => {
+  await rollsBack(`${path}/entries/1`, 'DELETE', 'DELETE');
 });
 
 test('a food id too large to be exact is rejected', async () => {

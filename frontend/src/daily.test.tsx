@@ -4,14 +4,28 @@ import { expect, test, vi } from 'vitest';
 import { App } from './app';
 
 const noSleep = () => new Response(JSON.stringify({ record: null }));
+const noMeals = () =>
+  new Response(
+    JSON.stringify({
+      entries: [],
+      totals: Object.fromEntries(
+        ['calories', 'carbs', 'protein', 'fat', 'sugars', 'sodium'].map((key) => [
+          key,
+          { value: null, missing: 0 },
+        ]),
+      ),
+    }),
+  );
+
+// The day's cards load along with the page.
+const dayCard = (url: string) =>
+  url.startsWith('/api/sleep') ? noSleep() : url.startsWith('/api/meals') ? noMeals() : null;
 
 const health = (body: object, status = 200) =>
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) =>
-      Promise.resolve(
-        url.startsWith('/api/sleep') ? noSleep() : new Response(JSON.stringify(body), { status }),
-      ),
+      Promise.resolve(dayCard(url) ?? new Response(JSON.stringify(body), { status })),
     ),
   );
 
@@ -135,7 +149,8 @@ test('a slow older response does not overwrite a newer today', async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) => {
-      if (url.startsWith('/api/sleep')) return Promise.resolve(noSleep());
+      const card = dayCard(url);
+      if (card) return Promise.resolve(card);
       healthCalls += 1;
       return healthCalls === 1
         ? new Promise((resolve) => (finishFirst = resolve))
@@ -221,11 +236,7 @@ test('typing a date leaves one history entry and blur starts a new one', () => {
 
 test('each day loads its own sleep record', async () => {
   const fetchMock = vi.fn((url: string) =>
-    Promise.resolve(
-      url.startsWith('/api/sleep')
-        ? noSleep()
-        : new Response(JSON.stringify({ today: '2026-03-15' })),
-    ),
+    Promise.resolve(dayCard(url) ?? new Response(JSON.stringify({ today: '2026-03-15' }))),
   );
   vi.stubGlobal('fetch', fetchMock);
   open('/daily/2026-03-15');
@@ -246,7 +257,7 @@ test('a slow reply for the day just left does not fill in the new day', async ()
     vi.fn((url: string) =>
       url.startsWith('/api/sleep')
         ? new Promise((resolve) => replies.set(url, resolve))
-        : Promise.resolve(new Response(JSON.stringify({ today: '2026-03-15' }))),
+        : Promise.resolve(dayCard(url) ?? new Response(JSON.stringify({ today: '2026-03-15' }))),
     ),
   );
   open('/daily/2026-03-15');
@@ -273,6 +284,42 @@ test('a slow reply for the day just left does not fill in the new day', async ()
   await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
   expect(screen.queryByText('7시간 30분')).not.toBeInTheDocument();
   expect(screen.getByLabelText('취침 시각')).toHaveValue('');
+});
+
+test('a slow meal reply for the day just left does not fill in the new day', async () => {
+  const replies = new Map<string, (response: Response) => void>();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) =>
+      url.startsWith('/api/meals')
+        ? new Promise((resolve) => replies.set(url, resolve))
+        : Promise.resolve(dayCard(url) ?? new Response(JSON.stringify({ today: '2026-03-15' }))),
+    ),
+  );
+  open('/daily/2026-03-15');
+  await waitFor(() => expect(replies.has('/api/meals/2026-03-15')).toBe(true));
+  fireEvent.click(screen.getByRole('link', { name: '다음 날' }));
+  await screen.findByText('2026년 3월 16일 월요일');
+  await waitFor(() => expect(replies.has('/api/meals/2026-03-16')).toBe(true));
+
+  replies.get('/api/meals/2026-03-16')?.(noMeals());
+  await screen.findByText('아직 기록한 식사가 없습니다.');
+  const eaten = {
+    id: 1,
+    meal: 'lunch',
+    name: '어제의 김밥',
+    brand: null,
+    servings: 1,
+    servingSize: null,
+    servingUnit: null,
+    calories: 300,
+  };
+  const body = (await noMeals().json()) as { totals: object };
+  replies.get('/api/meals/2026-03-15')?.(
+    new Response(JSON.stringify({ entries: [eaten], totals: body.totals })),
+  );
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  expect(screen.queryByText('어제의 김밥')).not.toBeInTheDocument();
 });
 
 test('a day shows a place for each record kind', () => {

@@ -3,7 +3,7 @@ import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
-import { isRealDate } from './dates.js';
+import { parseDate } from './dates.js';
 import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError, serviceDate } from './standard/http.js';
 
@@ -49,13 +49,6 @@ const toRecord = (row: SleepRow) => ({
   sleepScore: row.sleep_score,
   source: row.source,
 });
-
-const parseDate = (value: unknown) => {
-  if (typeof value !== 'string' || !isRealDate(value)) {
-    throw new HttpError(400, '날짜가 올바르지 않습니다');
-  }
-  return value;
-};
 
 export function sleepRouter(pool: Pool, limits: RateLimitSettings) {
   const router = Router();

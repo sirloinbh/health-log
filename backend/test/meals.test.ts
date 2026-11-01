@@ -1,0 +1,83 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+import type { Pool } from 'pg';
+
+import { withApi } from './helpers.js';
+
+const path = '/api/meals/2026-03-15';
+const fromFood = { meal: 'lunch', servings: 1.5, foodId: 7 };
+const typed = { meal: 'snack', servings: 1, name: '떡볶이', calories: 480 };
+
+// Rejected input must never reach the database.
+const rejects = async (target: string, body: object | undefined, message: string) => {
+  const queries: unknown[] = [];
+  const pool = {
+    query: async (...args: unknown[]) => {
+      queries.push(args);
+      return { rows: [] };
+    },
+  } as unknown as Pool;
+  await withApi(pool, async (call) => {
+    const { status, data } = await call(target, { method: body ? 'POST' : 'GET', body });
+    assert.equal(status, 400);
+    assert.equal(data.error, message);
+  });
+  assert.equal(queries.length, 0);
+};
+
+test('a meal has to be one of the four', async () => {
+  await rejects(path, { ...fromFood, meal: 'brunch' }, '끼니를 선택해 주세요');
+});
+
+test('a quantity must be positive, sane, and at most two decimals', async () => {
+  await rejects(path, { ...fromFood, servings: 0 }, '수량은 0보다 커야 합니다');
+  await rejects(path, { ...fromFood, servings: 1000 }, '수량이 너무 큽니다');
+  await rejects(path, { ...fromFood, servings: 1.555 }, '수량은 소수 둘째 자리까지 입력해 주세요');
+  await rejects(path, { meal: 'lunch', foodId: 7 }, '수량을 숫자로 입력해 주세요');
+});
+
+test('an entry is either a chosen food or a typed name with calories', async () => {
+  await rejects(
+    path,
+    { meal: 'lunch', servings: 1 },
+    '음식을 선택하거나 이름을 입력해 주세요, 직접 입력할 때는 칼로리가 필요합니다',
+  );
+  await rejects(
+    path,
+    { meal: 'lunch', servings: 1, name: '떡볶이' },
+    '직접 입력할 때는 칼로리가 필요합니다',
+  );
+  await rejects(
+    path,
+    { ...fromFood, name: '떡볶이' },
+    '음식 선택과 직접 입력은 함께 쓸 수 없습니다',
+  );
+  await rejects(path, { ...typed, name: '   ' }, '음식 이름을 입력해 주세요');
+  await rejects(path, { ...typed, calories: -1 }, '칼로리는 0 이상이어야 합니다');
+});
+
+test('a food id too large to be exact is rejected', async () => {
+  await rejects(path, { ...fromFood, foodId: 2 ** 53 }, '음식이 올바르지 않습니다');
+});
+
+test('a date in the path has to exist', async () => {
+  await rejects('/api/meals/2026-02-30', undefined, '날짜가 올바르지 않습니다');
+  await rejects('/api/meals/2026-02-30', typed, '날짜가 올바르지 않습니다');
+});
+
+test('the meals API is rate limited', async () => {
+  const pool = {
+    query: async () => ({ rows: [{}] }),
+  } as unknown as Pool;
+  await withApi(
+    pool,
+    async (call) => {
+      assert.equal((await call(path)).status, 200);
+      const limited = await call(path);
+      assert.equal(limited.status, 429);
+      assert.match(String(limited.data.error), /요청이 너무 많습니다/);
+    },
+    { rateLimit: { max: 1, windowMs: 60_000 } },
+  );
+});

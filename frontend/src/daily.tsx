@@ -8,9 +8,10 @@ import { Input } from './components/ui/input';
 import { Notice } from './components/ui/notice';
 import { formatDate, isValidDate, shiftDate } from './daily-date';
 import { type Health, healthText } from './health';
+import { SleepCard } from './sleep';
 
 // Each feature replaces its placeholder here as its issue lands.
-const sections = ['수면', '식단', '술·담배', '하루 체크', '병원·약'];
+const sections = ['식단', '술·담배', '하루 체크', '병원·약'];
 
 // Typing a year passes through values like 0002-10-31; those must not change the page.
 const earliestDate = '2000-01-01';
@@ -121,6 +122,7 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
         ) : null}
       </nav>
       <div className="grid gap-4 md:grid-cols-2">
+        <SleepCard key={date} date={date} />
         {sections.map((title) => (
           <Card key={title}>
             <CardHeader>

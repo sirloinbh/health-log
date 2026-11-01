@@ -26,7 +26,12 @@ export async function withApi(
         headers: init?.body === undefined ? undefined : { 'content-type': 'application/json' },
         body: init?.body === undefined ? undefined : JSON.stringify(init.body),
       });
-      return { status: response.status, data: (await response.json()) as Record<string, unknown> };
+      // A 204 has no body to read.
+      const text = await response.text();
+      return {
+        status: response.status,
+        data: (text ? JSON.parse(text) : {}) as Record<string, unknown>,
+      };
     });
   } finally {
     await new Promise<void>((resolve, reject) =>

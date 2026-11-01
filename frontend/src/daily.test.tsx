@@ -3,10 +3,16 @@ import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
 
+const noSleep = () => new Response(JSON.stringify({ record: null }));
+
 const health = (body: object, status = 200) =>
   vi.stubGlobal(
     'fetch',
-    vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))),
+    vi.fn((url: string) =>
+      Promise.resolve(
+        url.startsWith('/api/sleep') ? noSleep() : new Response(JSON.stringify(body), { status }),
+      ),
+    ),
   );
 
 const open = (path: string) => {
@@ -125,12 +131,16 @@ test('returning to the tab checks today again', async () => {
 test('a slow older response does not overwrite a newer today', async () => {
   const respond = (today: string) => new Response(JSON.stringify({ today }));
   let finishFirst = (_response: Response) => {};
+  let healthCalls = 0;
   vi.stubGlobal(
     'fetch',
-    vi
-      .fn()
-      .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)))
-      .mockImplementation(() => Promise.resolve(respond('2026-03-16'))),
+    vi.fn((url: string) => {
+      if (url.startsWith('/api/sleep')) return Promise.resolve(noSleep());
+      healthCalls += 1;
+      return healthCalls === 1
+        ? new Promise((resolve) => (finishFirst = resolve))
+        : Promise.resolve(respond('2026-03-16'));
+    }),
   );
   open('/daily/2026-03-16');
   fireEvent(document, new Event('visibilitychange'));
@@ -207,6 +217,26 @@ test('typing a date leaves one history entry and blur starts a new one', () => {
   fireEvent.blur(input);
   fireEvent.change(input, { target: { value: '2026-12-26' } });
   expect(window.history.length).toBe(before + 2);
+});
+
+test('each day loads its own sleep record', async () => {
+  const fetchMock = vi.fn((url: string) =>
+    Promise.resolve(
+      url.startsWith('/api/sleep')
+        ? noSleep()
+        : new Response(JSON.stringify({ today: '2026-03-15' })),
+    ),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  open('/daily/2026-03-15');
+  await screen.findByLabelText('취침 시각');
+  fireEvent.click(screen.getByRole('link', { name: '다음 날' }));
+  await screen.findByText('2026년 3월 16일 월요일');
+  await screen.findByLabelText('취침 시각');
+  const sleepCalls = fetchMock.mock.calls
+    .map(([url]) => url)
+    .filter((url) => url.startsWith('/api/sleep'));
+  expect(sleepCalls).toEqual(['/api/sleep/2026-03-15', '/api/sleep/2026-03-16']);
 });
 
 test('a day shows a place for each record kind', () => {

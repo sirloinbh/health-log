@@ -11,7 +11,7 @@
 
 - **DB:** `database/migrations/003_sleep_records.sql`. 날짜당 한 건이며 기본 키는 `sleep_date`다. 취침·기상은 `timestamptz`, 길이는 `duration_minutes`(중앙 규칙의 시점·기간 형식)로 저장한다. 수면 단계와 점수 칸은 #26의 저장 항목이며 #28 전까지 비어 있다. 값이 없으면 `NULL`이고 0이 아니다.
 - **API:** `backend/src/sleep.ts`. `GET`(없으면 `{ record: null }`), `PUT`(같은 날을 덮어씀), `DELETE`(없으면 404) `/api/sleep/:date`. 요청 횟수 제한은 음식 API와 같은 방식으로 걸었다.
-- **서버 검증:** 시각은 오프셋이 있는 ISO 8601만 받는다. 기상이 취침보다 늦어야 하고, 길이는 24시간 이하이며, 기상 날짜(서비스 시간대)가 경로의 날짜와 같아야 한다. DB는 기상이 취침보다 늦을 것, 24시간 이하일 것, `duration_minutes`의 범위만 강제한다. 날짜와 길이가 시각과 맞는지는 서버가 맡는다.
+- **서버 검증:** 시각은 오프셋이 있는 ISO 8601만 받는다. 기상이 취침보다 늦어야 하고, 길이는 24시간 이하이며, 기상 날짜(서비스 시간대)가 경로의 날짜와 같아야 한다. DB는 기상이 취침보다 늦을 것과 24시간 이하일 것, 각 칸의 값 범위를 강제한다. 기록 날짜와 `duration_minutes`가 시각과 맞는지는 서버가 맡는다.
 - **화면:** `frontend/src/sleep.tsx`. 하루 기록의 수면 칸을 입력·요약·수정·삭제 카드로 바꿨다. 불러오기에 실패하면 입력 폼을 숨겨, 보지 못한 기록을 덮어쓰지 않게 했다.
 - **정리:** 날짜 판정 `isRealDate`를 `backend/src/dates.ts`로 옮겨 함께 쓴다. 테스트 도우미 `withApi`가 본문 없는 204를 읽을 수 있게 고쳤다.
 
@@ -44,12 +44,18 @@
 - **DB 제약:** 24시간 제한을 DB에도 더했다. 문서의 "같은 제약" 표현은 실제에 맞게 고쳤다.
 - **화면 규칙:** 저장 버튼에 공통 `Spinner`를 쓰고, 미리 보기의 `aria-live` 영역을 항상 두었다.
 
+## 2차 리뷰 보완 — 2026-11-01
+
+- **24시간을 몇 초 넘는 입력의 500:** 1차 보완에서 넣은 DB 제약은 정확한 길이를, 서버는 반올림한 분을 봐서 24시간 20초가 500이 됐다. 서버도 정확한 길이로 판정한다. 30초 미만의 수면은 "1분 이상" 문구로 거부한다.
+- **테스트 공백:** 저장 중 `Spinner`, 미리 보기 영역이 처음부터 있는지 테스트를 더했다.
+- **문서:** DB 제약 설명과 건너뛴 테스트의 위치를 고쳤다. 1989년 이전 날짜 판정은 #50 댓글에 옮겨 적었다.
+
 ## 검증
 
 - 추가한 테스트: `backend/test/sleep.test.ts`, `backend/test/sleep.integration.test.ts`, `frontend/src/sleep-time.test.ts`, `frontend/src/sleep.test.tsx`, `frontend/src/daily.test.tsx`(날짜별 불러오기)
 - 완료 기준의 23:30~07:00 = 7시간 30분은 서버와 화면 양쪽에서 확인했다.
 
-- `npm run check`(임시 DB 사용): 통과. 백엔드 59개 통과, 건너뜀 0개. 프런트엔드 122개 통과, 2개 건너뜀(`theme.test.ts`의 다크 전용 앱용 조건, 이 변경과 무관). 스킬 검사 4개 통과
+- `npm run check`(임시 DB 사용): 통과. 백엔드 61개 통과, 건너뜀 0개. 프런트엔드 123개 통과, 2개 건너뜀(`lib/theme.test.ts`와 `components/layout/app-shell.test.tsx`의 다크 전용 앱용 조건, 이 변경과 무관). 스킬 검사 4개 통과
 - `npm run knip`, `npm run standards:check`: 통과
 
 ### DB 통합 테스트
@@ -57,7 +63,7 @@
 이 PC의 DB 계정은 `health_test`를 만들 수 없어, `initdb`로 임시 폴더에 PostgreSQL 17 클러스터를 따로 띄워 `health_test`를 만들었다. 기존 DB는 건드리지 않았고 확인 뒤 지웠다.
 
 - 마이그레이션 3개 적용, `003` 재실행도 통과
-- `TEST_DATABASE_URL`을 임시 DB로 두고 `npm run test -w backend`: 59개 통과, 건너뜀 0개
+- `TEST_DATABASE_URL`을 임시 DB로 두고 `npm run test -w backend`: 61개 통과, 건너뜀 0개
 
 ### 브라우저 확인
 

@@ -54,6 +54,19 @@ test('a sleep longer than a day is rejected', async () => {
   );
 });
 
+test('the limits use the exact span, not rounded minutes', async () => {
+  await rejects(
+    `/api/sleep/${date}`,
+    { bedAt: '2026-03-14T07:00:00+09:00', wakeAt: '2026-03-15T07:00:20+09:00' },
+    '수면 시간은 24시간을 넘을 수 없습니다',
+  );
+  await rejects(
+    `/api/sleep/${date}`,
+    { bedAt: '2026-03-15T07:00:00+09:00', wakeAt: '2026-03-15T07:00:20+09:00' },
+    '수면 시간은 1분 이상이어야 합니다',
+  );
+});
+
 test('a sleep is filed under the day of waking in the service time zone', async () => {
   await rejects('/api/sleep/2026-03-14', valid, '기상 시각의 날짜가 기록 날짜와 다릅니다');
   // 22:30 UTC on the 14th is 07:30 on the 15th in Seoul.

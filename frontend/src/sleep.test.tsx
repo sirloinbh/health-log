@@ -59,6 +59,17 @@ test('a day without a record asks for times and files a night under the day of w
   });
 });
 
+test('the preview region is there before it has anything to say, so it gets announced', async () => {
+  server({ body: { record: null } });
+  const { container } = render(<SleepCard date={date} />);
+  await screen.findByLabelText('취침 시각');
+  const region = container.querySelector('form [aria-live="polite"]');
+  expect(region).toBeEmptyDOMElement();
+  typeTimes('23:30', '07:00');
+  expect(container.querySelector('form [aria-live="polite"]')).toBe(region);
+  expect(region).toHaveTextContent('전날 23:30에 잠들어 7시간 30분');
+});
+
 test('saving without both times explains itself and sends nothing', async () => {
   const fetchMock = server({ body: { record: null } });
   render(<SleepCard date={date} />);
@@ -191,6 +202,7 @@ test('a save in flight cannot be sent twice', async () => {
   const save = screen.getByRole('button', { name: '저장' });
   fireEvent.click(save);
   await waitFor(() => expect(save).toBeDisabled());
+  expect(screen.getByRole('status', { name: '저장하는 중' })).toBeInTheDocument();
   fireEvent.click(save);
   expect(fetchMock).toHaveBeenCalledTimes(2);
   finish(new Response(JSON.stringify(record)));

@@ -7,7 +7,7 @@ import { isRealDate } from './dates.js';
 import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError, serviceDate } from './standard/http.js';
 
-const maxMinutes = 24 * 60;
+const maxSpan = 24 * 60 * 60_000;
 
 /** Whole minutes between two instants. Midnight needs no special case because both carry a date. */
 export const sleepMinutes = (bedAt: string, wakeAt: string) =>
@@ -77,9 +77,12 @@ export function sleepRouter(pool: Pool, limits: RateLimitSettings) {
     // PostgreSQL refuses some offsets that JavaScript reads fine, so it only ever sees UTC.
     const bedAt = new Date(input.bedAt).toISOString();
     const wakeAt = new Date(input.wakeAt).toISOString();
+    // The exact span, as the database checks it: rounded minutes would let 24h 20s through to a 500.
+    const span = new Date(wakeAt).getTime() - new Date(bedAt).getTime();
+    if (span <= 0) throw new HttpError(400, '기상 시각은 취침 시각보다 늦어야 합니다');
+    if (span > maxSpan) throw new HttpError(400, '수면 시간은 24시간을 넘을 수 없습니다');
     const minutes = sleepMinutes(bedAt, wakeAt);
-    if (minutes < 1) throw new HttpError(400, '기상 시각은 취침 시각보다 늦어야 합니다');
-    if (minutes > maxMinutes) throw new HttpError(400, '수면 시간은 24시간을 넘을 수 없습니다');
+    if (minutes < 1) throw new HttpError(400, '수면 시간은 1분 이상이어야 합니다');
     if (serviceDate(new Date(wakeAt)) !== date) {
       throw new HttpError(400, '기상 시각의 날짜가 기록 날짜와 다릅니다');
     }

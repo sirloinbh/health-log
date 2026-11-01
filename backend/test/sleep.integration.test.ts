@@ -113,6 +113,18 @@ test('typing over an imported sleep drops the stages that no longer apply', { sk
   });
 });
 
+test('exactly a day is accepted by the server and the database', { skip }, async () => {
+  await withApi(pool, async (call) => {
+    const { status, data } = await call(`/api/sleep/${days[4]}`, {
+      method: 'PUT',
+      body: { bedAt: '1990-01-05T07:00:00+09:00', wakeAt: '1990-01-06T07:00:00+09:00' },
+    });
+    assert.equal(status, 200);
+    assert.equal(data.durationMinutes, 1440);
+  });
+  await pool.query('DELETE FROM sleep_records WHERE sleep_date = $1', [days[4]]);
+});
+
 test('deleting removes the record, and deleting again is a 404', { skip }, async () => {
   await withApi(pool, async (call) => {
     const path = `/api/sleep/${days[4]}`;

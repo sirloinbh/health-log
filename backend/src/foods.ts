@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError, parseId } from './standard/http.js';
@@ -13,18 +13,23 @@ const hasTwoDecimalsAtMost = (value: number) => Number(value.toFixed(2)) === val
 
 const amount = (label: string) =>
   z
-    .number({ invalid_type_error: `${label}은(는) 숫자로 입력해 주세요` })
+    .number({ error: `${label}은(는) 숫자로 입력해 주세요` })
     .min(0, `${label}은(는) 0 이상이어야 합니다`)
     .max(maxAmount, `${label}이(가) 너무 큽니다`)
     .refine(hasTwoDecimalsAtMost, `${label}은(는) 소수 둘째 자리까지 입력해 주세요`)
     .nullable()
     .default(null);
 
+// Not .min()/.max(): those also run on a non-string with a length and add a second message.
 const optionalText = (label: string, max: number) =>
   z
-    .string({ invalid_type_error: `${label}이(가) 올바르지 않습니다` })
+    .string({ error: `${label}이(가) 올바르지 않습니다` })
     .trim()
-    .max(max, `${label}은(는) ${max}자 이하로 입력해 주세요`)
+    // abort: the source rules below would otherwise add their messages to this one.
+    .refine((value) => value.length <= max, {
+      message: `${label}은(는) ${max}자 이하로 입력해 주세요`,
+      abort: true,
+    })
     .nullable()
     .default(null)
     .transform((value) => value || null);
@@ -51,31 +56,22 @@ const foodInput = z
   .object(
     {
       name: z
-        .string({
-          required_error: '음식 이름을 입력해 주세요',
-          invalid_type_error: '음식 이름을 입력해 주세요',
-        })
+        .string({ error: '음식 이름을 입력해 주세요' })
         .trim()
-        .min(1, '음식 이름을 입력해 주세요')
-        .max(100, '음식 이름은 100자 이하로 입력해 주세요'),
+        .refine((value) => value.length >= 1, '음식 이름을 입력해 주세요')
+        .refine((value) => value.length <= 100, '음식 이름은 100자 이하로 입력해 주세요'),
       brand: optionalText('브랜드', 50),
       category: optionalText('분류', 30),
       servingSize: z
-        .number({
-          required_error: '1회 제공량을 입력해 주세요',
-          invalid_type_error: '1회 제공량을 입력해 주세요',
-        })
+        .number({ error: '1회 제공량을 입력해 주세요' })
         .positive('1회 제공량은 0보다 커야 합니다')
         .max(maxAmount, '1회 제공량이 너무 큽니다')
         .refine(hasTwoDecimalsAtMost, '1회 제공량은 소수 둘째 자리까지 입력해 주세요'),
       servingUnit: z
-        .string({
-          required_error: '1회 제공량 단위를 입력해 주세요',
-          invalid_type_error: '1회 제공량 단위를 입력해 주세요',
-        })
+        .string({ error: '1회 제공량 단위를 입력해 주세요' })
         .trim()
-        .min(1, '1회 제공량 단위를 입력해 주세요')
-        .max(10, '1회 제공량 단위는 10자 이하로 입력해 주세요'),
+        .refine((value) => value.length >= 1, '1회 제공량 단위를 입력해 주세요')
+        .refine((value) => value.length <= 10, '1회 제공량 단위는 10자 이하로 입력해 주세요'),
       calories: amount('칼로리'),
       carbs: amount('탄수화물'),
       protein: amount('단백질'),
@@ -84,26 +80,23 @@ const foodInput = z
       sodium: amount('나트륨'),
       sourceType: z
         .enum(['official', 'label', 'public', 'estimate', 'manual'], {
-          errorMap: () => ({ message: '출처 종류가 올바르지 않습니다' }),
+          error: '출처 종류가 올바르지 않습니다',
         })
         .default('manual'),
       sourceUrl: z
-        .string({ invalid_type_error: '출처 주소가 올바르지 않습니다' })
+        .string({ error: '출처 주소가 올바르지 않습니다' })
         .trim()
-        .max(2000, '출처 주소가 너무 깁니다')
+        .refine((value) => value.length <= 2000, '출처 주소가 너무 깁니다')
         .refine(isHttpUrl, '출처 주소는 http 또는 https로 시작해야 합니다')
         .nullable()
         .default(null),
       checkedOn: z
-        .string({ invalid_type_error: '확인 날짜가 올바르지 않습니다' })
+        .string({ error: '확인 날짜가 올바르지 않습니다' })
         .refine(isRealDate, '확인 날짜가 올바르지 않습니다')
         .nullable()
         .default(null),
     },
-    {
-      required_error: '요청 본문이 올바르지 않습니다',
-      invalid_type_error: '요청 본문이 올바르지 않습니다',
-    },
+    { error: '요청 본문이 올바르지 않습니다' },
   )
   .superRefine((food, ctx) => {
     // A number that claims a source has to say where and when it was checked.
@@ -120,9 +113,9 @@ const foodInput = z
 
 const searchQuery = z.object({
   q: z
-    .string({ invalid_type_error: '검색어가 올바르지 않습니다' })
+    .string({ error: '검색어가 올바르지 않습니다' })
     .trim()
-    .max(100, '검색어는 100자 이하로 입력해 주세요')
+    .refine((value) => value.length <= 100, '검색어는 100자 이하로 입력해 주세요')
     .default(''),
 });
 

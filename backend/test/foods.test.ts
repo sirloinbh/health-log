@@ -177,3 +177,57 @@ test('a repeated search parameter is rejected instead of failing on the server',
     assert.equal(data.error, '검색어가 올바르지 않습니다');
   });
 });
+
+test('a too-long brand answers only with its own message, not the source rules', async () => {
+  const pool = { query: async () => ({ rows: [] }) } as unknown as Pool;
+  await withApi(pool, async (call) => {
+    const { status, data } = await call('/api/foods', {
+      method: 'POST',
+      body: { ...valid, brand: 'a'.repeat(51), sourceType: 'official' },
+    });
+    assert.equal(status, 400);
+    assert.equal(data.error, '브랜드은(는) 50자 이하로 입력해 주세요');
+  });
+});
+
+test('fields left out are stored with their defaults, and a blank brand as no brand', async () => {
+  const params: unknown[][] = [];
+  const pool = {
+    query: async (_sql: string, values: unknown[]) => {
+      params.push(values);
+      return { rows: [{}] };
+    },
+  } as unknown as Pool;
+  await withApi(pool, async (call) => {
+    const { status } = await call('/api/foods', {
+      method: 'POST',
+      body: { ...valid, brand: '   ' },
+    });
+    assert.equal(status, 201);
+  });
+  assert.deepEqual(params, [
+    ['치즈버거', null, null, 120, 'g', null, null, null, null, null, null, 'manual', null, null],
+  ]);
+});
+
+test('a value that is not text answers with one message, even if it has a length', async () => {
+  const pool = { query: async () => ({ rows: [] }) } as unknown as Pool;
+  const longList = Array.from({ length: 101 }, () => 'a');
+  const cases: [Record<string, unknown>, string][] = [
+    [{ name: [] }, '음식 이름을 입력해 주세요'],
+    [{ name: longList }, '음식 이름을 입력해 주세요'],
+    [{ servingUnit: [] }, '1회 제공량 단위를 입력해 주세요'],
+    [{ brand: longList }, '브랜드이(가) 올바르지 않습니다'],
+    [{ sourceUrl: { length: 2001 } }, '출처 주소가 올바르지 않습니다'],
+  ];
+  await withApi(pool, async (call) => {
+    for (const [change, message] of cases) {
+      const { status, data } = await call('/api/foods', {
+        method: 'POST',
+        body: { ...valid, ...change },
+      });
+      assert.equal(status, 400);
+      assert.equal(data.error, message);
+    }
+  });
+});

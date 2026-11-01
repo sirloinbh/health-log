@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
+import { toast } from './components/ui/sonner';
 import { SleepCard } from './sleep';
 
 const date = '2026-03-15';
@@ -121,15 +122,18 @@ test('a record already gone counts as deleted', async () => {
   expect(await screen.findByLabelText('취침 시각')).toBeInTheDocument();
 });
 
-test('a failed delete keeps the record and the dialog', async () => {
+test('a failed delete says why and keeps the record and the dialog', async () => {
+  const shown = vi.spyOn(toast, 'error');
   server({ body: { record } }, { status: 500, body: { error: '서버 오류가 발생했습니다' } });
   render(<SleepCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
   const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' });
   fireEvent.click(confirm);
   await waitFor(() => expect(confirm).toBeEnabled());
+  expect(shown).toHaveBeenCalledWith('서버 오류가 발생했습니다');
   expect(screen.getByRole('dialog')).toBeInTheDocument();
   expect(screen.getByText('7시간 30분')).toBeInTheDocument();
+  shown.mockRestore();
 });
 
 test('an imported sleep says where it came from', async () => {
@@ -148,15 +152,71 @@ test('a failed load offers another try, with no form to overwrite an unseen reco
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
-test('a reply for a day already left is ignored', async () => {
+test('pressing edit moves focus to the card instead of losing it', async () => {
+  server({ body: { record } });
+  render(<SleepCard date={date} />);
+  const edit = await screen.findByRole('button', { name: '수정' });
+  edit.focus();
+  fireEvent.click(edit);
+  await waitFor(() => expect(screen.getByText('수면').parentElement).toHaveFocus());
+});
+
+test('saving unchanged times sends nothing, so an imported record stays as it is', async () => {
+  const fetchMock = server({ body: { record: { ...record, source: 'garmin' } } });
+  render(<SleepCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: '수정' }));
+  expect(screen.getByText(/수면 단계와 점수가 지워집니다/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  expect(await screen.findByText('가민')).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+test('a directly entered record has no such warning', async () => {
+  server({ body: { record } });
+  render(<SleepCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: '수정' }));
+  expect(screen.queryByText(/수면 단계와 점수가 지워집니다/)).not.toBeInTheDocument();
+});
+
+test('a save in flight cannot be sent twice', async () => {
+  let finish = (_response: Response) => {};
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify({ record: null })))
+    .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+  vi.stubGlobal('fetch', fetchMock);
+  render(<SleepCard date={date} />);
+  await screen.findByLabelText('취침 시각');
+  typeTimes('23:30', '07:00');
+  const save = screen.getByRole('button', { name: '저장' });
+  fireEvent.click(save);
+  await waitFor(() => expect(save).toBeDisabled());
+  fireEvent.click(save);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  finish(new Response(JSON.stringify(record)));
+  expect(await screen.findByText('7시간 30분')).toBeInTheDocument();
+});
+
+test('a save that fails after leaving the day still says so', async () => {
+  const shown = vi.spyOn(toast, 'error');
   let finish = (_response: Response) => {};
   vi.stubGlobal(
     'fetch',
-    vi.fn(() => new Promise((resolve) => (finish = resolve))),
+    vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ record: null })))
+      .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve))),
   );
   const { unmount } = render(<SleepCard date={date} />);
+  await screen.findByLabelText('취침 시각');
+  typeTimes('23:30', '07:00');
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
   unmount();
-  finish(new Response(JSON.stringify({ record })));
-  await Promise.resolve();
-  expect(screen.queryByText('7시간 30분')).not.toBeInTheDocument();
+  finish(new Response(JSON.stringify({ error: '서버 오류가 발생했습니다' }), { status: 500 }));
+  await waitFor(() =>
+    expect(shown).toHaveBeenCalledWith(
+      '2026-03-15 수면 기록을 저장하지 못했습니다: 서버 오류가 발생했습니다',
+    ),
+  );
+  shown.mockRestore();
 });

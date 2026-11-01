@@ -26,6 +26,11 @@ test('a length reads in hours and minutes', () => {
   expect(formatMinutes(30)).toBe('30분');
 });
 
+test('a date from before 1989 reads back at the time that was typed', () => {
+  const { wakeAt } = toInstants('1988-07-01', '23:30', '07:00');
+  expect(clockOf(new Date(wakeAt).toISOString())).toBe('07:00');
+});
+
 test('stored instants read in the service time zone', () => {
   expect(clockOf('2026-02-28T14:30:00.000Z')).toBe('23:30');
   expect(dayOf('2026-02-28T14:30:00.000Z')).toBe('2026-02-28');

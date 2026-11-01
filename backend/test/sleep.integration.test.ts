@@ -125,6 +125,16 @@ test('deleting removes the record, and deleting again is a 404', { skip }, async
   });
 });
 
+test('the database itself refuses a sleep longer than a day', { skip }, async () => {
+  await assert.rejects(
+    pool.query(
+      `INSERT INTO sleep_records (sleep_date, bed_at, wake_at, duration_minutes)
+       VALUES ('1990-01-02', '1990-01-01T00:00:00Z', '1990-01-02T00:01:00Z', 60)`,
+    ),
+    { code: '23514' },
+  );
+});
+
 test('the database itself refuses a wake time before the bed time', { skip }, async () => {
   await assert.rejects(
     pool.query(

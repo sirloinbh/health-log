@@ -13,5 +13,7 @@ CREATE TABLE IF NOT EXISTS sleep_records (
   source text NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'garmin')),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT sleep_records_wake_after_bed CHECK (wake_at > bed_at)
+  CONSTRAINT sleep_records_wake_after_bed CHECK (wake_at > bed_at),
+  -- Imports write here too, so the database holds the length limit as well.
+  CONSTRAINT sleep_records_at_most_a_day CHECK (wake_at - bed_at <= interval '24 hours')
 );

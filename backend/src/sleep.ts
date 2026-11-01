@@ -73,7 +73,10 @@ export function sleepRouter(pool: Pool, limits: RateLimitSettings) {
   // Typed times replace the whole record: stages and a score from an import no longer describe them.
   router.put('/:date', async (req, res) => {
     const date = parseDate(req.params.date);
-    const { bedAt, wakeAt } = sleepInput.parse(req.body);
+    const input = sleepInput.parse(req.body);
+    // PostgreSQL refuses some offsets that JavaScript reads fine, so it only ever sees UTC.
+    const bedAt = new Date(input.bedAt).toISOString();
+    const wakeAt = new Date(input.wakeAt).toISOString();
     const minutes = sleepMinutes(bedAt, wakeAt);
     if (minutes < 1) throw new HttpError(400, '기상 시각은 취침 시각보다 늦어야 합니다');
     if (minutes > maxMinutes) throw new HttpError(400, '수면 시간은 24시간을 넘을 수 없습니다');

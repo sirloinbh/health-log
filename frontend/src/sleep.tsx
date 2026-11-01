@@ -9,6 +9,7 @@ import { Label } from './components/ui/label';
 import { Notice } from './components/ui/notice';
 import { SkeletonText } from './components/ui/skeleton';
 import { toast } from './components/ui/sonner';
+import { Spinner } from './components/ui/spinner';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
 import {
@@ -48,11 +49,24 @@ function SleepForm({
   const [saving, setSaving] = useState(false);
   const { notice, error } = useNotice();
   const length = bed && wake ? minutesBetween(bed, wake) : 0;
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!bed || !wake) {
       error('취침 시각과 기상 시각을 입력해 주세요');
+      return;
+    }
+    // Nothing to save: a PUT would still turn an imported record into a manual one.
+    if (record && bed === clockOf(record.bedAt) && wake === clockOf(record.wakeAt)) {
+      onCancel?.();
       return;
     }
     setSaving(true);
@@ -64,6 +78,11 @@ function SleepForm({
         }),
       );
     } catch (cause) {
+      // Moving to another day removes this form, and the night still was not saved.
+      if (!mounted.current) {
+        toast.error(`${date} 수면 기록을 저장하지 못했습니다: ${errorText(cause)}`);
+        return;
+      }
       error(cause);
       setSaving(false);
     }
@@ -91,15 +110,22 @@ function SleepForm({
           />
         </div>
       </div>
-      {length > 0 ? (
-        <p aria-live="polite" className="text-body-sm text-muted-foreground">
-          {isOvernight(bed, wake) ? '전날' : '이날'} {bed}에 잠들어 {formatMinutes(length)}
+      {/* Stays mounted: a live region announces changes only if it was already there. */}
+      <p aria-live="polite" className="min-h-5 text-body-sm text-muted-foreground">
+        {length > 0
+          ? `${isOvernight(bed, wake) ? '전날' : '이날'} ${bed}에 잠들어 ${formatMinutes(length)}`
+          : null}
+      </p>
+      {record?.source === 'garmin' ? (
+        <p className="text-body-sm text-muted-foreground">
+          시각을 바꿔 저장하면 가민에서 가져온 수면 단계와 점수가 지워집니다.
         </p>
       ) : null}
       <Notice notice={notice} />
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={saving}>
-          {saving ? '저장 중…' : '저장'}
+        <Button type="submit" disabled={saving} aria-busy={saving || undefined}>
+          {saving ? <Spinner size="sm" label="저장하는 중" /> : null}
+          저장
         </Button>
         {onCancel ? (
           <Button type="button" variant="outline" disabled={saving} onClick={onCancel}>
@@ -244,7 +270,14 @@ export function SleepCard({ date }: { date: string }) {
           />
         ) : null}
         {record && !editing ? (
-          <SleepSummary record={record} onEdit={() => setEditing(true)} onDelete={remove} />
+          <SleepSummary
+            record={record}
+            onEdit={() => {
+              setEditing(true);
+              setMoveFocus((count) => count + 1);
+            }}
+            onDelete={remove}
+          />
         ) : null}
       </CardContent>
     </Card>

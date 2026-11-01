@@ -4,18 +4,10 @@ import { shiftDate } from './daily-date';
 // a bed time later on the clock than the wake time means the night before.
 const serviceOffset = '+09:00';
 
-const clock = new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'Asia/Seoul',
-  hour: '2-digit',
-  minute: '2-digit',
-  hourCycle: 'h23',
-});
-const day = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Asia/Seoul',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
+// Reading uses the same fixed offset as writing. Asia/Seoul had other offsets before 1989, and reading
+// through it would show those dates at a different time than was typed.
+const inService = (instant: string) =>
+  new Date(new Date(instant).getTime() + 9 * 60 * 60_000).toISOString();
 
 export const isOvernight = (bed: string, wake: string) => bed > wake;
 
@@ -35,6 +27,6 @@ export function formatMinutes(total: number) {
   return [hours ? `${hours}시간` : '', minutes ? `${minutes}분` : ''].filter(Boolean).join(' ');
 }
 
-export const clockOf = (instant: string) => clock.format(new Date(instant));
+export const clockOf = (instant: string) => inService(instant).slice(11, 16);
 
-export const dayOf = (instant: string) => day.format(new Date(instant));
+export const dayOf = (instant: string) => inService(instant).slice(0, 10);

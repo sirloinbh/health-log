@@ -266,6 +266,7 @@ export function BodyCard({ date }: { date: string }) {
   const heading = useRef<HTMLDivElement>(null);
   const live = useRef(true);
   const latestHistory = useRef(0);
+  const [retryingChanges, setRetryingChanges] = useState(false);
 
   const load = useCallback(async () => {
     clear();
@@ -312,6 +313,16 @@ export function BodyCard({ date }: { date: string }) {
     const timer = setTimeout(() => heading.current?.focus(), 0);
     return () => clearTimeout(timer);
   }, [moveFocus]);
+
+  const retryChanges = async () => {
+    // Clearing first means a repeated failure appears anew and is announced again.
+    changesClear();
+    setRetryingChanges(true);
+    await loadHistory();
+    setRetryingChanges(false);
+    // The pressed button was disabled and may be gone, which would drop keyboard focus.
+    setMoveFocus((count) => count + 1);
+  };
 
   const finish = (next: BodyRecord | null) => {
     setRecord(next);
@@ -384,12 +395,20 @@ export function BodyCard({ date }: { date: string }) {
         ) : null}
         <Notice notice={changesNotice} />
         {/* While the record has failed too, its own button retries both. */}
-        {changesNotice && record !== undefined ? (
-          <Button variant="outline" className="self-start" onClick={() => void loadHistory()}>
+        {(changesNotice || retryingChanges) && record !== undefined ? (
+          <Button
+            variant="outline"
+            className="self-start"
+            disabled={retryingChanges}
+            aria-busy={retryingChanges || undefined}
+            onClick={() => void retryChanges()}
+          >
+            {retryingChanges ? <Spinner size="sm" label="불러오는 중" /> : null}
             변화 다시 불러오기
           </Button>
         ) : null}
-        <BodyChanges date={date} records={history} />
+        {/* Numbers from before a failed reload may be wrong, so they do not stay on screen. */}
+        {changesNotice || retryingChanges ? null : <BodyChanges date={date} records={history} />}
       </CardContent>
     </Card>
   );

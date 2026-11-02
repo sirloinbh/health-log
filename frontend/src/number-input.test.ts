@@ -20,3 +20,10 @@ test.each(['49,5', '1,200', '70.5.1', '1e5', '-1', '+1', '.5', '5.', '70kg', '٧
     expect(parseAmount(text)).toBeUndefined();
   },
 );
+
+test('digits too long to be exact are rejected, not rounded or turned into Infinity', () => {
+  expect(parseAmount('9'.repeat(400))).toBeUndefined();
+  expect(parseAmount('500.000000000000001')).toBeUndefined();
+  expect(parseAmount('70.100000000000000001')).toBeUndefined();
+  expect(parseAmount('123456789.5')).toBe(123456789.5);
+});

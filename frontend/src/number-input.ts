@@ -6,5 +6,6 @@
 export function parseAmount(text: string) {
   const trimmed = text.trim();
   if (trimmed === '') return null;
-  return /^\d+(\.\d+)?$/.test(trimmed) ? Number(trimmed) : undefined;
+  // Bounded lengths: 400 digits would become Infinity, then null in JSON, and erase the stored value.
+  return /^\d{1,9}(\.\d{1,9})?$/.test(trimmed) ? Number(trimmed) : undefined;
 }

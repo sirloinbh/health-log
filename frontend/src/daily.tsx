@@ -123,7 +123,8 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
           </Button>
         ) : null}
       </nav>
-      <div className="grid gap-4 md:grid-cols-2">
+      {/* An explicit column: an implicit one grows with its content, past the edge of a phone. */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <SleepCard key={date} date={date} />
         <MealCard key={`meal-${date}`} date={date} />
         <BodyCard key={`body-${date}`} date={date} />

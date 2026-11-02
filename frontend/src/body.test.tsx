@@ -155,6 +155,77 @@ test('a trend that fails to load leaves today usable and can be retried', async 
   expect(screen.queryByRole('button', { name: '변화 다시 불러오기' })).not.toBeInTheDocument();
 });
 
+test('numbers from before a failed reload do not stay on screen', async () => {
+  const earlier = { ...record, date: '2026-03-10', weightKg: 75 };
+  const saved = { ...record, weightKg: 60 };
+  server({
+    recordReplies: [{ body: { record } }, { body: saved }],
+    history: [
+      { body: { records: [earlier, record] } },
+      { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+    ],
+  });
+  render(<BodyCard date={date} />);
+  await screen.findByRole('row', { name: /체중.*−4\.5kg/ });
+
+  fireEvent.click(screen.getByRole('button', { name: '수정' }));
+  fireEvent.change(screen.getByLabelText('체중 (kg)'), { target: { value: '60' } });
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('기간별 변화를 불러오지 못했습니다');
+  expect(screen.getByText('60kg')).toBeInTheDocument();
+  expect(screen.queryByRole('table')).not.toBeInTheDocument();
+});
+
+test('a trend retry shows it is running, allows one at a time, and announces failure again', async () => {
+  let finishRetry = (_response: Response) => {};
+  let historyCalls = 0;
+  const fetchMock = vi.fn((url: string) => {
+    if (!url.startsWith('/api/body?')) {
+      return Promise.resolve(new Response(JSON.stringify({ record: null })));
+    }
+    historyCalls += 1;
+    if (historyCalls === 1) {
+      return Promise.resolve(new Response(JSON.stringify({ error: 'x' }), { status: 500 }));
+    }
+    return new Promise<Response>((resolve) => (finishRetry = resolve));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  render(<BodyCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: '변화 다시 불러오기' }));
+
+  const retry = await screen.findByRole('button', { name: /변화 다시 불러오기/ });
+  expect(retry).toBeDisabled();
+  expect(retry).toHaveAttribute('aria-busy', 'true');
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  fireEvent.click(retry);
+  expect(historyCalls).toBe(2);
+
+  finishRetry(new Response(JSON.stringify({ error: 'x' }), { status: 500 }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('기간별 변화를 불러오지 못했습니다');
+  expect(screen.getByRole('button', { name: '변화 다시 불러오기' })).toBeEnabled();
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      screen.getByRole('heading', { name: '신체' }).parentElement,
+    ),
+  );
+});
+
+test('a value too long to read is refused and the stored value stays', async () => {
+  const fetchMock = server({ recordReplies: [{ body: { record } }] });
+  render(<BodyCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: '수정' }));
+  fireEvent.change(screen.getByLabelText('체중 (kg)'), { target: { value: '9'.repeat(400) } });
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('숫자만 입력해 주세요');
+  expect(
+    fetchMock.mock.calls.some(
+      (args) => (args as unknown as [string, RequestInit])[1]?.method === 'PUT',
+    ),
+  ).toBe(false);
+});
+
 test('when both fail, one retry brings back the record and the trend', async () => {
   const earlier = { ...record, date: '2026-03-10', weightKg: 72 };
   server({

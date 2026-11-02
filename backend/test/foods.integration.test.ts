@@ -88,6 +88,72 @@ test('a re-run never overwrites a food whose date was cleared by an edit', { ski
   assert.equal((await countAndCalories(name)).calories, 510);
 });
 
+test('popular foods are stored per serving with a checkable public source', { skip }, async () => {
+  const { rows } = await pool.query<{ total: string; sourced: string }>(
+    `SELECT count(*) AS total,
+            count(*) FILTER (
+              WHERE source_type = 'public'
+                AND source_url LIKE 'https://various.foodsafetykorea.go.kr/%'
+                AND checked_on IS NOT NULL
+            ) AS sourced
+     FROM foods WHERE source_url LIKE '%foodsafetykorea%'`,
+  );
+  assert.ok(Number(rows[0]!.total) >= 95, `${rows[0]!.total} foods`);
+  assert.equal(rows[0]!.sourced, rows[0]!.total);
+
+  // A source page with no food group once stored the next field's label as the category.
+  const labels = await pool.query("SELECT name FROM foods WHERE category LIKE '%품목대표%'");
+  assert.deepEqual(labels.rows, []);
+
+  // Measured values win: the calculated record would give 590 mL with 342 mg of sodium.
+  const ramen = await pool.query<{ serving_size: string; sodium: string }>(
+    "SELECT serving_size, sodium FROM foods WHERE name = '라면' AND brand IS NULL",
+  );
+  assert.equal(Number(ramen.rows[0]!.serving_size), 550);
+  assert.equal(Number(ramen.rows[0]!.sodium), 1556.5);
+
+  // Measured records filed under another spelling: 자장면 and 돼지고기볶음(제육볶음) at the source.
+  const servings = await pool.query<{ name: string; serving_size: string; serving_unit: string }>(
+    "SELECT name, serving_size, serving_unit FROM foods WHERE name IN ('짜장면(자장면)', '제육볶음') AND brand IS NULL ORDER BY name",
+  );
+  assert.deepEqual(
+    servings.rows.map((row) => [row.name, Number(row.serving_size), row.serving_unit]),
+    [
+      ['제육볶음', 250, 'g'],
+      ['짜장면(자장면)', 650, 'g'],
+    ],
+  );
+
+  // The source gives 61 kcal per 100 g and a total of 400 g; its Korean name must decode too.
+  const stew = await pool.query<{ serving_size: string; serving_unit: string; calories: string }>(
+    "SELECT serving_size, serving_unit, calories FROM foods WHERE name = '김치찌개' AND brand IS NULL",
+  );
+  assert.equal(stew.rowCount, 1);
+  assert.equal(Number(stew.rows[0]!.serving_size), 400);
+  assert.equal(stew.rows[0]!.serving_unit, 'g');
+  assert.equal(Number(stew.rows[0]!.calories), 244);
+});
+
+test('popular foods can be found by the words people search for', { skip }, async () => {
+  await withApi(pool, async (call) => {
+    const expected = {
+      닭가슴살: '닭가슴살(삶은것)',
+      계란: '삶은 달걀(계란)',
+      치킨: '닭튀김(치킨)',
+      돈까스: '돈가스(돈까스)',
+      콜라: '콜라',
+      요거트: '플레인 요거트(요구르트)',
+      찜닭: '찜닭(안동찜닭)',
+      참치김밥: '참치김밥',
+    };
+    for (const [q, name] of Object.entries(expected)) {
+      const { data } = await call(`/api/foods?q=${encodeURIComponent(q)}`);
+      const names = (data.foods as { name: string }[]).map((food) => food.name);
+      assert.ok(names.includes(name), `${q}: ${names.join(', ')}`);
+    }
+  });
+});
+
 test('the documented example runs as written and repeats safely', { skip }, async (t) => {
   // Its Korean literals must decode: the escapes spell 예시 and 브랜드.
   const example = "name = '예시' AND brand = '브랜드'";

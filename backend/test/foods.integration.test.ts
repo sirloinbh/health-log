@@ -88,6 +88,29 @@ test('a re-run never overwrites a food whose date was cleared by an edit', { ski
   assert.equal((await countAndCalories(name)).calories, 510);
 });
 
+test('popular foods are stored per serving with a checkable public source', { skip }, async () => {
+  const { rows } = await pool.query<{ total: string; sourced: string }>(
+    `SELECT count(*) AS total,
+            count(*) FILTER (
+              WHERE source_type = 'public'
+                AND source_url LIKE 'https://various.foodsafetykorea.go.kr/%'
+                AND checked_on IS NOT NULL
+            ) AS sourced
+     FROM foods WHERE source_url LIKE '%foodsafetykorea%'`,
+  );
+  assert.equal(Number(rows[0]!.total), 91);
+  assert.equal(rows[0]!.sourced, rows[0]!.total);
+
+  // The source gives 61 kcal per 100 g and a total of 400 g; its Korean name must decode too.
+  const stew = await pool.query<{ serving_size: string; serving_unit: string; calories: string }>(
+    "SELECT serving_size, serving_unit, calories FROM foods WHERE name = '김치찌개' AND brand IS NULL",
+  );
+  assert.equal(stew.rowCount, 1);
+  assert.equal(Number(stew.rows[0]!.serving_size), 400);
+  assert.equal(stew.rows[0]!.serving_unit, 'g');
+  assert.equal(Number(stew.rows[0]!.calories), 244);
+});
+
 test('the documented example runs as written and repeats safely', { skip }, async (t) => {
   // Its Korean literals must decode: the escapes spell 예시 and 브랜드.
   const example = "name = '예시' AND brand = '브랜드'";

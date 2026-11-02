@@ -325,7 +325,7 @@ test('a slow meal reply for the day just left does not fill in the new day', asy
 test('a day shows a place for each record kind', () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  for (const name of ['수면', '식단', '술·담배', '하루 체크', '병원·약']) {
+  for (const name of ['수면', '식단', '신체', '술·담배', '하루 체크', '병원·약']) {
     expect(screen.getByRole('heading', { level: 2, name })).toBeInTheDocument();
   }
 });

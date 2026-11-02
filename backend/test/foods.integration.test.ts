@@ -98,7 +98,7 @@ test('popular foods are stored per serving with a checkable public source', { sk
             ) AS sourced
      FROM foods WHERE source_url LIKE '%foodsafetykorea%'`,
   );
-  assert.ok(Number(rows[0]!.total) >= 90, `${rows[0]!.total} foods`);
+  assert.ok(Number(rows[0]!.total) >= 95, `${rows[0]!.total} foods`);
   assert.equal(rows[0]!.sourced, rows[0]!.total);
 
   // A source page with no food group once stored the next field's label as the category.
@@ -112,6 +112,18 @@ test('popular foods are stored per serving with a checkable public source', { sk
   assert.equal(Number(ramen.rows[0]!.serving_size), 550);
   assert.equal(Number(ramen.rows[0]!.sodium), 1556.5);
 
+  // Measured records filed under another spelling: 자장면 and 돼지고기볶음(제육볶음) at the source.
+  const servings = await pool.query<{ name: string; serving_size: string; serving_unit: string }>(
+    "SELECT name, serving_size, serving_unit FROM foods WHERE name IN ('짜장면(자장면)', '제육볶음') AND brand IS NULL ORDER BY name",
+  );
+  assert.deepEqual(
+    servings.rows.map((row) => [row.name, Number(row.serving_size), row.serving_unit]),
+    [
+      ['제육볶음', 250, 'g'],
+      ['짜장면(자장면)', 650, 'g'],
+    ],
+  );
+
   // The source gives 61 kcal per 100 g and a total of 400 g; its Korean name must decode too.
   const stew = await pool.query<{ serving_size: string; serving_unit: string; calories: string }>(
     "SELECT serving_size, serving_unit, calories FROM foods WHERE name = '김치찌개' AND brand IS NULL",
@@ -124,9 +136,20 @@ test('popular foods are stored per serving with a checkable public source', { sk
 
 test('popular foods can be found by the words people search for', { skip }, async () => {
   await withApi(pool, async (call) => {
-    for (const q of ['닭가슴살', '계란', '치킨', '돈까스', '콜라', '요거트', '찜닭']) {
+    const expected = {
+      닭가슴살: '닭가슴살(삶은것)',
+      계란: '삶은 달걀(계란)',
+      치킨: '닭튀김(치킨)',
+      돈까스: '돈가스(돈까스)',
+      콜라: '콜라',
+      요거트: '플레인 요거트(요구르트)',
+      찜닭: '찜닭(안동찜닭)',
+      참치김밥: '참치김밥',
+    };
+    for (const [q, name] of Object.entries(expected)) {
       const { data } = await call(`/api/foods?q=${encodeURIComponent(q)}`);
-      assert.ok((data.foods as unknown[]).length > 0, q);
+      const names = (data.foods as { name: string }[]).map((food) => food.name);
+      assert.ok(names.includes(name), `${q}: ${names.join(', ')}`);
     }
   });
 });

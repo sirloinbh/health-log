@@ -1,6 +1,12 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
-import { type BodyRecord, changeOver, changeWindows, formatChange } from './body-change';
+import {
+  type BodyRecord,
+  changeOver,
+  changeWindows,
+  formatChange,
+  formatSpan,
+} from './body-change';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
@@ -13,6 +19,7 @@ import { Spinner } from './components/ui/spinner';
 import { shiftDate } from './daily-date';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
+import { parseAmount } from './number-input';
 
 const pathOf = (date: string) => `/api/body/${date}`;
 
@@ -42,14 +49,12 @@ const formOf = (record: BodyRecord | null): Form => ({
   memo: record?.memo ?? '',
 });
 
-const numberOrNull = (value: string) => (value.trim() === '' ? null : Number(value));
-
 const bodyOf = (form: Form) => ({
-  weightKg: numberOrNull(form.weightKg),
-  bodyFatPercent: numberOrNull(form.bodyFatPercent),
-  waistCm: numberOrNull(form.waistCm),
-  systolicMmhg: numberOrNull(form.systolicMmhg),
-  diastolicMmhg: numberOrNull(form.diastolicMmhg),
+  weightKg: parseAmount(form.weightKg),
+  bodyFatPercent: parseAmount(form.bodyFatPercent),
+  waistCm: parseAmount(form.waistCm),
+  systolicMmhg: parseAmount(form.systolicMmhg),
+  diastolicMmhg: parseAmount(form.diastolicMmhg),
   memo: form.memo.trim() || null,
 });
 
@@ -78,12 +83,9 @@ function BodyForm({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // A number field reports "" for text like "70,5"; saving that would drop the value silently.
-    const unreadable = [...event.currentTarget.querySelectorAll('input')].find(
-      (input) => input.validity.badInput,
-    );
+    const unreadable = numberFields.find(({ key }) => parseAmount(form[key]) === undefined);
     if (unreadable) {
-      error(`${unreadable.labels?.[0]?.textContent ?? '입력값'}의 입력값을 확인해 주세요`);
+      error(`${unreadable.label}: 숫자만 입력해 주세요. 소수점은 마침표로 씁니다 (예: 70.5)`);
       return;
     }
     setSaving(true);
@@ -108,9 +110,8 @@ function BodyForm({
             <Label htmlFor={id}>{label}</Label>
             <Input
               id={id}
-              type="number"
               inputMode={key === 'systolicMmhg' || key === 'diastolicMmhg' ? 'numeric' : 'decimal'}
-              step="any"
+              autoComplete="off"
               value={form[key]}
               onChange={(event) =>
                 setForm((current) => ({ ...current, [key]: event.target.value }))
@@ -231,12 +232,18 @@ function BodyChanges({ date, records }: { date: string; records: BodyRecord[] })
               {changeWindows.map((days) => {
                 const change = changeOver(records, key, date, days);
                 return (
-                  <td
-                    key={days}
-                    className="px-2 py-1 whitespace-nowrap"
-                    title={change ? `${change.from} → ${change.to}` : undefined}
-                  >
-                    {change ? formatChange(change, unit) : '기록 부족'}
+                  <td key={days} className="px-2 py-1 align-top whitespace-nowrap">
+                    {change ? (
+                      <>
+                        {formatChange(change, unit)}
+                        {/* Without its dates, one day's change would read as this whole period's. */}
+                        <span className="block text-caption text-muted-foreground">
+                          {formatSpan(change)}
+                        </span>
+                      </>
+                    ) : (
+                      '기록 부족'
+                    )}
                   </td>
                 );
               })}
@@ -282,9 +289,10 @@ export function BodyCard({ date }: { date: string }) {
       if (!live.current || request !== latestHistory.current) return;
       changesClear();
       setHistory(data.records ?? []);
-    } catch (cause) {
+    } catch {
+      // Says which part failed: the record above has its own message for the same outage.
       if (live.current && request === latestHistory.current) {
-        changesError(cause, '기간별 변화를 불러오지 못했습니다');
+        changesError('기간별 변화를 불러오지 못했습니다');
       }
     }
   }, [changesClear, changesError, date]);
@@ -336,7 +344,14 @@ export function BodyCard({ date }: { date: string }) {
       <CardContent className="flex flex-col gap-4">
         <Notice notice={notice} />
         {notice && record === undefined ? (
-          <Button variant="outline" className="self-start" onClick={() => void load()}>
+          <Button
+            variant="outline"
+            className="self-start"
+            onClick={() => {
+              void load();
+              void loadHistory();
+            }}
+          >
             다시 시도
           </Button>
         ) : null}
@@ -368,6 +383,12 @@ export function BodyCard({ date }: { date: string }) {
           />
         ) : null}
         <Notice notice={changesNotice} />
+        {/* While the record has failed too, its own button retries both. */}
+        {changesNotice && record !== undefined ? (
+          <Button variant="outline" className="self-start" onClick={() => void loadHistory()}>
+            변화 다시 불러오기
+          </Button>
+        ) : null}
         <BodyChanges date={date} records={history} />
       </CardContent>
     </Card>

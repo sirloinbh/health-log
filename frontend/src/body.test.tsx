@@ -72,7 +72,7 @@ test('weight alone is saved, and blanks go as no value', async () => {
 
 test('saving reloads the trend so the new value counts at once', async () => {
   const earlier = { ...record, date: '2026-03-10', weightKg: 72 };
-  const fetchMock = server({
+  server({
     recordReplies: [{ body: { record: null } }, { body: record }],
     history: [{ body: { records: [earlier] } }, { body: { records: [earlier, record] } }],
   });
@@ -81,8 +81,11 @@ test('saving reloads the trend so the new value counts at once', async () => {
   fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
   const row = await screen.findByRole('row', { name: /체중.*−1\.5kg/ });
-  expect(within(row).getAllByText('−1.5kg')).toHaveLength(3);
-  expect(fetchMock.mock.calls[0]).toBeDefined();
+  expect(
+    within(row)
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent),
+  ).toEqual(['−1.5kg3/10~3/15', '−1.5kg3/10~3/15', '−1.5kg3/10~3/15']);
 });
 
 test('the trend asks for the 90 days ending on the day shown', async () => {
@@ -94,7 +97,7 @@ test('the trend asks for the 90 days ending on the day shown', async () => {
   );
 });
 
-test('a window with one measurement says there is not enough', async () => {
+test('each window shows its own change with the days it compares', async () => {
   server({
     recordReplies: [{ body: { record } }],
     history: [
@@ -111,19 +114,122 @@ test('a window with one measurement says there is not enough', async () => {
   });
   render(<BodyCard date={date} />);
   const row = await screen.findByRole('row', { name: /체중/ });
-  const cells = within(row).getAllByRole('cell');
-  expect(cells.map((cell) => cell.textContent)).toEqual(['−0.5kg', '−0.5kg', '−4.5kg']);
+  expect(
+    within(row)
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent),
+  ).toEqual(['−0.5kg3/14~3/15', '−0.5kg3/14~3/15', '−4.5kg1/10~3/15']);
   expect(screen.queryByRole('row', { name: /허리둘레/ })).not.toBeInTheDocument();
 });
 
-test('a trend that fails to load leaves today usable', async () => {
+test('a window with one measurement says there is not enough', async () => {
+  server({
+    recordReplies: [{ body: { record } }],
+    history: [{ body: { records: [{ ...record, date: '2026-01-10', weightKg: 75 }, record] } }],
+  });
+  render(<BodyCard date={date} />);
+  const row = await screen.findByRole('row', { name: /체중/ });
+  expect(
+    within(row)
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent),
+  ).toEqual(['기록 부족', '기록 부족', '−4.5kg1/10~3/15']);
+});
+
+test('a trend that fails to load leaves today usable and can be retried', async () => {
+  const earlier = { ...record, date: '2026-03-10', weightKg: 72 };
   server({
     recordReplies: [{ body: { record: null } }],
-    history: [{ status: 500, body: { error: '서버 오류가 발생했습니다' } }],
+    history: [
+      { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+      { body: { records: [earlier, record] } },
+    ],
   });
   render(<BodyCard date={date} />);
   expect(await screen.findByLabelText('체중 (kg)')).toBeEnabled();
-  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  expect(await screen.findByRole('alert')).toHaveTextContent('기간별 변화를 불러오지 못했습니다');
+
+  fireEvent.click(screen.getByRole('button', { name: '변화 다시 불러오기' }));
+  expect(await screen.findByRole('row', { name: /체중/ })).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '변화 다시 불러오기' })).not.toBeInTheDocument();
+});
+
+test('when both fail, one retry brings back the record and the trend', async () => {
+  const earlier = { ...record, date: '2026-03-10', weightKg: 72 };
+  server({
+    recordReplies: [
+      { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+      { body: { record } },
+    ],
+    history: [
+      { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+      { body: { records: [earlier, record] } },
+    ],
+  });
+  render(<BodyCard date={date} />);
+  await screen.findByText('기간별 변화를 불러오지 못했습니다');
+  await screen.findByText('서버 오류가 발생했습니다');
+  expect(screen.queryByRole('button', { name: '변화 다시 불러오기' })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+  expect(await screen.findByText('70.5kg')).toBeInTheDocument();
+  expect(await screen.findByRole('row', { name: /체중/ })).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('a slow older trend does not overwrite the one that includes a save', async () => {
+  const earlier = { ...record, date: '2026-03-10', weightKg: 72 };
+  let finishFirst = (_response: Response) => {};
+  let historyCalls = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string, init?: RequestInit) => {
+      if (url.startsWith('/api/body?')) {
+        historyCalls += 1;
+        if (historyCalls === 1) return new Promise((resolve) => (finishFirst = resolve));
+        return Promise.resolve(new Response(JSON.stringify({ records: [earlier, record] })));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify(init?.method === 'PUT' ? record : { record: null })),
+      );
+    }),
+  );
+  render(<BodyCard date={date} />);
+  fireEvent.change(await screen.findByLabelText('체중 (kg)'), { target: { value: '70.5' } });
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  await screen.findByRole('row', { name: /체중.*−1\.5kg/ });
+
+  finishFirst(new Response(JSON.stringify({ records: [earlier] })));
+  await new Promise((resolve) => setTimeout(resolve));
+  expect(screen.getByRole('row', { name: /체중.*−1\.5kg/ })).toBeInTheDocument();
+});
+
+test('a save that fails after leaving the day still says so', async () => {
+  const shown = vi.spyOn(toast, 'error');
+  let failSave = (_response: Response) => {};
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') return new Promise((resolve) => (failSave = resolve));
+      return Promise.resolve(
+        new Response(
+          JSON.stringify(url.startsWith('/api/body?') ? { records: [] } : { record: null }),
+        ),
+      );
+    }),
+  );
+  const { unmount } = render(<BodyCard date={date} />);
+  fireEvent.change(await screen.findByLabelText('체중 (kg)'), { target: { value: '70.5' } });
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  unmount();
+
+  failSave(new Response(JSON.stringify({ error: '서버 오류가 발생했습니다' }), { status: 500 }));
+  await waitFor(() =>
+    expect(shown).toHaveBeenCalledWith(
+      `${date} 신체 기록을 저장하지 못했습니다: 서버 오류가 발생했습니다`,
+    ),
+  );
 });
 
 test('a failed load hides the form so an unseen record cannot be overwritten', async () => {
@@ -155,19 +261,22 @@ test('a server rejection keeps the form and the typed values', async () => {
   fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent('함께 입력해 주세요');
-  expect(screen.getByLabelText('수축기 혈압 (mmHg)')).toHaveValue(120);
+  expect(screen.getByLabelText('수축기 혈압 (mmHg)')).toHaveValue('120');
   expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
 });
 
-test('text a number field cannot read is reported instead of dropped', async () => {
+test('a comma decimal is refused, never read as ten times the value', async () => {
   const fetchMock = server({ recordReplies: [{ body: { record: null } }] });
   render(<BodyCard date={date} />);
   const weight = await screen.findByLabelText('체중 (kg)');
-  // jsdom never reports badInput; a real browser does for text like "70,5".
-  Object.defineProperty(weight, 'validity', { value: { badInput: true } });
+  fireEvent.change(weight, { target: { value: '49,5' } });
+  expect(weight).toHaveValue('49,5');
   fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('체중 (kg)의 입력값을 확인해 주세요');
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    '체중 (kg): 숫자만 입력해 주세요. 소수점은 마침표로 씁니다',
+  );
+  expect(weight).toHaveValue('49,5');
   expect(
     fetchMock.mock.calls.some(
       (args) => (args as unknown as [string, RequestInit])[1]?.method === 'PUT',
@@ -183,8 +292,8 @@ test('editing starts from the record and cancel changes nothing', async () => {
 
   fireEvent.click(screen.getByRole('button', { name: '수정' }));
   const weight = screen.getByLabelText('체중 (kg)');
-  expect(weight).toHaveValue(70.5);
-  expect(screen.getByLabelText('체지방률 (%)')).toHaveValue(null);
+  expect(weight).toHaveValue('70.5');
+  expect(screen.getByLabelText('체지방률 (%)')).toHaveValue('');
   expect(screen.getByLabelText('메모')).toHaveValue('공복');
   fireEvent.change(weight, { target: { value: '60' } });
   fireEvent.click(screen.getByRole('button', { name: '취소' }));
@@ -213,7 +322,7 @@ test('deleting asks first, then offers the form again and reloads the trend', as
   ).toBe(false);
   fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }));
 
-  expect(await screen.findByLabelText('체중 (kg)')).toHaveValue(null);
+  expect(await screen.findByLabelText('체중 (kg)')).toHaveValue('');
   expect(success).toHaveBeenCalledWith('삭제했습니다');
   await waitFor(() =>
     expect(

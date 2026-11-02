@@ -38,6 +38,13 @@ export function changeOver(
   return { amount, from: first.date, to: last.date };
 }
 
+const monthDay = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
+
+/** The measurements a change compares, such as 3/9~3/10. */
+export function formatSpan(change: Change) {
+  return `${monthDay(change.from)}~${monthDay(change.to)}`;
+}
+
 export function formatChange(change: Change, unit: string) {
   if (change.amount === 0) return `변화 없음`;
   return `${change.amount > 0 ? '+' : '−'}${Math.abs(change.amount)}${unit}`;

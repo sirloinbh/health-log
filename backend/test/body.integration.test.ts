@@ -124,24 +124,32 @@ test('deleting removes the record and a second delete is 404', { skip }, async (
   });
 });
 
-test('the database itself refuses what the API refuses', { skip }, async () => {
-  const insert = (column: string, ...values: number[]) => {
-    const columns = column.split(',');
-    const places = values.map((_, index) => `$${index + 2}`).join(', ');
-    return pool.query(
-      `INSERT INTO body_records (record_date, ${columns.join(', ')}) VALUES ($1, ${places})`,
-      ['1990-02-06', ...values],
-    );
-  };
-  const attempts: [string, ...number[]][] = [
-    ['weight_kg', 0],
-    ['body_fat_percent', 100.5],
-    ['waist_cm', -1],
-    ['systolic_mmhg', 120],
-    ['diastolic_mmhg', 80],
-    ['systolic_mmhg,diastolic_mmhg', 80, 90],
-  ];
-  for (const [column, ...values] of attempts) {
-    await assert.rejects(insert(column, ...values), { code: '23514' }, column);
-  }
-});
+test(
+  'the database itself refuses values out of range and lone blood pressure',
+  { skip },
+  async () => {
+    const insert = (column: string, ...values: number[]) => {
+      const columns = column.split(',');
+      const places = values.map((_, index) => `$${index + 2}`).join(', ');
+      return pool.query(
+        `INSERT INTO body_records (record_date, ${columns.join(', ')}) VALUES ($1, ${places})`,
+        ['1990-02-06', ...values],
+      );
+    };
+    const attempts: [string, ...number[]][] = [
+      ['weight_kg', 0],
+      ['body_fat_percent', 100.5],
+      ['waist_cm', -1],
+      ['systolic_mmhg', 120],
+      ['diastolic_mmhg', 80],
+      ['systolic_mmhg,diastolic_mmhg', 80, 90],
+      ['systolic_mmhg,diastolic_mmhg', 49, 30],
+      ['systolic_mmhg,diastolic_mmhg', 301, 80],
+      ['systolic_mmhg,diastolic_mmhg', 120, 19],
+      ['systolic_mmhg,diastolic_mmhg', 250, 201],
+    ];
+    for (const [column, ...values] of attempts) {
+      await assert.rejects(insert(column, ...values), { code: '23514' }, column);
+    }
+  },
+);

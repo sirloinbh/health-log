@@ -38,3 +38,7 @@ Docker 데몬이 `500 Internal Server Error`로 응답하지 않아 `scripts/bac
 - **Docker로 실제 실행:** `scripts/backup.ps1`과 `database/README.md`의 Docker 명령은 아직 실행하지 못했다. 데몬이 정상일 때 문서대로 처음부터 복원해 본다.
 - **PC 밖 보관 위치:** 사용자가 정한다. 이 저장소는 OneDrive 폴더 안에 있어 `backups/`도 OneDrive로 동기화될 수 있다. 의료 기록이 클라우드에 올라가는 셈이므로 동기화 여부를 함께 확인한다.
 - 서버의 `deploy/backup.sh`는 이번 범위가 아니다. 서버 배포 전에 확인한다.
+
+## 변경 — 신체 기록 반영
+
+#44 병합에 맞춰 행 수 비교 목록에 `body_records`를 더했다. 임시 DB 복원 검증은 이 테이블이 생기기 전에 했다.

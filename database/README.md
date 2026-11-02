@@ -40,7 +40,7 @@ docker compose exec -T db rm -f /tmp/restore.sql
 두 DB에서 같은 명령을 실행해 테이블별 행 수를 비교한다. 기록 테이블이 늘면 목록에 더한다.
 
 ```powershell
-foreach ($db in 'health', 'health_restore') { docker compose exec -T db sh -c "psql -U `"`$POSTGRES_USER`" -d $db -At -c `"SELECT 'foods', count(*) FROM foods UNION ALL SELECT 'sleep_records', count(*) FROM sleep_records UNION ALL SELECT 'meal_entries', count(*) FROM meal_entries ORDER BY 1`"" }
+foreach ($db in 'health', 'health_restore') { docker compose exec -T db sh -c "psql -U `"`$POSTGRES_USER`" -d $db -At -c `"SELECT 'foods', count(*) FROM foods UNION ALL SELECT 'sleep_records', count(*) FROM sleep_records UNION ALL SELECT 'meal_entries', count(*) FROM meal_entries UNION ALL SELECT 'body_records', count(*) FROM body_records ORDER BY 1`"" }
 ```
 
 ### 교체

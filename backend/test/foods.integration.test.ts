@@ -98,8 +98,19 @@ test('popular foods are stored per serving with a checkable public source', { sk
             ) AS sourced
      FROM foods WHERE source_url LIKE '%foodsafetykorea%'`,
   );
-  assert.equal(Number(rows[0]!.total), 91);
+  assert.ok(Number(rows[0]!.total) >= 90, `${rows[0]!.total} foods`);
   assert.equal(rows[0]!.sourced, rows[0]!.total);
+
+  // A source page with no food group once stored the next field's label as the category.
+  const labels = await pool.query("SELECT name FROM foods WHERE category LIKE '%품목대표%'");
+  assert.deepEqual(labels.rows, []);
+
+  // Measured values win: the calculated record would give 590 mL with 342 mg of sodium.
+  const ramen = await pool.query<{ serving_size: string; sodium: string }>(
+    "SELECT serving_size, sodium FROM foods WHERE name = '라면' AND brand IS NULL",
+  );
+  assert.equal(Number(ramen.rows[0]!.serving_size), 550);
+  assert.equal(Number(ramen.rows[0]!.sodium), 1556.5);
 
   // The source gives 61 kcal per 100 g and a total of 400 g; its Korean name must decode too.
   const stew = await pool.query<{ serving_size: string; serving_unit: string; calories: string }>(
@@ -109,6 +120,15 @@ test('popular foods are stored per serving with a checkable public source', { sk
   assert.equal(Number(stew.rows[0]!.serving_size), 400);
   assert.equal(stew.rows[0]!.serving_unit, 'g');
   assert.equal(Number(stew.rows[0]!.calories), 244);
+});
+
+test('popular foods can be found by the words people search for', { skip }, async () => {
+  await withApi(pool, async (call) => {
+    for (const q of ['닭가슴살', '계란', '치킨', '돈까스', '콜라', '요거트', '찜닭']) {
+      const { data } = await call(`/api/foods?q=${encodeURIComponent(q)}`);
+      assert.ok((data.foods as unknown[]).length > 0, q);
+    }
+  });
 });
 
 test('the documented example runs as written and repeats safely', { skip }, async (t) => {

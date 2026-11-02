@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 
+import { BodyCard } from './body';
 import { Button } from './components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from './components/ui/card';
 import { Input } from './components/ui/input';
@@ -125,6 +126,7 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
       <div className="grid gap-4 md:grid-cols-2">
         <SleepCard key={date} date={date} />
         <MealCard key={`meal-${date}`} date={date} />
+        <BodyCard key={`body-${date}`} date={date} />
         {sections.map((title) => (
           <Card key={title}>
             <CardHeader>

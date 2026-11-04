@@ -156,6 +156,7 @@ test.each([
   ['세트', ['1,5'], '샘플 햇반 수량: 숫자만 입력해 주세요. 소수점은 마침표로 씁니다'],
   ['세트', ['0'], '샘플 햇반 수량을 0보다 큰 숫자로 입력해 주세요'],
   ['세트', ['1.555'], '샘플 햇반 수량은 소수 둘째 자리까지 입력해 주세요'],
+  ['세트', ['1000'], '샘플 햇반 수량은 999 이하로 입력해 주세요'],
 ])('name %j with quantities %j is refused before sending', async (name, quantities, message) => {
   const fetchMock = serve(() => json({ combos: [] }));
   open();
@@ -234,7 +235,7 @@ test('a server rejection keeps the dialog open with its message and what was typ
   expect(within(dialog).getByRole('button', { name: '저장' })).toBeEnabled();
 });
 
-test('deleting asks first, then the list is read again', async () => {
+test('deleting asks first, reads the list again, and keeps keyboard focus on the page', async () => {
   let deleted = false;
   const fetchMock = serve((_url, init) => {
     if (init?.method === 'DELETE') {
@@ -253,6 +254,10 @@ test('deleting asks first, then the list is read again', async () => {
   expect(writes(fetchMock).map(([url, init]) => [url, init?.method])).toEqual([
     ['/api/combos/9', 'DELETE'],
   ]);
+  // The deleted card took its buttons with it; focus goes to the page title, not to the body.
+  await vi.waitFor(() =>
+    expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1, name: '조합' })),
+  );
 });
 
 test('a combo already gone counts as deleted', async () => {

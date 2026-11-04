@@ -25,6 +25,8 @@ import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-in
 
 /** The most foods one combo holds; the server and database refuse more. */
 const maxItems = 20;
+/** The largest quantity of one food, as for a single meal entry. */
+const maxServings = 999;
 
 type FoodOption = {
   id: number;
@@ -47,6 +49,8 @@ function readDraft(name: string, items: DraftItem[]) {
     const servings = parseAmount(item.servings);
     if (servings === undefined) return unreadableAmount(label);
     if (servings === null || !(servings > 0)) return `${label}을 0보다 큰 숫자로 입력해 주세요`;
+    // The server says only "수량이 너무 큽니다"; here the message can name the food.
+    if (servings > maxServings) return `${label}은 ${maxServings} 이하로 입력해 주세요`;
     if (!hasTwoDecimalsAtMost(servings)) return `${label}은 소수 둘째 자리까지 입력해 주세요`;
     read.push({ foodId: item.foodId, servings });
   }
@@ -336,6 +340,15 @@ export function CombosPage() {
   const [editing, setEditing] = useState<Combo | 'new' | null>(null);
   const { notice, error, clear } = useNotice();
   const latestLoad = useRef(0);
+  const [moveFocus, setMoveFocus] = useState(0);
+  const heading = useRef<HTMLHeadingElement>(null);
+
+  // A deleted combo takes its buttons with it, and a closing dialog restores focus on a timer first.
+  useEffect(() => {
+    if (!moveFocus) return;
+    const timer = setTimeout(() => heading.current?.focus(), 0);
+    return () => clearTimeout(timer);
+  }, [moveFocus]);
 
   const load = useCallback(async () => {
     // A slow older read must not overwrite a newer one.
@@ -366,13 +379,16 @@ export function CombosPage() {
       }
     }
     toast.success('삭제했습니다');
+    setMoveFocus((count) => count + 1);
     void load();
   };
 
   return (
     <section aria-labelledby="page-title" className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
-        <h1 id="page-title">조합</h1>
+        <h1 id="page-title" ref={heading} tabIndex={-1} className="outline-none">
+          조합
+        </h1>
         <p className="text-body text-muted-foreground">
           자주 함께 먹는 음식을 묶어 두고, 하루 기록의 식단 카드에서 한 번에 기록합니다.
         </p>

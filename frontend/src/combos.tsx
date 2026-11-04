@@ -379,6 +379,9 @@ export function CombosPage() {
       }
     }
     toast.success('삭제했습니다');
+    // Drop the card now: if it stayed until the reload, the closing dialog would hand focus back
+    // to its delete button, and focus would fall to the body when the reload removes it.
+    setCombos((list) => list?.filter((item) => item.id !== combo.id) ?? list);
     setMoveFocus((count) => count + 1);
     void load();
   };

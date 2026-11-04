@@ -260,6 +260,31 @@ test('deleting asks first, reads the list again, and keeps keyboard focus on the
   );
 });
 
+test('a deleted combo leaves the screen before the list is read again', async () => {
+  let deleted = false;
+  let finish = (_response: Response) => {};
+  serve((_url, init) => {
+    if (init?.method === 'DELETE') {
+      deleted = true;
+      return json(null, 204);
+    }
+    // The reload after deleting hangs until the test lets it go.
+    return deleted
+      ? new Promise<Response>((resolve) => (finish = resolve))
+      : json({ combos: [breakfast] });
+  });
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '아침 세트 삭제' }));
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '삭제' }));
+
+  await vi.waitFor(() =>
+    expect(screen.queryByRole('heading', { level: 2, name: '아침 세트' })).not.toBeInTheDocument(),
+  );
+  expect(screen.queryByRole('button', { name: '아침 세트 삭제' })).not.toBeInTheDocument();
+  finish(json({ combos: [] }));
+  expect(await screen.findByText('조합이 없습니다')).toBeInTheDocument();
+});
+
 test('a combo already gone counts as deleted', async () => {
   let deleted = false;
   serve((_url, init) => {

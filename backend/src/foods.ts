@@ -172,6 +172,9 @@ const inputValues = (food: z.infer<typeof foodInput>) => [
   food.checkedOn,
 ];
 
+/** How many recently eaten foods the meal card offers before any search. */
+const recentLimit = 10;
+
 // A search for "100%" means those characters, not a LIKE wildcard.
 const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, '\\$&')}%`;
 
@@ -196,6 +199,23 @@ export function foodsRouter(pool: Pool, today: () => string, limits: RateLimitSe
        ORDER BY name, brand NULLS FIRST
        LIMIT 100`,
       [q, likePattern(q)],
+    );
+    res.json({ foods: rows.map(toFood) });
+  });
+
+  // Stored foods by when they were last recorded, each once. Typed-in entries have no food, and an
+  // entry whose food was removed has lost its link, so neither can show up.
+  router.get('/recent', async (_req, res) => {
+    const { rows } = await pool.query<FoodRow>(
+      `SELECT ${columns} FROM foods
+       JOIN (
+         SELECT food_id, max(id) AS last_entry FROM meal_entries
+         WHERE food_id IS NOT NULL
+         GROUP BY food_id
+         ORDER BY last_entry DESC
+         LIMIT ${recentLimit}
+       ) recent ON recent.food_id = foods.id
+       ORDER BY recent.last_entry DESC`,
     );
     res.json({ foods: rows.map(toFood) });
   });

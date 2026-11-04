@@ -191,8 +191,13 @@ function AddEntry({
   const [pending, setPending] = useState<string | null>(null);
   // Stored foods last recorded, so a usual food needs no search. null until read, or if it failed.
   const [recent, setRecent] = useState<FoodOption[] | null>(null);
-  const [recentFailed, setRecentFailed] = useState(false);
+  // Why the list could not be read. Kept apart from the add errors below, which the next action
+  // clears: this one stays with its retry button until a read succeeds.
+  const [recentFailure, setRecentFailure] = useState<string | null>(null);
   const latestRecent = useRef(0);
+  const recentHeading = useRef<HTMLParagraphElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const [focusAfterRetry, setFocusAfterRetry] = useState(0);
   // Combos are read only when asked for, so a day opens with no extra request.
   const [combos, setCombos] = useState<Combo[] | null>(null);
   const [loadingCombos, setLoadingCombos] = useState(false);
@@ -213,24 +218,37 @@ function AddEntry({
     clearTyped();
   };
 
+  /** Resolves to whether this read is the one now on screen. */
   const loadRecent = useCallback(async () => {
     // A slow older read must not put back an order that a newer one already replaced.
     const request = ++latestRecent.current;
     try {
       const data = await requestJson<{ foods: FoodOption[] }>('/api/foods/recent');
-      if (request !== latestRecent.current) return;
+      if (request !== latestRecent.current) return false;
       setRecent(data.foods);
-      setRecentFailed(false);
+      setRecentFailure(null);
+      return true;
     } catch (cause) {
-      if (request !== latestRecent.current) return;
-      setRecentFailed(true);
-      recentError(cause);
+      if (request === latestRecent.current) setRecentFailure(errorText(cause));
+      return false;
     }
-  }, [recentError]);
+  }, []);
 
   useEffect(() => {
     void loadRecent();
   }, [loadRecent]);
+
+  // The retry button goes away once the read works. Focus moves to the list's heading, or to the
+  // search when there is still nothing to offer, instead of falling to the page.
+  useEffect(() => {
+    if (!focusAfterRetry) return;
+    const timer = setTimeout(() => (recentHeading.current ?? searchInput.current)?.focus(), 0);
+    return () => clearTimeout(timer);
+  }, [focusAfterRetry]);
+
+  const retryRecent = async () => {
+    if (await loadRecent()) setFocusAfterRetry((count) => count + 1);
+  };
 
   const copyMeal = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -399,16 +417,25 @@ function AddEntry({
         />
       </div>
       {/* Shown only once there is something to offer, or a reason it could not be read. */}
-      {recent?.length || recentFailed ? (
+      {recent?.length || recentFailure ? (
         <section aria-label="최근 먹은 음식" className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-body-sm font-medium">최근 먹은 음식</p>
-            {recentFailed ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => void loadRecent()}>
+            <p ref={recentHeading} tabIndex={-1} className="text-body-sm font-medium outline-none">
+              최근 먹은 음식
+            </p>
+            {recentFailure ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => void retryRecent()}>
                 다시 불러오기
               </Button>
             ) : null}
           </div>
+          <Notice
+            notice={
+              recentFailure
+                ? { kind: 'error', text: `최근 먹은 음식을 불러오지 못했습니다: ${recentFailure}` }
+                : undefined
+            }
+          />
           {recent?.length ? (
             <FoodChoices
               label="최근 먹은 음식 목록"
@@ -423,6 +450,7 @@ function AddEntry({
       ) : null}
       <form role="search" onSubmit={(event) => void search(event)} className="flex gap-2">
         <Input
+          ref={searchInput}
           type="search"
           aria-label="음식 검색"
           placeholder="이름 또는 브랜드"

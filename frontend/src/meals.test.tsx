@@ -870,14 +870,25 @@ test('recent foods that cannot be read say why and can be read again', async () 
     fail
       ? new Response(JSON.stringify({ error: '서버 오류가 발생했습니다' }), { status: 500 })
       : new Response(JSON.stringify({ foods: [recentRice] }));
-  server({ body: emptyDay });
+  server({ body: emptyDay }, { body: { foods: [] } });
   render(<MealCard date={date} />);
   const section = await screen.findByRole('region', { name: '최근 먹은 음식' });
-  expect(await within(section).findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  expect(await within(section).findByRole('alert')).toHaveTextContent(
+    '최근 먹은 음식을 불러오지 못했습니다: 서버 오류가 발생했습니다',
+  );
+  // Another action clears its own messages, not the reason the retry button is there.
+  fireEvent.change(screen.getByLabelText('음식 검색'), { target: { value: '없는 음식' } });
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  await screen.findByText(/찾는 음식이 없습니다/);
+  expect(within(section).getByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+
   fail = false;
   fireEvent.click(within(section).getByRole('button', { name: '다시 불러오기' }));
   expect(await within(section).findByRole('button', { name: '샘플 햇반 추가' })).toBeEnabled();
   expect(within(section).queryByRole('button', { name: '다시 불러오기' })).not.toBeInTheDocument();
+  expect(within(section).queryByRole('alert')).not.toBeInTheDocument();
+  // The retry button is gone, so focus goes to the list's heading rather than the page.
+  await waitFor(() => expect(document.activeElement).toHaveTextContent('최근 먹은 음식'));
 });
 
 test('recording a combo or a copy reads the recent foods again; typed food does not', async () => {

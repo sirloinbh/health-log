@@ -48,8 +48,9 @@ const addFood = async (name: string, calories: number) => {
 };
 
 // The list covers every food in the database, and other test files record meals at the same time.
-// Only this file's foods are compared. Pushing them out of the ten would take more than seven other
-// foods recorded in the moment between the last record and the read.
+// Only this file's foods are compared. Pushing one of them out of the ten would take more than seven
+// other foods recorded between this file's oldest record in the test and the read, a few
+// milliseconds in which the other files record only a handful of foods.
 const ours = (foods: Food[]) => foods.filter((food) => food.name.startsWith(prefix));
 
 test('each food shows once, by when it was last recorded', { skip }, async () => {
@@ -85,6 +86,31 @@ test('each food shows once, by when it was last recorded', { skip }, async () =>
         [soup, 80],
       ],
     );
+  });
+});
+
+test('typed-in food takes none of the ten places', { skip }, async () => {
+  const foodIds: number[] = [];
+  for (let index = 0; index < 10; index += 1) {
+    foodIds.push(await addFood(`slot-${index}`, 10 + index));
+  }
+  await withApi(pool, async (call) => {
+    for (const foodId of foodIds) {
+      await call(`/api/meals/${days[2]}`, {
+        method: 'POST',
+        body: { meal: 'breakfast', servings: 1, foodId },
+      });
+    }
+    // The newest record of all has no food. Counted as a group of its own, it would take a place
+    // and leave nine foods.
+    await call(`/api/meals/${days[2]}`, {
+      method: 'POST',
+      body: { meal: 'snack', servings: 1, name: `${prefix}typed slot`, calories: 10 },
+    });
+    const foods = (await call('/api/foods/recent')).data.foods as Food[];
+    // Ten whoever recorded them: this file alone recorded ten different foods just now.
+    assert.equal(foods.length, 10);
+    assert.ok(!foods.some((food) => food.name === `${prefix}typed slot`));
   });
 });
 

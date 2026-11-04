@@ -694,3 +694,73 @@ test('a combo the server refuses says why and records nothing on screen', async 
   expect(screen.getByText('아직 기록한 식사가 없습니다.')).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(3);
 });
+
+const copyForm = () => screen.getByRole('form', { name: '다른 날에서 복사' });
+
+test('the chosen meal of the day before is copied by default', async () => {
+  const fetchMock = server({ body: emptyDay }, { status: 201, body: oneEntry });
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  fireEvent.click(screen.getByRole('button', { name: '점심' }));
+  const form = copyForm();
+  expect(within(form).getByLabelText('복사할 날짜')).toHaveValue('2026-03-14');
+  fireEvent.click(within(form).getByRole('button', { name: '점심 복사' }));
+
+  const lunch = await screen.findByRole('region', { name: '점심' });
+  expect(within(lunch).getByText('버거집 치즈버거')).toBeInTheDocument();
+  expect(request(fetchMock, 1)).toEqual({
+    url: `/api/meals/${date}/copy`,
+    method: 'POST',
+    body: { from: '2026-03-14', meal: 'lunch' },
+  });
+});
+
+test('any other day can be the one copied', async () => {
+  const fetchMock = server({ body: emptyDay }, { status: 201, body: oneEntry });
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  const form = copyForm();
+  fireEvent.change(within(form).getByLabelText('복사할 날짜'), {
+    target: { value: '2026-03-01' },
+  });
+  fireEvent.click(within(form).getByRole('button', { name: '아침 복사' }));
+  await screen.findByText('버거집 치즈버거');
+  expect(request(fetchMock, 1).body).toEqual({ from: '2026-03-01', meal: 'breakfast' });
+});
+
+test.each([
+  ['', '복사할 날짜를 골라 주세요'],
+  [date, '다른 날짜를 골라 주세요'],
+])('copy from %j is refused before sending', async (from, message) => {
+  const fetchMock = server({ body: emptyDay });
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  const form = copyForm();
+  fireEvent.change(within(form).getByLabelText('복사할 날짜'), { target: { value: from } });
+  fireEvent.click(within(form).getByRole('button', { name: '아침 복사' }));
+  expect(await within(form).findByRole('alert')).toHaveTextContent(message);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+test('a meal with nothing to copy says which day and meal were empty', async () => {
+  server({ body: emptyDay }, { status: 404, body: { error: '복사할 기록이 없습니다' } });
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  fireEvent.click(screen.getByRole('button', { name: '저녁' }));
+  const form = copyForm();
+  fireEvent.click(within(form).getByRole('button', { name: '저녁 복사' }));
+  expect(await within(form).findByRole('alert')).toHaveTextContent(
+    '2026년 3월 14일 토요일 저녁에 복사할 기록이 없습니다',
+  );
+  expect(screen.getByText('아직 기록한 식사가 없습니다.')).toBeInTheDocument();
+  expect(within(form).getByRole('button', { name: '저녁 복사' })).toBeEnabled();
+});
+
+test('another failure to copy shows the server message next to the copy button', async () => {
+  server({ body: emptyDay }, { status: 500, body: { error: '서버 오류가 발생했습니다' } });
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  const form = copyForm();
+  fireEvent.click(within(form).getByRole('button', { name: '아침 복사' }));
+  expect(await within(form).findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+});

@@ -124,6 +124,50 @@ function EntryRow({
   );
 }
 
+/** Stored foods, each with its own add button. Search results and recent foods look the same. */
+function FoodChoices({
+  label,
+  foods,
+  adding,
+  waiting,
+  onAdd,
+}: {
+  label: string;
+  foods: FoodOption[];
+  adding: boolean;
+  /** The food whose add button is waiting, if it is in this list. */
+  waiting: number | null;
+  onAdd: (food: FoodOption) => void;
+}) {
+  return (
+    <ul aria-label={label} className="flex max-h-80 flex-col divide-y overflow-y-auto">
+      {foods.map((food) => (
+        <li key={food.id} className="flex items-center justify-between gap-3 py-2">
+          <div className="flex min-w-0 flex-col">
+            <span className="wrap-anywhere">{fullName(food)}</span>
+            <span className="text-caption text-muted-foreground">
+              1회 {food.servingSize}
+              {food.servingUnit} ·{' '}
+              {food.calories === null ? '칼로리 값 없음' : `${food.calories}kcal`}
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={adding}
+            aria-busy={waiting === food.id || undefined}
+            aria-label={`${fullName(food)} 추가`}
+            onClick={() => onAdd(food)}
+          >
+            {waiting === food.id ? <Spinner size="sm" label="기록하는 중" /> : null}
+            추가
+          </Button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function AddEntry({
   date,
   adding,
@@ -143,12 +187,23 @@ function AddEntry({
   const [searching, setSearching] = useState(false);
   const [name, setName] = useState('');
   const [calories, setCalories] = useState('');
-  // Which button is waiting: `food-<id>`, `combo-<id>`, 'copy' or 'typed'.
+  // Which button is waiting: `search-<id>`, `recent-<id>`, `combo-<id>`, 'copy' or 'typed'.
   const [pending, setPending] = useState<string | null>(null);
+  // Stored foods last recorded, so a usual food needs no search. null until read, or if it failed.
+  const [recent, setRecent] = useState<FoodOption[] | null>(null);
+  // Why the list could not be read. Kept apart from the add errors below, which the next action
+  // clears: this one stays with its retry button until a read succeeds.
+  const [recentFailure, setRecentFailure] = useState<string | null>(null);
+  const latestRecent = useRef(0);
+  const recentHeading = useRef<HTMLParagraphElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const [focusAfterRetry, setFocusAfterRetry] = useState(0);
+  const focusAfterRead = useRef(false);
   // Combos are read only when asked for, so a day opens with no extra request.
   const [combos, setCombos] = useState<Combo[] | null>(null);
   const [loadingCombos, setLoadingCombos] = useState(false);
   // A long result list sits between the forms, so each shows its errors next to its own buttons.
+  const { notice: recentNotice, error: recentError, clear: clearRecent } = useNotice();
   const { notice: listNotice, error: listError, clear: clearList } = useNotice();
   const { notice: comboNotice, error: comboError, clear: clearCombo } = useNotice();
   const { notice: copyNotice, error: copyError, clear: clearCopy } = useNotice();
@@ -157,10 +212,50 @@ function AddEntry({
   const mealLabel = meals.find(({ key }) => key === meal)!.label;
 
   const clear = () => {
+    clearRecent();
     clearList();
     clearCombo();
     clearCopy();
     clearTyped();
+  };
+
+  const loadRecent = useCallback(async () => {
+    // A slow older read must not put back an order that a newer one already replaced.
+    const request = ++latestRecent.current;
+    try {
+      const data = await requestJson<{ foods: FoodOption[] }>('/api/foods/recent');
+      if (request !== latestRecent.current) return;
+      setRecent(data.foods);
+      setRecentFailure(null);
+      // Whichever read clears the failure removes the retry button, even one started by an add
+      // that finished after the retry was pressed.
+      if (focusAfterRead.current) {
+        focusAfterRead.current = false;
+        setFocusAfterRetry((count) => count + 1);
+      }
+    } catch (cause) {
+      if (request !== latestRecent.current) return;
+      setRecentFailure(errorText(cause));
+      // The retry button is still there, and focus with it.
+      focusAfterRead.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadRecent();
+  }, [loadRecent]);
+
+  // The retry button goes away once the read works. Focus moves to the list's heading, or to the
+  // search when there is still nothing to offer, instead of falling to the page.
+  useEffect(() => {
+    if (!focusAfterRetry) return;
+    const timer = setTimeout(() => (recentHeading.current ?? searchInput.current)?.focus(), 0);
+    return () => clearTimeout(timer);
+  }, [focusAfterRetry]);
+
+  const retryRecent = () => {
+    focusAfterRead.current = true;
+    void loadRecent();
   };
 
   const copyMeal = async (event: FormEvent<HTMLFormElement>) => {
@@ -176,7 +271,7 @@ function AddEntry({
     }
     setPending('copy');
     try {
-      await onAdd({ from: copyFrom, meal }, '/copy');
+      if (await onAdd({ from: copyFrom, meal }, '/copy')) void loadRecent();
     } catch (cause) {
       // Say which meal of which day was empty, not just that nothing was found.
       copyError(
@@ -204,8 +299,13 @@ function AddEntry({
   const addCombo = async (combo: Combo) => {
     clear();
     setPending(`combo-${combo.id}`);
-    await onAdd({ meal }, `/combos/${combo.id}`).catch((cause: unknown) => comboError(cause));
-    setPending(null);
+    try {
+      if (await onAdd({ meal }, `/combos/${combo.id}`)) void loadRecent();
+    } catch (cause) {
+      comboError(cause);
+    } finally {
+      setPending(null);
+    }
   };
 
   const readServings = (showError: (message: string) => void) => {
@@ -247,15 +347,24 @@ function AddEntry({
     }
   };
 
-  const addFood = async (food: FoodOption) => {
-    const value = readServings(listError);
+  /** `from` says which list was used, so the error and the spinner show next to that list. */
+  const addFood = async (food: FoodOption, from: 'search' | 'recent') => {
+    const showError = from === 'recent' ? recentError : listError;
+    const value = readServings(showError);
     if (value === null) return;
-    setPending(`food-${food.id}`);
-    await onAdd({ meal, servings: value, foodId: food.id }).catch((cause: unknown) =>
-      listError(cause),
-    );
-    setPending(null);
+    setPending(`${from}-${food.id}`);
+    try {
+      // The food just eaten moves to the top of the recent list.
+      if (await onAdd({ meal, servings: value, foodId: food.id })) void loadRecent();
+    } catch (cause) {
+      showError(cause);
+    } finally {
+      setPending(null);
+    }
   };
+
+  const waitingIn = (from: 'search' | 'recent') =>
+    pending?.startsWith(`${from}-`) ? Number(pending.slice(from.length + 1)) : null;
 
   const addTyped = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -315,8 +424,41 @@ function AddEntry({
           onChange={(event) => setServings(event.target.value)}
         />
       </div>
+      {/* Shown only once there is something to offer, or a reason it could not be read. */}
+      {recent?.length || recentFailure ? (
+        <section aria-label="최근 먹은 음식" className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <p ref={recentHeading} tabIndex={-1} className="text-body-sm font-medium outline-none">
+              최근 먹은 음식
+            </p>
+            {recentFailure ? (
+              <Button type="button" variant="outline" size="sm" onClick={retryRecent}>
+                다시 불러오기
+              </Button>
+            ) : null}
+          </div>
+          <Notice
+            notice={
+              recentFailure
+                ? { kind: 'error', text: `최근 먹은 음식을 불러오지 못했습니다: ${recentFailure}` }
+                : undefined
+            }
+          />
+          {recent?.length ? (
+            <FoodChoices
+              label="최근 먹은 음식 목록"
+              foods={recent}
+              adding={adding}
+              waiting={waitingIn('recent')}
+              onAdd={(food) => void addFood(food, 'recent')}
+            />
+          ) : null}
+          <Notice notice={recentNotice} />
+        </section>
+      ) : null}
       <form role="search" onSubmit={(event) => void search(event)} className="flex gap-2">
         <Input
+          ref={searchInput}
           type="search"
           aria-label="음식 검색"
           placeholder="이름 또는 브랜드"
@@ -343,31 +485,13 @@ function AddEntry({
             : `검색 결과 ${foods.length}건`}
       </p>
       {foods?.length ? (
-        <ul aria-label="검색 결과" className="flex max-h-80 flex-col divide-y overflow-y-auto">
-          {foods.map((food) => (
-            <li key={food.id} className="flex items-center justify-between gap-3 py-2">
-              <div className="flex min-w-0 flex-col">
-                <span className="wrap-anywhere">{fullName(food)}</span>
-                <span className="text-caption text-muted-foreground">
-                  1회 {food.servingSize}
-                  {food.servingUnit} ·{' '}
-                  {food.calories === null ? '칼로리 값 없음' : `${food.calories}kcal`}
-                </span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={adding}
-                aria-busy={pending === `food-${food.id}` || undefined}
-                aria-label={`${fullName(food)} 추가`}
-                onClick={() => void addFood(food)}
-              >
-                {pending === `food-${food.id}` ? <Spinner size="sm" label="기록하는 중" /> : null}
-                추가
-              </Button>
-            </li>
-          ))}
-        </ul>
+        <FoodChoices
+          label="검색 결과"
+          foods={foods}
+          adding={adding}
+          waiting={waitingIn('search')}
+          onAdd={(food) => void addFood(food, 'search')}
+        />
       ) : null}
       <section aria-label="조합" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">

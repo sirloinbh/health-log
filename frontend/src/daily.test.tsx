@@ -19,7 +19,13 @@ const noMeals = () =>
 
 // The day's cards load along with the page.
 const dayCard = (url: string) =>
-  url.startsWith('/api/sleep') ? noSleep() : url.startsWith('/api/meals') ? noMeals() : null;
+  url.startsWith('/api/sleep')
+    ? noSleep()
+    : url.startsWith('/api/meals')
+      ? noMeals()
+      : url === '/api/foods/recent'
+        ? new Response(JSON.stringify({ foods: [] }))
+        : null;
 
 const health = (body: object, status = 200) =>
   vi.stubGlobal(

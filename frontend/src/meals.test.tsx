@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { expect, test, vi } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 
 import { toast } from './components/ui/sonner';
 import { MealCard } from './meals';
@@ -47,6 +47,27 @@ const oneEntry = {
   },
 };
 
+// The card reads the recent foods on its own whenever it opens or records something. That read is
+// answered here, apart from the replies each test lists in order, so those stay about the day.
+let recentReply: () => Response | Promise<Response> = () =>
+  new Response(JSON.stringify({ foods: [] }));
+const recentCalls: string[] = [];
+
+beforeEach(() => {
+  recentReply = () => new Response(JSON.stringify({ foods: [] }));
+  recentCalls.length = 0;
+});
+
+const stubFetch = (inner: (url: string, init?: RequestInit) => Promise<Response>) =>
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string, init?: RequestInit) => {
+      if (url !== '/api/foods/recent') return inner(url, init);
+      recentCalls.push(url);
+      return Promise.resolve(recentReply());
+    }),
+  );
+
 type Reply = { status?: number; body?: unknown };
 
 // Answers in order, so a test states exactly what the server said to each request.
@@ -57,7 +78,7 @@ const server = (...replies: Reply[]) => {
       new Response(body === undefined ? null : JSON.stringify(body), { status }),
     );
   });
-  vi.stubGlobal('fetch', fetchMock);
+  stubFetch(fetchMock);
   return fetchMock;
 };
 
@@ -222,7 +243,7 @@ test('an entry in flight cannot be sent twice', async () => {
     .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
     .mockResolvedValueOnce(new Response(JSON.stringify({ foods: [food] })))
     .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
-  vi.stubGlobal('fetch', fetchMock);
+  stubFetch(fetchMock);
   render(<MealCard date={date} />);
   await screen.findByLabelText('음식 검색');
   const add = await searchFood();
@@ -240,7 +261,7 @@ test('the typed form also waits for its request, and shows that it is working', 
     .fn()
     .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
     .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
-  vi.stubGlobal('fetch', fetchMock);
+  stubFetch(fetchMock);
   render(<MealCard date={date} />);
   await screen.findByLabelText('음식 이름');
   fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '떡볶이' } });
@@ -262,8 +283,7 @@ test('the typed form also waits for its request, and shows that it is working', 
 
 test('the delete buttons wait while an entry is being recorded', async () => {
   let finish = (_response: Response) => {};
-  vi.stubGlobal(
-    'fetch',
+  stubFetch(
     vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(oneEntry)))
@@ -292,8 +312,7 @@ test('the next attempt clears the last error', async () => {
 
 test('a slower older search does not replace a newer one', async () => {
   const replies: ((response: Response) => void)[] = [];
-  vi.stubGlobal(
-    'fetch',
+  stubFetch(
     vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
@@ -467,8 +486,7 @@ test('a search says how many it found', async () => {
 
 test('a search in progress shows that it is working', async () => {
   let finish = (_response: Response) => {};
-  vi.stubGlobal(
-    'fetch',
+  stubFetch(
     vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
@@ -497,8 +515,7 @@ test('a read started before an entry was recorded does not undo it on screen', a
     entries: [entry, { ...entry, id: 2, name: '떡볶이', brand: null }],
     totals: emptyTotals,
   };
-  vi.stubGlobal(
-    'fetch',
+  stubFetch(
     vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(oneEntry)))
@@ -540,8 +557,7 @@ test('trying again moves focus to the card, as the button it was on goes away', 
 test('recording that succeeds after leaving the day still says so', async () => {
   const shown = vi.spyOn(toast, 'success');
   let finish = (_response: Response) => {};
-  vi.stubGlobal(
-    'fetch',
+  stubFetch(
     vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
@@ -561,8 +577,7 @@ test('recording that succeeds after leaving the day still says so', async () => 
 test('losing the answer after leaving the day does not claim it was not recorded', async () => {
   const shown = vi.spyOn(toast, 'error');
   let lose = (_cause: Error) => {};
-  vi.stubGlobal(
-    'fetch',
+  stubFetch(
     vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
@@ -586,8 +601,7 @@ test('losing the answer after leaving the day does not claim it was not recorded
 test('recording that fails after leaving the day still says so', async () => {
   const shown = vi.spyOn(toast, 'error');
   let finish = (_response: Response) => {};
-  vi.stubGlobal(
-    'fetch',
+  stubFetch(
     vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
@@ -771,7 +785,7 @@ test('while a copy is on its way the button says so and cannot copy twice', asyn
     .fn()
     .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
     .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
-  vi.stubGlobal('fetch', fetchMock);
+  stubFetch(fetchMock);
   render(<MealCard date={date} />);
   await screen.findByLabelText('음식 이름');
   const button = within(copyForm()).getByRole('button', { name: '아침 복사' });
@@ -785,4 +799,180 @@ test('while a copy is on its way the button says so and cannot copy twice', asyn
   expect(await screen.findByText('버거집 치즈버거')).toBeInTheDocument();
   expect(button).toBeEnabled();
   expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+const recentRice = {
+  id: 3,
+  name: '햇반',
+  brand: '샘플',
+  servingSize: 210,
+  servingUnit: 'g',
+  calories: 300,
+};
+const answerRecent = (...lists: object[][]) => {
+  // One list per read, in order; the last one repeats.
+  recentReply = () =>
+    new Response(JSON.stringify({ foods: lists.length > 1 ? lists.shift() : lists[0] }));
+};
+
+test('recently eaten foods are offered before any search and add with the chosen meal', async () => {
+  answerRecent([recentRice, food], [recentRice, food]);
+  const fetchMock = server({ body: emptyDay }, { status: 201, body: oneEntry });
+  render(<MealCard date={date} />);
+  const list = await screen.findByRole('list', { name: '최근 먹은 음식 목록' });
+  expect(
+    within(list)
+      .getAllByRole('listitem')
+      .map((item) => item.querySelector('span')?.textContent),
+  ).toEqual(['샘플 햇반', '버거집 치즈버거']);
+  expect(within(list).getByText('1회 210g · 300kcal')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '저녁' }));
+  fireEvent.change(screen.getByLabelText('수량 (1회 제공량 기준)'), { target: { value: '2' } });
+  fireEvent.click(within(list).getByRole('button', { name: '샘플 햇반 추가' }));
+
+  await screen.findByText('버거집 치즈버거', { selector: 'section[aria-label=점심] *' });
+  expect(request(fetchMock, 1)).toEqual({
+    url: `/api/meals/${date}`,
+    method: 'POST',
+    body: { meal: 'dinner', servings: 2, foodId: 3 },
+  });
+  // Read once on opening and again after recording, so the order follows what was just eaten.
+  await waitFor(() => expect(recentCalls).toHaveLength(2));
+});
+
+test('with nothing eaten from the store yet, there is no recent list', async () => {
+  server({ body: emptyDay });
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  await waitFor(() => expect(recentCalls).toHaveLength(1));
+  expect(screen.queryByRole('region', { name: '최근 먹은 음식' })).not.toBeInTheDocument();
+});
+
+test('a recent food refused shows why next to the recent list', async () => {
+  answerRecent([recentRice]);
+  server({ body: emptyDay }, { status: 404, body: { error: '음식을 찾을 수 없습니다' } });
+  render(<MealCard date={date} />);
+  const section = await screen.findByRole('region', { name: '최근 먹은 음식' });
+  fireEvent.change(screen.getByLabelText('수량 (1회 제공량 기준)'), { target: { value: '0' } });
+  fireEvent.click(within(section).getByRole('button', { name: '샘플 햇반 추가' }));
+  expect(await within(section).findByRole('alert')).toHaveTextContent(
+    '수량을 0보다 큰 숫자로 입력해 주세요',
+  );
+  fireEvent.change(screen.getByLabelText('수량 (1회 제공량 기준)'), { target: { value: '1' } });
+  fireEvent.click(within(section).getByRole('button', { name: '샘플 햇반 추가' }));
+  expect(await within(section).findByRole('alert')).toHaveTextContent('음식을 찾을 수 없습니다');
+  // Nothing was recorded, so the list is not read again.
+  expect(recentCalls).toHaveLength(1);
+});
+
+test('recent foods that cannot be read say why and can be read again', async () => {
+  let fail = true;
+  recentReply = () =>
+    fail
+      ? new Response(JSON.stringify({ error: '서버 오류가 발생했습니다' }), { status: 500 })
+      : new Response(JSON.stringify({ foods: [recentRice] }));
+  server({ body: emptyDay }, { body: { foods: [] } });
+  render(<MealCard date={date} />);
+  const section = await screen.findByRole('region', { name: '최근 먹은 음식' });
+  expect(await within(section).findByRole('alert')).toHaveTextContent(
+    '최근 먹은 음식을 불러오지 못했습니다: 서버 오류가 발생했습니다',
+  );
+  // Another action clears its own messages, not the reason the retry button is there.
+  fireEvent.change(screen.getByLabelText('음식 검색'), { target: { value: '없는 음식' } });
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  await screen.findByText(/찾는 음식이 없습니다/);
+  expect(within(section).getByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+
+  fail = false;
+  fireEvent.click(within(section).getByRole('button', { name: '다시 불러오기' }));
+  expect(await within(section).findByRole('button', { name: '샘플 햇반 추가' })).toBeEnabled();
+  expect(within(section).queryByRole('button', { name: '다시 불러오기' })).not.toBeInTheDocument();
+  expect(within(section).queryByRole('alert')).not.toBeInTheDocument();
+  // The retry button is gone, so focus goes to the list's heading rather than the page.
+  await waitFor(() =>
+    expect(document.activeElement).toBe(within(section).getByText('최근 먹은 음식')),
+  );
+});
+
+test('recording a combo or a copy reads the recent foods again; typed food does not', async () => {
+  const fetchMock = server(
+    { body: emptyDay },
+    { status: 201, body: oneEntry },
+    { status: 201, body: oneEntry },
+    { body: { combos: [combo] } },
+    { status: 201, body: oneEntry },
+  );
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '떡볶이' } });
+  fireEvent.change(screen.getByLabelText('1회 칼로리 (kcal)'), { target: { value: '480' } });
+  fireEvent.click(screen.getByRole('button', { name: '바로 기록' }));
+  await screen.findByText('버거집 치즈버거');
+  await waitFor(() => expect(screen.getByRole('button', { name: '바로 기록' })).toBeEnabled());
+  expect(recentCalls).toHaveLength(1);
+
+  fireEvent.click(within(copyForm()).getByRole('button', { name: '아침 복사' }));
+  await waitFor(() => expect(recentCalls).toHaveLength(2));
+
+  fireEvent.click(screen.getByRole('button', { name: '조합에서 고르기' }));
+  fireEvent.click(await screen.findByRole('button', { name: '점심 세트 기록' }));
+  await waitFor(() => expect(recentCalls).toHaveLength(3));
+  expect([0, 1, 2, 3, 4].map((call) => request(fetchMock, call).url)).toEqual([
+    `/api/meals/${date}`,
+    `/api/meals/${date}`,
+    `/api/meals/${date}/copy`,
+    '/api/combos',
+    `/api/meals/${date}/combos/9`,
+  ]);
+});
+
+test('a retry that finds nothing moves focus to the search instead', async () => {
+  let fail = true;
+  recentReply = () =>
+    fail
+      ? new Response(JSON.stringify({ error: '서버 오류가 발생했습니다' }), { status: 500 })
+      : new Response(JSON.stringify({ foods: [] }));
+  server({ body: emptyDay });
+  render(<MealCard date={date} />);
+  const section = await screen.findByRole('region', { name: '최근 먹은 음식' });
+  fail = false;
+  fireEvent.click(within(section).getByRole('button', { name: '다시 불러오기' }));
+  await waitFor(() =>
+    expect(screen.queryByRole('region', { name: '최근 먹은 음식' })).not.toBeInTheDocument(),
+  );
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('음식 검색')));
+});
+
+test('focus follows the retry even when a read started by an add answers first', async () => {
+  const fail = () =>
+    new Response(JSON.stringify({ error: '서버 오류가 발생했습니다' }), { status: 500 });
+  let finishRetry = (_response: Response) => {};
+  const replies = [
+    fail,
+    () => new Promise<Response>((resolve) => (finishRetry = resolve)),
+    () => new Response(JSON.stringify({ foods: [recentRice] })),
+  ];
+  recentReply = () => replies.shift()!();
+  let finishAdd = (_response: Response) => {};
+  stubFetch(
+    vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ foods: [food] })))
+      .mockImplementationOnce(() => new Promise((resolve) => (finishAdd = resolve))),
+  );
+  render(<MealCard date={date} />);
+  const section = await screen.findByRole('region', { name: '최근 먹은 음식' });
+  fireEvent.click(await searchFood());
+  // While the add waits, the retry starts a read; the add's own read starts after it and wins.
+  fireEvent.click(within(section).getByRole('button', { name: '다시 불러오기' }));
+  finishAdd(new Response(JSON.stringify(oneEntry), { status: 201 }));
+  expect(
+    await within(section).findByRole('button', { name: '샘플 햇반 추가' }),
+  ).toBeInTheDocument();
+  finishRetry(fail());
+  await waitFor(() =>
+    expect(document.activeElement).toBe(within(section).getByText('최근 먹은 음식')),
+  );
+  expect(within(section).queryByRole('alert')).not.toBeInTheDocument();
 });

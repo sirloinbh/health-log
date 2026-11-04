@@ -11,6 +11,7 @@ import { Notice } from './components/ui/notice';
 import { SkeletonText } from './components/ui/skeleton';
 import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
+import { formatDate, isValidDate, shiftDate } from './daily-date';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
 import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
@@ -124,21 +125,25 @@ function EntryRow({
 }
 
 function AddEntry({
+  date,
   adding,
   onAdd,
 }: {
+  date: string;
   adding: boolean;
   /** `path` follows the day's address, e.g. `/combos/3` to record a combo. */
   onAdd: (body: object, path?: string) => Promise<boolean>;
 }) {
   const [meal, setMeal] = useState<MealKey>('breakfast');
+  // "The same as yesterday" is the usual copy.
+  const [copyFrom, setCopyFrom] = useState(() => shiftDate(date, -1));
   const [servings, setServings] = useState('1');
   const [query, setQuery] = useState('');
   const [foods, setFoods] = useState<FoodOption[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [name, setName] = useState('');
   const [calories, setCalories] = useState('');
-  // Which button is waiting: `food-<id>`, `combo-<id>` or 'typed'.
+  // Which button is waiting: `food-<id>`, `combo-<id>`, 'copy' or 'typed'.
   const [pending, setPending] = useState<string | null>(null);
   // Combos are read only when asked for, so a day opens with no extra request.
   const [combos, setCombos] = useState<Combo[] | null>(null);
@@ -146,13 +151,42 @@ function AddEntry({
   // A long result list sits between the forms, so each shows its errors next to its own buttons.
   const { notice: listNotice, error: listError, clear: clearList } = useNotice();
   const { notice: comboNotice, error: comboError, clear: clearCombo } = useNotice();
+  const { notice: copyNotice, error: copyError, clear: clearCopy } = useNotice();
   const { notice: typedNotice, error: typedError, clear: clearTyped } = useNotice();
   const latestSearch = useRef(0);
+  const mealLabel = meals.find(({ key }) => key === meal)!.label;
 
   const clear = () => {
     clearList();
     clearCombo();
+    clearCopy();
     clearTyped();
+  };
+
+  const copyMeal = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    clear();
+    if (!isValidDate(copyFrom)) {
+      copyError('복사할 날짜를 골라 주세요');
+      return;
+    }
+    if (copyFrom === date) {
+      copyError('다른 날짜를 골라 주세요');
+      return;
+    }
+    setPending('copy');
+    try {
+      await onAdd({ from: copyFrom, meal }, '/copy');
+    } catch (cause) {
+      // Say which meal of which day was empty, not just that nothing was found.
+      copyError(
+        cause instanceof RequestError && cause.status === 404
+          ? `${formatDate(copyFrom)} ${mealLabel}에 복사할 기록이 없습니다`
+          : cause,
+      );
+    } finally {
+      setPending(null);
+    }
   };
 
   const loadCombos = async () => {
@@ -388,6 +422,41 @@ function AddEntry({
         )}
         <Notice notice={comboNotice} />
       </section>
+      <form
+        aria-label="다른 날에서 복사"
+        onSubmit={(event) => void copyMeal(event)}
+        noValidate
+        className="flex flex-col gap-3"
+      >
+        <p className="text-body-sm font-medium">다른 날에서 복사</p>
+        <p id="meal-copy-help" className="text-caption break-keep text-muted-foreground">
+          고른 날의 {mealLabel} 기록을 이 날 {mealLabel}에 그대로 더합니다. 영양성분은 그날 기록한
+          값 그대로입니다.
+        </p>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="meal-copy-from">복사할 날짜</Label>
+            <Input
+              id="meal-copy-from"
+              type="date"
+              className="w-auto"
+              value={copyFrom}
+              onChange={(event) => setCopyFrom(event.target.value)}
+            />
+          </div>
+          <Button
+            type="submit"
+            variant="outline"
+            disabled={adding}
+            aria-busy={pending === 'copy' || undefined}
+            aria-describedby="meal-copy-help"
+          >
+            {pending === 'copy' ? <Spinner size="sm" label="복사하는 중" /> : null}
+            {mealLabel} 복사
+          </Button>
+        </div>
+        <Notice notice={copyNotice} />
+      </form>
       <form onSubmit={(event) => void addTyped(event)} noValidate className="flex flex-col gap-3">
         <p className="text-body-sm font-medium">저장소에 없는 음식</p>
         <div className="grid grid-cols-2 gap-4">
@@ -564,7 +633,7 @@ export function MealCard({ date }: { date: string }) {
                   </section>
                 ))
             )}
-            <AddEntry adding={adding} onAdd={add} />
+            <AddEntry date={date} adding={adding} onAdd={add} />
           </>
         ) : null}
       </CardContent>

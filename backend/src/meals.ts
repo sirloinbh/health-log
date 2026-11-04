@@ -3,7 +3,7 @@ import { rateLimit } from 'express-rate-limit';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
-import { parseDate } from './dates.js';
+import { isRealDate, parseDate } from './dates.js';
 import { hasTwoDecimalsAtMost } from './foods.js';
 import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError, parseId } from './standard/http.js';
@@ -22,6 +22,16 @@ export const servingsInput = z
   .refine(hasTwoDecimalsAtMost, '수량은 소수 둘째 자리까지 입력해 주세요');
 
 const comboUse = z.object({ meal: mealKey }, { error: '요청 본문이 올바르지 않습니다' });
+
+const mealCopy = z.object(
+  {
+    from: z
+      .string({ error: '복사할 날짜를 골라 주세요' })
+      .refine(isRealDate, '복사할 날짜가 올바르지 않습니다'),
+    meal: mealKey,
+  },
+  { error: '요청 본문이 올바르지 않습니다' },
+);
 
 const entryInput = z
   .object(
@@ -203,6 +213,29 @@ export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
           ? new HttpError(400, '조합에 음식이 없습니다')
           : new HttpError(404, '조합을 찾을 수 없습니다');
       }
+      return day(client, date);
+    });
+    res.status(201).json(answer);
+  });
+
+  // Another day's meal is copied as it was recorded, not read again from the food store, so the
+  // copy carries the same values. One statement: either every entry is copied or none.
+  router.post('/:date/copy', async (req, res) => {
+    const date = parseDate(req.params.date);
+    const { from, meal } = mealCopy.parse(req.body);
+    if (from === date) throw new HttpError(400, '다른 날짜를 골라 주세요');
+    const answer = await inTransaction(async (client) => {
+      const { rowCount } = await client.query(
+        `INSERT INTO meal_entries (entry_date, meal, servings, food_id, name, brand, serving_size,
+           serving_unit, calories, carbs, protein, fat, sugars, sodium)
+         SELECT $1, meal, servings, food_id, name, brand, serving_size, serving_unit, calories,
+           carbs, protein, fat, sugars, sodium
+         FROM meal_entries
+         WHERE entry_date = $2 AND meal = $3
+         ORDER BY id`,
+        [date, from, meal],
+      );
+      if (!rowCount) throw new HttpError(404, '복사할 기록이 없습니다');
       return day(client, date);
     });
     res.status(201).json(answer);

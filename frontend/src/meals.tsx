@@ -12,6 +12,7 @@ import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
+import { parseAmount, unreadableAmount } from './number-input';
 
 const meals = [
   { key: 'breakfast', label: '아침' },
@@ -145,8 +146,6 @@ function AddEntry({
   const { notice: listNotice, error: listError, clear: clearList } = useNotice();
   const { notice: typedNotice, error: typedError, clear: clearTyped } = useNotice();
   const latestSearch = useRef(0);
-  const servingsInput = useRef<HTMLInputElement>(null);
-  const caloriesInput = useRef<HTMLInputElement>(null);
 
   const clear = () => {
     clearList();
@@ -155,9 +154,12 @@ function AddEntry({
 
   const readServings = (showError: (message: string) => void) => {
     clear();
-    // A number field reports "" for unreadable text such as "1,5".
-    const value = Number(servings);
-    if (servingsInput.current?.validity.badInput || servings.trim() === '' || !(value > 0)) {
+    const value = parseAmount(servings);
+    if (value === undefined) {
+      showError(unreadableAmount('수량'));
+      return null;
+    }
+    if (value === null || !(value > 0)) {
       showError('수량을 0보다 큰 숫자로 입력해 주세요');
       return null;
     }
@@ -207,13 +209,18 @@ function AddEntry({
       typedError('음식 이름을 입력해 주세요');
       return;
     }
-    if (caloriesInput.current?.validity.badInput || calories.trim() === '') {
+    const kcal = parseAmount(calories);
+    if (kcal === undefined) {
+      typedError(unreadableAmount('1회 칼로리'));
+      return;
+    }
+    if (kcal === null) {
       typedError('칼로리를 숫자로 입력해 주세요');
       return;
     }
     setPending('typed');
     try {
-      const added = await onAdd({ meal, servings: value, name, calories: Number(calories) });
+      const added = await onAdd({ meal, servings: value, name, calories: kcal });
       if (added) {
         // Anything typed while waiting is the next entry, not this one.
         setName((current) => (current === name ? '' : current));
@@ -246,11 +253,8 @@ function AddEntry({
         <Label htmlFor="meal-servings">수량 (1회 제공량 기준)</Label>
         <Input
           id="meal-servings"
-          ref={servingsInput}
-          type="number"
           inputMode="decimal"
-          step="any"
-          min="0"
+          autoComplete="off"
           value={servings}
           onChange={(event) => setServings(event.target.value)}
         />
@@ -320,11 +324,8 @@ function AddEntry({
             <Label htmlFor="meal-calories">1회 칼로리 (kcal)</Label>
             <Input
               id="meal-calories"
-              ref={caloriesInput}
-              type="number"
               inputMode="decimal"
-              step="any"
-              min="0"
+              autoComplete="off"
               value={calories}
               onChange={(event) => setCalories(event.target.value)}
             />

@@ -165,8 +165,8 @@ test('editing starts from the food and saves to its address', async () => {
   open();
   fireEvent.click(await screen.findByRole('button', { name: '치즈버거 수정' }));
   const dialog = await screen.findByRole('dialog');
-  expect(within(dialog).getByLabelText('칼로리 (kcal)')).toHaveValue(300);
-  expect(within(dialog).getByLabelText('지방 (g)')).toHaveValue(null);
+  expect(within(dialog).getByLabelText('칼로리 (kcal)')).toHaveValue('300');
+  expect(within(dialog).getByLabelText('지방 (g)')).toHaveValue('');
   expect(within(dialog).getByLabelText('확인 날짜')).toHaveValue('2026-10-31');
   fireEvent.change(within(dialog).getByLabelText('칼로리 (kcal)'), { target: { value: '310' } });
   fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
@@ -184,20 +184,51 @@ test('editing starts from the food and saves to its address', async () => {
   });
 });
 
-test('text a number field cannot read is reported instead of saved as no value', async () => {
+test.each([
+  '1회 제공량',
+  '칼로리 (kcal)',
+  '탄수화물 (g)',
+  '단백질 (g)',
+  '지방 (g)',
+  '당류 (g)',
+  '나트륨 (mg)',
+])('a comma decimal in %s is refused, never read as ten times the value', async (label) => {
   const fetchMock = serve(() => json({ foods: [] }));
   open();
   fireEvent.click(await screen.findByRole('button', { name: '음식 추가' }));
   const dialog = await screen.findByRole('dialog');
-  const calories = within(dialog).getByLabelText('칼로리 (kcal)');
-  // jsdom never reports badInput; a real browser does for text like "1,200".
-  Object.defineProperty(calories, 'validity', { value: { badInput: true } });
+  fireEvent.change(within(dialog).getByLabelText('음식 이름'), { target: { value: '치즈버거' } });
+  fireEvent.change(within(dialog).getByLabelText('1회 제공량'), { target: { value: '120' } });
+  const field = within(dialog).getByLabelText(label);
+  fireEvent.change(field, { target: { value: '49,5' } });
+  // A number field would have dropped the comma and shown 495 here.
+  expect(field).toHaveValue('49,5');
   fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
 
   expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-    '칼로리 (kcal)의 입력값을 확인해 주세요',
+    `${label}: 숫자만 입력해 주세요. 소수점은 마침표로 씁니다`,
   );
+  expect(field).toHaveValue('49,5');
   expect(foodCalls(fetchMock).some(([, init]) => init?.method === 'POST')).toBe(false);
+});
+
+test('a decimal written with a point is sent as that number', async () => {
+  const fetchMock = serve((_url, init) =>
+    init?.method === 'POST' ? json(food, 201) : json({ foods: [] }),
+  );
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '음식 추가' }));
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.change(within(dialog).getByLabelText('음식 이름'), { target: { value: '치즈버거' } });
+  fireEvent.change(within(dialog).getByLabelText('1회 제공량'), { target: { value: ' 49.5 ' } });
+  fireEvent.change(within(dialog).getByLabelText('단백질 (g)'), { target: { value: '15.25' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+
+  await vi.waitFor(() =>
+    expect(foodCalls(fetchMock).some(([, init]) => init?.method === 'POST')).toBe(true),
+  );
+  const post = foodCalls(fetchMock).find(([, init]) => init?.method === 'POST')!;
+  expect(JSON.parse(String(post[1]?.body))).toMatchObject({ servingSize: 49.5, protein: 15.25 });
 });
 
 test('a save in progress cannot be cancelled or closed', async () => {

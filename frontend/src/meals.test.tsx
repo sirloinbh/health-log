@@ -124,7 +124,7 @@ test('a food not in the store is recorded with just a name and calories', async 
   fireEvent.click(screen.getByRole('button', { name: '바로 기록' }));
 
   await waitFor(() => expect(screen.getByLabelText('음식 이름')).toHaveValue(''));
-  expect(screen.getByLabelText('1회 칼로리 (kcal)')).toHaveValue(null);
+  expect(screen.getByLabelText('1회 칼로리 (kcal)')).toHaveValue('');
   expect(request(fetchMock, 1).body).toEqual({
     meal: 'breakfast',
     servings: 1,
@@ -151,6 +151,8 @@ test.each([
   ['', '수량을 0보다 큰 숫자로 입력해 주세요'],
   ['0', '수량을 0보다 큰 숫자로 입력해 주세요'],
   ['1.555', '수량은 소수 둘째 자리까지 입력해 주세요'],
+  ['49,5', '수량: 숫자만 입력해 주세요. 소수점은 마침표로 씁니다'],
+  ['1.5.1', '수량: 숫자만 입력해 주세요. 소수점은 마침표로 씁니다'],
 ])('a quantity of "%s" is refused before sending', async (value, message) => {
   const fetchMock = server({ body: emptyDay }, { body: { foods: [food] } });
   render(<MealCard date={date} />);
@@ -159,6 +161,46 @@ test.each([
   fireEvent.click(await searchFood());
   expect(await screen.findByRole('alert')).toHaveTextContent(message);
   expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+test.each([
+  ['수량 (1회 제공량 기준)', '수량'],
+  ['1회 칼로리 (kcal)', '1회 칼로리'],
+])('a comma decimal in %s is refused, never read as ten times the value', async (label, name) => {
+  const fetchMock = server({ body: emptyDay });
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '떡볶이' } });
+  fireEvent.change(screen.getByLabelText('1회 칼로리 (kcal)'), { target: { value: '480' } });
+  const field = screen.getByLabelText(label);
+  fireEvent.change(field, { target: { value: '49,5' } });
+  // A number field would have dropped the comma and shown 495 here.
+  expect(field).toHaveValue('49,5');
+  fireEvent.click(screen.getByRole('button', { name: '바로 기록' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    `${name}: 숫자만 입력해 주세요. 소수점은 마침표로 씁니다`,
+  );
+  expect(field).toHaveValue('49,5');
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+test('a calorie with a decimal point is sent as that number', async () => {
+  const fetchMock = server({ body: emptyDay }, { status: 201, body: oneEntry });
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  fireEvent.change(screen.getByLabelText('수량 (1회 제공량 기준)'), { target: { value: '0.5' } });
+  fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '떡볶이' } });
+  fireEvent.change(screen.getByLabelText('1회 칼로리 (kcal)'), { target: { value: '49.5' } });
+  fireEvent.click(screen.getByRole('button', { name: '바로 기록' }));
+
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  expect(request(fetchMock, 1).body).toEqual({
+    meal: 'breakfast',
+    servings: 0.5,
+    name: '떡볶이',
+    calories: 49.5,
+  });
 });
 
 test('the server refusing an entry shows why and keeps what was typed', async () => {
@@ -215,7 +257,7 @@ test('the typed form also waits for its request, and shows that it is working', 
   finish(new Response(JSON.stringify(oneEntry), { status: 201 }));
   await waitFor(() => expect(save).toBeEnabled());
   expect(screen.getByLabelText('음식 이름')).toHaveValue('김밥');
-  expect(screen.getByLabelText('1회 칼로리 (kcal)')).toHaveValue(null);
+  expect(screen.getByLabelText('1회 칼로리 (kcal)')).toHaveValue('');
 });
 
 test('the delete buttons wait while an entry is being recorded', async () => {

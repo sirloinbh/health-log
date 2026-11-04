@@ -10,17 +10,24 @@ import { HttpError, parseId } from './standard/http.js';
 
 const nutrients = ['calories', 'carbs', 'protein', 'fat', 'sugars', 'sodium'] as const;
 
+const mealKey = z.enum(['breakfast', 'lunch', 'dinner', 'snack'], {
+  error: '끼니를 선택해 주세요',
+});
+
+/** How many servings: the same rule for a meal entry and a combo item. */
+export const servingsInput = z
+  .number({ error: '수량을 숫자로 입력해 주세요' })
+  .positive('수량은 0보다 커야 합니다')
+  .max(999, '수량이 너무 큽니다')
+  .refine(hasTwoDecimalsAtMost, '수량은 소수 둘째 자리까지 입력해 주세요');
+
+const comboUse = z.object({ meal: mealKey }, { error: '요청 본문이 올바르지 않습니다' });
+
 const entryInput = z
   .object(
     {
-      meal: z.enum(['breakfast', 'lunch', 'dinner', 'snack'], {
-        error: '끼니를 선택해 주세요',
-      }),
-      servings: z
-        .number({ error: '수량을 숫자로 입력해 주세요' })
-        .positive('수량은 0보다 커야 합니다')
-        .max(999, '수량이 너무 큽니다')
-        .refine(hasTwoDecimalsAtMost, '수량은 소수 둘째 자리까지 입력해 주세요'),
+      meal: mealKey,
+      servings: servingsInput,
       foodId: z
         .number({ error: '음식이 올바르지 않습니다' })
         .int('음식이 올바르지 않습니다')
@@ -166,6 +173,35 @@ export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
            VALUES ($1, $2, $3, $4, $5)`,
           [date, entry.meal, entry.servings, entry.name, entry.calories],
         );
+      }
+      return day(client, date);
+    });
+    res.status(201).json(answer);
+  });
+
+  // Every food of the combo goes in with one statement, so either all of them are recorded or none.
+  router.post('/:date/combos/:id', async (req, res) => {
+    const date = parseDate(req.params.date);
+    const comboId = parseId(req.params.id, '조합');
+    const { meal } = comboUse.parse(req.body);
+    const answer = await inTransaction(async (client) => {
+      const { rowCount } = await client.query(
+        `INSERT INTO meal_entries (entry_date, meal, servings, food_id, name, brand, serving_size,
+           serving_unit, calories, carbs, protein, fat, sugars, sodium)
+         SELECT $1, $2, i.servings, f.id, f.name, f.brand, f.serving_size, f.serving_unit,
+           f.calories, f.carbs, f.protein, f.fat, f.sugars, f.sodium
+         FROM meal_combo_items i JOIN foods f ON f.id = i.food_id
+         WHERE i.combo_id = $3
+         ORDER BY i.position`,
+        [date, meal, comboId],
+      );
+      if (!rowCount) {
+        const { rowCount: found } = await client.query('SELECT 1 FROM meal_combos WHERE id = $1', [
+          comboId,
+        ]);
+        throw found
+          ? new HttpError(400, '조합에 음식이 없습니다')
+          : new HttpError(404, '조합을 찾을 수 없습니다');
       }
       return day(client, date);
     });

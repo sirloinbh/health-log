@@ -13,3 +13,6 @@ export function parseAmount(text: string) {
 /** What to tell someone whose typed amount `parseAmount` could not read. */
 export const unreadableAmount = (label: string) =>
   `${label}: 숫자만 입력해 주세요. 소수점은 마침표로 씁니다 (예: 70.5)`;
+
+/** Amounts are stored with two decimals; anything finer would be rounded without a word. */
+export const hasTwoDecimalsAtMost = (value: number) => Number(value.toFixed(2)) === value;

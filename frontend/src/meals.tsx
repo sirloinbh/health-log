@@ -1,6 +1,7 @@
 import { Trash2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
+import { type Combo, comboSummary, fullName } from './combo-text';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
@@ -12,7 +13,7 @@ import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
-import { parseAmount, unreadableAmount } from './number-input';
+import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
 
 const meals = [
   { key: 'breakfast', label: '아침' },
@@ -58,11 +59,6 @@ type FoodOption = {
 };
 
 const pathOf = (date: string) => `/api/meals/${date}`;
-
-const fullName = ({ brand, name }: { brand: string | null; name: string }) =>
-  brand ? `${brand} ${name}` : name;
-
-const hasTwoDecimalsAtMost = (value: number) => Number(value.toFixed(2)) === value;
 
 function Totals({ totals }: { totals: MealDay['totals'] }) {
   const incomplete = nutrients.filter(({ key }) => totals[key].missing > 0);
@@ -132,7 +128,8 @@ function AddEntry({
   onAdd,
 }: {
   adding: boolean;
-  onAdd: (body: object) => Promise<boolean>;
+  /** `path` follows the day's address, e.g. `/combos/3` to record a combo. */
+  onAdd: (body: object, path?: string) => Promise<boolean>;
 }) {
   const [meal, setMeal] = useState<MealKey>('breakfast');
   const [servings, setServings] = useState('1');
@@ -141,15 +138,40 @@ function AddEntry({
   const [searching, setSearching] = useState(false);
   const [name, setName] = useState('');
   const [calories, setCalories] = useState('');
-  const [pending, setPending] = useState<number | 'typed' | null>(null);
-  // A long result list sits between the two forms, so each shows its errors next to its own buttons.
+  // Which button is waiting: `food-<id>`, `combo-<id>` or 'typed'.
+  const [pending, setPending] = useState<string | null>(null);
+  // Combos are read only when asked for, so a day opens with no extra request.
+  const [combos, setCombos] = useState<Combo[] | null>(null);
+  const [loadingCombos, setLoadingCombos] = useState(false);
+  // A long result list sits between the forms, so each shows its errors next to its own buttons.
   const { notice: listNotice, error: listError, clear: clearList } = useNotice();
+  const { notice: comboNotice, error: comboError, clear: clearCombo } = useNotice();
   const { notice: typedNotice, error: typedError, clear: clearTyped } = useNotice();
   const latestSearch = useRef(0);
 
   const clear = () => {
     clearList();
+    clearCombo();
     clearTyped();
+  };
+
+  const loadCombos = async () => {
+    clear();
+    setLoadingCombos(true);
+    try {
+      setCombos((await requestJson<{ combos: Combo[] }>('/api/combos')).combos);
+    } catch (cause) {
+      comboError(cause);
+    } finally {
+      setLoadingCombos(false);
+    }
+  };
+
+  const addCombo = async (combo: Combo) => {
+    clear();
+    setPending(`combo-${combo.id}`);
+    await onAdd({ meal }, `/combos/${combo.id}`).catch((cause: unknown) => comboError(cause));
+    setPending(null);
   };
 
   const readServings = (showError: (message: string) => void) => {
@@ -194,7 +216,7 @@ function AddEntry({
   const addFood = async (food: FoodOption) => {
     const value = readServings(listError);
     if (value === null) return;
-    setPending(food.id);
+    setPending(`food-${food.id}`);
     await onAdd({ meal, servings: value, foodId: food.id }).catch((cause: unknown) =>
       listError(cause),
     );
@@ -302,17 +324,70 @@ function AddEntry({
                 variant="outline"
                 size="sm"
                 disabled={adding}
-                aria-busy={pending === food.id || undefined}
+                aria-busy={pending === `food-${food.id}` || undefined}
                 aria-label={`${fullName(food)} 추가`}
                 onClick={() => void addFood(food)}
               >
-                {pending === food.id ? <Spinner size="sm" label="기록하는 중" /> : null}
+                {pending === `food-${food.id}` ? <Spinner size="sm" label="기록하는 중" /> : null}
                 추가
               </Button>
             </li>
           ))}
         </ul>
       ) : null}
+      <section aria-label="조합" className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-body-sm font-medium">조합</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={loadingCombos}
+            aria-busy={loadingCombos || undefined}
+            onClick={() => void loadCombos()}
+          >
+            {loadingCombos ? <Spinner size="sm" label="불러오는 중" /> : null}
+            {combos === null ? '조합에서 고르기' : '조합 다시 불러오기'}
+          </Button>
+        </div>
+        {combos === null ? null : combos.length === 0 ? (
+          <p className="text-body-sm break-keep text-muted-foreground">
+            저장한 조합이 없습니다. 메뉴의 조합 화면에서 만들 수 있습니다.
+          </p>
+        ) : (
+          <>
+            <p className="text-caption break-keep text-muted-foreground">
+              고른 끼니에, 조합에 저장한 수량대로 기록합니다.
+            </p>
+            <ul aria-label="조합 목록" className="flex max-h-80 flex-col divide-y overflow-y-auto">
+              {combos.map((combo) => (
+                <li key={combo.id} className="flex items-center justify-between gap-3 py-2">
+                  <div className="flex min-w-0 flex-col">
+                    <span className="wrap-anywhere">{combo.name}</span>
+                    <span className="text-caption text-muted-foreground">
+                      {comboSummary(combo)}
+                    </span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={adding || combo.items.length === 0}
+                    aria-busy={pending === `combo-${combo.id}` || undefined}
+                    aria-label={`${combo.name} 기록`}
+                    onClick={() => void addCombo(combo)}
+                  >
+                    {pending === `combo-${combo.id}` ? (
+                      <Spinner size="sm" label="기록하는 중" />
+                    ) : null}
+                    기록
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        <Notice notice={comboNotice} />
+      </section>
       <form onSubmit={(event) => void addTyped(event)} noValidate className="flex flex-col gap-3">
         <p className="text-body-sm font-medium">저장소에 없는 음식</p>
         <div className="grid grid-cols-2 gap-4">
@@ -389,10 +464,10 @@ export function MealCard({ date }: { date: string }) {
   }, [moveFocus]);
 
   /** Resolves to whether it was added; a failure rejects so the form can show it next to its fields. */
-  const add = async (body: object) => {
+  const add = async (body: object, path = '') => {
     setAdding(true);
     try {
-      const data = await requestJson<MealDay>(pathOf(date), { method: 'POST', body });
+      const data = await requestJson<MealDay>(`${pathOf(date)}${path}`, { method: 'POST', body });
       changes.current += 1;
       if (!live.current) {
         toast.success(`${date} 식사를 기록했습니다`);

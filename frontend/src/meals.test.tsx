@@ -607,3 +607,90 @@ test('recording that fails after leaving the day still says so', async () => {
   );
   shown.mockRestore();
 });
+
+const combo = {
+  id: 9,
+  name: '점심 세트',
+  items: [
+    {
+      foodId: 7,
+      name: '치즈버거',
+      brand: '버거집',
+      servings: 1.5,
+      servingSize: 120,
+      servingUnit: 'g',
+      calories: 450,
+    },
+  ],
+  calories: { value: 450, missing: 0 },
+};
+
+test('a combo is read only when asked for, then recorded into the chosen meal', async () => {
+  const fetchMock = server(
+    { body: emptyDay },
+    { body: { combos: [combo] } },
+    { status: 201, body: oneEntry },
+  );
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole('button', { name: '점심' }));
+  fireEvent.click(screen.getByRole('button', { name: '조합에서 고르기' }));
+  const list = await screen.findByRole('list', { name: '조합 목록' });
+  expect(within(list).getByText('음식 1개 · 450kcal')).toBeInTheDocument();
+  fireEvent.click(within(list).getByRole('button', { name: '점심 세트 기록' }));
+
+  const lunch = await screen.findByRole('region', { name: '점심' });
+  expect(within(lunch).getByText('버거집 치즈버거')).toBeInTheDocument();
+  expect(request(fetchMock, 1)).toEqual({ url: '/api/combos', method: 'GET', body: undefined });
+  expect(request(fetchMock, 2)).toEqual({
+    url: `/api/meals/${date}/combos/9`,
+    method: 'POST',
+    body: { meal: 'lunch' },
+  });
+});
+
+test('with no combos saved, the card says where to make one', async () => {
+  server({ body: emptyDay }, { body: { combos: [] } });
+  render(<MealCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: '조합에서 고르기' }));
+  expect(
+    await screen.findByText('저장한 조합이 없습니다. 메뉴의 조합 화면에서 만들 수 있습니다.'),
+  ).toBeInTheDocument();
+});
+
+test('a combo with no foods left cannot be recorded', async () => {
+  server(
+    { body: emptyDay },
+    { body: { combos: [{ ...combo, items: [], calories: { value: null, missing: 0 } }] } },
+  );
+  render(<MealCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: '조합에서 고르기' }));
+  const list = await screen.findByRole('list', { name: '조합 목록' });
+  expect(within(list).getByText('음식이 없습니다')).toBeInTheDocument();
+  expect(within(list).getByRole('button', { name: '점심 세트 기록' })).toBeDisabled();
+});
+
+test('combos that cannot be read say why next to their button', async () => {
+  server({ body: emptyDay }, { status: 500, body: { error: '서버 오류가 발생했습니다' } });
+  render(<MealCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: '조합에서 고르기' }));
+  const section = screen.getByRole('region', { name: '조합' });
+  expect(await within(section).findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  expect(within(section).getByRole('button', { name: '조합에서 고르기' })).toBeEnabled();
+});
+
+test('a combo the server refuses says why and records nothing on screen', async () => {
+  const fetchMock = server(
+    { body: emptyDay },
+    { body: { combos: [combo] } },
+    { status: 404, body: { error: '조합을 찾을 수 없습니다' } },
+  );
+  render(<MealCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: '조합에서 고르기' }));
+  fireEvent.click(await screen.findByRole('button', { name: '점심 세트 기록' }));
+  const section = screen.getByRole('region', { name: '조합' });
+  expect(await within(section).findByRole('alert')).toHaveTextContent('조합을 찾을 수 없습니다');
+  expect(screen.getByText('아직 기록한 식사가 없습니다.')).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+});

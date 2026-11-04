@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { types } from 'pg';
 
 import { bodyRouter } from './body.js';
+import { combosRouter } from './combos.js';
 import { foodsRouter } from './foods.js';
 import { mealsRouter } from './meals.js';
 import { defaultRateLimit, type RateLimitSettings } from './rate-limit.js';
@@ -39,6 +40,7 @@ export function createApp(
   // Not on health, so monitoring still answers while a client is being limited.
   app.use('/api/foods', foodsRouter(pool, today, options.rateLimit ?? defaultRateLimit));
   app.use('/api/meals', mealsRouter(pool, options.rateLimit ?? defaultRateLimit));
+  app.use('/api/combos', combosRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api/sleep', sleepRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api/body', bodyRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api', notFound);

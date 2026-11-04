@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { parseAmount } from './number-input';
+import { hasTwoDecimalsAtMost, parseAmount } from './number-input';
 
 test('plain numbers are read, with spaces around them ignored', () => {
   expect(parseAmount('70')).toBe(70);
@@ -26,4 +26,10 @@ test('digits too long to be exact are rejected, not rounded or turned into Infin
   expect(parseAmount('500.000000000000001')).toBeUndefined();
   expect(parseAmount('70.100000000000000001')).toBeUndefined();
   expect(parseAmount('123456789.5')).toBe(123456789.5);
+});
+
+test('two decimals are the finest amount kept', () => {
+  expect(hasTwoDecimalsAtMost(1.25)).toBe(true);
+  expect(hasTwoDecimalsAtMost(3)).toBe(true);
+  expect(hasTwoDecimalsAtMost(1.255)).toBe(false);
 });

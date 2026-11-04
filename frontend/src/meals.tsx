@@ -429,7 +429,7 @@ function AddEntry({
         className="flex flex-col gap-3"
       >
         <p className="text-body-sm font-medium">다른 날에서 복사</p>
-        <p className="text-caption break-keep text-muted-foreground">
+        <p id="meal-copy-help" className="text-caption break-keep text-muted-foreground">
           고른 날의 {mealLabel} 기록을 이 날 {mealLabel}에 그대로 더합니다. 영양성분은 그날 기록한
           값 그대로입니다.
         </p>
@@ -449,6 +449,7 @@ function AddEntry({
             variant="outline"
             disabled={adding}
             aria-busy={pending === 'copy' || undefined}
+            aria-describedby="meal-copy-help"
           >
             {pending === 'copy' ? <Spinner size="sm" label="복사하는 중" /> : null}
             {mealLabel} 복사

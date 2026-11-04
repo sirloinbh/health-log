@@ -764,3 +764,25 @@ test('another failure to copy shows the server message next to the copy button',
   fireEvent.click(within(form).getByRole('button', { name: '아침 복사' }));
   expect(await within(form).findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
 });
+
+test('while a copy is on its way the button says so and cannot copy twice', async () => {
+  let finish = (_response: Response) => {};
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
+    .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+  vi.stubGlobal('fetch', fetchMock);
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  const button = within(copyForm()).getByRole('button', { name: '아침 복사' });
+  expect(button).toHaveAccessibleDescription(/그대로 더합니다/);
+  fireEvent.click(button);
+
+  await waitFor(() => expect(button).toBeDisabled());
+  expect(button).toHaveAttribute('aria-busy', 'true');
+  fireEvent.click(button);
+  finish(new Response(JSON.stringify(oneEntry), { status: 201 }));
+  expect(await screen.findByText('버거집 치즈버거')).toBeInTheDocument();
+  expect(button).toBeEnabled();
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});

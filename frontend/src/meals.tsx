@@ -198,6 +198,7 @@ function AddEntry({
   const recentHeading = useRef<HTMLParagraphElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const [focusAfterRetry, setFocusAfterRetry] = useState(0);
+  const focusAfterRead = useRef(false);
   // Combos are read only when asked for, so a day opens with no extra request.
   const [combos, setCombos] = useState<Combo[] | null>(null);
   const [loadingCombos, setLoadingCombos] = useState(false);
@@ -218,19 +219,25 @@ function AddEntry({
     clearTyped();
   };
 
-  /** Resolves to whether this read is the one now on screen. */
   const loadRecent = useCallback(async () => {
     // A slow older read must not put back an order that a newer one already replaced.
     const request = ++latestRecent.current;
     try {
       const data = await requestJson<{ foods: FoodOption[] }>('/api/foods/recent');
-      if (request !== latestRecent.current) return false;
+      if (request !== latestRecent.current) return;
       setRecent(data.foods);
       setRecentFailure(null);
-      return true;
+      // Whichever read clears the failure removes the retry button, even one started by an add
+      // that finished after the retry was pressed.
+      if (focusAfterRead.current) {
+        focusAfterRead.current = false;
+        setFocusAfterRetry((count) => count + 1);
+      }
     } catch (cause) {
-      if (request === latestRecent.current) setRecentFailure(errorText(cause));
-      return false;
+      if (request !== latestRecent.current) return;
+      setRecentFailure(errorText(cause));
+      // The retry button is still there, and focus with it.
+      focusAfterRead.current = false;
     }
   }, []);
 
@@ -246,8 +253,9 @@ function AddEntry({
     return () => clearTimeout(timer);
   }, [focusAfterRetry]);
 
-  const retryRecent = async () => {
-    if (await loadRecent()) setFocusAfterRetry((count) => count + 1);
+  const retryRecent = () => {
+    focusAfterRead.current = true;
+    void loadRecent();
   };
 
   const copyMeal = async (event: FormEvent<HTMLFormElement>) => {
@@ -424,7 +432,7 @@ function AddEntry({
               최근 먹은 음식
             </p>
             {recentFailure ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => void retryRecent()}>
+              <Button type="button" variant="outline" size="sm" onClick={retryRecent}>
                 다시 불러오기
               </Button>
             ) : null}

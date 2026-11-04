@@ -49,7 +49,8 @@ const oneEntry = {
 
 // The card reads the recent foods on its own whenever it opens or records something. That read is
 // answered here, apart from the replies each test lists in order, so those stay about the day.
-let recentReply: () => Response = () => new Response(JSON.stringify({ foods: [] }));
+let recentReply: () => Response | Promise<Response> = () =>
+  new Response(JSON.stringify({ foods: [] }));
 const recentCalls: string[] = [];
 
 beforeEach(() => {
@@ -888,7 +889,9 @@ test('recent foods that cannot be read say why and can be read again', async () 
   expect(within(section).queryByRole('button', { name: '다시 불러오기' })).not.toBeInTheDocument();
   expect(within(section).queryByRole('alert')).not.toBeInTheDocument();
   // The retry button is gone, so focus goes to the list's heading rather than the page.
-  await waitFor(() => expect(document.activeElement).toHaveTextContent('최근 먹은 음식'));
+  await waitFor(() =>
+    expect(document.activeElement).toBe(within(section).getByText('최근 먹은 음식')),
+  );
 });
 
 test('recording a combo or a copy reads the recent foods again; typed food does not', async () => {
@@ -921,4 +924,55 @@ test('recording a combo or a copy reads the recent foods again; typed food does 
     '/api/combos',
     `/api/meals/${date}/combos/9`,
   ]);
+});
+
+test('a retry that finds nothing moves focus to the search instead', async () => {
+  let fail = true;
+  recentReply = () =>
+    fail
+      ? new Response(JSON.stringify({ error: '서버 오류가 발생했습니다' }), { status: 500 })
+      : new Response(JSON.stringify({ foods: [] }));
+  server({ body: emptyDay });
+  render(<MealCard date={date} />);
+  const section = await screen.findByRole('region', { name: '최근 먹은 음식' });
+  fail = false;
+  fireEvent.click(within(section).getByRole('button', { name: '다시 불러오기' }));
+  await waitFor(() =>
+    expect(screen.queryByRole('region', { name: '최근 먹은 음식' })).not.toBeInTheDocument(),
+  );
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('음식 검색')));
+});
+
+test('focus follows the retry even when a read started by an add answers first', async () => {
+  const fail = () =>
+    new Response(JSON.stringify({ error: '서버 오류가 발생했습니다' }), { status: 500 });
+  let finishRetry = (_response: Response) => {};
+  const replies = [
+    fail,
+    () => new Promise<Response>((resolve) => (finishRetry = resolve)),
+    () => new Response(JSON.stringify({ foods: [recentRice] })),
+  ];
+  recentReply = () => replies.shift()!();
+  let finishAdd = (_response: Response) => {};
+  stubFetch(
+    vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ foods: [food] })))
+      .mockImplementationOnce(() => new Promise((resolve) => (finishAdd = resolve))),
+  );
+  render(<MealCard date={date} />);
+  const section = await screen.findByRole('region', { name: '최근 먹은 음식' });
+  fireEvent.click(await searchFood());
+  // While the add waits, the retry starts a read; the add's own read starts after it and wins.
+  fireEvent.click(within(section).getByRole('button', { name: '다시 불러오기' }));
+  finishAdd(new Response(JSON.stringify(oneEntry), { status: 201 }));
+  expect(
+    await within(section).findByRole('button', { name: '샘플 햇반 추가' }),
+  ).toBeInTheDocument();
+  finishRetry(fail());
+  await waitFor(() =>
+    expect(document.activeElement).toBe(within(section).getByText('최근 먹은 음식')),
+  );
+  expect(within(section).queryByRole('alert')).not.toBeInTheDocument();
 });

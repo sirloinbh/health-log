@@ -740,7 +740,7 @@ provider "aws" { region = var.region }
 | 3. 관리형 확장                | ECS Fargate + ECR + RDS + ALB                            | 상시 비용 큼                                    | 트래픽·가용성이 필요할 때                               |
 | 정적 프런트만                 | Amplify 등                                               | 별도 계산                                       | API·DB는 따로 필요                                      |
 
-- **로그인 없는 앱은 공개 인터넷에 그대로 노출하지 않는다.** VPN·사설 접속 또는 인증을 먼저 설계한다.
+- **로그인 없는 앱은 공개 인터넷에 그대로 노출하지 않는다.** VPN·사설 접속 또는 인증을 먼저 설계한다. 이 앱은 지정 IP만 허용한다([외부 접속 보호](access-protection.md)).
 - 배포할 때 함께 준비할 것: HTTPS, 원격 state(S3 + 잠금), GitHub OIDC 배포 역할(장기 키 없음), 이미지 버전 태그, health check, CloudWatch 로그 보존 기간, 백업·복원 절차, 이전 이미지로 되돌리는 방법.
 - 상세 비용 계산: workout-memo의 `docs/shared-hosting-costs.md`.
 

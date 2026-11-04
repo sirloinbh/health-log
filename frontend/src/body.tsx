@@ -19,7 +19,7 @@ import { Spinner } from './components/ui/spinner';
 import { shiftDate } from './daily-date';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
-import { parseAmount } from './number-input';
+import { parseAmount, unreadableAmount } from './number-input';
 
 const pathOf = (date: string) => `/api/body/${date}`;
 
@@ -85,7 +85,7 @@ function BodyForm({
     event.preventDefault();
     const unreadable = numberFields.find(({ key }) => parseAmount(form[key]) === undefined);
     if (unreadable) {
-      error(`${unreadable.label}: 숫자만 입력해 주세요. 소수점은 마침표로 씁니다 (예: 70.5)`);
+      error(unreadableAmount(unreadable.label));
       return;
     }
     setSaving(true);

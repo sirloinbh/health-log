@@ -26,6 +26,7 @@ import {
 import { toast } from './components/ui/sonner';
 import { requestJson } from './lib/api';
 import { useNotice } from './lib/use-notice';
+import { parseAmount, unreadableAmount } from './number-input';
 
 const nutrients = [
   { key: 'calories', label: '칼로리', unit: 'kcal' },
@@ -105,20 +106,24 @@ const formOf = (food: Food): Form => ({
 });
 
 const textOrNull = (value: string) => value.trim() || null;
-const numberOrNull = (value: string) => (value.trim() === '' ? null : Number(value));
+
+const numberFields = [
+  { key: 'servingSize', label: '1회 제공량' },
+  ...nutrients.map(({ key, label, unit }) => ({ key, label: `${label} (${unit})` })),
+] as const;
 
 const bodyOf = (form: Form) => ({
   name: form.name,
   brand: textOrNull(form.brand),
   category: textOrNull(form.category),
-  servingSize: numberOrNull(form.servingSize),
+  servingSize: parseAmount(form.servingSize),
   servingUnit: form.servingUnit,
-  calories: numberOrNull(form.calories),
-  carbs: numberOrNull(form.carbs),
-  protein: numberOrNull(form.protein),
-  fat: numberOrNull(form.fat),
-  sugars: numberOrNull(form.sugars),
-  sodium: numberOrNull(form.sodium),
+  calories: parseAmount(form.calories),
+  carbs: parseAmount(form.carbs),
+  protein: parseAmount(form.protein),
+  fat: parseAmount(form.fat),
+  sugars: parseAmount(form.sugars),
+  sodium: parseAmount(form.sodium),
   sourceType: form.sourceType,
   sourceUrl: textOrNull(form.sourceUrl),
   checkedOn: textOrNull(form.checkedOn),
@@ -153,12 +158,10 @@ function FoodDialog({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // A number field reports "" for text like "1,200"; saving that would turn it into "no value".
-    const unreadable = [...event.currentTarget.querySelectorAll('input')].find(
-      (input) => input.validity.badInput,
-    );
+    // Unreadable text like "49,5" must not be saved as no value or as 495.
+    const unreadable = numberFields.find(({ key }) => parseAmount(form[key]) === undefined);
     if (unreadable) {
-      error(`${unreadable.labels?.[0]?.textContent ?? '입력값'}의 입력값을 확인해 주세요`);
+      error(unreadableAmount(unreadable.label));
       return;
     }
     setSaving(true);
@@ -198,9 +201,8 @@ function FoodDialog({
             <Field id="food-serving-size" label="1회 제공량">
               <Input
                 id="food-serving-size"
-                type="number"
                 inputMode="decimal"
-                step="any"
+                autoComplete="off"
                 value={form.servingSize}
                 onChange={update('servingSize')}
               />
@@ -216,9 +218,8 @@ function FoodDialog({
               <Field key={key} id={`food-${key}`} label={`${label} (${unit})`}>
                 <Input
                   id={`food-${key}`}
-                  type="number"
                   inputMode="decimal"
-                  step="any"
+                  autoComplete="off"
                   value={form[key]}
                   onChange={update(key)}
                 />

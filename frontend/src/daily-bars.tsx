@@ -10,7 +10,8 @@ const dayLabel = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.sl
 
 /**
  * One value per day as thin bars from a shared baseline. A day without a value is a gap with a
- * small mark, never a zero bar. Hover or focus shows the day; the table holds every value.
+ * small mark, never a zero bar. Hovering or tapping a bar shows its day; keyboard and screen
+ * reader users read every value from the table below.
  */
 export function DailyBars({
   title,
@@ -31,6 +32,14 @@ export function DailyBars({
       ? `${title}: 기록한 날이 없습니다`
       : `${title}: ${bars.length}일 중 ${recorded}일 기록, 가장 높은 날 ${format(max)}`;
   const shown = active === null ? null : bars[active];
+  const edge =
+    active === null
+      ? null
+      : active < bars.length / 4
+        ? 'start'
+        : active >= (bars.length * 3) / 4
+          ? 'end'
+          : null;
 
   return (
     <figure className="flex flex-col gap-2">
@@ -106,8 +115,13 @@ export function DailyBars({
         {shown ? (
           <div
             role="status"
-            className="pointer-events-none absolute -top-2 z-10 -translate-x-1/2 -translate-y-full rounded-md border bg-popover px-2 py-1 text-caption whitespace-nowrap text-popover-foreground shadow-sm"
-            style={{ left: `${(((active ?? 0) + 0.5) / bars.length) * 100}%` }}
+            // Near either edge the tip hangs inward, so it never sticks out past the card.
+            className={`pointer-events-none absolute -top-2 z-10 -translate-y-full rounded-md border bg-popover px-2 py-1 text-caption whitespace-nowrap text-popover-foreground shadow-sm ${
+              edge === 'start' ? '' : edge === 'end' ? '-translate-x-full' : '-translate-x-1/2'
+            }`}
+            style={{
+              left: `${(((active ?? 0) + (edge === 'start' ? 0 : edge === 'end' ? 1 : 0.5)) / bars.length) * 100}%`,
+            }}
           >
             {dayLabel(shown.date)} · {shown.value === null ? '기록 없음' : format(shown.value)}
           </div>

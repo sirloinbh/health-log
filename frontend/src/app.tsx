@@ -110,7 +110,6 @@ export function App() {
       <AppShell appName="식단·수면·건강 기록" nav={nav}>
         <Routes>
           <Route path={pages.overview} element={<ReportPage health={health} />} />
-
           <Route
             path={pages.daily}
             element={<TodayRedirect basePath={pages.daily} health={health} />}

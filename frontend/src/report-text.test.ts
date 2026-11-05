@@ -16,14 +16,14 @@ test('minutes read as hours and minutes', () => {
   expect(minutesText(449.6)).toBe('7시간 30분');
 });
 
-test('a change says which way, and an empty side is not a change', () => {
+test('a change says which way and how many days the earlier side had; an empty side is no change', () => {
   const words = periodWords.week;
-  expect(changeText(450, 420, words, minutesText)).toBe('지난주보다 +30분');
-  expect(changeText(400, 460, words, minutesText)).toBe('지난주보다 -1시간');
-  expect(changeText(420, 420, words, minutesText)).toBe('지난주와 같음');
-  expect(changeText(420, 420, periodWords.month, minutesText)).toBe('지난달과 같음');
-  expect(changeText(420, null, words, minutesText)).toBe('지난주 기록 없음');
-  expect(changeText(null, 420, words, minutesText)).toBeNull();
+  expect(changeText(450, 420, 5, words, minutesText)).toBe('지난주(5일)보다 +30분');
+  expect(changeText(400, 460, 1, words, minutesText)).toBe('지난주(1일)보다 -1시간');
+  expect(changeText(420, 420, 3, words, minutesText)).toBe('지난주(3일)와 같음');
+  expect(changeText(420, 420, 20, periodWords.month, minutesText)).toBe('지난달(20일)과 같음');
+  expect(changeText(420, null, 0, words, minutesText)).toBe('지난주 기록 없음');
+  expect(changeText(null, 420, 4, words, minutesText)).toBeNull();
 });
 
 test('a share is out of the days answered, and none answered is no share', () => {

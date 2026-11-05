@@ -123,11 +123,13 @@ const readDays = async (db: Db, span: Span) => {
      LEFT JOIN (
        SELECT entry_date, sum(round(calories * servings, 2)) AS calories,
          bool_and(calories IS NOT NULL) AS complete
-       FROM meal_entries GROUP BY entry_date
+       FROM meal_entries WHERE entry_date BETWEEN $2 AND $3 GROUP BY entry_date
      ) m ON m.entry_date = d.date
      LEFT JOIN habit_days h ON h.record_date = d.date
      ORDER BY d.date`,
-    [datesIn(span)],
+    // The meal totals are limited to the span: Postgres would not push the join's date into the
+    // grouped subquery, and the whole history would be summed on every request.
+    [datesIn(span), span.from, span.to],
   );
   return rows.map((row) => ({
     date: row.date,

@@ -61,6 +61,8 @@ function Stats({
   const diet = shareOf(current.diet);
   const sleepGood = shareOf(current.sleepGood);
   const points = (value: number) => `${value}%p`;
+  const drinking = shareOf({ days: current.drinking.days, yes: current.drinking.drinkingDays });
+  const previousDrinking = { days: previous.drinking.days, yes: previous.drinking.drinkingDays };
   return (
     <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <Stat
@@ -74,6 +76,7 @@ function Stats({
         change={changeText(
           current.sleep.averageMinutes,
           previous.sleep.averageMinutes,
+          previous.sleep.days,
           words,
           minutesText,
         )}
@@ -94,19 +97,24 @@ function Stats({
         change={changeText(
           current.calories.average,
           previous.calories.average,
+          previous.calories.days,
           words,
           (value) => `${value.toLocaleString('ko-KR')}kcal`,
         )}
       />
       <Stat
         label="술 마신 날"
-        value={current.drinking.days ? `${current.drinking.drinkingDays}일` : '기록 없음'}
+        value={
+          drinking === null ? '기록 없음' : `${current.drinking.drinkingDays}일 (${drinking}%)`
+        }
         sample={daysText(current.drinking.days)}
+        // Periods with different numbers of recorded days compare by share, not by count.
         change={changeText(
-          current.drinking.days ? current.drinking.drinkingDays : null,
-          previous.drinking.days ? previous.drinking.drinkingDays : null,
+          drinking,
+          shareOf(previousDrinking),
+          previous.drinking.days,
           words,
-          (value) => `${value}일`,
+          points,
         )}
       />
       <Stat
@@ -123,6 +131,7 @@ function Stats({
         change={changeText(
           current.smoking.averagePerDay,
           previous.smoking.averagePerDay,
+          previous.smoking.days,
           words,
           (value) => `${Number(value.toFixed(1))}개비`,
         )}
@@ -131,13 +140,19 @@ function Stats({
         label="식단 지킴"
         value={diet === null ? '기록 없음' : `${diet}%`}
         sample={`체크한 날 ${current.diet.days}일`}
-        change={changeText(diet, shareOf(previous.diet), words, points)}
+        change={changeText(diet, shareOf(previous.diet), previous.diet.days, words, points)}
       />
       <Stat
         label="수면 만족"
         value={sleepGood === null ? '기록 없음' : `${sleepGood}%`}
         sample={`체크한 날 ${current.sleepGood.days}일`}
-        change={changeText(sleepGood, shareOf(previous.sleepGood), words, points)}
+        change={changeText(
+          sleepGood,
+          shareOf(previous.sleepGood),
+          previous.sleepGood.days,
+          words,
+          points,
+        )}
       />
     </dl>
   );
@@ -146,15 +161,15 @@ function Stats({
 function SleepAfterDrinking({ report }: { report: Report }) {
   const { afterDrinking, afterNoDrinking } = report.sleepAfterDrinking;
   const groups = [
-    { label: '술 마신 다음 날 밤', group: afterDrinking, bar: 'bg-[#eb6834] dark:bg-[#d95926]' },
-    { label: '안 마신 다음 날 밤', group: afterNoDrinking, bar: 'bg-[#2a78d6] dark:bg-[#3987e5]' },
+    { label: '술 마신 날 밤', group: afterDrinking, bar: 'bg-[#eb6834] dark:bg-[#d95926]' },
+    { label: '안 마신 날 밤', group: afterNoDrinking, bar: 'bg-[#2a78d6] dark:bg-[#3987e5]' },
   ];
   const longest = Math.max(...groups.map(({ group }) => group.averageMinutes ?? 0), 1);
   const thin = groups.some(({ group }) => group.nights < fewNights);
   return (
     <Card>
       <CardHeader>
-        <CardTitle asHeading="h2">술과 다음 날 수면</CardTitle>
+        <CardTitle asHeading="h2">술과 그날 밤 수면</CardTitle>
         <CardDescription className="break-keep">
           관련성을 보여 줄 뿐, 원인을 판정하지 않습니다.
         </CardDescription>
@@ -189,8 +204,8 @@ function SleepAfterDrinking({ report }: { report: Report }) {
           </p>
         ) : null}
         <p className="text-caption break-keep text-muted-foreground">
-          수면은 깬 날짜로 기록하므로, 술을 기록한 날의 다음 날짜 수면을 비교합니다. 술 기록이 없는
-          날의 다음 수면은 빼고 셉니다.
+          술을 기록한 날 밤에 자고 다음 날 아침에 깬 수면을 비교합니다. 수면은 깬 날짜로 기록하므로
+          다음 날짜의 수면입니다. 술을 기록하지 않은 날 밤은 빼고 셉니다.
         </p>
       </CardContent>
     </Card>
@@ -305,7 +320,13 @@ export function ReportPage({ health }: { health: Health }) {
           다시 시도
         </Button>
       ) : null}
-      {!shown && !notice ? (
+      {!date && health.state === 'error' ? (
+        <p className="text-body-sm break-keep text-muted-foreground">
+          서버의 오늘 날짜를 알 수 없어 리포트를 불러오지 못했습니다. 서버 연결이 돌아오면 다시
+          불러옵니다.
+        </p>
+      ) : null}
+      {!shown && !notice && (date || health.state === 'loading') ? (
         <div role="status" aria-busy="true" aria-label="리포트 불러오는 중">
           <SkeletonText lines={3} />
         </div>

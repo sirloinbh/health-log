@@ -53,14 +53,17 @@ const signed = (value: number, text: string) =>
 export const changeText = (
   current: number | null,
   previous: number | null,
+  previousDays: number,
   words: PeriodWords,
   format: (magnitude: number) => string,
 ) => {
   if (current === null) return null;
   if (previous === null) return `${words.previous} 기록 없음`;
+  // The earlier period's day count, so a change against one recorded day reads as thin as it is.
+  const earlier = `${words.previous}(${previousDays}일)`;
   const change = current - previous;
-  if (change === 0) return words.same;
-  return `${words.previous}보다 ${signed(change, format(Math.abs(change)))}`;
+  if (change === 0) return `${earlier}${words.same.slice(words.previous.length)}`;
+  return `${earlier}보다 ${signed(change, format(Math.abs(change)))}`;
 };
 
 export const shareOf = ({ days, yes }: Count) => (days ? Math.round((yes / days) * 100) : null);

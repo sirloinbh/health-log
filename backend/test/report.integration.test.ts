@@ -218,6 +218,10 @@ test(
     // Drinking on Sunday 04-08 is in the week; its night is dated Monday 04-09.
     await habit('1979-04-08', null, 1);
     await sleep('1979-04-09', 420);
+    // Drinking on the Sunday before belongs to the week before, even though its night is dated
+    // Monday 04-02, the first day of this week.
+    await habit('1979-04-01', null, 1);
+    await sleep('1979-04-02', 100);
 
     await withApi(pool, async (call) => {
       const { sleepAfterDrinking } = await report(call, 'week', '1979-04-04');
@@ -228,3 +232,25 @@ test(
     });
   },
 );
+
+test('the previous period is summed the same way as the current one', { skip }, async (t) => {
+  t.after(clean);
+  // The week before the week of 1979-04-02.
+  await meal('1979-03-27', 1200);
+  await meal('1979-03-28', 800);
+  await meal('1979-03-29', null);
+  await habit('1979-03-27', 4, 1);
+  await habit('1979-03-28', 2, 0);
+  await check('1979-03-27', true, false);
+  await check('1979-03-28', false, null);
+
+  await withApi(pool, async (call) => {
+    const { previous } = await report(call, 'week', '1979-04-04');
+    assert.deepEqual([previous.from, previous.to], ['1979-03-26', '1979-04-01']);
+    assert.deepEqual(previous.calories, { days: 2, incompleteDays: 1, average: 1000 });
+    assert.deepEqual(previous.drinking, { days: 2, drinkingDays: 1 });
+    assert.deepEqual(previous.smoking, { days: 2, cigarettes: 6, averagePerDay: 3 });
+    assert.deepEqual(previous.diet, { days: 2, yes: 1 });
+    assert.deepEqual(previous.sleepGood, { days: 1, yes: 0 });
+  });
+});

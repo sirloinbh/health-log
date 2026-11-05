@@ -221,11 +221,11 @@ test('while saving, the answers and the memo cannot change under the save', asyn
   fireEvent.click(within(diet).getByRole('button', { name: '지킴' }));
   fireEvent.click(screen.getByRole('button', { name: '저장' }));
   await waitFor(() => expect(within(diet).getByRole('button', { name: '못 지킴' })).toBeDisabled());
-  expect(screen.getByLabelText('메모')).toBeDisabled();
+  expect(screen.getByLabelText('메모')).toHaveAttribute('readonly');
   finish(new Response(JSON.stringify({ error: '서버 오류가 발생했습니다' }), { status: 500 }));
   expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
   expect(within(diet).getByRole('button', { name: '못 지킴' })).toBeEnabled();
-  expect(screen.getByLabelText('메모')).toBeEnabled();
+  expect(screen.getByLabelText('메모')).not.toHaveAttribute('readonly');
 });
 
 test('the memo field says how long it may be', async () => {
@@ -262,4 +262,15 @@ test('a save that fails after leaving the day still says so', async () => {
       `${date} 하루 체크를 저장하지 못했습니다: 서버 오류가 발생했습니다`,
     ),
   );
+});
+
+test('pressing Enter in the memo keeps the focus there when the save fails', async () => {
+  server({ body: dayOf(null) }, { status: 500, body: { error: '서버 오류가 발생했습니다' } });
+  render(<ChecksCard date={date} />);
+  const memo = await screen.findByLabelText('메모');
+  fireEvent.change(memo, { target: { value: '메모' } });
+  memo.focus();
+  fireEvent.submit(memo.closest('form')!);
+  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  expect(memo).toHaveFocus();
 });

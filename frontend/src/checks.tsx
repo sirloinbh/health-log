@@ -120,7 +120,8 @@ function CheckForm({
           autoComplete="off"
           maxLength={maxMemo}
           aria-describedby="check-memo-hint"
-          disabled={saving}
+          // Read-only, not disabled: a disabled field drops the focus of someone who pressed Enter in it.
+          readOnly={saving}
           value={form.memo}
           onChange={(event) => setForm((current) => ({ ...current, memo: event.target.value }))}
         />

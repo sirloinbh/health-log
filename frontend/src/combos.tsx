@@ -76,6 +76,8 @@ function ComboDialog({
   const [saving, setSaving] = useState(false);
   const { notice, error } = useNotice();
   const { notice: searchNotice, error: searchError, clear: clearSearch } = useNotice();
+  const { notice: pageNotice, error: pageError, clear: clearPage } = useNotice();
+  const shown = useRef<HTMLParagraphElement>(null);
   const {
     foods,
     more,
@@ -83,7 +85,15 @@ function ComboDialog({
     loadingMore,
     search: searchFoods,
     loadMore,
-  } = useFoodSearch<FoodOption>({ onStart: clearSearch, onError: searchError });
+  } = useFoodSearch<FoodOption>({
+    onStart: () => {
+      clearSearch();
+      clearPage();
+    },
+    onError: searchError,
+    onMoreStart: clearPage,
+    onMoreError: pageError,
+  });
 
   const search = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -217,7 +227,12 @@ function ComboDialog({
             </Button>
           </form>
           <Notice notice={searchNotice} />
-          <p role="status" className="text-body-sm break-keep text-muted-foreground empty:hidden">
+          <p
+            ref={shown}
+            role="status"
+            tabIndex={-1}
+            className="text-body-sm break-keep text-muted-foreground outline-none empty:hidden"
+          >
             {foods === null
               ? null
               : foods.length === 0
@@ -256,8 +271,13 @@ function ComboDialog({
             </ul>
           ) : null}
           {foods?.length && more ? (
-            <MoreFoodsButton loading={loadingMore || searching} onClick={() => void loadMore()} />
+            <MoreFoodsButton
+              loading={loadingMore || searching}
+              onLoad={loadMore}
+              afterLast={shown}
+            />
           ) : null}
+          <Notice notice={pageNotice} />
           <Notice notice={notice} />
         </div>
         <DialogFooter>

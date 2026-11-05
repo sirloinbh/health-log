@@ -273,14 +273,21 @@ test('the database itself refuses negative nutrients', { skip }, async () => {
 
 test('with 150 matching foods, paging reaches every one exactly once', { skip }, async () => {
   const name = `${prefix}paging-`;
-  // Each name twice, with and without a brand, so the page edge can fall between the two.
+  // Names come in pairs, without and with a brand, after one food alone: in the order the 100th
+  // and 101st foods are then one pair, so the page edge falls inside a name.
   for (let index = 0; index < 150; index += 1) {
+    const pair = Math.floor((index + 1) / 2);
     await pool.query(
       `INSERT INTO foods (name, brand, serving_size, serving_unit) VALUES ($1, $2, 100, 'g')`,
-      [`${name}${String(Math.floor(index / 2)).padStart(3, '0')}`, index % 2 ? 'brand' : null],
+      [`${name}${String(pair).padStart(3, '0')}`, index % 2 ? 'brand' : null],
     );
   }
   await withApi(pool, async (call) => {
+    const edge = await call(`/api/foods?q=${encodeURIComponent(name)}&offset=99`);
+    const [last, first] = (edge.data.foods as { name: string; brand: string | null }[]).slice(0, 2);
+    assert.equal(last.name, first.name);
+    assert.deepEqual([last.brand, first.brand], [null, 'brand']);
+
     const seen: string[] = [];
     let offset: number | null = 0;
     let pages = 0;

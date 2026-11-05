@@ -1,5 +1,5 @@
 import { Pencil, Plus } from 'lucide-react';
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
@@ -334,6 +334,10 @@ export function FoodsPage() {
   // null: closed, 'new': adding, a food: editing it.
   const [editing, setEditing] = useState<Food | 'new' | null>(null);
   const { notice, error, clear } = useNotice();
+  // A next page reports apart from the search, whose failure must stay in view: the list below it
+  // is still the answer to the earlier words.
+  const { notice: pageNotice, error: pageError, clear: clearPage } = useNotice();
+  const shown = useRef<HTMLParagraphElement>(null);
   // A failed search keeps the list on screen, along with the words that found it.
   const {
     foods,
@@ -343,7 +347,14 @@ export function FoodsPage() {
     applied,
     search: load,
     loadMore,
-  } = useFoodSearch<Food>({ onSuccess: clear, onError: error, keepOnError: true });
+  } = useFoodSearch<Food>({
+    onStart: clearPage,
+    onSuccess: clear,
+    onError: error,
+    keepOnError: true,
+    onMoreStart: clearPage,
+    onMoreError: pageError,
+  });
 
   useEffect(() => {
     void load('');
@@ -397,12 +408,22 @@ export function FoodsPage() {
         </div>
       ) : null}
       {/* Always in the page: a status region added along with its text may not be read out. */}
-      <p role="status" className="text-body-sm break-keep text-muted-foreground empty:hidden">
-        {foods?.length && more ? `음식 ${foods.length}개 표시 중. 더 있습니다.` : null}
+      <p
+        ref={shown}
+        role="status"
+        tabIndex={-1}
+        className="text-body-sm break-keep text-muted-foreground outline-none empty:hidden"
+      >
+        {foods?.length
+          ? more
+            ? `음식 ${foods.length}개 표시 중. 더 있습니다.`
+            : `음식 ${foods.length}개`
+          : null}
       </p>
       {foods?.length && more ? (
-        <MoreFoodsButton loading={loadingMore || searching} onClick={() => void loadMore()} />
+        <MoreFoodsButton loading={loadingMore || searching} onLoad={loadMore} afterLast={shown} />
       ) : null}
+      <Notice notice={pageNotice} />
       {editing ? (
         <FoodDialog
           food={editing === 'new' ? null : editing}

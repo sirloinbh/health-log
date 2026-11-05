@@ -208,6 +208,10 @@ function AddEntry({
   const { notice: comboNotice, error: comboError, clear: clearCombo } = useNotice();
   const { notice: copyNotice, error: copyError, clear: clearCopy } = useNotice();
   const { notice: typedNotice, error: typedError, clear: clearTyped } = useNotice();
+  // Below a long result list, next to the button that asked for the page.
+  const { notice: pageNotice, error: pageError, clear: clearPage } = useNotice();
+  const shown = useRef<HTMLParagraphElement>(null);
+  // A search clears every message, like the other forms; a next page only its own.
   const {
     foods,
     more,
@@ -215,7 +219,12 @@ function AddEntry({
     loadingMore,
     search: searchFoods,
     loadMore,
-  } = useFoodSearch<FoodOption>({ onStart: () => clear(), onError: listError });
+  } = useFoodSearch<FoodOption>({
+    onStart: () => clear(),
+    onError: listError,
+    onMoreStart: clearPage,
+    onMoreError: pageError,
+  });
   const mealLabel = meals.find(({ key }) => key === meal)!.label;
 
   const clear = () => {
@@ -224,6 +233,7 @@ function AddEntry({
     clearCombo();
     clearCopy();
     clearTyped();
+    clearPage();
   };
 
   const loadRecent = useCallback(async () => {
@@ -468,7 +478,12 @@ function AddEntry({
       </form>
       <Notice notice={listNotice} />
       {/* Always in the page: a status region added along with its text may not be read out. */}
-      <p role="status" className="text-body-sm break-keep text-muted-foreground empty:hidden">
+      <p
+        ref={shown}
+        role="status"
+        tabIndex={-1}
+        className="text-body-sm break-keep text-muted-foreground outline-none empty:hidden"
+      >
         {foods === null
           ? null
           : foods.length === 0
@@ -485,8 +500,9 @@ function AddEntry({
         />
       ) : null}
       {foods?.length && more ? (
-        <MoreFoodsButton loading={loadingMore || searching} onClick={() => void loadMore()} />
+        <MoreFoodsButton loading={loadingMore || searching} onLoad={loadMore} afterLast={shown} />
       ) : null}
+      <Notice notice={pageNotice} />
       <section aria-label="조합" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-body-sm font-medium">조합</p>

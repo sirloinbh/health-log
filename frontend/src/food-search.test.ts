@@ -103,7 +103,7 @@ test('a new search drops a next page still on its way', async () => {
   });
   const { view } = setup();
   await act(() => view.result.current.search('old'));
-  let page: Promise<void> = Promise.resolve();
+  let page: Promise<boolean> = Promise.resolve(false);
   act(() => {
     page = view.result.current.loadMore();
   });
@@ -156,4 +156,58 @@ test('a failed search empties the list, unless asked to keep it', async () => {
   expect(kept.view.result.current.foods).toHaveLength(2);
   // The list on screen is still the answer to "a", so a reload asks for "a" again.
   expect(kept.view.result.current.applied.current).toBe('a');
+});
+
+test('a next page runs its own callbacks, not the search ones, and says when it was the last', async () => {
+  serve((url) =>
+    url.endsWith('offset=200')
+      ? json({ foods: foodsFrom(201, 1), nextOffset: null })
+      : url.endsWith('offset=100')
+        ? json({ foods: foodsFrom(101, 100), nextOffset: 200 })
+        : json({ foods: foodsFrom(1, 100), nextOffset: 100 }),
+  );
+  const calls: string[] = [];
+  const view = renderHook(() =>
+    useFoodSearch<Food>({
+      onStart: () => calls.push('start'),
+      onSuccess: () => calls.push('success'),
+      onError: () => calls.push('error'),
+      onMoreStart: () => calls.push('more-start'),
+      onMoreError: () => calls.push('more-error'),
+    }),
+  );
+  await act(() => view.result.current.search(''));
+  let last: boolean | undefined;
+  await act(async () => {
+    last = await view.result.current.loadMore();
+  });
+  expect(last).toBe(false);
+  await act(async () => {
+    last = await view.result.current.loadMore();
+  });
+  expect(last).toBe(true);
+  expect(calls).toEqual(['start', 'success', 'more-start', 'more-start']);
+});
+
+test('a second press while a page loads does not ask for it again', async () => {
+  let finish = (_response: Response) => {};
+  const fetchMock = serve((url) =>
+    url.endsWith('offset=100')
+      ? new Promise((resolve) => (finish = resolve))
+      : json({ foods: foodsFrom(1, 100), nextOffset: 100 }),
+  );
+  const { view } = setup();
+  await act(() => view.result.current.search(''));
+  let first: Promise<boolean> = Promise.resolve(false);
+  act(() => {
+    first = view.result.current.loadMore();
+  });
+  await act(async () => {
+    expect(await view.result.current.loadMore()).toBe(false);
+  });
+  expect(fetchMock.mock.calls.filter(([url]) => url.includes('offset='))).toHaveLength(1);
+  finish(json({ foods: foodsFrom(101, 1), nextOffset: null }));
+  await act(async () => {
+    expect(await first).toBe(true);
+  });
 });

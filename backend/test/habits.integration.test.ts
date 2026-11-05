@@ -313,3 +313,39 @@ test('the database refuses rows the API would never write', { skip }, async (t) 
     ),
   );
 });
+
+test(
+  'two saves of one day at the same time both succeed, and one of them wins whole',
+  { skip },
+  async (t) => {
+    t.after(clean);
+    const a = { cigarettes: 1, drinks: [{ kind: 'soju', unit: 'bottle', amount: 1 }] };
+    const b = {
+      cigarettes: 2,
+      drinks: [
+        { kind: 'beer', unit: 'can', amount: 2 },
+        { kind: 'wine', unit: 'glass', amount: 1 },
+      ],
+    };
+    await withApi(pool, async (call) => {
+      // From smoking only, and from drinks already there.
+      for (const start of [{ cigarettes: 5 }, a]) {
+        await put(call, '1990-03-27', start);
+        for (let round = 0; round < 5; round += 1) {
+          const results = await Promise.all([
+            call('/api/habits/1990-03-27', { method: 'PUT', body: a }),
+            call('/api/habits/1990-03-27', { method: 'PUT', body: b }),
+          ]);
+          assert.deepEqual(
+            results.map(({ status }) => status),
+            [200, 200],
+            JSON.stringify(results.map(({ data }) => data)),
+          );
+          const { record } = (await call('/api/habits/1990-03-27')).data as unknown as Day;
+          const won = [a, b].find((body) => body.cigarettes === record?.cigarettes);
+          assert.deepEqual(record?.drinks, won?.drinks);
+        }
+      }
+    });
+  },
+);

@@ -186,6 +186,11 @@ export function habitsRouter(pool: Pool, limits: RateLimitSettings) {
     const date = parseDate(req.params.date);
     const input = habitInput.parse(req.body);
     const day = await inTransaction(async (client) => {
+      // Saves of one day take turns. The drinks are deleted before the day's row is locked, so
+      // without this two saves at once would both insert at position 0 and one would fail.
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('habit_days:' || $1::text))", [
+        date,
+      ]);
       // The old drinks go first: the database refuses to mark a day "not recorded" while it still
       // has drinks.
       await client.query('DELETE FROM habit_drinks WHERE record_date = $1', [date]);

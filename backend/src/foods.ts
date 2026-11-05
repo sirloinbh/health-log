@@ -119,7 +119,7 @@ const searchQuery = z.object({
 });
 
 /** How many foods one list or search request returns; the response says where the next page starts. */
-export const foodPageSize = 100;
+const foodPageSize = 100;
 
 type FoodRow = {
   id: string;

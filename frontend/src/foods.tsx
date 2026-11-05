@@ -1,5 +1,5 @@
 import { Pencil, Plus } from 'lucide-react';
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
@@ -24,8 +24,10 @@ import {
   SelectValue,
 } from './components/ui/select';
 import { toast } from './components/ui/sonner';
+import { useFoodSearch } from './food-search';
 import { requestJson } from './lib/api';
 import { useNotice } from './lib/use-notice';
+import { MoreFoodsButton } from './more-foods-button';
 import { parseAmount, unreadableAmount } from './number-input';
 
 const nutrients = [
@@ -329,37 +331,19 @@ function FoodCard({ food, onEdit }: { food: Food; onEdit: () => void }) {
 
 export function FoodsPage() {
   const [query, setQuery] = useState('');
-  const [foods, setFoods] = useState<Food[] | null>(null);
   // null: closed, 'new': adding, a food: editing it.
   const [editing, setEditing] = useState<Food | 'new' | null>(null);
   const { notice, error, clear } = useNotice();
-  const latestLoad = useRef(0);
-  // What the list shows, which can differ from words typed but not yet searched.
-  const appliedQuery = useRef('');
-
-  const load = useCallback(
-    async (search: string) => {
-      // A slow older search must not overwrite a newer one.
-      const request = ++latestLoad.current;
-      const previousQuery = appliedQuery.current;
-      appliedQuery.current = search;
-      try {
-        const data = await requestJson<{ foods: Food[] }>(
-          `/api/foods?q=${encodeURIComponent(search)}`,
-        );
-        if (request !== latestLoad.current) return;
-        clear();
-        setFoods(data.foods);
-      } catch (cause) {
-        if (request === latestLoad.current) {
-          // The list still shows the previous search.
-          appliedQuery.current = previousQuery;
-          error(cause);
-        }
-      }
-    },
-    [clear, error],
-  );
+  // A failed search keeps the list on screen, along with the words that found it.
+  const {
+    foods,
+    more,
+    searching,
+    loadingMore,
+    applied,
+    search: load,
+    loadMore,
+  } = useFoodSearch<Food>({ onSuccess: clear, onError: error, keepOnError: true });
 
   useEffect(() => {
     void load('');
@@ -412,6 +396,13 @@ export function FoodsPage() {
           ))}
         </div>
       ) : null}
+      {/* Always in the page: a status region added along with its text may not be read out. */}
+      <p role="status" className="text-body-sm break-keep text-muted-foreground empty:hidden">
+        {foods?.length && more ? `음식 ${foods.length}개 표시 중. 더 있습니다.` : null}
+      </p>
+      {foods?.length && more ? (
+        <MoreFoodsButton loading={loadingMore || searching} onClick={() => void loadMore()} />
+      ) : null}
       {editing ? (
         <FoodDialog
           food={editing === 'new' ? null : editing}
@@ -420,7 +411,7 @@ export function FoodsPage() {
             setEditing(null);
             // The saved food may not match the current search, so the list alone cannot confirm it.
             toast.success('저장했습니다');
-            void load(appliedQuery.current);
+            void load(applied.current);
           }}
         />
       ) : null}

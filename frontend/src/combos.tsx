@@ -19,8 +19,10 @@ import { Label } from './components/ui/label';
 import { Notice } from './components/ui/notice';
 import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
+import { resultText, useFoodSearch } from './food-search';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
+import { MoreFoodsButton } from './more-foods-button';
 import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
 
 /** The most foods one combo holds; the server and database refuse more. */
@@ -71,31 +73,21 @@ function ComboDialog({
     () => combo?.items.map((item) => ({ ...item, servings: String(item.servings) })) ?? [],
   );
   const [query, setQuery] = useState('');
-  const [foods, setFoods] = useState<FoodOption[] | null>(null);
-  const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const { notice, error } = useNotice();
   const { notice: searchNotice, error: searchError, clear: clearSearch } = useNotice();
-  const latestSearch = useRef(0);
+  const {
+    foods,
+    more,
+    searching,
+    loadingMore,
+    search: searchFoods,
+    loadMore,
+  } = useFoodSearch<FoodOption>({ onStart: clearSearch, onError: searchError });
 
-  const search = async (event: FormEvent<HTMLFormElement>) => {
+  const search = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const request = ++latestSearch.current;
-    setSearching(true);
-    clearSearch();
-    try {
-      const data = await requestJson<{ foods: FoodOption[] }>(
-        `/api/foods?q=${encodeURIComponent(query)}`,
-      );
-      if (request === latestSearch.current) setFoods(data.foods);
-    } catch (cause) {
-      if (request === latestSearch.current) {
-        setFoods(null);
-        searchError(cause);
-      }
-    } finally {
-      if (request === latestSearch.current) setSearching(false);
-    }
+    void searchFoods(query);
   };
 
   const addFood = (food: FoodOption) =>
@@ -206,7 +198,7 @@ function ComboDialog({
               </ul>
             )}
           </section>
-          <form role="search" onSubmit={(event) => void search(event)} className="flex gap-2">
+          <form role="search" onSubmit={search} className="flex gap-2">
             <Input
               type="search"
               aria-label="넣을 음식 검색"
@@ -231,8 +223,8 @@ function ComboDialog({
               : foods.length === 0
                 ? '찾는 음식이 없습니다. 음식 화면에서 먼저 추가해 주세요.'
                 : full
-                  ? `검색 결과 ${foods.length}건. 음식은 ${maxItems}개까지 넣을 수 있습니다.`
-                  : `검색 결과 ${foods.length}건`}
+                  ? `${resultText(foods.length, more)}. 음식은 ${maxItems}개까지 넣을 수 있습니다.`
+                  : resultText(foods.length, more)}
           </p>
           {foods?.length ? (
             <ul aria-label="검색 결과" className="flex max-h-60 flex-col divide-y overflow-y-auto">
@@ -262,6 +254,9 @@ function ComboDialog({
                 );
               })}
             </ul>
+          ) : null}
+          {foods?.length && more ? (
+            <MoreFoodsButton loading={loadingMore || searching} onClick={() => void loadMore()} />
           ) : null}
           <Notice notice={notice} />
         </div>

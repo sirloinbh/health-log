@@ -312,3 +312,34 @@ test('a failed load shows the server message', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
   expect(screen.queryByText('음식이 없습니다')).not.toBeInTheDocument();
 });
+
+test('a long list says more foods are waiting and adds the next page below', async () => {
+  const fetchMock = serve((url) =>
+    url.endsWith('offset=100')
+      ? json({ foods: [{ ...food, id: 2, name: '피자' }], nextOffset: null })
+      : json({ foods: [food], nextOffset: 100 }),
+  );
+  open();
+  await screen.findByRole('heading', { level: 2, name: '치즈버거' });
+  expect(screen.getByText('음식 1개 표시 중. 더 있습니다.')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '결과 더 보기' }));
+  expect(await screen.findByRole('heading', { level: 2, name: '피자' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 2, name: '치즈버거' })).toBeInTheDocument();
+  expect(foodCalls(fetchMock).at(-1)?.[0]).toBe('/api/foods?q=&offset=100');
+  expect(screen.queryByRole('button', { name: '결과 더 보기' })).not.toBeInTheDocument();
+  expect(screen.queryByText(/더 있습니다/)).not.toBeInTheDocument();
+});
+
+test('a failed next page keeps the list and the button to try again', async () => {
+  serve((url) =>
+    url.endsWith('offset=100')
+      ? json({ error: '서버 오류가 발생했습니다' }, 500)
+      : json({ foods: [food], nextOffset: 100 }),
+  );
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '결과 더 보기' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  expect(screen.getByRole('heading', { level: 2, name: '치즈버거' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '결과 더 보기' })).toBeEnabled();
+});

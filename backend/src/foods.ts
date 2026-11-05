@@ -111,7 +111,15 @@ const searchQuery = z.object({
     .trim()
     .refine((value) => value.length <= 100, '검색어는 100자 이하로 입력해 주세요')
     .default(''),
+  offset: z
+    .string({ error: '목록 위치가 올바르지 않습니다' })
+    .regex(/^\d{1,7}$/, '목록 위치가 올바르지 않습니다')
+    .transform(Number)
+    .default(0),
 });
+
+/** How many foods one list or search request returns; the response says where the next page starts. */
+export const foodPageSize = 100;
 
 type FoodRow = {
   id: string;
@@ -192,15 +200,22 @@ export function foodsRouter(pool: Pool, today: () => string, limits: RateLimitSe
   };
 
   router.get('/', async (req, res) => {
-    const { q } = searchQuery.parse(req.query);
+    const { q, offset } = searchQuery.parse(req.query);
+    // One row past the page says whether another page exists, without counting every match.
+    // Pages only add up if every food has one place in the order. A name and brand are already
+    // unique; id keeps that true even if the rule is ever relaxed.
     const { rows } = await pool.query<FoodRow>(
       `SELECT ${columns} FROM foods
        WHERE $1 = '' OR name ILIKE $2 OR brand ILIKE $2
-       ORDER BY name, brand NULLS FIRST
-       LIMIT 100`,
-      [q, likePattern(q)],
+       ORDER BY name, brand NULLS FIRST, id
+       LIMIT $3 OFFSET $4`,
+      [q, likePattern(q), foodPageSize + 1, offset],
     );
-    res.json({ foods: rows.map(toFood) });
+    const more = rows.length > foodPageSize;
+    res.json({
+      foods: rows.slice(0, foodPageSize).map(toFood),
+      nextOffset: more ? offset + foodPageSize : null,
+    });
   });
 
   // Stored foods by when they were last recorded, each once. Typed-in entries have no food, and an

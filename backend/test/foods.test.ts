@@ -231,3 +231,39 @@ test('a value that is not text answers with one message, even if it has a length
     }
   });
 });
+
+test('a list position that is not a plain whole number is rejected', async () => {
+  const pool = { query: async () => ({ rows: [] }) } as unknown as Pool;
+  await withApi(pool, async (call) => {
+    for (const offset of ['-1', '1.5', 'abc', '', '1e3', '12345678']) {
+      const { status, data } = await call(`/api/foods?offset=${offset}`);
+      assert.equal(status, 400, offset);
+      assert.equal(data.error, '목록 위치가 올바르지 않습니다');
+    }
+    assert.equal((await call('/api/foods?offset=1&offset=2')).status, 400);
+  });
+});
+
+test('a list asks for one food past the page to know whether another page exists', async () => {
+  const calls: unknown[][] = [];
+  const row = (id: number) => ({ id: String(id), name: `음식${id}`, serving_size: '1' });
+  const pool = {
+    query: async (...args: unknown[]) => {
+      calls.push(args);
+      const [, params] = args as [string, unknown[]];
+      const count = params[3] === 0 ? 101 : 3;
+      return { rows: Array.from({ length: count }, (_, index) => row(index + 1)) };
+    },
+  } as unknown as Pool;
+  await withApi(pool, async (call) => {
+    const first = await call('/api/foods');
+    assert.equal((first.data.foods as unknown[]).length, 100);
+    assert.equal(first.data.nextOffset, 100);
+    assert.deepEqual((calls[0][1] as unknown[]).slice(2), [101, 0]);
+
+    const last = await call('/api/foods?offset=100');
+    assert.equal((last.data.foods as unknown[]).length, 3);
+    assert.equal(last.data.nextOffset, null);
+    assert.deepEqual((calls[1][1] as unknown[]).slice(2), [101, 100]);
+  });
+});

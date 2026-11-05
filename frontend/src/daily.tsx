@@ -8,12 +8,13 @@ import { Card, CardDescription, CardHeader, CardTitle } from './components/ui/ca
 import { Input } from './components/ui/input';
 import { Notice } from './components/ui/notice';
 import { formatDate, isValidDate, shiftDate } from './daily-date';
+import { HabitsCard } from './habits';
 import { type Health, healthText } from './health';
 import { MealCard } from './meals';
 import { SleepCard } from './sleep';
 
 // Each feature replaces its placeholder here as its issue lands.
-const sections = ['술·담배', '하루 체크', '병원·약'];
+const sections = ['하루 체크', '병원·약'];
 
 // Typing a year passes through values like 0002-10-31; those must not change the page.
 const earliestDate = '2000-01-01';
@@ -128,6 +129,7 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
         <SleepCard key={date} date={date} />
         <MealCard key={`meal-${date}`} date={date} />
         <BodyCard key={`body-${date}`} date={date} />
+        <HabitsCard key={`habits-${date}`} date={date} />
         {sections.map((title) => (
           <Card key={title}>
             <CardHeader>

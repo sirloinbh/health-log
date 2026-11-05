@@ -4,15 +4,13 @@ import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
 import { parseDate } from './dates.js';
+import { hasTwoDecimalsAtMost } from './foods.js';
 import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError } from './standard/http.js';
 
 const drinkKinds = ['soju', 'beer', 'wine', 'makgeolli', 'whisky', 'other'] as const;
 const drinkUnits = ['glass', 'bottle', 'can'] as const;
 const maxDrinks = 20;
-
-// The column keeps two decimals; anything finer would be rounded silently.
-const hasTwoDecimalsAtMost = (value: number) => Number(value.toFixed(2)) === value;
 
 const drinkInput = z.object(
   {
@@ -157,10 +155,10 @@ export function habitsRouter(pool: Pool, limits: RateLimitSettings) {
   router.use(rateLimit(rateLimitOptions(limits)));
 
   // A change and the answer about it succeed together, so the totals shown match what was saved.
-  const inTransaction = async <T>(run: (client: PoolClient) => Promise<T>) => {
+  const inTransaction = async <T>(run: (client: PoolClient) => Promise<T>, begin = 'BEGIN') => {
     const client = await pool.connect();
     try {
-      await client.query('BEGIN');
+      await client.query(begin);
       const result = await run(client);
       await client.query('COMMIT');
       return result;
@@ -174,13 +172,23 @@ export function habitsRouter(pool: Pool, limits: RateLimitSettings) {
 
   router.get('/:date', async (req, res) => {
     const date = parseDate(req.params.date);
-    res.json(await readDay(pool, date));
+    // One snapshot for the record and both totals, so a save landing between them cannot make
+    // the answer disagree with itself.
+    res.json(
+      await inTransaction(
+        (client) => readDay(client, date),
+        'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY',
+      ),
+    );
   });
 
   router.put('/:date', async (req, res) => {
     const date = parseDate(req.params.date);
     const input = habitInput.parse(req.body);
     const day = await inTransaction(async (client) => {
+      // The old drinks go first: the database refuses to mark a day "not recorded" while it still
+      // has drinks.
+      await client.query('DELETE FROM habit_drinks WHERE record_date = $1', [date]);
       await client.query(
         `INSERT INTO habit_days (record_date, cigarettes, drinks_recorded) VALUES ($1, $2, $3)
          ON CONFLICT (record_date) DO UPDATE SET
@@ -189,7 +197,6 @@ export function habitsRouter(pool: Pool, limits: RateLimitSettings) {
            updated_at = now()`,
         [date, input.cigarettes, input.drinks !== null],
       );
-      await client.query('DELETE FROM habit_drinks WHERE record_date = $1', [date]);
       for (const [position, drink] of (input.drinks ?? []).entries()) {
         await client.query(
           `INSERT INTO habit_drinks (record_date, position, kind, unit, amount)

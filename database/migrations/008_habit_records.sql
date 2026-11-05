@@ -8,16 +8,23 @@ CREATE TABLE IF NOT EXISTS habit_days (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   -- A day with nothing recorded is no row at all.
-  CONSTRAINT habit_days_not_empty CHECK (cigarettes IS NOT NULL OR drinks_recorded)
+  CONSTRAINT habit_days_not_empty CHECK (cigarettes IS NOT NULL OR drinks_recorded),
+  -- The target of the drinks' key below.
+  CONSTRAINT habit_days_date_drinks UNIQUE (record_date, drinks_recorded)
 );
 
 -- One row per kind and unit drunk that day, in the order they were entered.
 CREATE TABLE IF NOT EXISTS habit_drinks (
-  record_date date NOT NULL REFERENCES habit_days (record_date) ON DELETE CASCADE,
+  record_date date NOT NULL,
+  -- Always true, and part of the key: drinks can only hang off a day whose drinking was recorded.
+  -- Marking such a day "not recorded" while drinks remain cascades false here and fails the check.
+  drinks_recorded boolean NOT NULL DEFAULT true CHECK (drinks_recorded),
   position smallint NOT NULL CHECK (position BETWEEN 0 AND 19),
   kind text NOT NULL CHECK (kind IN ('soju', 'beer', 'wine', 'makgeolli', 'whisky', 'other')),
   unit text NOT NULL CHECK (unit IN ('glass', 'bottle', 'can')),
   amount numeric(5, 2) NOT NULL CHECK (amount > 0 AND amount <= 99),
   PRIMARY KEY (record_date, position),
-  CONSTRAINT habit_drinks_kind_unit_once UNIQUE (record_date, kind, unit)
+  CONSTRAINT habit_drinks_kind_unit_once UNIQUE (record_date, kind, unit),
+  CONSTRAINT habit_drinks_day FOREIGN KEY (record_date, drinks_recorded)
+    REFERENCES habit_days (record_date, drinks_recorded) ON DELETE CASCADE ON UPDATE CASCADE
 );

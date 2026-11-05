@@ -33,7 +33,7 @@ import {
 } from './habit-text';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
-import { parseAmount, unreadableAmount } from './number-input';
+import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
 
 const pathOf = (date: string) => `/api/habits/${date}`;
 const maxDrinks = 20;
@@ -56,11 +56,19 @@ const draftOf = (drink: Drink): DraftDrink => ({
   amount: String(drink.amount),
 });
 
-// A new row starts on a kind not listed yet, so adding one is never a duplicate to fix.
+// A new row starts on a kind and unit not listed yet: a kind not used at all first, by the bottle.
+// There are 18 pairs and at most 20 rows, so only the last rows can repeat one, which the save
+// check then points out.
 const newDraft = (drinks: DraftDrink[]) => {
   const kinds = Object.keys(drinkKinds) as DrinkKind[];
-  const kind = kinds.find((each) => !drinks.some((drink) => drink.kind === each)) ?? 'other';
-  return draftOf({ kind, unit: 'bottle', amount: 1 });
+  const units = Object.keys(drinkUnits) as DrinkUnit[];
+  const used = (kind: DrinkKind, unit?: DrinkUnit) =>
+    drinks.some((drink) => drink.kind === kind && (unit === undefined || drink.unit === unit));
+  const kind = kinds.find((each) => !used(each));
+  if (kind) return draftOf({ kind, unit: 'bottle', amount: 1 });
+  const free = kinds.flatMap((each) => units.map((unit) => ({ kind: each, unit })));
+  const pair = free.find(({ kind: each, unit }) => !used(each, unit)) ?? free[0];
+  return draftOf({ ...pair, amount: 1 });
 };
 
 const formOf = (record: HabitRecord | null): Form => ({
@@ -76,6 +84,7 @@ const readForm = (form: Form) => {
   if (cigarettes !== null && !Number.isInteger(cigarettes)) {
     return '담배는 개비 수를 정수로 입력해 주세요';
   }
+  if (cigarettes !== null && cigarettes > 200) return '담배는 200개비 이하로 입력해 주세요';
   let drinks: Drink[] | null = null;
   if (form.mode === 'none') drinks = [];
   if (form.mode === 'some') {
@@ -86,6 +95,8 @@ const readForm = (form: Form) => {
       const amount = parseAmount(draft.amount);
       if (amount === undefined) return unreadableAmount(label);
       if (amount === null || amount <= 0) return `${label}을 0보다 큰 숫자로 입력해 주세요`;
+      if (amount > 99) return `${label}은 99 이하로 입력해 주세요`;
+      if (!hasTwoDecimalsAtMost(amount)) return `${label}은 소수 둘째 자리까지 입력해 주세요`;
       if (drinks.some((drink) => drink.kind === draft.kind && drink.unit === draft.unit)) {
         return `${drinkKinds[draft.kind]} ${drinkUnits[draft.unit]}이(가) 두 번 있습니다. 한 줄로 합쳐 주세요`;
       }

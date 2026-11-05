@@ -1,7 +1,19 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { expect, test, vi } from 'vitest';
+import { beforeAll, expect, test, vi } from 'vitest';
 
 import { HabitsCard } from './habits';
+
+// jsdom lacks pointer capture and scrolling, which Radix Select calls.
+beforeAll(() => {
+  Element.prototype.hasPointerCapture ??= () => false;
+  Element.prototype.releasePointerCapture ??= () => {};
+  Element.prototype.scrollIntoView ??= () => {};
+});
+
+const choose = (trigger: HTMLElement, option: string) => {
+  fireEvent.keyDown(trigger, { key: 'Enter' });
+  fireEvent.click(screen.getByRole('option', { name: option }));
+};
 
 const date = '2026-11-04';
 type Period = {
@@ -139,6 +151,9 @@ test.each([
   [{ cigarettes: '' }, '술이나 담배 중 하나 이상 기록해 주세요'],
   [{ cigarettes: '1.5' }, '정수로 입력'],
   [{ cigarettes: '3,5' }, '담배 \\(개비\\)'],
+  [{ cigarettes: '201' }, '200개비 이하'],
+  [{ cigarettes: '', drinks: true, amount: '99.5' }, '99 이하'],
+  [{ cigarettes: '', drinks: true, amount: '0.125' }, '소수 둘째 자리'],
   [{ cigarettes: '', drinks: true, amount: '0' }, '1번째 술의 양을 0보다 큰'],
   [{ cigarettes: '', drinks: true, amount: '1,5' }, '1번째 술의 양'],
 ])('%j is refused before anything is sent', async (input, message) => {
@@ -243,4 +258,33 @@ test('a failed load can be tried again', async () => {
   expect(within(card()).queryByRole('region', { name: '이 주' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
   expect(await screen.findByLabelText('담배 (개비)')).toBeInTheDocument();
+});
+
+test('the same kind and unit twice is refused before anything is sent', async () => {
+  const fetchMock = server({ body: dayOf(null) });
+  render(<HabitsCard date={date} />);
+  await screen.findByLabelText('담배 (개비)');
+  fireEvent.click(screen.getByRole('button', { name: '마심' }));
+  fireEvent.click(screen.getByRole('button', { name: '술 추가' }));
+  choose(screen.getByLabelText('2번째 술 종류'), '소주');
+  expect(screen.getByLabelText('2번째 술 종류')).toHaveTextContent('소주');
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('소주 병이(가) 두 번 있습니다');
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+test('once every kind is listed, a new row takes a unit not used yet', async () => {
+  server({ body: dayOf(null) });
+  render(<HabitsCard date={date} />);
+  await screen.findByLabelText('담배 (개비)');
+  fireEvent.click(screen.getByRole('button', { name: '마심' }));
+  for (let row = 2; row <= 7; row += 1) {
+    fireEvent.click(screen.getByRole('button', { name: '술 추가' }));
+  }
+  const kinds = [1, 2, 3, 4, 5, 6].map(
+    (row) => screen.getByLabelText(`${row}번째 술 종류`).textContent,
+  );
+  expect(kinds).toEqual(['소주', '맥주', '와인', '막걸리', '양주', '기타']);
+  expect(screen.getByLabelText('7번째 술 종류')).toHaveTextContent('소주');
+  expect(screen.getByLabelText('7번째 술 단위')).toHaveTextContent('잔');
 });

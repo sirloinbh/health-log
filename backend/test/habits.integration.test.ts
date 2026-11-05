@@ -129,6 +129,32 @@ test('saving again replaces the day, drinks included, in the order given', { ski
       ['1990-03-12'],
     );
     assert.equal(rows[0].n, 2);
+
+    // Back to smoking only: the drinks go, and drinking reads as not recorded again.
+    const smokeOnly = await put(call, '1990-03-12', { cigarettes: 1 });
+    assert.deepEqual(smokeOnly.record, { date: '1990-03-12', cigarettes: 1, drinks: null });
+    const left = await pool.query(
+      'SELECT count(*)::int AS n FROM habit_drinks WHERE record_date = $1',
+      ['1990-03-12'],
+    );
+    assert.equal(left.rows[0].n, 0);
+  });
+});
+
+test('a day with several drinks counts once among the drinking days', { skip }, async (t) => {
+  t.after(clean);
+  await withApi(pool, async (call) => {
+    await put(call, '1990-03-13', {
+      drinks: [
+        { kind: 'soju', unit: 'bottle', amount: 1 },
+        { kind: 'beer', unit: 'glass', amount: 2 },
+        { kind: 'beer', unit: 'can', amount: 1 },
+      ],
+    });
+    const day = await put(call, '1990-03-14', { drinks: [] });
+    assert.equal(day.week.drinking.days, 2);
+    assert.equal(day.week.drinking.drinkingDays, 1);
+    assert.equal(day.week.drinking.totals.length, 3);
   });
 });
 
@@ -252,6 +278,7 @@ test('a save that fails partway leaves the earlier record whole', { skip }, asyn
     });
   });
 });
+
 test('the database refuses rows the API would never write', { skip }, async (t) => {
   t.after(clean);
   await assert.rejects(pool.query("INSERT INTO habit_days (record_date) VALUES ('1990-03-22')"));
@@ -269,4 +296,20 @@ test('the database refuses rows the API would never write', { skip }, async (t) 
       values,
     );
   }
+  // Drinks only belong to a day whose drinking was recorded.
+  await pool.query("INSERT INTO habit_days (record_date, cigarettes) VALUES ('1990-03-23', 1)");
+  await assert.rejects(
+    pool.query(
+      "INSERT INTO habit_drinks (record_date, position, kind, unit, amount) VALUES ('1990-03-23', 0, 'soju', 'glass', 1)",
+    ),
+  );
+  await pool.query(
+    "INSERT INTO habit_drinks (record_date, position, kind, unit, amount) VALUES ('1990-03-22', 0, 'soju', 'glass', 1)",
+  );
+  // A day that still has drinks cannot be marked "not recorded".
+  await assert.rejects(
+    pool.query(
+      "UPDATE habit_days SET drinks_recorded = false, cigarettes = 0 WHERE record_date = '1990-03-22'",
+    ),
+  );
 });

@@ -29,6 +29,15 @@ const noHabits = () =>
       month: { from: '2026-03-01', to: '2026-03-31', ...emptyPeriod },
     }),
   );
+const noRate = { days: 0, yes: 0 };
+const noChecks = () =>
+  new Response(
+    JSON.stringify({
+      record: null,
+      week: { from: '2026-03-09', to: '2026-03-15', diet: noRate, sleep: noRate },
+      month: { from: '2026-03-01', to: '2026-03-31', diet: noRate, sleep: noRate },
+    }),
+  );
 
 // The day's cards load along with the page.
 const dayCard = (url: string) =>
@@ -38,9 +47,11 @@ const dayCard = (url: string) =>
       ? noMeals()
       : url.startsWith('/api/habits')
         ? noHabits()
-        : url === '/api/foods/recent'
-          ? new Response(JSON.stringify({ foods: [] }))
-          : null;
+        : url.startsWith('/api/checks')
+          ? noChecks()
+          : url === '/api/foods/recent'
+            ? new Response(JSON.stringify({ foods: [] }))
+            : null;
 
 const health = (body: object, status = 200) =>
   vi.stubGlobal(

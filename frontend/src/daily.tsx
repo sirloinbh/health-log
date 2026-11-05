@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 
 import { BodyCard } from './body';
+import { ChecksCard } from './checks';
 import { Button } from './components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from './components/ui/card';
 import { Input } from './components/ui/input';
@@ -14,7 +15,7 @@ import { MealCard } from './meals';
 import { SleepCard } from './sleep';
 
 // Each feature replaces its placeholder here as its issue lands.
-const sections = ['하루 체크', '병원·약'];
+const sections = ['병원·약'];
 
 // Typing a year passes through values like 0002-10-31; those must not change the page.
 const earliestDate = '2000-01-01';
@@ -130,6 +131,7 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
         <MealCard key={`meal-${date}`} date={date} />
         <BodyCard key={`body-${date}`} date={date} />
         <HabitsCard key={`habits-${date}`} date={date} />
+        <ChecksCard key={`checks-${date}`} date={date} />
         {sections.map((title) => (
           <Card key={title}>
             <CardHeader>

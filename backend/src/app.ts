@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { types } from 'pg';
 
 import { bodyRouter } from './body.js';
+import { checksRouter } from './checks.js';
 import { combosRouter } from './combos.js';
 import { foodsRouter } from './foods.js';
 import { habitsRouter } from './habits.js';
@@ -45,6 +46,7 @@ export function createApp(
   app.use('/api/sleep', sleepRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api/body', bodyRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api/habits', habitsRouter(pool, options.rateLimit ?? defaultRateLimit));
+  app.use('/api/checks', checksRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api', notFound);
   app.use(errorHandler);
   return app;

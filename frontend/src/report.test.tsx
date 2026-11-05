@@ -271,8 +271,40 @@ test('the tip of an edge bar hangs inward instead of past the card', async () =>
   const last = within(chart.closest('figure')!).getByText('11/8 · 7시간 40분');
   expect(last.className).toContain('-translate-x-full');
   expect(last.style.left).toBe('100%');
+  // The second bar from either end hangs inward too: the rule is the same on both sides.
+  fireEvent.mouseEnter(columns[5]);
+  expect(within(chart.closest('figure')!).getByText('11/7 · 7시간 30분').className).toContain(
+    '-translate-x-full',
+  );
+  fireEvent.mouseEnter(columns[1]);
+  expect(within(chart.closest('figure')!).getByText('11/3 · 기록 없음').className).not.toContain(
+    '-translate-x',
+  );
   fireEvent.mouseEnter(columns[3]);
   expect(within(chart.closest('figure')!).getByText('11/5 · 7시간 10분').className).toContain(
     '-translate-x-1/2',
   );
+});
+
+test('one failed check of the server keeps the report already on screen', async () => {
+  let healthy = true;
+  const fetchMock = vi.fn((url: string) =>
+    Promise.resolve(
+      url.startsWith('/api/report')
+        ? json(reportOf())
+        : healthy
+          ? json({ today })
+          : json({ error: '서버에 연결할 수 없습니다' }, 503),
+    ),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  render(<App />);
+  await screen.findByText('11월 2일 ~ 11월 8일');
+  healthy = false;
+  // Returning to the tab checks the server again.
+  document.dispatchEvent(new Event('visibilitychange'));
+  expect(await screen.findByRole('alert')).toHaveTextContent('서버에 연결할 수 없습니다');
+  expect(screen.getByText('11월 2일 ~ 11월 8일')).toBeInTheDocument();
+  expect(stat('평균 수면')).toHaveTextContent('7시간 30분');
+  expect(screen.queryByText(/서버의 오늘 날짜를 알 수 없어/)).not.toBeInTheDocument();
 });

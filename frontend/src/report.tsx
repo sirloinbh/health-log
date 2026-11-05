@@ -221,7 +221,10 @@ export function ReportPage({ health }: { health: Health }) {
   const [params, setParams] = useSearchParams();
   const period: Period = params.get('period') === 'month' ? 'month' : 'week';
   const asked = params.get('date');
-  const today = health.state === 'ok' ? health.today : null;
+  // The last date the server gave. One failed health poll must not blank a report already shown.
+  const [lastToday, setLastToday] = useState<string | null>(null);
+  if (health.state === 'ok' && health.today !== lastToday) setLastToday(health.today);
+  const today = health.state === 'ok' ? health.today : lastToday;
   const date = asked && isValidDate(asked) ? asked : today;
   const [report, setReport] = useState<Report | null>(null);
   const { notice, error, clear } = useNotice();

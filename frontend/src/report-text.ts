@@ -26,12 +26,12 @@ export type Report = {
   sleepAfterDrinking: { afterDrinking: Night; afterNoDrinking: Night };
 };
 
-export type PeriodWords = { name: string; previous: string; same: string };
+export type PeriodWords = { name: string; previous: string; with: string };
 
-// 주 ends in a vowel and 달 in a consonant, so "the same as" takes 와 and 과.
+// 주 ends in a vowel and 달 in a consonant, so "with" is 와 for one and 과 for the other.
 export const periodWords: Record<Period, PeriodWords> = {
-  week: { name: '주', previous: '지난주', same: '지난주와 같음' },
-  month: { name: '달', previous: '지난달', same: '지난달과 같음' },
+  week: { name: '주', previous: '지난주', with: '와' },
+  month: { name: '달', previous: '지난달', with: '과' },
 };
 
 /** "7시간 30분" */
@@ -62,7 +62,7 @@ export const changeText = (
   // The earlier period's day count, so a change against one recorded day reads as thin as it is.
   const earlier = `${words.previous}(${previousDays}일)`;
   const change = current - previous;
-  if (change === 0) return `${earlier}${words.same.slice(words.previous.length)}`;
+  if (change === 0) return `${earlier}${words.with} 같음`;
   return `${earlier}보다 ${signed(change, format(Math.abs(change)))}`;
 };
 

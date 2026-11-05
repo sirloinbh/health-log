@@ -32,12 +32,14 @@ export function DailyBars({
       ? `${title}: 기록한 날이 없습니다`
       : `${title}: ${bars.length}일 중 ${recorded}일 기록, 가장 높은 날 ${format(max)}`;
   const shown = active === null ? null : bars[active];
+  // The same share of bars counts as an edge on either side.
+  const edgeSpan = bars.length / 4;
   const edge =
     active === null
       ? null
-      : active < bars.length / 4
+      : active < edgeSpan
         ? 'start'
-        : active >= (bars.length * 3) / 4
+        : bars.length - 1 - active < edgeSpan
           ? 'end'
           : null;
 

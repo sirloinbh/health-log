@@ -12,8 +12,10 @@ import { SkeletonText } from './components/ui/skeleton';
 import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
 import { formatDate, isValidDate, shiftDate } from './daily-date';
+import { resultText, useFoodSearch } from './food-search';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
+import { MoreFoodsButton } from './more-foods-button';
 import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
 
 const meals = [
@@ -183,8 +185,6 @@ function AddEntry({
   const [copyFrom, setCopyFrom] = useState(() => shiftDate(date, -1));
   const [servings, setServings] = useState('1');
   const [query, setQuery] = useState('');
-  const [foods, setFoods] = useState<FoodOption[] | null>(null);
-  const [searching, setSearching] = useState(false);
   const [name, setName] = useState('');
   const [calories, setCalories] = useState('');
   // Which button is waiting: `search-<id>`, `recent-<id>`, `combo-<id>`, 'copy' or 'typed'.
@@ -208,7 +208,23 @@ function AddEntry({
   const { notice: comboNotice, error: comboError, clear: clearCombo } = useNotice();
   const { notice: copyNotice, error: copyError, clear: clearCopy } = useNotice();
   const { notice: typedNotice, error: typedError, clear: clearTyped } = useNotice();
-  const latestSearch = useRef(0);
+  // Below a long result list, next to the button that asked for the page.
+  const { notice: pageNotice, error: pageError, clear: clearPage } = useNotice();
+  const shown = useRef<HTMLParagraphElement>(null);
+  // A search clears every message, like the other forms; a next page only its own.
+  const {
+    foods,
+    more,
+    searching,
+    loadingMore,
+    search: searchFoods,
+    loadMore,
+  } = useFoodSearch<FoodOption>({
+    onStart: () => clear(),
+    onError: listError,
+    onMoreStart: clearPage,
+    onMoreError: pageError,
+  });
   const mealLabel = meals.find(({ key }) => key === meal)!.label;
 
   const clear = () => {
@@ -217,6 +233,7 @@ function AddEntry({
     clearCombo();
     clearCopy();
     clearTyped();
+    clearPage();
   };
 
   const loadRecent = useCallback(async () => {
@@ -326,25 +343,9 @@ function AddEntry({
     return value;
   };
 
-  const search = async (event: FormEvent<HTMLFormElement>) => {
+  const search = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const request = ++latestSearch.current;
-    setSearching(true);
-    clear();
-    try {
-      const data = await requestJson<{ foods: FoodOption[] }>(
-        `/api/foods?q=${encodeURIComponent(query)}`,
-      );
-      if (request === latestSearch.current) setFoods(data.foods);
-    } catch (cause) {
-      if (request === latestSearch.current) {
-        // Earlier results would read as the answer to this search.
-        setFoods(null);
-        listError(cause);
-      }
-    } finally {
-      if (request === latestSearch.current) setSearching(false);
-    }
+    void searchFoods(query);
   };
 
   /** `from` says which list was used, so the error and the spinner show next to that list. */
@@ -456,7 +457,7 @@ function AddEntry({
           <Notice notice={recentNotice} />
         </section>
       ) : null}
-      <form role="search" onSubmit={(event) => void search(event)} className="flex gap-2">
+      <form role="search" onSubmit={search} className="flex gap-2">
         <Input
           ref={searchInput}
           type="search"
@@ -477,12 +478,17 @@ function AddEntry({
       </form>
       <Notice notice={listNotice} />
       {/* Always in the page: a status region added along with its text may not be read out. */}
-      <p role="status" className="text-body-sm break-keep text-muted-foreground empty:hidden">
+      <p
+        ref={shown}
+        role="status"
+        tabIndex={-1}
+        className="rounded-sm text-body-sm break-keep text-muted-foreground outline-none empty:hidden focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
         {foods === null
           ? null
           : foods.length === 0
             ? '찾는 음식이 없습니다. 아래에 이름과 칼로리를 바로 적을 수 있습니다.'
-            : `검색 결과 ${foods.length}건`}
+            : resultText(foods.length, more)}
       </p>
       {foods?.length ? (
         <FoodChoices
@@ -493,6 +499,10 @@ function AddEntry({
           onAdd={(food) => void addFood(food, 'search')}
         />
       ) : null}
+      {foods?.length && more ? (
+        <MoreFoodsButton loading={loadingMore || searching} onLoad={loadMore} afterLast={shown} />
+      ) : null}
+      <Notice notice={pageNotice} />
       <section aria-label="조합" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-body-sm font-medium">조합</p>

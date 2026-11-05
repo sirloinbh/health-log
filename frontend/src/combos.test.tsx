@@ -305,3 +305,30 @@ test('a failed load shows the server message', async () => {
   open();
   expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
 });
+
+test('the food search in a combo also reads the next page', async () => {
+  const fetchMock = vi.fn((url: string) =>
+    Promise.resolve(
+      url.startsWith('/api/combos')
+        ? json({ combos: [] })
+        : url.startsWith('/api/foods')
+          ? json(
+              url.endsWith('offset=100')
+                ? { foods: [egg], nextOffset: null }
+                : { foods: [rice], nextOffset: 100 },
+            )
+          : json({ today: '2026-10-31' }),
+    ),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '조합 추가' }));
+  const dialog = await screen.findByRole('dialog');
+  await search(dialog);
+  expect(within(dialog).getByText('검색 결과 1건 표시 중, 결과가 더 있습니다')).toBeInTheDocument();
+
+  fireEvent.click(within(dialog).getByRole('button', { name: '결과 더 보기' }));
+  expect(await within(dialog).findByRole('button', { name: '삶은 달걀 넣기' })).toBeInTheDocument();
+  expect(within(dialog).getByRole('button', { name: '샘플 햇반 넣기' })).toBeInTheDocument();
+  expect(within(dialog).getByText('검색 결과 2건')).toBeInTheDocument();
+});

@@ -976,3 +976,50 @@ test('focus follows the retry even when a read started by an add answers first',
   );
   expect(within(section).queryByRole('alert')).not.toBeInTheDocument();
 });
+
+test('search results say when more are waiting, and the next page joins the list', async () => {
+  const fetchMock = server(
+    { body: emptyDay },
+    { body: { foods: [food], nextOffset: 100 } },
+    { body: { foods: [food, { ...food, id: 8, name: '불고기버거' }], nextOffset: null } },
+  );
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 검색');
+  await searchFood();
+  expect(screen.getByText('검색 결과 1건 표시 중, 결과가 더 있습니다')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '결과 더 보기' }));
+  expect(await screen.findByRole('button', { name: '버거집 불고기버거 추가' })).toBeInTheDocument();
+  expect(request(fetchMock, 2).url).toBe('/api/foods?q=%EC%B9%98%EC%A6%88&offset=100');
+  // The repeated food stays a single row.
+  expect(screen.getAllByRole('button', { name: '버거집 치즈버거 추가' })).toHaveLength(1);
+  expect(screen.getByText('검색 결과 2건')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '결과 더 보기' })).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByText('검색 결과 2건')).toHaveFocus());
+});
+
+test('a next page clears only its own message, not the other forms', async () => {
+  server(
+    { body: emptyDay },
+    { body: { foods: [food], nextOffset: 100 } },
+    { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+    { body: { foods: [{ ...food, id: 8, name: '불고기버거' }], nextOffset: 200 } },
+  );
+  render(<MealCard date={date} />);
+  const typedForm = (await screen.findByLabelText('음식 이름')).closest('form')!;
+  await searchFood();
+  fireEvent.click(screen.getByRole('button', { name: '바로 기록' }));
+  expect(within(typedForm).getByRole('alert')).toHaveTextContent('음식 이름을 입력해 주세요');
+
+  const more = screen.getByRole('button', { name: '결과 더 보기' });
+  fireEvent.click(more);
+  // The failure shows below the list, next to the button, not at the search far above.
+  const failed = await screen.findByText(/서버 오류가 발생했습니다/);
+  expect(more.compareDocumentPosition(failed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(within(typedForm).getByRole('alert')).toHaveTextContent('음식 이름을 입력해 주세요');
+
+  fireEvent.click(more);
+  await screen.findByRole('button', { name: '버거집 불고기버거 추가' });
+  expect(screen.queryByText(/서버 오류가 발생했습니다/)).not.toBeInTheDocument();
+  expect(within(typedForm).getByRole('alert')).toHaveTextContent('음식 이름을 입력해 주세요');
+});

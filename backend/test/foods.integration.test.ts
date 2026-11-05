@@ -270,3 +270,49 @@ test('the database itself refuses negative nutrients', { skip }, async () => {
     { code: '23514' },
   );
 });
+
+test('with 150 matching foods, paging reaches every one exactly once', { skip }, async () => {
+  const name = `${prefix}paging-`;
+  // Names come in pairs, without and with a brand, after one food alone: in the order the 100th
+  // and 101st foods are then one pair, so the page edge falls inside a name.
+  for (let index = 0; index < 150; index += 1) {
+    const pair = Math.floor((index + 1) / 2);
+    await pool.query(
+      `INSERT INTO foods (name, brand, serving_size, serving_unit) VALUES ($1, $2, 100, 'g')`,
+      [`${name}${String(pair).padStart(3, '0')}`, index % 2 ? 'brand' : null],
+    );
+  }
+  await withApi(pool, async (call) => {
+    const edge = await call(`/api/foods?q=${encodeURIComponent(name)}&offset=99`);
+    const [last, first] = (edge.data.foods as { name: string; brand: string | null }[]).slice(0, 2);
+    assert.equal(last.name, first.name);
+    assert.deepEqual([last.brand, first.brand], [null, 'brand']);
+
+    const seen: string[] = [];
+    let offset: number | null = 0;
+    let pages = 0;
+    while (offset !== null) {
+      const page = await call(`/api/foods?q=${encodeURIComponent(name)}&offset=${offset}`);
+      assert.equal(page.status, 200);
+      for (const food of page.data.foods as { name: string; brand: string | null }[]) {
+        seen.push(`${food.name}/${food.brand ?? ''}`);
+      }
+      offset = page.data.nextOffset as number | null;
+      pages += 1;
+    }
+    assert.equal(pages, 2);
+    assert.equal(seen.length, 150);
+    assert.equal(new Set(seen).size, 150);
+
+    // Without a search word the pages cover the whole store too.
+    const { rows } = await pool.query<{ count: string }>('SELECT count(*) FROM foods');
+    let all = 0;
+    offset = 0;
+    while (offset !== null) {
+      const page = await call(`/api/foods?offset=${offset}`);
+      all += (page.data.foods as unknown[]).length;
+      offset = page.data.nextOffset as number | null;
+    }
+    assert.equal(all, Number(rows[0].count));
+  });
+});

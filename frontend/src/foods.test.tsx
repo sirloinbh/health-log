@@ -312,3 +312,97 @@ test('a failed load shows the server message', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
   expect(screen.queryByText('음식이 없습니다')).not.toBeInTheDocument();
 });
+
+test('a long list says more foods are waiting and adds the next page below', async () => {
+  const fetchMock = serve((url) =>
+    url.endsWith('offset=100')
+      ? json({ foods: [{ ...food, id: 2, name: '피자' }], nextOffset: null })
+      : json({ foods: [food], nextOffset: 100 }),
+  );
+  open();
+  await screen.findByRole('heading', { level: 2, name: '치즈버거' });
+  expect(screen.getByText('음식 1개 표시 중. 더 있습니다.')).toBeInTheDocument();
+
+  const more = screen.getByRole('button', { name: '결과 더 보기' });
+  more.focus();
+  fireEvent.click(more);
+  expect(await screen.findByRole('heading', { level: 2, name: '피자' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 2, name: '치즈버거' })).toBeInTheDocument();
+  expect(foodCalls(fetchMock).at(-1)?.[0]).toBe('/api/foods?q=&offset=100');
+  expect(screen.queryByRole('button', { name: '결과 더 보기' })).not.toBeInTheDocument();
+  // With the button gone, focus lands on the line that says how many foods are shown.
+  await vi.waitFor(() => expect(screen.getByText('음식 2개')).toHaveFocus());
+});
+
+test('while the next page loads, the button keeps the focus and ignores presses', async () => {
+  let finish = (_response: Response) => {};
+  const fetchMock = serve((url) =>
+    url.endsWith('offset=100')
+      ? new Promise((resolve) => (finish = resolve))
+      : json({ foods: [food], nextOffset: 100 }),
+  );
+  open();
+  const more = await screen.findByRole('button', { name: '결과 더 보기' });
+  more.focus();
+  fireEvent.click(more);
+  await vi.waitFor(() => expect(more).toHaveAttribute('aria-disabled', 'true'));
+  // Not `disabled`: a disabled button drops the keyboard focus to the start of the page.
+  expect(more).not.toBeDisabled();
+  expect(more).toHaveFocus();
+  fireEvent.click(more);
+  expect(foodCalls(fetchMock).filter(([url]) => url.includes('offset='))).toHaveLength(1);
+  finish(json({ foods: [{ ...food, id: 2, name: '피자' }], nextOffset: 200 }));
+  await screen.findByRole('heading', { level: 2, name: '피자' });
+  expect(more).not.toHaveAttribute('aria-disabled');
+});
+
+test('after the last page, focus moved elsewhere while waiting stays there', async () => {
+  let finish = (_response: Response) => {};
+  serve((url) =>
+    url.endsWith('offset=100')
+      ? new Promise((resolve) => (finish = resolve))
+      : json({ foods: [food], nextOffset: 100 }),
+  );
+  open();
+  const more = await screen.findByRole('button', { name: '결과 더 보기' });
+  more.focus();
+  fireEvent.click(more);
+  const search = screen.getByLabelText('음식 검색');
+  search.focus();
+  finish(json({ foods: [{ ...food, id: 2, name: '피자' }], nextOffset: null }));
+  await screen.findByRole('heading', { level: 2, name: '피자' });
+  await new Promise((resolve) => setTimeout(resolve));
+  expect(search).toHaveFocus();
+});
+
+test('a next page leaves the message of a failed search in place', async () => {
+  serve((url) => {
+    if (url.endsWith('q=broken')) return json({ error: '검색이 실패했습니다' }, 500);
+    return url.includes('offset=')
+      ? json({ foods: [{ ...food, id: 2, name: '피자' }], nextOffset: null })
+      : json({ foods: [food], nextOffset: 100 });
+  });
+  open();
+  await screen.findByRole('heading', { level: 2, name: '치즈버거' });
+  fireEvent.change(screen.getByLabelText('음식 검색'), { target: { value: 'broken' } });
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('검색이 실패했습니다');
+
+  fireEvent.click(screen.getByRole('button', { name: '결과 더 보기' }));
+  await screen.findByRole('heading', { level: 2, name: '피자' });
+  // The list is still the answer to the earlier words, so the failure must stay in view.
+  expect(screen.getByRole('alert')).toHaveTextContent('검색이 실패했습니다');
+});
+
+test('a failed next page keeps the list and the button to try again', async () => {
+  serve((url) =>
+    url.endsWith('offset=100')
+      ? json({ error: '서버 오류가 발생했습니다' }, 500)
+      : json({ foods: [food], nextOffset: 100 }),
+  );
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '결과 더 보기' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  expect(screen.getByRole('heading', { level: 2, name: '치즈버거' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '결과 더 보기' })).not.toHaveAttribute('aria-disabled');
+});

@@ -158,3 +158,25 @@ test('the database refuses rows the API would never write', { skip }, async (t) 
     ),
   );
 });
+
+test(
+  'a memo of exactly 200 characters is kept, and spaces around it do not count',
+  { skip },
+  async (t) => {
+    t.after(clean);
+    await withApi(pool, async (call) => {
+      const full = '가'.repeat(200);
+      const day = await put(call, '1990-03-26', { memo: `  ${full}  ` });
+      assert.equal(day.record?.memo, full);
+      const { status } = await call('/api/checks/1990-03-26', {
+        method: 'PUT',
+        body: { memo: `${full}가` },
+      });
+      assert.equal(status, 400);
+    });
+    // The database takes the same 200 the API lets through.
+    await pool.query(
+      "INSERT INTO day_checks (record_date, memo) VALUES ('1990-03-27', repeat('a', 200))",
+    );
+  },
+);

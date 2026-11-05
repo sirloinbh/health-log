@@ -103,6 +103,8 @@ function CheckForm({
                 size="sm"
                 variant={form[key] === value ? 'default' : 'outline'}
                 aria-pressed={form[key] === value}
+                // A change after Save would not be in the save already on its way.
+                disabled={saving}
                 onClick={() => setForm((current) => ({ ...current, [key]: value }))}
               >
                 {label}
@@ -117,9 +119,14 @@ function CheckForm({
           id="check-memo"
           autoComplete="off"
           maxLength={maxMemo}
+          aria-describedby="check-memo-hint"
+          disabled={saving}
           value={form.memo}
           onChange={(event) => setForm((current) => ({ ...current, memo: event.target.value }))}
         />
+        <p id="check-memo-hint" className="text-caption text-muted-foreground">
+          {maxMemo}자까지 쓸 수 있습니다.
+        </p>
       </div>
       <Notice notice={notice} />
       <div className="flex flex-wrap gap-2">

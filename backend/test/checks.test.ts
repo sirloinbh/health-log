@@ -42,6 +42,7 @@ test('a check is yes, no or left out; nothing else stands for one', async () => 
 test('the memo is text of at most 200 characters', async () => {
   await rejects({ memo: 'a'.repeat(201) }, '200자 이하');
   await rejects({ memo: 3 }, '메모가 올바르지');
+  await rejects({ memo: 'a\u0000b' }, '쓸 수 없는 문자');
 });
 
 test('a check needs something in it', async () => {

@@ -24,6 +24,8 @@ const checkInput = z
         .string({ error: '메모가 올바르지 않습니다' })
         .trim()
         .max(200, '메모는 200자 이하로 입력해 주세요')
+        // PostgreSQL text cannot hold U+0000; refused here it is a 400, not a 500.
+        .refine((value) => !value.includes('\u0000'), '메모에 쓸 수 없는 문자가 있습니다')
         .nullable()
         .default(null)
         .transform((value) => value || null),

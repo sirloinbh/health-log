@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { expect, test, vi } from 'vitest';
 
 import { ChecksCard } from './checks';
+import { toast } from './components/ui/sonner';
 
 const date = '2026-11-04';
 type Rate = { days: number; yes: number };
@@ -203,4 +204,62 @@ test('a failed load can be tried again', async () => {
   expect(screen.queryByRole('region', { name: '이 주' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
   expect(await screen.findByRole('group', { name: '식단을 지켰나요?' })).toBeInTheDocument();
+});
+
+test('while saving, the answers and the memo cannot change under the save', async () => {
+  let finish = (_response: Response) => {};
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((_url: string, init?: RequestInit) =>
+      init?.method === 'PUT'
+        ? new Promise((resolve) => (finish = resolve))
+        : Promise.resolve(new Response(JSON.stringify(dayOf(null)))),
+    ),
+  );
+  render(<ChecksCard date={date} />);
+  const diet = await screen.findByRole('group', { name: '식단을 지켰나요?' });
+  fireEvent.click(within(diet).getByRole('button', { name: '지킴' }));
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  await waitFor(() => expect(within(diet).getByRole('button', { name: '못 지킴' })).toBeDisabled());
+  expect(screen.getByLabelText('메모')).toBeDisabled();
+  finish(new Response(JSON.stringify({ error: '서버 오류가 발생했습니다' }), { status: 500 }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  expect(within(diet).getByRole('button', { name: '못 지킴' })).toBeEnabled();
+  expect(screen.getByLabelText('메모')).toBeEnabled();
+});
+
+test('the memo field says how long it may be', async () => {
+  server({ body: dayOf(null) });
+  render(<ChecksCard date={date} />);
+  const memo = await screen.findByLabelText('메모');
+  expect(memo).toHaveAccessibleDescription('200자까지 쓸 수 있습니다.');
+  expect(memo).toHaveAttribute('maxLength', '200');
+});
+
+test('a save that fails after leaving the day still says so', async () => {
+  const shown = vi.spyOn(toast, 'error');
+  let failSave = (_response: Response) => {};
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((_url: string, init?: RequestInit) =>
+      init?.method === 'PUT'
+        ? new Promise((resolve) => (failSave = resolve))
+        : Promise.resolve(new Response(JSON.stringify(dayOf(null)))),
+    ),
+  );
+  const { unmount } = render(<ChecksCard date={date} />);
+  fireEvent.click(
+    within(await screen.findByRole('group', { name: '식단을 지켰나요?' })).getByRole('button', {
+      name: '지킴',
+    }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  unmount();
+
+  failSave(new Response(JSON.stringify({ error: '서버 오류가 발생했습니다' }), { status: 500 }));
+  await waitFor(() =>
+    expect(shown).toHaveBeenCalledWith(
+      `${date} 하루 체크를 저장하지 못했습니다: 서버 오류가 발생했습니다`,
+    ),
+  );
 });

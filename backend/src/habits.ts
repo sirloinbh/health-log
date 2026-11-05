@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { parseDate } from './dates.js';
+import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.js';
 import { hasTwoDecimalsAtMost } from './foods.js';
 import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError } from './standard/http.js';
@@ -54,27 +55,6 @@ const habitInput = z
       ctx.addIssue({ code: 'custom', message: '같은 술과 단위는 한 번만 입력해 주세요' });
     }
   });
-
-type Db = Pick<Pool, 'query'> | PoolClient;
-
-const toDate = (time: number) => new Date(time).toISOString().slice(0, 10);
-
-// Dates here are calendar days in the service time zone, already fixed by the caller. Counting
-// them as UTC midnights keeps every boundary on the day it names, whatever the server's zone.
-export function periodsOf(date: string) {
-  const day = Date.parse(`${date}T00:00:00Z`);
-  // Weeks run Monday to Sunday.
-  const sinceMonday = (new Date(day).getUTCDay() + 6) % 7;
-  const monday = day - sinceMonday * 86_400_000;
-  const [year, month] = date.split('-').map(Number);
-  return {
-    week: { from: toDate(monday), to: toDate(monday + 6 * 86_400_000) },
-    month: {
-      from: `${date.slice(0, 7)}-01`,
-      to: toDate(Date.UTC(year, month, 0)),
-    },
-  };
-}
 
 type DayRow = { record_date: string; cigarettes: number | null; drinks_recorded: boolean };
 type DrinkRow = { kind: string; unit: string; amount: string };
@@ -154,38 +134,18 @@ export function habitsRouter(pool: Pool, limits: RateLimitSettings) {
   const router = Router();
   router.use(rateLimit(rateLimitOptions(limits)));
 
-  // A change and the answer about it succeed together, so the totals shown match what was saved.
-  const inTransaction = async <T>(run: (client: PoolClient) => Promise<T>, begin = 'BEGIN') => {
-    const client = await pool.connect();
-    try {
-      await client.query(begin);
-      const result = await run(client);
-      await client.query('COMMIT');
-      return result;
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
-    }
-  };
-
   router.get('/:date', async (req, res) => {
     const date = parseDate(req.params.date);
     // One snapshot for the record and both totals, so a save landing between them cannot make
     // the answer disagree with itself.
-    res.json(
-      await inTransaction(
-        (client) => readDay(client, date),
-        'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY',
-      ),
-    );
+    res.json(await inTransaction(pool, (client) => readDay(client, date), snapshotRead));
   });
 
   router.put('/:date', async (req, res) => {
     const date = parseDate(req.params.date);
     const input = habitInput.parse(req.body);
-    const day = await inTransaction(async (client) => {
+    // A change and the answer about it succeed together, so the totals shown match what was saved.
+    const day = await inTransaction(pool, async (client) => {
       // Saves of one day take turns. The drinks are deleted before the day's row is locked, so
       // without this two saves at once would both insert at position 0 and one would fail.
       await client.query("SELECT pg_advisory_xact_lock(hashtext('habit_days:' || $1::text))", [

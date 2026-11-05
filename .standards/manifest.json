@@ -1,5 +1,5 @@
 {
-  "centralSha": "b85f96f86a5dda9c361b48e5dfb968ecf134b7df",
+  "centralSha": "5c3039c306b546445b55697f9b716b1f6b24f6be",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -20,7 +20,7 @@
     },
     ".claude/skills/std-backlog/SKILL.md": {
       "mode": "full",
-      "sha256": "ac1fab257c1e2fcd121e79ad6e80c40307fe5701e0f6947b22f49590c7a204bf",
+      "sha256": "24fc15a48fd17e3ef9f6b0468593ddfac0f5269b9357fbe14f19f9baf7bee2b5",
       "source": "templates/common/skills/std-backlog/SKILL.md"
     },
     ".claude/skills/std-communication/SKILL.md": {
@@ -35,7 +35,7 @@
     },
     ".claude/skills/std-git-writing/SKILL.md": {
       "mode": "full",
-      "sha256": "cce7987e8e692b3853b0a06b7b1424e602d335349be3d5a572d9f76e36b86ee6",
+      "sha256": "6bdd8344acfc9ce6c3108c3bdb9fd706131c48f6847695ff9d1057543860f68e",
       "source": "templates/common/skills/std-git-writing/SKILL.md"
     },
     ".claude/skills/std-implementation/SKILL.md": {
@@ -80,7 +80,7 @@
     },
     ".github/ISSUE_TEMPLATE/task.md": {
       "mode": "full",
-      "sha256": "c943a0669097203712125826a9d3b572478502da8b9747bfabbe17cac98b7eae",
+      "sha256": "2a7302c9ba872e11e2162cf4cc54880474a6bcbe8378c0c766223856453c9df1",
       "source": "templates/common/.github/ISSUE_TEMPLATE/task.md"
     },
     ".github/pull_request_template.md": {
@@ -677,7 +677,7 @@
     },
     "skills/std-backlog/SKILL.md": {
       "mode": "full",
-      "sha256": "ac1fab257c1e2fcd121e79ad6e80c40307fe5701e0f6947b22f49590c7a204bf",
+      "sha256": "24fc15a48fd17e3ef9f6b0468593ddfac0f5269b9357fbe14f19f9baf7bee2b5",
       "source": "templates/common/skills/std-backlog/SKILL.md"
     },
     "skills/std-communication/SKILL.md": {
@@ -692,7 +692,7 @@
     },
     "skills/std-git-writing/SKILL.md": {
       "mode": "full",
-      "sha256": "cce7987e8e692b3853b0a06b7b1424e602d335349be3d5a572d9f76e36b86ee6",
+      "sha256": "6bdd8344acfc9ce6c3108c3bdb9fd706131c48f6847695ff9d1057543860f68e",
       "source": "templates/common/skills/std-git-writing/SKILL.md"
     },
     "skills/std-implementation/SKILL.md": {

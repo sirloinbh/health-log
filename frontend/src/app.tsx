@@ -9,6 +9,7 @@ import { Toaster } from './components/ui/sonner';
 import { DailyPage, TodayRedirect } from './daily';
 import { FoodsPage } from './foods';
 import { type Health, healthText } from './health';
+import { ReportPage } from './report';
 
 // Every page URL lives here (central docs/directory-rules.md).
 const pages = {
@@ -108,16 +109,8 @@ export function App() {
     <BrowserRouter>
       <AppShell appName="식단·수면·건강 기록" nav={nav}>
         <Routes>
-          <Route
-            path={pages.overview}
-            element={
-              <Page
-                title="대시보드"
-                description="식단, 수면, 건강 상태를 날짜별로 기록하고 변화를 확인하는 개인 서비스"
-                health={health}
-              />
-            }
-          />
+          <Route path={pages.overview} element={<ReportPage health={health} />} />
+
           <Route
             path={pages.daily}
             element={<TodayRedirect basePath={pages.daily} health={health} />}

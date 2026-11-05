@@ -9,6 +9,7 @@ import { foodsRouter } from './foods.js';
 import { habitsRouter } from './habits.js';
 import { mealsRouter } from './meals.js';
 import { defaultRateLimit, type RateLimitSettings } from './rate-limit.js';
+import { reportRouter } from './report.js';
 import { sleepRouter } from './sleep.js';
 import { errorHandler, notFound } from './standard/http.js';
 
@@ -47,6 +48,7 @@ export function createApp(
   app.use('/api/body', bodyRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api/habits', habitsRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api/checks', checksRouter(pool, options.rateLimit ?? defaultRateLimit));
+  app.use('/api/report', reportRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api', notFound);
   app.use(errorHandler);
   return app;

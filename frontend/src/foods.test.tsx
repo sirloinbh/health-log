@@ -356,6 +356,25 @@ test('while the next page loads, the button keeps the focus and ignores presses'
   expect(more).not.toHaveAttribute('aria-disabled');
 });
 
+test('after the last page, focus moved elsewhere while waiting stays there', async () => {
+  let finish = (_response: Response) => {};
+  serve((url) =>
+    url.endsWith('offset=100')
+      ? new Promise((resolve) => (finish = resolve))
+      : json({ foods: [food], nextOffset: 100 }),
+  );
+  open();
+  const more = await screen.findByRole('button', { name: '결과 더 보기' });
+  more.focus();
+  fireEvent.click(more);
+  const search = screen.getByLabelText('음식 검색');
+  search.focus();
+  finish(json({ foods: [{ ...food, id: 2, name: '피자' }], nextOffset: null }));
+  await screen.findByRole('heading', { level: 2, name: '피자' });
+  await new Promise((resolve) => setTimeout(resolve));
+  expect(search).toHaveFocus();
+});
+
 test('a next page leaves the message of a failed search in place', async () => {
   serve((url) => {
     if (url.endsWith('q=broken')) return json({ error: '검색이 실패했습니다' }, 500);

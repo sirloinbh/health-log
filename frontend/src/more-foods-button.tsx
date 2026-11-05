@@ -26,10 +26,15 @@ export function MoreFoodsButton({
       className="self-start aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
       aria-disabled={loading || undefined}
       aria-busy={loading || undefined}
-      onClick={() => {
+      onClick={(event) => {
         if (loading) return;
+        const button = event.currentTarget;
         void onLoad().then((last) => {
-          if (last) afterLast.current?.focus();
+          // Only the focus the button had: someone who moved on while waiting stays where they are.
+          const active = document.activeElement;
+          if (last && (active === button || active === document.body || active === null)) {
+            afterLast.current?.focus();
+          }
         });
       }}
     >

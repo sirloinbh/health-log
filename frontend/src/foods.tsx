@@ -412,7 +412,7 @@ export function FoodsPage() {
         ref={shown}
         role="status"
         tabIndex={-1}
-        className="text-body-sm break-keep text-muted-foreground outline-none empty:hidden"
+        className="rounded-sm text-body-sm break-keep text-muted-foreground outline-none empty:hidden focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
         {foods?.length
           ? more

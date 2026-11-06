@@ -43,9 +43,9 @@
 | 이름이나 브랜드를 바꿈              | 조사값이 새 음식으로 하나 더 생김 |
 
 ```sql
-INSERT INTO foods (name, brand, category, serving_size, serving_unit, calories, carbs, protein, fat, sugars, sodium, source_type, source_url, checked_on)
+INSERT INTO foods (name, brand, category, serving_size, serving_unit, calories, carbs, protein, fat, sugars, sodium, source_type, source_url, checked_on, is_junk)
 VALUES
-  (U&'\C608\C2DC', U&'\BE0C\B79C\B4DC', NULL, 100, 'g', 250, NULL, 10, 8, NULL, 500, 'official', 'https://example.com/nutrition', '2026-10-31')
+  (U&'\C608\C2DC', U&'\BE0C\B79C\B4DC', NULL, 100, 'g', 250, NULL, 10, 8, NULL, 500, 'official', 'https://example.com/nutrition', '2026-10-31', true)
 ON CONFLICT (name, COALESCE(brand, '')) DO UPDATE SET
   category = EXCLUDED.category,
   serving_size = EXCLUDED.serving_size,
@@ -63,6 +63,7 @@ ON CONFLICT (name, COALESCE(brand, '')) DO UPDATE SET
 WHERE EXCLUDED.checked_on > foods.checked_on;
 ```
 
+- **정크푸드 표시(`is_junk`, #38)는 처음 넣을 때만 정한다.** 프랜차이즈 패스트푸드 메뉴(햄버거·피자·치킨 프랜차이즈 등)는 `true`, 그 밖의 음식은 `false`로 넣는다. `DO UPDATE SET`에는 넣지 않는다. 그래서 사용자가 화면에서 바꾼 표시는 새 조사로 갱신돼도 유지된다. 식사 기록은 기록할 때의 표시를 따로 가지므로, 표시를 바꿔도 지난 기록의 집계는 바뀌지 않는다.
 - 위 예시는 `backend/test/foods.integration.test.ts`가 그대로 실행해 검사한다. 형식을 바꾸면 테스트도 함께 확인한다.
 - **조사 데이터에는 출처 종류와 관계없이 확인 날짜를 적는다.** 날짜가 없으면 나중에 새 조사로 갱신할 수 없다.
 - **날짜 없는 음식은 조사 데이터로 바뀌지 않는다.** 화면에서 직접 입력한 값을 지키기 위해서다. 조사값으로 바꾸려면 아래 정정 방식을 쓴다.

@@ -2,8 +2,10 @@ import { Trash2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
 import { type Combo, comboSummary, fullName } from './combo-text';
+import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
+import { Checkbox } from './components/ui/checkbox';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
 import { Input } from './components/ui/input';
 import { Label } from './components/ui/label';
@@ -13,6 +15,8 @@ import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
 import { formatDate, isValidDate, shiftDate } from './daily-date';
 import { resultText, useFoodSearch } from './food-search';
+import { spanText } from './habit-text';
+import { type JunkPeriod, junkText } from './junk-text';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
 import { MoreFoodsButton } from './more-foods-button';
@@ -46,11 +50,14 @@ type Entry = Record<NutrientKey, number | null> & {
   servings: number;
   servingSize: number | null;
   servingUnit: string | null;
+  /** The mark when it was recorded; changing the food later leaves it as it was. */
+  isJunk: boolean;
 };
 
 type MealDay = {
   entries: Entry[];
   totals: Record<NutrientKey, { value: number | null; missing: number }>;
+  junk: { week: JunkPeriod; month: JunkPeriod };
 };
 
 type FoodOption = {
@@ -60,6 +67,7 @@ type FoodOption = {
   servingSize: number;
   servingUnit: string;
   calories: number | null;
+  isJunk: boolean;
 };
 
 const pathOf = (date: string) => `/api/meals/${date}`;
@@ -86,6 +94,29 @@ function Totals({ totals }: { totals: MealDay['totals'] }) {
   );
 }
 
+function JunkSummary({ junk }: { junk: MealDay['junk'] }) {
+  return (
+    <section aria-labelledby="meal-junk-heading" className="flex flex-col gap-1 text-body-sm">
+      <h3 id="meal-junk-heading" className="font-semibold">
+        정크푸드
+      </h3>
+      {(
+        [
+          ['이 주', junk.week],
+          ['이 달', junk.month],
+        ] as const
+      ).map(([title, period]) => (
+        <p key={title} className="break-keep">
+          {title} <span className="text-muted-foreground">{spanText(period)}</span>:{' '}
+          {junkText(period)}
+        </p>
+      ))}
+    </section>
+  );
+}
+
+const JunkBadge = () => <Badge variant="warning">정크푸드</Badge>;
+
 function EntryRow({
   entry,
   disabled,
@@ -100,7 +131,10 @@ function EntryRow({
   return (
     <li className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
       <div className="flex min-w-0 flex-col">
-        <span className="wrap-anywhere">{fullName(entry)}</span>
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="wrap-anywhere">{fullName(entry)}</span>
+          {entry.isJunk ? <JunkBadge /> : null}
+        </span>
         <span className="text-caption text-muted-foreground">
           {entry.servings}회분{serving} ·{' '}
           {entry.calories === null ? '칼로리 값 없음' : `${entry.calories}kcal`}
@@ -147,7 +181,10 @@ function FoodChoices({
       {foods.map((food) => (
         <li key={food.id} className="flex items-center justify-between gap-3 py-2">
           <div className="flex min-w-0 flex-col">
-            <span className="wrap-anywhere">{fullName(food)}</span>
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="wrap-anywhere">{fullName(food)}</span>
+              {food.isJunk ? <JunkBadge /> : null}
+            </span>
             <span className="text-caption text-muted-foreground">
               1회 {food.servingSize}
               {food.servingUnit} ·{' '}
@@ -188,6 +225,7 @@ function AddEntry({
   const [query, setQuery] = useState('');
   const [name, setName] = useState('');
   const [calories, setCalories] = useState('');
+  const [typedJunk, setTypedJunk] = useState(false);
   // Which button is waiting: `search-<id>`, `recent-<id>`, `combo-<id>`, 'copy' or 'typed'.
   const [pending, setPending] = useState<string | null>(null);
   // Stored foods last recorded, so a usual food needs no search. null until read, or if it failed.
@@ -387,11 +425,12 @@ function AddEntry({
     }
     setPending('typed');
     try {
-      const added = await onAdd({ meal, servings: value, name, calories: kcal });
+      const added = await onAdd({ meal, servings: value, name, calories: kcal, isJunk: typedJunk });
       if (added) {
         // Anything typed while waiting is the next entry, not this one.
         setName((current) => (current === name ? '' : current));
         setCalories((current) => (current === calories ? '' : current));
+        setTypedJunk((current) => (current === typedJunk ? false : current));
       }
     } catch (cause) {
       typedError(cause);
@@ -610,6 +649,21 @@ function AddEntry({
             />
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="meal-typed-junk"
+            checked={typedJunk}
+            aria-describedby="meal-typed-junk-help"
+            onCheckedChange={(checked) => setTypedJunk(checked === true)}
+          />
+          <Label htmlFor="meal-typed-junk">정크푸드</Label>
+        </div>
+        <p
+          id="meal-typed-junk-help"
+          className="-mt-2 text-caption break-keep text-muted-foreground"
+        >
+          위의 이 주·이 달 정크푸드 횟수로 셉니다.
+        </p>
         <Notice notice={typedNotice} />
         <Button
           type="submit"
@@ -753,6 +807,7 @@ export function MealCard({ date }: { date: string }) {
         {day ? (
           <>
             <Totals totals={day.totals} />
+            <JunkSummary junk={day.junk} />
             {day.entries.length === 0 ? (
               <p className="text-body-sm text-muted-foreground">아직 기록한 식사가 없습니다.</p>
             ) : (

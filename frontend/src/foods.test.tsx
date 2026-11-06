@@ -20,6 +20,7 @@ const food = {
   sourceType: 'official',
   sourceUrl: 'https://example.com/menu',
   checkedOn: '2026-10-31',
+  isJunk: false,
 };
 
 type Handler = (url: string, init?: RequestInit) => Response | Promise<Response>;
@@ -138,6 +139,7 @@ test('adding sends blanks as no value, then shows the list again', async () => {
     sourceType: 'manual',
     sourceUrl: null,
     checkedOn: null,
+    isJunk: false,
   });
 });
 
@@ -503,4 +505,36 @@ test('once focus has moved on from the edit button, a later redraw leaves it alo
   expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(screen.getByRole('heading', { level: 1, name: '음식' })).not.toHaveFocus();
+});
+
+// #38
+test('a food can be marked junk food, shown on its card, and the edit starts from the mark', async () => {
+  let current = food;
+  const fetchMock = serve((_url, init) => {
+    if (init?.method === 'PUT') {
+      current = { ...food, ...(JSON.parse(String(init.body)) as object) };
+      return json(current);
+    }
+    return json({ foods: [current] });
+  });
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '치즈버거 수정' }));
+  let dialog = await screen.findByRole('dialog');
+  const mark = within(dialog).getByRole('checkbox', { name: '정크푸드' });
+  expect(mark).not.toBeChecked();
+  expect(mark).toHaveAccessibleDescription(/이미 기록한 식사는 그대로입니다/);
+  fireEvent.click(mark);
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+
+  await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  const put = foodCalls(fetchMock).find(([, init]) => init?.method === 'PUT')!;
+  expect(JSON.parse(String(put[1]?.body))).toMatchObject({ isJunk: true });
+  const card = (await screen.findByRole('heading', { level: 2, name: '치즈버거' })).closest(
+    '[data-slot="card"]',
+  ) as HTMLElement;
+  expect(await within(card).findByText('정크푸드')).toBeVisible();
+
+  fireEvent.click(screen.getByRole('button', { name: '치즈버거 수정' }));
+  dialog = await screen.findByRole('dialog');
+  expect(within(dialog).getByRole('checkbox', { name: '정크푸드' })).toBeChecked();
 });

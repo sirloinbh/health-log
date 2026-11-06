@@ -122,7 +122,13 @@ test('a date in the path has to exist', async () => {
 });
 
 test('the meals API is rate limited', async () => {
-  const pool = { query: async () => ({ rows: [] }) } as unknown as Pool;
+  // A day is read in one snapshot: no entries, and periods with no junk food.
+  const noJunk = { times: '0', days: '0', calories: null, calories_missing: '0' };
+  const client = {
+    query: async (sql: string) => ({ rows: sql.includes('is_junk AND') ? [noJunk] : [] }),
+    release: () => {},
+  };
+  const pool = { connect: async () => client } as unknown as Pool;
   await withApi(
     pool,
     async (call) => {
@@ -148,4 +154,11 @@ test('copying needs another real day and one of the four meals', async () => {
 
 test('a copy whose answer cannot be read is rolled back, so a retry cannot double it', async () => {
   await rollsBack(`${path}/copy`, 'POST', 'INSERT', copy);
+});
+
+// #38. A stored food brings its own junk food mark; only typed-in food is marked in the request.
+test('the junk food mark is a yes or no, and only for typed-in food', async () => {
+  await rejects(path, { ...typed, isJunk: 'true' }, '정크푸드 표시가 올바르지 않습니다');
+  await rejects(path, { ...typed, isJunk: 1 }, '정크푸드 표시가 올바르지 않습니다');
+  await rejects(path, { ...fromFood, isJunk: true }, '음식 선택과 직접 입력은 함께 쓸 수 없습니다');
 });

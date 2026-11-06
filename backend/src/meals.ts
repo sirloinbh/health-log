@@ -166,7 +166,9 @@ export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
   const router = Router();
   router.use(rateLimit(rateLimitOptions(limits)));
 
-  // Callers run this in one transaction, so the day and its periods are read at one moment.
+  // A read runs this in one snapshot (snapshotRead), so the day and its periods agree. A change runs
+  // it in its own transaction, which sees the change; an entry another tab saves at that same moment
+  // may show in the periods before the list, until the next read.
   const day = async (db: Db, date: string) => {
     const { rows } = await db.query<EntryRow>(daySql, [date]);
     const { week, month } = periodsOf(date);

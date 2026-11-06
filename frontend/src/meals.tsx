@@ -96,8 +96,10 @@ function Totals({ totals }: { totals: MealDay['totals'] }) {
 
 function JunkSummary({ junk }: { junk: MealDay['junk'] }) {
   return (
-    <section aria-label="정크푸드" className="flex flex-col gap-1 text-body-sm">
-      <p className="font-medium">정크푸드</p>
+    <section aria-labelledby="meal-junk-heading" className="flex flex-col gap-1 text-body-sm">
+      <h3 id="meal-junk-heading" className="font-medium">
+        정크푸드
+      </h3>
       {(
         [
           ['이 주', junk.week],
@@ -651,10 +653,17 @@ function AddEntry({
           <Checkbox
             id="meal-typed-junk"
             checked={typedJunk}
+            aria-describedby="meal-typed-junk-help"
             onCheckedChange={(checked) => setTypedJunk(checked === true)}
           />
           <Label htmlFor="meal-typed-junk">정크푸드</Label>
         </div>
+        <p
+          id="meal-typed-junk-help"
+          className="-mt-2 text-caption break-keep text-muted-foreground"
+        >
+          위의 이 주·이 달 정크푸드 횟수로 셉니다.
+        </p>
         <Notice notice={typedNotice} />
         <Button
           type="submit"

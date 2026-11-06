@@ -297,6 +297,31 @@ test('the typed form also waits for its request, and shows that it is working', 
   expect(screen.getByLabelText('1회 칼로리 (kcal)')).toHaveValue('');
 });
 
+// #38: the junk food mark follows the same rule as the typed fields.
+test('a junk food mark changed while waiting belongs to the next entry', async () => {
+  let finish = (_response: Response) => {};
+  stubFetch(
+    vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
+      .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve))),
+  );
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '감자칩' } });
+  fireEvent.change(screen.getByLabelText('1회 칼로리 (kcal)'), { target: { value: '300' } });
+  const mark = screen.getByRole('checkbox', { name: '정크푸드' });
+  expect(mark).toHaveAccessibleDescription('위의 이 주·이 달 정크푸드 횟수로 셉니다.');
+  const save = screen.getByRole('button', { name: /바로 기록/ });
+  fireEvent.click(save);
+  await waitFor(() => expect(save).toBeDisabled());
+  fireEvent.click(mark);
+  expect(mark).toBeChecked();
+  finish(new Response(JSON.stringify(oneEntry), { status: 201 }));
+  await waitFor(() => expect(save).toBeEnabled());
+  expect(screen.getByRole('checkbox', { name: '정크푸드' })).toBeChecked();
+});
+
 test('the delete buttons wait while an entry is being recorded', async () => {
   let finish = (_response: Response) => {};
   stubFetch(
@@ -1129,6 +1154,7 @@ test('junk food entries are marked, with the week and month counts below the tot
   });
   render(<MealCard date={date} />);
   const summary = await screen.findByRole('region', { name: '정크푸드' });
+  expect(within(summary).getByRole('heading', { level: 3, name: '정크푸드' })).toBeVisible();
   expect(within(summary).getByText(/이 주/)).toHaveTextContent(
     '이 주 03.09~03.15: 3회 · 먹은 날 2일 · 1850kcal',
   );

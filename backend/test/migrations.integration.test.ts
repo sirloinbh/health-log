@@ -34,8 +34,9 @@ async function withEmptySchema(
     await client.query(`SET search_path TO ${schema}`);
     await body(client, schema);
   } finally {
-    await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
-    await client.end();
+    // A cleanup failure on a broken connection must not hide the error that broke it.
+    await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`).catch(() => undefined);
+    await client.end().catch(() => undefined);
   }
 }
 
@@ -113,7 +114,12 @@ test(
         const changed = files.map((file, index) =>
           index === 0 ? { ...file, sql: 'SELECT 2', checksum: checksum('SELECT 2') } : file,
         );
-        await assert.rejects(migrate(client, changed), /내용이 바뀌었습니다: 001_initial\.sql/);
+        const extra = { name: '900_new.sql', sql: 'SELECT 1', checksum: checksum('SELECT 1') };
+        await assert.rejects(
+          migrate(client, [...changed, extra]),
+          /내용이 바뀌었습니다: 001_initial\.sql/,
+        );
+        assert.deepEqual(await recorded(client), names, 'the new file did not run');
       });
 
       // Files added after this PR (010 and later) are picked up by name order alone.

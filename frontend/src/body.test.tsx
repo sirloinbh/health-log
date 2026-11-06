@@ -533,3 +533,22 @@ test('trying again moves focus to the card, as the button it was on goes away', 
     expect(screen.getByRole('heading', { name: '신체' }).parentElement).toHaveFocus(),
   );
 });
+
+test('a retry cannot be started twice, so no older answer can land after a newer one', async () => {
+  let finish = (_response: Response) => {};
+  const fetchMock = server({
+    recordReplies: [{ status: 500, body: { error: '서버 오류가 발생했습니다' } }],
+  });
+  render(<BodyCard date={date} />);
+  const again = await screen.findByRole('button', { name: '다시 시도' });
+  fetchMock.mockImplementation(() => new Promise<Response>((resolve) => (finish = resolve)));
+  const before = fetchMock.mock.calls.length;
+  fireEvent.click(again);
+  fireEvent.click(again);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  // The button goes with the first press; the second reaches nothing. (The body card also
+  // reloads its trend, hence two requests there.)
+  expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+  expect(fetchMock.mock.calls.length - before).toBe(2);
+  finish(new Response(JSON.stringify({ error: 'x' }), { status: 500 }));
+});

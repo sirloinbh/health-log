@@ -6,6 +6,7 @@ import { z } from 'zod/v4';
 import { servingsInput } from './meals.js';
 import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError, parseId } from './standard/http.js';
+import { charCount } from './text.js';
 
 const maxItems = 20;
 
@@ -15,7 +16,7 @@ const comboInput = z.object(
       .string({ error: '조합 이름을 입력해 주세요' })
       .trim()
       .refine((value) => value.length >= 1, '조합 이름을 입력해 주세요')
-      .refine((value) => value.length <= 50, '조합 이름은 50자 이하로 입력해 주세요'),
+      .refine((value) => charCount(value) <= 50, '조합 이름은 50자 이하로 입력해 주세요'),
     items: z
       .array(
         z.object(

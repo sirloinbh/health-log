@@ -233,7 +233,28 @@ test('the memo field says how long it may be', async () => {
   render(<ChecksCard date={date} />);
   const memo = await screen.findByLabelText('메모');
   expect(memo).toHaveAccessibleDescription('200자까지 쓸 수 있습니다.');
-  expect(memo).toHaveAttribute('maxLength', '200');
+  // A maxLength would count an emoji twice and stop typing at 100 of them.
+  expect(memo).not.toHaveAttribute('maxLength');
+});
+
+test('200 emoji are sent as the hint says, and one more is refused before sending', async () => {
+  const memo = '🍙'.repeat(200);
+  const fetchMock = server(
+    { body: dayOf(null) },
+    { body: dayOf({ date, dietKept: null, sleepGood: null, memo }) },
+  );
+  render(<ChecksCard date={date} />);
+  const field = await screen.findByLabelText('메모');
+
+  fireEvent.change(field, { target: { value: memo + '🍙' } });
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('메모는 200자 이하로 입력해 주세요');
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+
+  fireEvent.change(field, { target: { value: memo } });
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  expect(request(fetchMock, 1).body).toEqual({ dietKept: null, sleepGood: null, memo });
 });
 
 test('a save that fails after leaving the day still says so', async () => {
@@ -332,4 +353,20 @@ test('trying again moves focus to the card, as the button it was on goes away', 
   await waitFor(() =>
     expect(screen.getByRole('heading', { name: '하루 체크' }).parentElement).toHaveFocus(),
   );
+});
+
+test('a retry cannot be started twice, so no older answer can land after a newer one', async () => {
+  let finish = (_response: Response) => {};
+  const fetchMock = server({ status: 500, body: { error: '서버 오류가 발생했습니다' } });
+  render(<ChecksCard date={date} />);
+  const again = await screen.findByRole('button', { name: '다시 시도' });
+  fetchMock.mockImplementation(() => new Promise<Response>((resolve) => (finish = resolve)));
+  const before = fetchMock.mock.calls.length;
+  fireEvent.click(again);
+  fireEvent.click(again);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  // The button goes with the first press; the second reaches nothing.
+  expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+  expect(fetchMock.mock.calls.length - before).toBe(1);
+  finish(new Response(JSON.stringify({ error: 'x' }), { status: 500 }));
 });

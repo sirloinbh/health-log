@@ -20,8 +20,9 @@ export function trackWrite<T>(path: string, write: Promise<T>): Promise<T> {
 }
 
 /**
- * Resolves once no write is pending under a path starting with `prefix`, succeeded or not. Writes
- * started while waiting are waited for too, since the read that follows must come after them.
+ * Resolves once no write is pending under a path starting with `prefix`, succeeded or not. When it
+ * has to wait, writes started meanwhile are waited for too. With nothing pending it goes ahead at
+ * once, so a write started in the same moment as the read is not covered.
  */
 export async function writesSettled(prefix: string): Promise<void> {
   for (;;) {
@@ -31,4 +32,9 @@ export async function writesSettled(prefix: string): Promise<void> {
     if (waits.length === 0) return;
     await Promise.all(waits);
   }
+}
+
+/** For tests: a test that stops before its save settles must not leave later tests waiting. */
+export function forgetPendingWrites() {
+  pending.clear();
 }

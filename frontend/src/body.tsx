@@ -292,7 +292,7 @@ export function BodyCard({ date }: { date: string }) {
     const request = ++latestHistory.current;
     const from = shiftDate(date, 1 - Math.max(...changeWindows));
     try {
-      // Any day in the window may have a save on its way, so wait for every body write.
+      // A save to a day in the window changes the trend; waiting for every body write is simplest.
       await writesSettled(pathOf(''));
       const data = await requestJson<{ records?: BodyRecord[] }>(
         `/api/body?from=${from}&to=${date}`,

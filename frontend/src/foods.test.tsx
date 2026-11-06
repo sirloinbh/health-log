@@ -406,3 +406,56 @@ test('a failed next page keeps the list and the button to try again', async () =
   expect(screen.getByRole('heading', { level: 2, name: '치즈버거' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '결과 더 보기' })).not.toHaveAttribute('aria-disabled');
 });
+
+// Opens by keyboard, as a pointer click would not focus the button in every browser.
+const openWith = async (name: string) => {
+  const opener = await screen.findByRole('button', { name });
+  opener.focus();
+  fireEvent.click(opener);
+  return { opener, dialog: await screen.findByRole('dialog') };
+};
+
+test('cancelling the add dialog returns focus to the add button', async () => {
+  serve(() => json({ foods: [] }));
+  open();
+  const { opener, dialog } = await openWith('음식 추가');
+  fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+});
+
+test('closing the edit dialog with Escape returns focus to that food’s edit button', async () => {
+  serve(() => json({ foods: [food, { ...food, id: 2, name: '감자튀김' }] }));
+  open();
+  const { opener, dialog } = await openWith('치즈버거 수정');
+  fireEvent.keyDown(dialog, { key: 'Escape' });
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('saving returns focus to the edit button while the food is still listed', async () => {
+  serve((_url, init) => (init?.method === 'PUT' ? json(food) : json({ foods: [food] })));
+  open();
+  const { dialog } = await openWith('치즈버거 수정');
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  await vi.waitFor(() =>
+    expect(screen.getByRole('button', { name: '치즈버거 수정' })).toHaveFocus(),
+  );
+});
+
+test('a saved food the search no longer finds leaves focus on the page title, not the body', async () => {
+  let saved = false;
+  serve((_url, init) => {
+    if (init?.method === 'PUT') {
+      saved = true;
+      return json({ ...food, name: '더블버거' });
+    }
+    return json({ foods: saved ? [] : [food] });
+  });
+  open();
+  const { dialog } = await openWith('치즈버거 수정');
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
+  await vi.waitFor(() =>
+    expect(screen.getByRole('heading', { level: 1, name: '음식' })).toHaveFocus(),
+  );
+});

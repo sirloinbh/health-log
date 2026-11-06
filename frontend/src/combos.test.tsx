@@ -332,3 +332,56 @@ test('the food search in a combo also reads the next page', async () => {
   expect(within(dialog).getByRole('button', { name: '샘플 햇반 넣기' })).toBeInTheDocument();
   expect(within(dialog).getByText('검색 결과 2건')).toBeInTheDocument();
 });
+
+// Opens by keyboard, as a pointer click would not focus the button in every browser.
+const openWith = async (name: string) => {
+  const opener = await screen.findByRole('button', { name });
+  opener.focus();
+  fireEvent.click(opener);
+  return { opener, dialog: await screen.findByRole('dialog') };
+};
+
+test('cancelling the add dialog returns focus to the add button', async () => {
+  serve(() => json({ combos: [] }));
+  open();
+  const { opener, dialog } = await openWith('조합 추가');
+  fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+});
+
+test('closing the edit dialog with Escape returns focus to that combo’s edit button', async () => {
+  serve(() => json({ combos: [breakfast, { ...breakfast, id: 10, name: '점심 세트' }] }));
+  open();
+  const { opener, dialog } = await openWith('아침 세트 수정');
+  fireEvent.keyDown(dialog, { key: 'Escape' });
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('saving an edit returns focus to the combo’s edit button', async () => {
+  serve((_url, init) => (init?.method === 'PUT' ? json(breakfast) : json({ combos: [breakfast] })));
+  open();
+  const { dialog } = await openWith('아침 세트 수정');
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  await vi.waitFor(() =>
+    expect(screen.getByRole('button', { name: '아침 세트 수정' })).toHaveFocus(),
+  );
+});
+
+test('a combo gone when the list is read again leaves focus on the page title, not the body', async () => {
+  let saved = false;
+  serve((_url, init) => {
+    if (init?.method === 'PUT') {
+      saved = true;
+      return json(breakfast);
+    }
+    return json({ combos: saved ? [] : [breakfast] });
+  });
+  open();
+  const { dialog } = await openWith('아침 세트 수정');
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  expect(await screen.findByText('조합이 없습니다')).toBeInTheDocument();
+  await vi.waitFor(() =>
+    expect(screen.getByRole('heading', { level: 1, name: '조합' })).toHaveFocus(),
+  );
+});

@@ -97,7 +97,7 @@ function Totals({ totals }: { totals: MealDay['totals'] }) {
 function JunkSummary({ junk }: { junk: MealDay['junk'] }) {
   return (
     <section aria-labelledby="meal-junk-heading" className="flex flex-col gap-1 text-body-sm">
-      <h3 id="meal-junk-heading" className="font-medium">
+      <h3 id="meal-junk-heading" className="font-semibold">
         정크푸드
       </h3>
       {(

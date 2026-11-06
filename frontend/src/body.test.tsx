@@ -516,3 +516,20 @@ test('a slow older trend failure does not replace the one that includes a save',
   expect(screen.queryByText('기간별 변화를 불러오지 못했습니다')).not.toBeInTheDocument();
   expect(screen.getByRole('row', { name: /체중.*−1\.5kg/ })).toBeInTheDocument();
 });
+
+test('trying again moves focus to the card, as the button it was on goes away', async () => {
+  server({
+    recordReplies: [
+      { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+      { body: { record } },
+    ],
+  });
+  render(<BodyCard date={date} />);
+  const again = await screen.findByRole('button', { name: '다시 시도' });
+  again.focus();
+  fireEvent.click(again);
+  expect(await screen.findByText('70.5kg')).toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: '신체' }).parentElement).toHaveFocus(),
+  );
+});

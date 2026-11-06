@@ -285,3 +285,15 @@ test('leaving again while waiting for a save sends no read for the day left', as
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
+
+test('trying again moves focus to the card, as the button it was on goes away', async () => {
+  server({ status: 500, body: { error: '서버 오류가 발생했습니다' } }, { body: { record } });
+  render(<SleepCard date={date} />);
+  const again = await screen.findByRole('button', { name: '다시 시도' });
+  again.focus();
+  fireEvent.click(again);
+  expect(await screen.findByText('7시간 30분')).toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: '수면' }).parentElement).toHaveFocus(),
+  );
+});

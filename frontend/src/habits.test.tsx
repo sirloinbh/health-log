@@ -336,3 +336,15 @@ test('a failed delete says why and keeps the day and the dialog', async () => {
   expect(screen.getByText('3개비')).toBeInTheDocument();
   shown.mockRestore();
 });
+
+test('trying again moves focus to the card, as the button it was on goes away', async () => {
+  server({ status: 500, body: { error: '서버 오류가 발생했습니다' } }, { body: dayOf(null) });
+  render(<HabitsCard date={date} />);
+  const again = await screen.findByRole('button', { name: '다시 시도' });
+  again.focus();
+  fireEvent.click(again);
+  expect(await screen.findByLabelText('담배 (개비)')).toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: '술·담배' }).parentElement).toHaveFocus(),
+  );
+});

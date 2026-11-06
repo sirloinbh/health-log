@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { trackWrite, writesSettled } from './pending-writes';
+import { forgetPendingWrites, trackWrite, writesSettled } from './pending-writes';
 
 const deferred = <T>() => {
   let resolve = (_value: T) => {};
@@ -66,5 +66,19 @@ test('a save started while waiting is waited for too', async () => {
   first.resolve(null);
   expect(await settledYet(waiting)).toBe(false);
   second.resolve(null);
+  expect(await settledYet(waiting)).toBe(true);
+});
+
+test('a write from before a reset settling late does not end the wait for a newer one', async () => {
+  const old = deferred<null>();
+  const newer = deferred<null>();
+  void trackWrite('/api/sleep/2026-03-15', old.promise);
+  forgetPendingWrites();
+  void trackWrite('/api/sleep/2026-03-15', newer.promise);
+  const waiting = writesSettled('/api/sleep/2026-03-15');
+
+  old.resolve(null);
+  expect(await settledYet(waiting)).toBe(false);
+  newer.resolve(null);
   expect(await settledYet(waiting)).toBe(true);
 });

@@ -645,6 +645,8 @@ export function MealCard({ date }: { date: string }) {
     try {
       // A meal added before leaving this day may still be on its way; read after it lands.
       await writesSettled(pathOf(date));
+      // Left again while waiting: nothing would show the answer.
+      if (!live.current) return false;
       const data = await requestJson<MealDay>(pathOf(date));
       if (stillCurrent()) setDay(data);
       return true;

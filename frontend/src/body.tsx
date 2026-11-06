@@ -279,6 +279,8 @@ export function BodyCard({ date }: { date: string }) {
     try {
       // A save from before leaving this day may still be on its way; read after it lands.
       await writesSettled(pathOf(date));
+      // Left again while waiting: nothing would show the answer.
+      if (!live.current) return;
       const data = await requestJson<{ record: BodyRecord | null }>(pathOf(date));
       if (live.current) setRecord(data.record);
     } catch (cause) {
@@ -294,6 +296,8 @@ export function BodyCard({ date }: { date: string }) {
     try {
       // A save to a day in the window changes the trend; waiting for every body write is simplest.
       await writesSettled(pathOf(''));
+      // Left again while waiting: nothing would show the answer.
+      if (!live.current) return;
       const data = await requestJson<{ records?: BodyRecord[] }>(
         `/api/body?from=${from}&to=${date}`,
       );

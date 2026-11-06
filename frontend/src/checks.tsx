@@ -219,6 +219,8 @@ export function ChecksCard({ date }: { date: string }) {
     try {
       // A save from before leaving this day may still be on its way; read after it lands.
       await writesSettled(pathOf(date));
+      // Left again while waiting: nothing would show the answer.
+      if (!live.current) return;
       const data = await requestJson<CheckDay>(pathOf(date));
       if (live.current) setDay(data);
     } catch (cause) {

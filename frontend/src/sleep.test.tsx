@@ -262,3 +262,26 @@ test('coming back while a save is on its way shows the saved night, not a blank 
   expect(await screen.findByText('7시간 30분')).toBeInTheDocument();
   expect(screen.queryByLabelText('취침 시각')).not.toBeInTheDocument();
 });
+
+test('leaving again while waiting for a save sends no read for the day left', async () => {
+  let finishSave = () => {};
+  const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+    if (init?.method === 'PUT') {
+      return new Promise<Response>((resolve) => {
+        finishSave = () => resolve(new Response(JSON.stringify(record)));
+      });
+    }
+    return Promise.resolve(new Response(JSON.stringify({ record: null })));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const first = render(<SleepCard date={date} />);
+  await screen.findByLabelText('취침 시각');
+  typeTimes('23:30', '07:00');
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  first.unmount();
+  render(<SleepCard date={date} />).unmount();
+
+  finishSave();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});

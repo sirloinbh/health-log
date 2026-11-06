@@ -7,14 +7,10 @@ import { promisify } from 'node:util';
 import { Client } from 'pg';
 
 import { checksum, migrate, readMigrations } from '../src/migrations.js';
+import { testDatabaseSkip } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
-// These tests write. A shared machine's variable may name another project's test database.
-const databaseName = url ? new URL(url).pathname.slice(1) : null;
-const skip =
-  databaseName === 'health_test'
-    ? false
-    : `health_test 전용 DB가 아닙니다: ${databaseName ?? '없음'}`;
+const skip = testDatabaseSkip(url);
 const dir = fileURLToPath(new URL('../../database/migrations/', import.meta.url));
 const backend = fileURLToPath(new URL('../', import.meta.url));
 const run = promisify(execFile);

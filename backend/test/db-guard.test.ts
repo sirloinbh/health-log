@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { test } from 'node:test';
+
+import { testDatabaseSkip } from './helpers.js';
+
+// #52. DB tests run only against health_test and say why they were skipped otherwise.
+test('DB tests run only against health_test', () => {
+  assert.equal(testDatabaseSkip('postgres://postgres@127.0.0.1:5472/health_test'), false);
+  assert.equal(testDatabaseSkip('postgres://u:p@localhost/health_test?sslmode=disable'), false);
+});
+
+test('another database or none is skipped with its name as the reason', () => {
+  assert.equal(
+    testDatabaseSkip('postgres://postgres@127.0.0.1:5432/study_test'),
+    'health_test 전용 DB가 아닙니다: study_test',
+  );
+  assert.equal(
+    testDatabaseSkip('postgres://postgres@127.0.0.1:5432/health'),
+    'health_test 전용 DB가 아닙니다: health',
+  );
+  assert.equal(testDatabaseSkip(undefined), 'health_test 전용 DB가 아닙니다: 없음');
+  assert.equal(testDatabaseSkip(''), 'health_test 전용 DB가 아닙니다: 없음');
+});
+
+const dbReadme = new URL('../../database/README.md', import.meta.url);
+// The backend-only deploy repository has no database folder.
+const docsTest = existsSync(dbReadme) ? test : test.skip;
+
+// Copied as written, U&'\\AE30' stores the characters "\AE30" instead of the Hangul letter.
+docsTest('the DB guide writes Unicode escapes with one backslash', () => {
+  const text = readFileSync(dbReadme, 'utf8');
+  assert.ok(text.includes("U&'\\XXXX'"), 'the escape rule is still documented');
+  assert.doesNotMatch(text, /U&'[^']*\\\\/);
+});

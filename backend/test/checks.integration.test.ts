@@ -3,15 +3,10 @@ import { after, before, test } from 'node:test';
 
 import { Pool } from 'pg';
 
-import { withApi } from './helpers.js';
+import { testDatabaseSkip, withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
-// These tests write. A shared machine's variable may name another project's test database.
-const databaseName = url ? new URL(url).pathname.slice(1) : null;
-const skip =
-  databaseName === 'health_test'
-    ? false
-    : `health_test 전용 DB가 아닙니다: ${databaseName ?? '없음'}`;
+const skip = testDatabaseSkip(url);
 
 // Far from any real record. 1990-04-01 is a Sunday and 1990-04-30 a Monday.
 const first = '1990-03-01';

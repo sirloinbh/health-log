@@ -56,8 +56,10 @@
 
 ### 명령
 
-- `TEST_DATABASE_URL= npm run check`: 아래 PR 기록 참고
-- `npm run knip`: 아래 PR 기록 참고
+- `TEST_DATABASE_URL= npm run check`: 통과
+  - 프런트 348개 통과, 2개 건너뜀. 백엔드 89개 통과, DB 테스트 77개 건너뜀. 스킬 4개 통과.
+  - 셸의 `TEST_DATABASE_URL`이 다른 프로젝트 DB를 가리켜 비우고 실행했다. 프런트만 바꾼 변경이다.
+- `npm run knip`: 통과
 
 ## 한계
 

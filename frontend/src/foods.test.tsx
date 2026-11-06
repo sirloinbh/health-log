@@ -406,3 +406,101 @@ test('a failed next page keeps the list and the button to try again', async () =
   expect(screen.getByRole('heading', { level: 2, name: '치즈버거' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '결과 더 보기' })).not.toHaveAttribute('aria-disabled');
 });
+
+// Focuses the button first, as a keyboard user would; a pointer click does not in every browser.
+const openWith = async (name: string) => {
+  const opener = await screen.findByRole('button', { name });
+  opener.focus();
+  fireEvent.click(opener);
+  return { opener, dialog: await screen.findByRole('dialog') };
+};
+
+test('cancelling the add dialog returns focus to the add button', async () => {
+  serve(() => json({ foods: [] }));
+  open();
+  const { opener, dialog } = await openWith('음식 추가');
+  fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+});
+
+test('closing the edit dialog with Escape returns focus to that food’s edit button', async () => {
+  serve(() => json({ foods: [food, { ...food, id: 2, name: '감자튀김' }] }));
+  open();
+  const { opener, dialog } = await openWith('치즈버거 수정');
+  fireEvent.keyDown(dialog, { key: 'Escape' });
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('saving returns focus to the edit button while the food is still listed', async () => {
+  serve((_url, init) => (init?.method === 'PUT' ? json(food) : json({ foods: [food] })));
+  open();
+  const { dialog } = await openWith('치즈버거 수정');
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  await vi.waitFor(() =>
+    expect(screen.getByRole('button', { name: '치즈버거 수정' })).toHaveFocus(),
+  );
+});
+
+test('a saved food the search no longer finds leaves focus on the page title, not the body', async () => {
+  let saved = false;
+  serve((_url, init) => {
+    if (init?.method === 'PUT') {
+      saved = true;
+      return json({ ...food, name: '더블버거' });
+    }
+    return json({ foods: saved ? [] : [food] });
+  });
+  open();
+  const { dialog } = await openWith('치즈버거 수정');
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
+  await vi.waitFor(() =>
+    expect(screen.getByRole('heading', { level: 1, name: '음식' })).toHaveFocus(),
+  );
+});
+
+test('a slow reload that drops the saved food still leaves focus on the page title', async () => {
+  let saved = false;
+  let finishReload: (() => void) | undefined;
+  serve((_url, init) => {
+    if (init?.method === 'PUT') {
+      saved = true;
+      return json({ ...food, name: '더블버거' });
+    }
+    if (!saved) return json({ foods: [food] });
+    // Slower than the dialog's close, so focus is back on the edit button when the list changes.
+    return new Promise<Response>((resolve) => (finishReload = () => resolve(json({ foods: [] }))));
+  });
+  open();
+  const { opener, dialog } = await openWith('치즈버거 수정');
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+
+  // The reload has to be on its way, or finishing it would do nothing.
+  await vi.waitFor(() => expect(finishReload).toBeDefined());
+  finishReload?.();
+  expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
+  await vi.waitFor(() =>
+    expect(screen.getByRole('heading', { level: 1, name: '음식' })).toHaveFocus(),
+  );
+});
+
+test('once focus has moved on from the edit button, a later redraw leaves it alone', async () => {
+  serve((url) => json({ foods: url === '/api/foods?q=' ? [food] : [] }));
+  open();
+  const { opener, dialog } = await openWith('치즈버거 수정');
+  fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+
+  // Typing in the search field moves focus on. A mouse click on 검색 that does not focus the
+  // button (as in Safari) then leaves focus on <body> while the search removes the card.
+  const field = screen.getByRole('searchbox', { name: '음식 검색' });
+  field.focus();
+  fireEvent.change(field, { target: { value: '없는음식' } });
+  field.blur();
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(screen.getByRole('heading', { level: 1, name: '음식' })).not.toHaveFocus();
+});

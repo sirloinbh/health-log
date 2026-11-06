@@ -29,6 +29,7 @@ import { requestJson } from './lib/api';
 import { useNotice } from './lib/use-notice';
 import { MoreFoodsButton } from './more-foods-button';
 import { parseAmount, unreadableAmount } from './number-input';
+import { useReturnFocus } from './return-focus';
 
 const nutrients = [
   { key: 'calories', label: '칼로리', unit: 'kcal' },
@@ -278,7 +279,7 @@ function FoodDialog({
   );
 }
 
-function FoodCard({ food, onEdit }: { food: Food; onEdit: () => void }) {
+function FoodCard({ food, onEdit }: { food: Food; onEdit: (opener: HTMLElement) => void }) {
   return (
     <Card>
       <CardHeader>
@@ -318,7 +319,7 @@ function FoodCard({ food, onEdit }: { food: Food; onEdit: () => void }) {
             size="sm"
             className="ml-auto"
             aria-label={`${food.name} 수정`}
-            onClick={onEdit}
+            onClick={(event) => onEdit(event.currentTarget)}
           >
             <Pencil aria-hidden />
             수정
@@ -338,6 +339,16 @@ export function FoodsPage() {
   // is still the answer to the earlier words.
   const { notice: pageNotice, error: pageError, clear: clearPage } = useNotice();
   const shown = useRef<HTMLParagraphElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const { remember, returnFocus } = useReturnFocus(heading);
+  const openDialog = (opener: HTMLElement, target: Food | 'new') => {
+    remember(opener);
+    setEditing(target);
+  };
+  const closeDialog = () => {
+    setEditing(null);
+    returnFocus();
+  };
   // A failed search keeps the list on screen, along with the words that found it.
   const {
     foods,
@@ -363,7 +374,14 @@ export function FoodsPage() {
   return (
     <section aria-labelledby="page-title" className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
-        <h1 id="page-title">음식</h1>
+        <h1
+          id="page-title"
+          ref={heading}
+          tabIndex={-1}
+          className="rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
+          음식
+        </h1>
         <p className="text-body text-muted-foreground">영양성분과 출처를 관리합니다.</p>
       </header>
       <div className="flex flex-wrap items-center gap-2">
@@ -386,7 +404,7 @@ export function FoodsPage() {
             검색
           </Button>
         </form>
-        <Button onClick={() => setEditing('new')}>
+        <Button onClick={(event) => openDialog(event.currentTarget, 'new')}>
           <Plus aria-hidden />
           음식 추가
         </Button>
@@ -403,7 +421,7 @@ export function FoodsPage() {
       {foods?.length ? (
         <div className="grid gap-4 md:grid-cols-2">
           {foods.map((food) => (
-            <FoodCard key={food.id} food={food} onEdit={() => setEditing(food)} />
+            <FoodCard key={food.id} food={food} onEdit={(opener) => openDialog(opener, food)} />
           ))}
         </div>
       ) : null}
@@ -427,9 +445,9 @@ export function FoodsPage() {
       {editing ? (
         <FoodDialog
           food={editing === 'new' ? null : editing}
-          onClose={() => setEditing(null)}
+          onClose={closeDialog}
           onSaved={() => {
-            setEditing(null);
+            closeDialog();
             // The saved food may not match the current search, so the list alone cannot confirm it.
             toast.success('저장했습니다');
             void load(applied.current);

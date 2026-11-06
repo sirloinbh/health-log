@@ -232,3 +232,33 @@ test('a save that fails after leaving the day still says so', async () => {
   );
   shown.mockRestore();
 });
+
+test('coming back while a save is on its way shows the saved night, not a blank form', async () => {
+  let saved = false;
+  let finishSave = () => {};
+  const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+    if (init?.method === 'PUT') {
+      return new Promise<Response>((resolve) => {
+        finishSave = () => {
+          saved = true;
+          resolve(new Response(JSON.stringify(record)));
+        };
+      });
+    }
+    return Promise.resolve(new Response(JSON.stringify({ record: saved ? record : null })));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const first = render(<SleepCard date={date} />);
+  await screen.findByLabelText('취침 시각');
+  typeTimes('23:30', '07:00');
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  first.unmount();
+  render(<SleepCard date={date} />);
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(screen.queryByLabelText('취침 시각')).not.toBeInTheDocument();
+  finishSave();
+  expect(await screen.findByText('7시간 30분')).toBeInTheDocument();
+  expect(screen.queryByLabelText('취침 시각')).not.toBeInTheDocument();
+});

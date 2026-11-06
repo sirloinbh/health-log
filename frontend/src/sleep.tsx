@@ -12,6 +12,7 @@ import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
+import { trackWrite, writesSettled } from './pending-writes';
 import {
   clockOf,
   dayOf,
@@ -72,10 +73,13 @@ function SleepForm({
     setSaving(true);
     try {
       onSaved(
-        await requestJson<SleepRecord>(pathOf(date), {
-          method: 'PUT',
-          body: toInstants(date, bed, wake),
-        }),
+        await trackWrite(
+          pathOf(date),
+          requestJson<SleepRecord>(pathOf(date), {
+            method: 'PUT',
+            body: toInstants(date, bed, wake),
+          }),
+        ),
       );
     } catch (cause) {
       // Moving to another day removes this form, and the night still was not saved.
@@ -197,6 +201,8 @@ export function SleepCard({ date }: { date: string }) {
   const load = useCallback(async () => {
     clear();
     try {
+      // A save from before leaving this day may still be on its way; read after it lands.
+      await writesSettled(pathOf(date));
       const data = await requestJson<{ record: SleepRecord | null }>(pathOf(date));
       if (live.current) setRecord(data.record);
     } catch (cause) {
@@ -227,7 +233,7 @@ export function SleepCard({ date }: { date: string }) {
 
   const remove = async () => {
     try {
-      await requestJson(pathOf(date), { method: 'DELETE' });
+      await trackWrite(pathOf(date), requestJson(pathOf(date), { method: 'DELETE' }));
     } catch (cause) {
       // Already gone counts as deleted; anything else keeps the dialog open with the reason.
       if (!(cause instanceof RequestError && cause.status === 404)) {

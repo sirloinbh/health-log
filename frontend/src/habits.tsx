@@ -34,6 +34,7 @@ import {
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
 import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
+import { trackWrite, writesSettled } from './pending-writes';
 
 const pathOf = (date: string) => `/api/habits/${date}`;
 const maxDrinks = 20;
@@ -210,7 +211,12 @@ function HabitForm({
     }
     setSaving(true);
     try {
-      onSaved(await requestJson<HabitDay>(pathOf(date), { method: 'PUT', body }));
+      onSaved(
+        await trackWrite(
+          pathOf(date),
+          requestJson<HabitDay>(pathOf(date), { method: 'PUT', body }),
+        ),
+      );
     } catch (cause) {
       // Moving to another day removes this form, and the record still was not saved.
       if (!mounted.current) {
@@ -370,6 +376,8 @@ export function HabitsCard({ date }: { date: string }) {
   const load = useCallback(async () => {
     clear();
     try {
+      // A save from before leaving this day may still be on its way; read after it lands.
+      await writesSettled(pathOf(date));
       const data = await requestJson<HabitDay>(pathOf(date));
       if (live.current) setDay(data);
     } catch (cause) {
@@ -400,7 +408,7 @@ export function HabitsCard({ date }: { date: string }) {
 
   const remove = async () => {
     try {
-      await requestJson(pathOf(date), { method: 'DELETE' });
+      await trackWrite(pathOf(date), requestJson(pathOf(date), { method: 'DELETE' }));
     } catch (cause) {
       // Already gone counts as deleted; anything else keeps the dialog open with the reason.
       if (!(cause instanceof RequestError && cause.status === 404)) {

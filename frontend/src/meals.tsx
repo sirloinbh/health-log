@@ -17,6 +17,7 @@ import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
 import { MoreFoodsButton } from './more-foods-button';
 import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
+import { trackWrite, writesSettled } from './pending-writes';
 
 const meals = [
   { key: 'breakfast', label: '아침' },
@@ -642,6 +643,8 @@ export function MealCard({ date }: { date: string }) {
     const seen = changes.current;
     const stillCurrent = () => live.current && seen === changes.current;
     try {
+      // A meal added before leaving this day may still be on its way; read after it lands.
+      await writesSettled(pathOf(date));
       const data = await requestJson<MealDay>(pathOf(date));
       if (stillCurrent()) setDay(data);
       return true;
@@ -670,7 +673,10 @@ export function MealCard({ date }: { date: string }) {
   const add = async (body: object, path = '') => {
     setAdding(true);
     try {
-      const data = await requestJson<MealDay>(`${pathOf(date)}${path}`, { method: 'POST', body });
+      const data = await trackWrite(
+        pathOf(date),
+        requestJson<MealDay>(`${pathOf(date)}${path}`, { method: 'POST', body }),
+      );
       changes.current += 1;
       if (!live.current) {
         toast.success(`${date} 식사를 기록했습니다`);
@@ -696,9 +702,10 @@ export function MealCard({ date }: { date: string }) {
 
   const remove = async (id: number) => {
     try {
-      const data = await requestJson<MealDay>(`${pathOf(date)}/entries/${id}`, {
-        method: 'DELETE',
-      });
+      const data = await trackWrite(
+        pathOf(date),
+        requestJson<MealDay>(`${pathOf(date)}/entries/${id}`, { method: 'DELETE' }),
+      );
       changes.current += 1;
       if (live.current) setDay(data);
     } catch (cause) {

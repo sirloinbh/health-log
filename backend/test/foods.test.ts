@@ -206,7 +206,24 @@ test('fields left out are stored with their defaults, and a blank brand as no br
     assert.equal(status, 201);
   });
   assert.deepEqual(params, [
-    ['치즈버거', null, null, 120, 'g', null, null, null, null, null, null, 'manual', null, null],
+    // A new food left unmarked is not junk food (#38).
+    [
+      '치즈버거',
+      null,
+      null,
+      120,
+      'g',
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      'manual',
+      null,
+      null,
+      false,
+    ],
   ]);
 });
 
@@ -266,4 +283,32 @@ test('a list asks for one food past the page to know whether another page exists
     assert.equal(last.data.nextOffset, null);
     assert.deepEqual((calls[1][1] as unknown[]).slice(2), [101, 100]);
   });
+});
+
+// #38. An edit that leaves the mark out keeps it, so a screen that predates the mark cannot clear it.
+test('the junk food mark is a yes or no, kept on an edit that leaves it out', async () => {
+  await rejects({ ...valid, isJunk: 'yes' }, '정크푸드 표시가 올바르지 않습니다');
+  await rejects({ ...valid, isJunk: null }, '정크푸드 표시가 올바르지 않습니다');
+  const params: unknown[][] = [];
+  const pool = {
+    query: async (_sql: string, values: unknown[]) => {
+      params.push(values);
+      return { rows: [{}] };
+    },
+  } as unknown as Pool;
+  await withApi(pool, async (call) => {
+    assert.equal(
+      (await call('/api/foods', { method: 'POST', body: { ...valid, isJunk: true } })).status,
+      201,
+    );
+    assert.equal((await call('/api/foods/5', { method: 'PUT', body: valid })).status, 200);
+    assert.equal(
+      (await call('/api/foods/5', { method: 'PUT', body: { ...valid, isJunk: false } })).status,
+      200,
+    );
+  });
+  assert.deepEqual(
+    params.map((values) => values.slice(14)),
+    [[true], [null, 5], [false, 5]],
+  );
 });

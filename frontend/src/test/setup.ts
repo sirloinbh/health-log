@@ -18,6 +18,13 @@ window.matchMedia ??= (query: string) =>
     dispatchEvent: () => false,
   }) as MediaQueryList;
 
+// jsdom has no ResizeObserver; a checkbox inside a form measures its hidden input with it.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
 afterEach(() => {
   cleanup();
   vi.useRealTimers();

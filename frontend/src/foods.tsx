@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
+import { Checkbox } from './components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -61,6 +62,7 @@ type Food = Record<NutrientKey, number | null> & {
   sourceType: SourceType;
   sourceUrl: string | null;
   checkedOn: string | null;
+  isJunk: boolean;
 };
 
 type Form = Record<NutrientKey, string> & {
@@ -72,6 +74,7 @@ type Form = Record<NutrientKey, string> & {
   sourceType: SourceType;
   sourceUrl: string;
   checkedOn: string;
+  isJunk: boolean;
 };
 
 const emptyForm: Form = {
@@ -89,6 +92,7 @@ const emptyForm: Form = {
   sourceType: 'manual',
   sourceUrl: '',
   checkedOn: '',
+  isJunk: false,
 };
 
 const formOf = (food: Food): Form => ({
@@ -106,6 +110,7 @@ const formOf = (food: Food): Form => ({
   sourceType: food.sourceType,
   sourceUrl: food.sourceUrl ?? '',
   checkedOn: food.checkedOn ?? '',
+  isJunk: food.isJunk,
 });
 
 const textOrNull = (value: string) => value.trim() || null;
@@ -130,6 +135,7 @@ const bodyOf = (form: Form) => ({
   sourceType: form.sourceType,
   sourceUrl: textOrNull(form.sourceUrl),
   checkedOn: textOrNull(form.checkedOn),
+  isJunk: form.isJunk,
 });
 
 // The server and database only store http(s) addresses; a link must never run script regardless.
@@ -264,6 +270,23 @@ function FoodDialog({
               onChange={update('checkedOn')}
             />
           </Field>
+          {/* #38: counted in the meal card. A recorded meal keeps the mark it was recorded with. */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="food-is-junk"
+                checked={form.isJunk}
+                aria-describedby="food-is-junk-help"
+                onCheckedChange={(checked) =>
+                  setForm((current) => ({ ...current, isJunk: checked === true }))
+                }
+              />
+              <Label htmlFor="food-is-junk">정크푸드</Label>
+            </div>
+            <p id="food-is-junk-help" className="text-caption break-keep text-muted-foreground">
+              식단에서 정크푸드 횟수로 셉니다. 표시를 바꿔도 이미 기록한 식사는 그대로입니다.
+            </p>
+          </div>
           <Notice notice={notice} />
           <DialogFooter>
             <Button type="button" variant="outline" disabled={saving} onClick={onClose}>
@@ -302,6 +325,7 @@ function FoodCard({ food, onEdit }: { food: Food; onEdit: (opener: HTMLElement) 
           ))}
         </dl>
         <div className="flex flex-wrap items-center gap-2 text-caption text-muted-foreground">
+          {food.isJunk ? <Badge variant="warning">정크푸드</Badge> : null}
           <Badge variant="secondary">{sourceLabels[food.sourceType]}</Badge>
           {food.checkedOn ? <span>{food.checkedOn} 확인</span> : null}
           {food.sourceUrl && isSafeLink(food.sourceUrl) ? (

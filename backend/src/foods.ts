@@ -89,6 +89,9 @@ const foodInput = z
         .refine(isRealDate, '확인 날짜가 올바르지 않습니다')
         .nullable()
         .default(null),
+      // Left out, a new food is not junk food and an edited one keeps its mark, so a screen that
+      // predates the mark cannot clear it.
+      isJunk: z.boolean({ error: '정크푸드 표시가 올바르지 않습니다' }).optional(),
     },
     { error: '요청 본문이 올바르지 않습니다' },
   )
@@ -137,10 +140,11 @@ type FoodRow = {
   source_type: string;
   source_url: string | null;
   checked_on: string | null;
+  is_junk: boolean;
 };
 
 const columns =
-  'id, name, brand, category, serving_size, serving_unit, calories, carbs, protein, fat, sugars, sodium, source_type, source_url, checked_on';
+  'id, name, brand, category, serving_size, serving_unit, calories, carbs, protein, fat, sugars, sodium, source_type, source_url, checked_on, is_junk';
 
 // pg returns BIGINT and NUMERIC as strings.
 const optionalNumber = (value: string | null) => (value === null ? null : Number(value));
@@ -161,6 +165,7 @@ const toFood = (row: FoodRow) => ({
   sourceType: row.source_type,
   sourceUrl: row.source_url,
   checkedOn: row.checked_on,
+  isJunk: row.is_junk,
 });
 
 const inputValues = (food: z.infer<typeof foodInput>) => [
@@ -239,10 +244,10 @@ export function foodsRouter(pool: Pool, today: () => string, limits: RateLimitSe
     const food = parseFood(req.body);
     const { rows } = await pool.query<FoodRow>(
       `INSERT INTO foods (name, brand, category, serving_size, serving_unit, calories, carbs, protein,
-         fat, sugars, sodium, source_type, source_url, checked_on)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         fat, sugars, sodium, source_type, source_url, checked_on, is_junk)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING ${columns}`,
-      inputValues(food),
+      [...inputValues(food), food.isJunk ?? false],
     );
     res.status(201).json(toFood(rows[0]));
   });
@@ -253,10 +258,11 @@ export function foodsRouter(pool: Pool, today: () => string, limits: RateLimitSe
     const { rows } = await pool.query<FoodRow>(
       `UPDATE foods SET name = $1, brand = $2, category = $3, serving_size = $4, serving_unit = $5,
          calories = $6, carbs = $7, protein = $8, fat = $9, sugars = $10, sodium = $11,
-         source_type = $12, source_url = $13, checked_on = $14, updated_at = now()
-       WHERE id = $15
+         source_type = $12, source_url = $13, checked_on = $14,
+         is_junk = COALESCE($15, is_junk), updated_at = now()
+       WHERE id = $16
        RETURNING ${columns}`,
-      [...inputValues(food), id],
+      [...inputValues(food), food.isJunk ?? null, id],
     );
     if (!rows[0]) throw new HttpError(404, '음식을 찾을 수 없습니다');
     res.json(toFood(rows[0]));

@@ -9,8 +9,10 @@ import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
  */
 export function useReturnFocus(fallback: RefObject<HTMLElement | null>) {
   const opener = useRef<HTMLElement | null>(null);
-  // Set from closing until focus has gone somewhere or a new dialog opens.
+  // Set from closing until the opener is gone, focus has moved on from it, or a new dialog opens.
   const watching = useRef(false);
+  // Whether focus has been handed back since the last close.
+  const returned = useRef(false);
   const [returns, setReturns] = useState(0);
 
   // The closing dialog moves focus on a timer of its own first.
@@ -19,6 +21,7 @@ export function useReturnFocus(fallback: RefObject<HTMLElement | null>) {
     const timer = setTimeout(() => {
       const target = opener.current?.isConnected ? opener.current : fallback.current;
       target?.focus();
+      returned.current = true;
     }, 0);
     return () => clearTimeout(timer);
   }, [fallback, returns]);
@@ -26,9 +29,17 @@ export function useReturnFocus(fallback: RefObject<HTMLElement | null>) {
   // After every redraw: a list read again after a save may have removed the opener while it had
   // focus, which drops focus to <body>. No dependencies, as the redraw can come from any state.
   useEffect(() => {
-    if (!watching.current || opener.current?.isConnected) return;
-    watching.current = false;
-    if (document.activeElement === document.body) fallback.current?.focus();
+    if (!watching.current) return;
+    const active = document.activeElement;
+    if (!opener.current?.isConnected) {
+      watching.current = false;
+      if (active === document.body) fallback.current?.focus();
+      return;
+    }
+    // Focus went elsewhere after it was handed back: later redraws are none of this hook's business.
+    if (returned.current && active !== opener.current && active !== document.body) {
+      watching.current = false;
+    }
   });
 
   /** Call when the dialog opens, with the element that opened it. */
@@ -40,6 +51,7 @@ export function useReturnFocus(fallback: RefObject<HTMLElement | null>) {
   /** Call when the dialog closes. */
   const returnFocus = useCallback(() => {
     watching.current = true;
+    returned.current = false;
     setReturns((count) => count + 1);
   }, []);
 

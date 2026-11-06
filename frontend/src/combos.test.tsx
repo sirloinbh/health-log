@@ -388,7 +388,7 @@ test('a combo gone when the list is read again leaves focus on the page title, n
 
 test('a slow reload that drops the saved combo still leaves focus on the page title', async () => {
   let saved = false;
-  let finishReload = () => {};
+  let finishReload: (() => void) | undefined;
   serve((_url, init) => {
     if (init?.method === 'PUT') {
       saved = true;
@@ -403,7 +403,9 @@ test('a slow reload that drops the saved combo still leaves focus on the page ti
   fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
   await vi.waitFor(() => expect(opener).toHaveFocus());
 
-  finishReload();
+  // The reload has to be on its way, or finishing it would do nothing.
+  await vi.waitFor(() => expect(finishReload).toBeDefined());
+  finishReload?.();
   expect(await screen.findByText('조합이 없습니다')).toBeInTheDocument();
   await vi.waitFor(() =>
     expect(screen.getByRole('heading', { level: 1, name: '조합' })).toHaveFocus(),

@@ -462,7 +462,7 @@ test('a saved food the search no longer finds leaves focus on the page title, no
 
 test('a slow reload that drops the saved food still leaves focus on the page title', async () => {
   let saved = false;
-  let finishReload = () => {};
+  let finishReload: (() => void) | undefined;
   serve((_url, init) => {
     if (init?.method === 'PUT') {
       saved = true;
@@ -477,9 +477,30 @@ test('a slow reload that drops the saved food still leaves focus on the page tit
   fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
   await vi.waitFor(() => expect(opener).toHaveFocus());
 
-  finishReload();
+  // The reload has to be on its way, or finishing it would do nothing.
+  await vi.waitFor(() => expect(finishReload).toBeDefined());
+  finishReload?.();
   expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
   await vi.waitFor(() =>
     expect(screen.getByRole('heading', { level: 1, name: '음식' })).toHaveFocus(),
   );
+});
+
+test('once focus has moved on from the edit button, a later redraw leaves it alone', async () => {
+  serve((url) => json({ foods: url === '/api/foods?q=' ? [food] : [] }));
+  open();
+  const { opener, dialog } = await openWith('치즈버거 수정');
+  fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+
+  // Typing in the search field moves focus on. A mouse click on 검색 that does not focus the
+  // button (as in Safari) then leaves focus on <body> while the search removes the card.
+  const field = screen.getByRole('searchbox', { name: '음식 검색' });
+  field.focus();
+  fireEvent.change(field, { target: { value: '없는음식' } });
+  field.blur();
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(screen.getByRole('heading', { level: 1, name: '음식' })).not.toHaveFocus();
 });

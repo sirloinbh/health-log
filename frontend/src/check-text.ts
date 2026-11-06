@@ -23,3 +23,9 @@ export const answerText = (value: boolean | null, yes: string, no: string) =>
 /** "4/5일 지킴 (80%)". The share is of the days answered, so an unchecked day changes nothing. */
 export const rateText = ({ days, yes }: Rate, word: string) =>
   days === 0 ? '기록 없음' : `${yes}/${days}일 ${word} (${Math.round((yes / days) * 100)}%)`;
+
+/**
+ * Characters as the server and the database count them: an emoji is one, not the two UTF-16 units
+ * that `string.length` and an input's `maxLength` count (#92).
+ */
+export const charCount = (value: string) => [...value].length;

@@ -696,7 +696,7 @@ workout-memo는 확정한 이슈를 큐에 넣으면 PC에서 테스트 → 구�
 6. **최소 기능:** `createApp(pool)`, `GET /api/health`, 기준 화면 1개, 단위 테스트 1개, DB 통합 테스트 1개, UI 테스트 1개를 만든다.
 7. **로컬 검증:**
    - `docker compose up -d db`로 DB를 띄운다.
-   - 전용 테스트 DB를 만들어 모든 마이그레이션을 `psql -f`로 적용한다.
+   - 전용 테스트 DB를 만들어 모든 마이그레이션을 적용한다. CI처럼 `psql -f`로 한 번 적용한 뒤 `npm run db:migrate`(`DATABASE_URL`을 그 DB로)로 기록한다.
    - `TEST_DATABASE_URL`을 설정하고 `npm run check`를 실행한다.
 
    확인: exit 0이고 DB 테스트가 건너뛰지 않았다.

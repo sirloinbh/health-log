@@ -515,18 +515,22 @@ test('a read started before an entry was recorded does not undo it on screen', a
     entries: [entry, { ...entry, id: 2, name: '떡볶이', brand: null }],
     totals: emptyTotals,
   };
-  stubFetch(
-    vi
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(oneEntry)))
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ error: '식사 기록을 찾을 수 없습니다' }), { status: 404 }),
-      )
-      .mockResolvedValueOnce(
+  // Reads and writes answer from separate lists: each read first waits a turn for pending writes,
+  // so the order in which the two reach fetch is not what this test is about.
+  const reads: (() => Promise<Response>)[] = [
+    () => Promise.resolve(new Response(JSON.stringify(oneEntry))),
+    () =>
+      Promise.resolve(
         new Response(JSON.stringify({ error: '서버 오류가 발생했습니다' }), { status: 500 }),
-      )
-      .mockImplementationOnce(() => new Promise((resolve) => (finishRead = resolve)))
-      .mockResolvedValueOnce(new Response(JSON.stringify(added), { status: 201 })),
+      ),
+    () => new Promise((resolve) => (finishRead = resolve)),
+  ];
+  const writes = [
+    new Response(JSON.stringify({ error: '식사 기록을 찾을 수 없습니다' }), { status: 404 }),
+    new Response(JSON.stringify(added), { status: 201 }),
+  ];
+  stubFetch((_url, init) =>
+    init?.method === 'GET' ? reads.shift()!() : Promise.resolve(writes.shift()!),
   );
   render(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: '버거집 치즈버거 삭제' }));
@@ -1022,4 +1026,36 @@ test('a next page clears only its own message, not the other forms', async () =>
   await screen.findByRole('button', { name: '버거집 불고기버거 추가' });
   expect(screen.queryByText(/서버 오류가 발생했습니다/)).not.toBeInTheDocument();
   expect(within(typedForm).getByRole('alert')).toHaveTextContent('음식 이름을 입력해 주세요');
+});
+
+test('coming back while an entry is being recorded shows it, not the day without it', async () => {
+  const added = { entries: [{ ...entry, name: '떡볶이', brand: null }], totals: emptyTotals };
+  let saved = false;
+  let finishAdd = () => {};
+  const inner = vi.fn((_url: string, init?: RequestInit) => {
+    if (init?.method === 'POST') {
+      return new Promise<Response>((resolve) => {
+        finishAdd = () => {
+          saved = true;
+          resolve(new Response(JSON.stringify(added), { status: 201 }));
+        };
+      });
+    }
+    return Promise.resolve(
+      new Response(JSON.stringify(saved ? added : { entries: [], totals: emptyTotals })),
+    );
+  });
+  stubFetch(inner);
+  const first = render(<MealCard date={date} />);
+  fireEvent.change(await screen.findByLabelText('음식 이름'), { target: { value: '떡볶이' } });
+  fireEvent.change(screen.getByLabelText('1회 칼로리 (kcal)'), { target: { value: '480' } });
+  fireEvent.click(screen.getByRole('button', { name: '바로 기록' }));
+  first.unmount();
+  render(<MealCard date={date} />);
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(inner.mock.calls.filter(([, init]) => init?.method === 'GET')).toHaveLength(1);
+  finishAdd();
+  expect(await screen.findByRole('button', { name: '떡볶이 삭제' })).toBeInTheDocument();
+  expect(inner.mock.calls.filter(([, init]) => init?.method === 'GET')).toHaveLength(2);
 });

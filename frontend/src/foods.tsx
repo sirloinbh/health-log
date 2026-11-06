@@ -340,7 +340,7 @@ export function FoodsPage() {
   const { notice: pageNotice, error: pageError, clear: clearPage } = useNotice();
   const shown = useRef<HTMLParagraphElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
-  const { remember, returnFocus, keepFocus } = useReturnFocus(heading);
+  const { remember, returnFocus } = useReturnFocus(heading);
   const openDialog = (opener: HTMLElement, target: Food | 'new') => {
     remember(opener);
     setEditing(target);
@@ -374,7 +374,12 @@ export function FoodsPage() {
   return (
     <section aria-labelledby="page-title" className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
-        <h1 id="page-title" ref={heading} tabIndex={-1} className="outline-none">
+        <h1
+          id="page-title"
+          ref={heading}
+          tabIndex={-1}
+          className="rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
           음식
         </h1>
         <p className="text-body text-muted-foreground">영양성분과 출처를 관리합니다.</p>
@@ -445,8 +450,7 @@ export function FoodsPage() {
             closeDialog();
             // The saved food may not match the current search, so the list alone cannot confirm it.
             toast.success('저장했습니다');
-            // The edited food may no longer match the search, taking its edit button with it.
-            void load(applied.current).then(keepFocus);
+            void load(applied.current);
           }}
         />
       ) : null}

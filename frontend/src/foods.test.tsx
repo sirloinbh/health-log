@@ -407,7 +407,7 @@ test('a failed next page keeps the list and the button to try again', async () =
   expect(screen.getByRole('button', { name: '결과 더 보기' })).not.toHaveAttribute('aria-disabled');
 });
 
-// Opens by keyboard, as a pointer click would not focus the button in every browser.
+// Focuses the button first, as a keyboard user would; a pointer click does not in every browser.
 const openWith = async (name: string) => {
   const opener = await screen.findByRole('button', { name });
   opener.focus();
@@ -454,6 +454,30 @@ test('a saved food the search no longer finds leaves focus on the page title, no
   open();
   const { dialog } = await openWith('치즈버거 수정');
   fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
+  await vi.waitFor(() =>
+    expect(screen.getByRole('heading', { level: 1, name: '음식' })).toHaveFocus(),
+  );
+});
+
+test('a slow reload that drops the saved food still leaves focus on the page title', async () => {
+  let saved = false;
+  let finishReload = () => {};
+  serve((_url, init) => {
+    if (init?.method === 'PUT') {
+      saved = true;
+      return json({ ...food, name: '더블버거' });
+    }
+    if (!saved) return json({ foods: [food] });
+    // Slower than the dialog's close, so focus is back on the edit button when the list changes.
+    return new Promise<Response>((resolve) => (finishReload = () => resolve(json({ foods: [] }))));
+  });
+  open();
+  const { opener, dialog } = await openWith('치즈버거 수정');
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+
+  finishReload();
   expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
   await vi.waitFor(() =>
     expect(screen.getByRole('heading', { level: 1, name: '음식' })).toHaveFocus(),

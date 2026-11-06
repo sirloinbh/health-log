@@ -363,7 +363,7 @@ export function CombosPage() {
   const latestLoad = useRef(0);
   const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLHeadingElement>(null);
-  const { remember, returnFocus, keepFocus } = useReturnFocus(heading);
+  const { remember, returnFocus } = useReturnFocus(heading);
   const openDialog = (opener: HTMLElement, target: Combo | 'new') => {
     remember(opener);
     setEditing(target);
@@ -374,6 +374,7 @@ export function CombosPage() {
   };
 
   // A deleted combo takes its buttons with it, and a closing dialog restores focus on a timer first.
+  // The delete dialog has its own trigger; the add and edit dialogs return focus through useReturnFocus.
   useEffect(() => {
     if (!moveFocus) return;
     const timer = setTimeout(() => heading.current?.focus(), 0);
@@ -419,7 +420,12 @@ export function CombosPage() {
   return (
     <section aria-labelledby="page-title" className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
-        <h1 id="page-title" ref={heading} tabIndex={-1} className="outline-none">
+        <h1
+          id="page-title"
+          ref={heading}
+          tabIndex={-1}
+          className="rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
           조합
         </h1>
         <p className="text-body text-muted-foreground">
@@ -463,7 +469,7 @@ export function CombosPage() {
           onSaved={() => {
             closeDialog();
             toast.success('저장했습니다');
-            void load().then(keepFocus);
+            void load();
           }}
         />
       ) : null}

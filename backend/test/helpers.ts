@@ -13,7 +13,7 @@ export function testDatabaseSkip(url: string | undefined): false | string {
     try {
       name = new URL(url).pathname.slice(1);
     } catch {
-      // Node's own message repeats the whole value, password included.
+      // Node's error carries the whole value (input), password included, and prints it; no cause.
       throw new Error(
         'TEST_DATABASE_URL을 주소로 읽을 수 없습니다(값은 비밀번호가 있을 수 있어 표시하지 않습니다).',
       );

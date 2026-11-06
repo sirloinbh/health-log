@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { inspect } from 'node:util';
 
 import { testDatabaseSkip } from './helpers.js';
 
@@ -32,7 +33,8 @@ test('an address that cannot be read fails without printing its password', () =>
     () => testDatabaseSkip('postgres://user:secret-pass@bad host/health_test'),
     (error: Error) => {
       assert.match(error.message, /TEST_DATABASE_URL을 주소로 읽을 수 없습니다/);
-      assert.doesNotMatch(error.message, /secret-pass/);
+      // Printed errors show their properties and cause too, not only the message.
+      assert.doesNotMatch(inspect(error), /secret-pass/);
       return true;
     },
   );

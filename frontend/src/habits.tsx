@@ -438,7 +438,15 @@ export function HabitsCard({ date }: { date: string }) {
       <CardContent className="flex flex-col gap-4">
         <Notice notice={notice} />
         {notice && day === undefined ? (
-          <Button variant="outline" className="self-start" onClick={() => void load()}>
+          <Button
+            variant="outline"
+            className="self-start"
+            onClick={() => {
+              void load();
+              // Trying again removes this button, which would drop keyboard focus to the page.
+              setMoveFocus((count) => count + 1);
+            }}
+          >
             다시 시도
           </Button>
         ) : null}

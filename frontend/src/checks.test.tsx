@@ -321,3 +321,15 @@ test('a failed delete says why and keeps the check and the dialog', async () => 
   expect(screen.getByText('야식 참음')).toBeInTheDocument();
   shown.mockRestore();
 });
+
+test('trying again moves focus to the card, as the button it was on goes away', async () => {
+  server({ status: 500, body: { error: '서버 오류가 발생했습니다' } }, { body: dayOf(null) });
+  render(<ChecksCard date={date} />);
+  const again = await screen.findByRole('button', { name: '다시 시도' });
+  again.focus();
+  fireEvent.click(again);
+  expect(await screen.findByRole('group', { name: '식단을 지켰나요?' })).toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: '하루 체크' }).parentElement).toHaveFocus(),
+  );
+});

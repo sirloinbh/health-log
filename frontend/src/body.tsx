@@ -375,6 +375,8 @@ export function BodyCard({ date }: { date: string }) {
             onClick={() => {
               void load();
               void loadHistory();
+              // Trying again removes this button, which would drop keyboard focus to the page.
+              setMoveFocus((count) => count + 1);
             }}
           >
             다시 시도

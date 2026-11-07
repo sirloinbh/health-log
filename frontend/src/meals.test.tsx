@@ -14,7 +14,18 @@ const emptyTotals = {
   sugars: noTotal,
   sodium: noTotal,
 };
-const emptyDay = { entries: [], totals: emptyTotals };
+const noJunkPeriod = (from: string, to: string) => ({
+  from,
+  to,
+  times: 0,
+  days: 0,
+  calories: { value: null, missing: 0 },
+});
+const noJunk = {
+  week: noJunkPeriod('2026-03-09', '2026-03-15'),
+  month: noJunkPeriod('2026-03-01', '2026-03-31'),
+};
+const emptyDay = { entries: [], totals: emptyTotals, junk: noJunk };
 const food = {
   id: 7,
   name: '치즈버거',
@@ -22,6 +33,7 @@ const food = {
   servingSize: 120,
   servingUnit: 'g',
   calories: 300,
+  isJunk: false,
 };
 const entry = {
   id: 1,
@@ -37,9 +49,11 @@ const entry = {
   fat: null,
   sugars: null,
   sodium: null,
+  isJunk: false,
 };
 const oneEntry = {
   entries: [entry],
+  junk: noJunk,
   totals: {
     ...emptyTotals,
     calories: { value: 450, missing: 0 },
@@ -151,6 +165,7 @@ test('a food not in the store is recorded with just a name and calories', async 
     servings: 1,
     name: '떡볶이',
     calories: 480,
+    isJunk: false,
   });
 });
 
@@ -221,6 +236,7 @@ test('a calorie with a decimal point is sent as that number', async () => {
     servings: 0.5,
     name: '떡볶이',
     calories: 49.5,
+    isJunk: false,
   });
 });
 
@@ -279,6 +295,31 @@ test('the typed form also waits for its request, and shows that it is working', 
   await waitFor(() => expect(save).toBeEnabled());
   expect(screen.getByLabelText('음식 이름')).toHaveValue('김밥');
   expect(screen.getByLabelText('1회 칼로리 (kcal)')).toHaveValue('');
+});
+
+// #38: the junk food mark follows the same rule as the typed fields.
+test('a junk food mark changed while waiting belongs to the next entry', async () => {
+  let finish = (_response: Response) => {};
+  stubFetch(
+    vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
+      .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve))),
+  );
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '감자칩' } });
+  fireEvent.change(screen.getByLabelText('1회 칼로리 (kcal)'), { target: { value: '300' } });
+  const mark = screen.getByRole('checkbox', { name: '정크푸드' });
+  expect(mark).toHaveAccessibleDescription('위의 이 주·이 달 정크푸드 횟수로 셉니다.');
+  const save = screen.getByRole('button', { name: /바로 기록/ });
+  fireEvent.click(save);
+  await waitFor(() => expect(save).toBeDisabled());
+  fireEvent.click(mark);
+  expect(mark).toBeChecked();
+  finish(new Response(JSON.stringify(oneEntry), { status: 201 }));
+  await waitFor(() => expect(save).toBeEnabled());
+  expect(screen.getByRole('checkbox', { name: '정크푸드' })).toBeChecked();
 });
 
 test('the delete buttons wait while an entry is being recorded', async () => {
@@ -514,6 +555,7 @@ test('a read started before an entry was recorded does not undo it on screen', a
   const added = {
     entries: [entry, { ...entry, id: 2, name: '떡볶이', brand: null }],
     totals: emptyTotals,
+    junk: noJunk,
   };
   // Reads and writes answer from separate lists: each read first waits a turn for pending writes,
   // so the order in which the two reach fetch is not what this test is about.
@@ -1029,7 +1071,11 @@ test('a next page clears only its own message, not the other forms', async () =>
 });
 
 test('coming back while an entry is being recorded shows it, not the day without it', async () => {
-  const added = { entries: [{ ...entry, name: '떡볶이', brand: null }], totals: emptyTotals };
+  const added = {
+    entries: [{ ...entry, name: '떡볶이', brand: null }],
+    totals: emptyTotals,
+    junk: noJunk,
+  };
   let saved = false;
   let finishAdd = () => {};
   const inner = vi.fn((_url: string, init?: RequestInit) => {
@@ -1041,9 +1087,7 @@ test('coming back while an entry is being recorded shows it, not the day without
         };
       });
     }
-    return Promise.resolve(
-      new Response(JSON.stringify(saved ? added : { entries: [], totals: emptyTotals })),
-    );
+    return Promise.resolve(new Response(JSON.stringify(saved ? added : emptyDay)));
   });
   stubFetch(inner);
   const first = render(<MealCard date={date} />);
@@ -1058,4 +1102,75 @@ test('coming back while an entry is being recorded shows it, not the day without
   finishAdd();
   expect(await screen.findByRole('button', { name: '떡볶이 삭제' })).toBeInTheDocument();
   expect(inner.mock.calls.filter(([, init]) => init?.method === 'GET')).toHaveLength(2);
+});
+
+// #38
+test('a typed-in food can be marked junk food, and the mark clears after it is recorded', async () => {
+  const fetchMock = server({ body: emptyDay }, { status: 201, body: oneEntry });
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('음식 이름');
+  fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '감자칩' } });
+  fireEvent.change(screen.getByLabelText('1회 칼로리 (kcal)'), { target: { value: '300' } });
+  const mark = screen.getByRole('checkbox', { name: '정크푸드' });
+  expect(mark).not.toBeChecked();
+  fireEvent.click(mark);
+  fireEvent.click(screen.getByRole('button', { name: '바로 기록' }));
+
+  await waitFor(() => expect(screen.getByLabelText('음식 이름')).toHaveValue(''));
+  expect(request(fetchMock, 1).body).toEqual({
+    meal: 'breakfast',
+    servings: 1,
+    name: '감자칩',
+    calories: 300,
+    isJunk: true,
+  });
+  expect(screen.getByRole('checkbox', { name: '정크푸드' })).not.toBeChecked();
+});
+
+test('a stored food is recorded without a mark of its own; it brings the food mark', async () => {
+  recentReply = () => new Response(JSON.stringify({ foods: [{ ...food, isJunk: true }] }));
+  const fetchMock = server({ body: emptyDay }, { status: 201, body: oneEntry });
+  render(<MealCard date={date} />);
+  const recent = await screen.findByRole('list', { name: '최근 먹은 음식 목록' });
+  expect(within(recent).getByText('정크푸드')).toBeVisible();
+  fireEvent.click(within(recent).getByRole('button', { name: '버거집 치즈버거 추가' }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  expect(request(fetchMock, 1).body).toEqual({ meal: 'breakfast', servings: 1, foodId: 7 });
+});
+
+test('junk food entries are marked, with the week and month counts below the totals', async () => {
+  server({
+    body: {
+      entries: [
+        { ...entry, isJunk: true },
+        { ...entry, id: 2, name: '샐러드', brand: null, isJunk: false },
+      ],
+      totals: emptyTotals,
+      junk: {
+        week: { ...noJunk.week, times: 3, days: 2, calories: { value: 1850, missing: 0 } },
+        month: { ...noJunk.month, times: 4, days: 3, calories: { value: 2100, missing: 1 } },
+      },
+    },
+  });
+  render(<MealCard date={date} />);
+  const summary = await screen.findByRole('region', { name: '정크푸드' });
+  expect(within(summary).getByRole('heading', { level: 3, name: '정크푸드' })).toBeVisible();
+  expect(within(summary).getByText(/이 주/)).toHaveTextContent(
+    '이 주 03.09~03.15: 3회 · 먹은 날 2일 · 1850kcal',
+  );
+  expect(within(summary).getByText(/이 달/)).toHaveTextContent(
+    '이 달 03.01~03.31: 4회 · 먹은 날 3일 · 2100kcal 이상 (칼로리 모르는 기록 1개 제외)',
+  );
+  const lunch = screen.getByRole('region', { name: '점심' });
+  const items = within(lunch).getAllByRole('listitem');
+  expect(within(items[0]).getByText('정크푸드')).toBeVisible();
+  expect(within(items[1]).queryByText('정크푸드')).not.toBeInTheDocument();
+});
+
+test('a day without junk food says none for the week and the month', async () => {
+  server({ body: emptyDay });
+  render(<MealCard date={date} />);
+  const summary = await screen.findByRole('region', { name: '정크푸드' });
+  expect(within(summary).getByText(/이 주/)).toHaveTextContent('이 주 03.09~03.15: 없음');
+  expect(within(summary).getByText(/이 달/)).toHaveTextContent('이 달 03.01~03.31: 없음');
 });

@@ -3,10 +3,21 @@ import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
 
+// The settings page loads the goals along with it.
+const noGoals = {
+  today: '2026-10-26',
+  current: { calories: null, protein: null, sleep: null, sober_days: null },
+  history: [],
+};
+
 const health = (body: object, status = 200) =>
   vi.stubGlobal(
     'fetch',
-    vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))),
+    vi.fn((url: string) =>
+      Promise.resolve(
+        new Response(JSON.stringify(url === '/api/goals' ? noGoals : body), { status }),
+      ),
+    ),
   );
 
 test('shows the server date from /api/health on the overview', async () => {
@@ -30,6 +41,8 @@ test('each page has its own address and is marked in the main menu', async () =>
   expect(window.location.pathname).toBe('/settings');
   expect(await screen.findByRole('heading', { level: 1, name: '설정' })).toBeInTheDocument();
   expect(within(menu).getByRole('link', { name: '설정' })).toHaveAttribute('aria-current', 'page');
+  // Goals are set here (#45).
+  expect(await screen.findByRole('heading', { level: 2, name: '목표' })).toBeInTheDocument();
 });
 
 test('an unknown address falls back to the overview', async () => {

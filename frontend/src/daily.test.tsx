@@ -39,6 +39,25 @@ const noChecks = () =>
     }),
   );
 
+const noGoals = (url: string) =>
+  new Response(
+    JSON.stringify({
+      date: url.slice(-10),
+      items: ['calories', 'protein', 'sleep', 'sober_days'].map((item) => ({
+        item,
+        goal: null,
+        status: null,
+        actual:
+          item === 'sleep'
+            ? { minutes: null }
+            : item === 'sober_days'
+              ? { from: '2026-03-09', to: '2026-03-15', recordedDays: 0, soberDays: 0 }
+              : { entries: 0, total: null, missing: 0 },
+      })),
+      checks: null,
+    }),
+  );
+
 // The day's cards load along with the page.
 const dayCard = (url: string) =>
   url.startsWith('/api/sleep')
@@ -49,9 +68,11 @@ const dayCard = (url: string) =>
         ? noHabits()
         : url.startsWith('/api/checks')
           ? noChecks()
-          : url === '/api/foods/recent'
-            ? new Response(JSON.stringify({ foods: [] }))
-            : null;
+          : url.startsWith('/api/goals/days/')
+            ? noGoals(url)
+            : url === '/api/foods/recent'
+              ? new Response(JSON.stringify({ foods: [] }))
+              : null;
 
 const health = (body: object, status = 200) =>
   vi.stubGlobal(

@@ -4,15 +4,10 @@ import { after, before, test } from 'node:test';
 
 import { Pool } from 'pg';
 
-import { withApi } from './helpers.js';
+import { testDatabaseSkip, withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
-// These tests write. A shared machine's variable may name another project's test database.
-const databaseName = url ? new URL(url).pathname.slice(1) : null;
-const skip =
-  databaseName === 'health_test'
-    ? false
-    : `health_test 전용 DB가 아닙니다: ${databaseName ?? '없음'}`;
+const skip = testDatabaseSkip(url);
 
 const prefix = 'integration-test-';
 const base = { servingSize: 100, servingUnit: 'g' };
@@ -44,7 +39,7 @@ const importFood = (name: string, calories: number, checkedOn: string) =>
   pool.query(
     documentedSql.replace(
       /VALUES[\s\S]*?ON CONFLICT/,
-      `VALUES ($1, 'integration-brand', NULL, 100, 'g', $2, NULL, NULL, NULL, NULL, NULL, 'official', 'https://example.com/menu', $3)\nON CONFLICT`,
+      `VALUES ($1, 'integration-brand', NULL, 100, 'g', $2, NULL, NULL, NULL, NULL, NULL, 'official', 'https://example.com/menu', $3, true)\nON CONFLICT`,
     ),
     [name, calories, checkedOn],
   );
@@ -74,6 +69,20 @@ test('only newer research replaces a food, so a re-run keeps later edits', { ski
 
   await importFood(name, 520, '2026-11-30');
   assert.equal((await countAndCalories(name)).calories, 520);
+});
+
+// #38. Franchise fast food is imported marked; a newer research updates the numbers, not the mark.
+test('an imported food keeps the junk food mark the user changed', { skip }, async () => {
+  const name = `${prefix}junk-mark`;
+  const mark = async () =>
+    (await pool.query<{ is_junk: boolean }>('SELECT is_junk FROM foods WHERE name = $1', [name]))
+      .rows[0]?.is_junk;
+  await importFood(name, 500, '2026-10-31');
+  assert.equal(await mark(), true);
+  await pool.query('UPDATE foods SET is_junk = false WHERE name = $1', [name]);
+  await importFood(name, 520, '2026-11-30');
+  assert.equal((await countAndCalories(name)).calories, 520);
+  assert.equal(await mark(), false);
 });
 
 test('a re-run never overwrites a food whose date was cleared by an edit', { skip }, async () => {

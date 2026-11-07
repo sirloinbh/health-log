@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
+import { Checkbox } from './components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,7 @@ import { requestJson } from './lib/api';
 import { useNotice } from './lib/use-notice';
 import { MoreFoodsButton } from './more-foods-button';
 import { parseAmount, unreadableAmount } from './number-input';
+import { useReturnFocus } from './return-focus';
 
 const nutrients = [
   { key: 'calories', label: '칼로리', unit: 'kcal' },
@@ -60,6 +62,7 @@ type Food = Record<NutrientKey, number | null> & {
   sourceType: SourceType;
   sourceUrl: string | null;
   checkedOn: string | null;
+  isJunk: boolean;
 };
 
 type Form = Record<NutrientKey, string> & {
@@ -71,6 +74,7 @@ type Form = Record<NutrientKey, string> & {
   sourceType: SourceType;
   sourceUrl: string;
   checkedOn: string;
+  isJunk: boolean;
 };
 
 const emptyForm: Form = {
@@ -88,6 +92,7 @@ const emptyForm: Form = {
   sourceType: 'manual',
   sourceUrl: '',
   checkedOn: '',
+  isJunk: false,
 };
 
 const formOf = (food: Food): Form => ({
@@ -105,6 +110,7 @@ const formOf = (food: Food): Form => ({
   sourceType: food.sourceType,
   sourceUrl: food.sourceUrl ?? '',
   checkedOn: food.checkedOn ?? '',
+  isJunk: food.isJunk,
 });
 
 const textOrNull = (value: string) => value.trim() || null;
@@ -129,6 +135,7 @@ const bodyOf = (form: Form) => ({
   sourceType: form.sourceType,
   sourceUrl: textOrNull(form.sourceUrl),
   checkedOn: textOrNull(form.checkedOn),
+  isJunk: form.isJunk,
 });
 
 // The server and database only store http(s) addresses; a link must never run script regardless.
@@ -263,6 +270,23 @@ function FoodDialog({
               onChange={update('checkedOn')}
             />
           </Field>
+          {/* #38: counted in the meal card. A recorded meal keeps the mark it was recorded with. */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="food-is-junk"
+                checked={form.isJunk}
+                aria-describedby="food-is-junk-help"
+                onCheckedChange={(checked) =>
+                  setForm((current) => ({ ...current, isJunk: checked === true }))
+                }
+              />
+              <Label htmlFor="food-is-junk">정크푸드</Label>
+            </div>
+            <p id="food-is-junk-help" className="text-caption break-keep text-muted-foreground">
+              식단에서 정크푸드 횟수로 셉니다. 표시를 바꿔도 이미 기록한 식사는 그대로입니다.
+            </p>
+          </div>
           <Notice notice={notice} />
           <DialogFooter>
             <Button type="button" variant="outline" disabled={saving} onClick={onClose}>
@@ -278,7 +302,7 @@ function FoodDialog({
   );
 }
 
-function FoodCard({ food, onEdit }: { food: Food; onEdit: () => void }) {
+function FoodCard({ food, onEdit }: { food: Food; onEdit: (opener: HTMLElement) => void }) {
   return (
     <Card>
       <CardHeader>
@@ -301,6 +325,7 @@ function FoodCard({ food, onEdit }: { food: Food; onEdit: () => void }) {
           ))}
         </dl>
         <div className="flex flex-wrap items-center gap-2 text-caption text-muted-foreground">
+          {food.isJunk ? <Badge variant="warning">정크푸드</Badge> : null}
           <Badge variant="secondary">{sourceLabels[food.sourceType]}</Badge>
           {food.checkedOn ? <span>{food.checkedOn} 확인</span> : null}
           {food.sourceUrl && isSafeLink(food.sourceUrl) ? (
@@ -318,7 +343,7 @@ function FoodCard({ food, onEdit }: { food: Food; onEdit: () => void }) {
             size="sm"
             className="ml-auto"
             aria-label={`${food.name} 수정`}
-            onClick={onEdit}
+            onClick={(event) => onEdit(event.currentTarget)}
           >
             <Pencil aria-hidden />
             수정
@@ -338,6 +363,16 @@ export function FoodsPage() {
   // is still the answer to the earlier words.
   const { notice: pageNotice, error: pageError, clear: clearPage } = useNotice();
   const shown = useRef<HTMLParagraphElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const { remember, returnFocus } = useReturnFocus(heading);
+  const openDialog = (opener: HTMLElement, target: Food | 'new') => {
+    remember(opener);
+    setEditing(target);
+  };
+  const closeDialog = () => {
+    setEditing(null);
+    returnFocus();
+  };
   // A failed search keeps the list on screen, along with the words that found it.
   const {
     foods,
@@ -363,7 +398,14 @@ export function FoodsPage() {
   return (
     <section aria-labelledby="page-title" className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
-        <h1 id="page-title">음식</h1>
+        <h1
+          id="page-title"
+          ref={heading}
+          tabIndex={-1}
+          className="rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
+          음식
+        </h1>
         <p className="text-body text-muted-foreground">영양성분과 출처를 관리합니다.</p>
       </header>
       <div className="flex flex-wrap items-center gap-2">
@@ -386,7 +428,7 @@ export function FoodsPage() {
             검색
           </Button>
         </form>
-        <Button onClick={() => setEditing('new')}>
+        <Button onClick={(event) => openDialog(event.currentTarget, 'new')}>
           <Plus aria-hidden />
           음식 추가
         </Button>
@@ -403,7 +445,7 @@ export function FoodsPage() {
       {foods?.length ? (
         <div className="grid gap-4 md:grid-cols-2">
           {foods.map((food) => (
-            <FoodCard key={food.id} food={food} onEdit={() => setEditing(food)} />
+            <FoodCard key={food.id} food={food} onEdit={(opener) => openDialog(opener, food)} />
           ))}
         </div>
       ) : null}
@@ -427,9 +469,9 @@ export function FoodsPage() {
       {editing ? (
         <FoodDialog
           food={editing === 'new' ? null : editing}
-          onClose={() => setEditing(null)}
+          onClose={closeDialog}
           onSaved={() => {
-            setEditing(null);
+            closeDialog();
             // The saved food may not match the current search, so the list alone cannot confirm it.
             toast.success('저장했습니다');
             void load(applied.current);

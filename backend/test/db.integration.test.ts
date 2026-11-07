@@ -3,14 +3,15 @@ import { test } from 'node:test';
 
 import { Pool } from 'pg';
 
-import { withApi } from './helpers.js';
+import { testDatabaseSkip, withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
+const skip = testDatabaseSkip(url);
 
-// Requires a dedicated test DB with database/migrations applied. Skipped (not passed) without it.
+// Requires health_test with database/migrations applied. Skipped (not passed) otherwise, with the reason.
 test(
   'baseline schema is applied and health answers against the real database',
-  { skip: !url },
+  { skip },
   async (t) => {
     const pool = new Pool({ connectionString: url });
     t.after(() => pool.end());

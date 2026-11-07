@@ -21,6 +21,7 @@ import { Spinner } from './components/ui/spinner';
 import { spanText } from './habit-text';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
+import { trackWrite, writesSettled } from './pending-writes';
 
 const pathOf = (date: string) => `/api/checks/${date}`;
 const maxMemo = 200;
@@ -68,10 +69,13 @@ function CheckForm({
     setSaving(true);
     try {
       onSaved(
-        await requestJson<CheckDay>(pathOf(date), {
-          method: 'PUT',
-          body: { dietKept: form.dietKept, sleepGood: form.sleepGood, memo },
-        }),
+        await trackWrite(
+          pathOf(date),
+          requestJson<CheckDay>(pathOf(date), {
+            method: 'PUT',
+            body: { dietKept: form.dietKept, sleepGood: form.sleepGood, memo },
+          }),
+        ),
       );
     } catch (cause) {
       // Moving to another day removes this form, and the check still was not saved.
@@ -213,6 +217,10 @@ export function ChecksCard({ date }: { date: string }) {
   const load = useCallback(async () => {
     clear();
     try {
+      // A save from before leaving this day may still be on its way; read after it lands.
+      await writesSettled(pathOf(date));
+      // Left again while waiting: nothing would show the answer.
+      if (!live.current) return;
       const data = await requestJson<CheckDay>(pathOf(date));
       if (live.current) setDay(data);
     } catch (cause) {
@@ -243,7 +251,7 @@ export function ChecksCard({ date }: { date: string }) {
 
   const remove = async () => {
     try {
-      await requestJson(pathOf(date), { method: 'DELETE' });
+      await trackWrite(pathOf(date), requestJson(pathOf(date), { method: 'DELETE' }));
     } catch (cause) {
       // Already gone counts as deleted; anything else keeps the dialog open with the reason.
       if (!(cause instanceof RequestError && cause.status === 404)) {
@@ -271,7 +279,15 @@ export function ChecksCard({ date }: { date: string }) {
       <CardContent className="flex flex-col gap-4">
         <Notice notice={notice} />
         {notice && day === undefined ? (
-          <Button variant="outline" className="self-start" onClick={() => void load()}>
+          <Button
+            variant="outline"
+            className="self-start"
+            onClick={() => {
+              void load();
+              // Trying again removes this button, which would drop keyboard focus to the page.
+              setMoveFocus((count) => count + 1);
+            }}
+          >
             다시 시도
           </Button>
         ) : null}

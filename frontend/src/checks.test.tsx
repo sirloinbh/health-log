@@ -274,3 +274,62 @@ test('pressing Enter in the memo keeps the focus there when the save fails', asy
   expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
   expect(memo).toHaveFocus();
 });
+
+test('coming back while a save is on its way shows the saved check, not a blank form', async () => {
+  const check = { date, dietKept: null, sleepGood: null, memo: '야식 참음' };
+  let saved = false;
+  let finishSave = () => {};
+  const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+    if (init?.method === 'PUT') {
+      return new Promise<Response>((resolve) => {
+        finishSave = () => {
+          saved = true;
+          resolve(new Response(JSON.stringify(dayOf(check))));
+        };
+      });
+    }
+    return Promise.resolve(new Response(JSON.stringify(dayOf(saved ? check : null))));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const first = render(<ChecksCard date={date} />);
+  fireEvent.change(await screen.findByLabelText('메모'), { target: { value: '야식 참음' } });
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  first.unmount();
+  render(<ChecksCard date={date} />);
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(screen.queryByLabelText('메모')).not.toBeInTheDocument();
+  finishSave();
+  expect(await screen.findByText('야식 참음')).toBeInTheDocument();
+  expect(screen.queryByLabelText('메모')).not.toBeInTheDocument();
+});
+
+test('a failed delete says why and keeps the check and the dialog', async () => {
+  const shown = vi.spyOn(toast, 'error');
+  server(
+    { body: dayOf({ date, dietKept: true, sleepGood: null, memo: '야식 참음' }) },
+    { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+  );
+  render(<ChecksCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
+  const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' });
+  fireEvent.click(confirm);
+  await waitFor(() => expect(confirm).toBeEnabled());
+  expect(shown).toHaveBeenCalledWith('서버 오류가 발생했습니다');
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(screen.getByText('야식 참음')).toBeInTheDocument();
+  shown.mockRestore();
+});
+
+test('trying again moves focus to the card, as the button it was on goes away', async () => {
+  server({ status: 500, body: { error: '서버 오류가 발생했습니다' } }, { body: dayOf(null) });
+  render(<ChecksCard date={date} />);
+  const again = await screen.findByRole('button', { name: '다시 시도' });
+  again.focus();
+  fireEvent.click(again);
+  expect(await screen.findByRole('group', { name: '식단을 지켰나요?' })).toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: '하루 체크' }).parentElement).toHaveFocus(),
+  );
+});

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeAll, expect, test, vi } from 'vitest';
 
+import { toast } from './components/ui/sonner';
 import { HabitsCard } from './habits';
 
 // jsdom lacks pointer capture and scrolling, which Radix Select calls.
@@ -287,4 +288,63 @@ test('once every kind is listed, a new row takes a unit not used yet', async () 
   expect(kinds).toEqual(['소주', '맥주', '와인', '막걸리', '양주', '기타']);
   expect(screen.getByLabelText('7번째 술 종류')).toHaveTextContent('소주');
   expect(screen.getByLabelText('7번째 술 단위')).toHaveTextContent('잔');
+});
+
+test('coming back while a save is on its way shows the saved day, not a blank form', async () => {
+  const smoked = { date, cigarettes: 3, drinks: null };
+  let saved = false;
+  let finishSave = () => {};
+  const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+    if (init?.method === 'PUT') {
+      return new Promise<Response>((resolve) => {
+        finishSave = () => {
+          saved = true;
+          resolve(new Response(JSON.stringify(dayOf(smoked))));
+        };
+      });
+    }
+    return Promise.resolve(new Response(JSON.stringify(dayOf(saved ? smoked : null))));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const first = render(<HabitsCard date={date} />);
+  fireEvent.change(await screen.findByLabelText('담배 (개비)'), { target: { value: '3' } });
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  first.unmount();
+  render(<HabitsCard date={date} />);
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(screen.queryByLabelText('담배 (개비)')).not.toBeInTheDocument();
+  finishSave();
+  expect(await screen.findByText('3개비')).toBeInTheDocument();
+  expect(screen.queryByLabelText('담배 (개비)')).not.toBeInTheDocument();
+});
+
+test('a failed delete says why and keeps the day and the dialog', async () => {
+  const shown = vi.spyOn(toast, 'error');
+  server(
+    { body: dayOf({ date, cigarettes: 3, drinks: null }) },
+    { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+  );
+  render(<HabitsCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
+  const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' });
+  fireEvent.click(confirm);
+  await waitFor(() => expect(confirm).toBeEnabled());
+  expect(shown).toHaveBeenCalledWith('서버 오류가 발생했습니다');
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(screen.getByText('3개비')).toBeInTheDocument();
+  shown.mockRestore();
+});
+
+test('trying again moves focus to the card, as the button it was on goes away', async () => {
+  server({ status: 500, body: { error: '서버 오류가 발생했습니다' } }, { body: dayOf(null) });
+  render(<HabitsCard date={date} />);
+  const again = await screen.findByRole('button', { name: '다시 시도' });
+  again.focus();
+  fireEvent.click(again);
+  expect(await screen.findByLabelText('담배 (개비)')).toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: '술·담배' }).parentElement).toHaveFocus(),
+  );
 });

@@ -14,6 +14,18 @@ const noMeals = () =>
           { value: null, missing: 0 },
         ]),
       ),
+      junk: Object.fromEntries(
+        ['week', 'month'].map((key) => [
+          key,
+          {
+            from: '2026-03-01',
+            to: '2026-03-31',
+            times: 0,
+            days: 0,
+            calories: { value: null, missing: 0 },
+          },
+        ]),
+      ),
     }),
   );
 
@@ -367,9 +379,9 @@ test('a slow meal reply for the day just left does not fill in the new day', asy
     servingUnit: null,
     calories: 300,
   };
-  const body = (await noMeals().json()) as { totals: object };
+  const body = (await noMeals().json()) as { totals: object; junk: object };
   replies.get('/api/meals/2026-03-15')?.(
-    new Response(JSON.stringify({ entries: [eaten], totals: body.totals })),
+    new Response(JSON.stringify({ entries: [eaten], totals: body.totals, junk: body.junk })),
   );
   await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
   expect(screen.queryByText('어제의 김밥')).not.toBeInTheDocument();

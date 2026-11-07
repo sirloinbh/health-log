@@ -24,6 +24,7 @@ import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
 import { MoreFoodsButton } from './more-foods-button';
 import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
+import { useReturnFocus } from './return-focus';
 
 /** The most foods one combo holds; the server and database refuse more. */
 const maxItems = 20;
@@ -299,7 +300,7 @@ function ComboCard({
   onDelete,
 }: {
   combo: Combo;
-  onEdit: () => void;
+  onEdit: (opener: HTMLElement) => void;
   onDelete: () => Promise<unknown>;
 }) {
   return (
@@ -339,7 +340,12 @@ function ComboCard({
               </Button>
             }
           />
-          <Button variant="outline" size="sm" aria-label={`${combo.name} 수정`} onClick={onEdit}>
+          <Button
+            variant="outline"
+            size="sm"
+            aria-label={`${combo.name} 수정`}
+            onClick={(event) => onEdit(event.currentTarget)}
+          >
             <Pencil aria-hidden />
             수정
           </Button>
@@ -357,8 +363,18 @@ export function CombosPage() {
   const latestLoad = useRef(0);
   const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLHeadingElement>(null);
+  const { remember, returnFocus } = useReturnFocus(heading);
+  const openDialog = (opener: HTMLElement, target: Combo | 'new') => {
+    remember(opener);
+    setEditing(target);
+  };
+  const closeDialog = () => {
+    setEditing(null);
+    returnFocus();
+  };
 
   // A deleted combo takes its buttons with it, and a closing dialog restores focus on a timer first.
+  // The delete dialog has its own trigger; the add and edit dialogs return focus through useReturnFocus.
   useEffect(() => {
     if (!moveFocus) return;
     const timer = setTimeout(() => heading.current?.focus(), 0);
@@ -404,7 +420,12 @@ export function CombosPage() {
   return (
     <section aria-labelledby="page-title" className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
-        <h1 id="page-title" ref={heading} tabIndex={-1} className="outline-none">
+        <h1
+          id="page-title"
+          ref={heading}
+          tabIndex={-1}
+          className="rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
           조합
         </h1>
         <p className="text-body text-muted-foreground">
@@ -412,7 +433,7 @@ export function CombosPage() {
         </p>
       </header>
       <div>
-        <Button onClick={() => setEditing('new')}>
+        <Button onClick={(event) => openDialog(event.currentTarget, 'new')}>
           <Plus aria-hidden />
           조합 추가
         </Button>
@@ -435,7 +456,7 @@ export function CombosPage() {
             <ComboCard
               key={combo.id}
               combo={combo}
-              onEdit={() => setEditing(combo)}
+              onEdit={(opener) => openDialog(opener, combo)}
               onDelete={() => remove(combo)}
             />
           ))}
@@ -444,9 +465,9 @@ export function CombosPage() {
       {editing ? (
         <ComboDialog
           combo={editing === 'new' ? null : editing}
-          onClose={() => setEditing(null)}
+          onClose={closeDialog}
           onSaved={() => {
-            setEditing(null);
+            closeDialog();
             toast.success('저장했습니다');
             void load();
           }}

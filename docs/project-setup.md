@@ -482,16 +482,11 @@ server {
 - 번호는 3자리 순번으로 매긴다. **병렬 브랜치에서 같은 번호를 쓰지 않도록 작업 시작 시 번호를 예약한다.** workout-memo는 동시에 연 PR들이 `003`을 겹쳐 쓴 적이 있다.
 - 모든 마이그레이션은 재실행해도 안전하게 쓴다: `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, 시드 데이터는 `INSERT … ON CONFLICT DO NOTHING/UPDATE`.
 - 기존 데이터의 의미를 보존한다. 예를 들어 새 `completed` 컬럼은 기본값을 `true`로 줘서 과거 기록의 판정이 바뀌지 않게 한다.
-- 적용 방식:
-  - 빈 볼륨: Compose가 `/docker-entrypoint-initdb.d`의 모든 파일을 이름순으로 자동 실행한다.
-  - CI: 모든 파일을 이름순으로 `psql -v ON_ERROR_STOP=1 -f`로 적용한다.
-  - **기존 DB: 컨테이너에 마운트된 파일을 직접 실행한다.**
-
-    ```powershell
-    docker compose exec -T db psql -U <db> -d <db> -v ON_ERROR_STOP=1 -f /docker-entrypoint-initdb.d/NNN_<설명>.sql
-    ```
-
-    `Get-Content … | docker compose exec … psql`처럼 **PowerShell 파이프로 넘기지 않는다.** Windows PowerShell 5.1은 외부 프로그램으로 파이프할 때 ASCII로 보내 한글이 `?`로 깨진다. workout-memo에서 `'기타'` 브랜드가 `'??'`로 중복 저장되는 것을 재현했다. 어쩔 수 없이 파이프해야 하면 먼저 `$OutputEncoding = [System.Text.UTF8Encoding]::new($false)`를 설정한다.
+- 적용 방식(#53부터 중앙 표준 실행기, [DB 문서](../database/README.md)):
+  - 빈 볼륨: Compose가 `/docker-entrypoint-initdb.d`의 모든 파일을 이름순으로 자동 실행한다. 이어서 `npm run db:migrate`가 같은 파일을 다시 적용하며 기록한다.
+  - CI: 모든 파일을 이름순으로 `psql -v ON_ERROR_STOP=1 -f`로 한 번 적용한 뒤 `npm run db:migrate`를 실행한다.
+  - **기존 DB: `npm run db:migrate`가 `schema_migrations`에 없는 파일만 실행한다.** 서버 배포는 `node dist/migrate.js`로 같은 실행기를 쓴다.
+  - psql로 직접 적용할 때도 `Get-Content … | docker compose exec … psql`처럼 **PowerShell 파이프로 넘기지 않는다.** Windows PowerShell 5.1은 외부 프로그램으로 파이프할 때 ASCII로 보내 한글이 `?`로 깨진다. workout-memo에서 `'기타'` 브랜드가 `'??'`로 중복 저장되는 것을 재현했다. 어쩔 수 없이 파이프해야 하면 먼저 `$OutputEncoding = [System.Text.UTF8Encoding]::new($false)`를 설정한다.
 - SQL의 한글 리터럴(CHECK 값 등)은 가능하면 `U&'\AC00\C2B4'` 같은 유니코드 이스케이프로 쓴다. 적용 경로와 무관하게 안전하다.
 - 단위·NULL 규칙을 스키마에 명시한다. 확인하지 못한 값은 NULL로 두고 0과 구분한다. 수치 정밀도는 `NUMERIC(p,s)`로 정한다.
 - 백업: `scripts/backup.ps1`이 `pg_dump --no-owner --no-acl`을 UTF-8(BOM 없음) 파일로 저장한다. `backups/`는 Git에서 제외하며, PC 밖 안전한 저장소에도 보관하고 주기적으로 복원을 확인한다.
@@ -701,7 +696,7 @@ workout-memo는 확정한 이슈를 큐에 넣으면 PC에서 테스트 → 구�
 6. **최소 기능:** `createApp(pool)`, `GET /api/health`, 기준 화면 1개, 단위 테스트 1개, DB 통합 테스트 1개, UI 테스트 1개를 만든다.
 7. **로컬 검증:**
    - `docker compose up -d db`로 DB를 띄운다.
-   - 전용 테스트 DB를 만들어 모든 마이그레이션을 `psql -f`로 적용한다.
+   - 전용 테스트 DB를 만들어 모든 마이그레이션을 적용한다. CI처럼 `psql -f`로 한 번 적용한 뒤 `npm run db:migrate`(`DATABASE_URL`을 그 DB로)로 기록한다.
    - `TEST_DATABASE_URL`을 설정하고 `npm run check`를 실행한다.
 
    확인: exit 0이고 DB 테스트가 건너뛰지 않았다.

@@ -4,6 +4,24 @@ import type { Pool } from 'pg';
 
 import { createApp } from '../src/app.js';
 
+// A shared machine's TEST_DATABASE_URL may name another project's test database (this PC had
+// study_test). DB tests run only against health_test, so they never write elsewhere and never pass
+// without checking this app's schema; otherwise node:test shows them skipped with this reason (#52).
+export function testDatabaseSkip(url: string | undefined): false | string {
+  let name = '';
+  if (url) {
+    try {
+      name = new URL(url).pathname.slice(1);
+    } catch {
+      // Node's error carries the whole value (input), password included, and prints it; no cause.
+      throw new Error(
+        'TEST_DATABASE_URL을 주소로 읽을 수 없습니다(값은 비밀번호가 있을 수 있어 표시하지 않습니다).',
+      );
+    }
+  }
+  return name === 'health_test' ? false : `health_test 전용 DB가 아닙니다: ${name || '없음'}`;
+}
+
 // Ports fetch() refuses with "bad port" (Fetch standard, 1024 and up). Windows can hand them out when
 // its dynamic range starts low, which made tests fail now and then.
 const fetchBlockedPorts = new Set([

@@ -19,7 +19,8 @@
     "typecheck": "npm run typecheck --workspaces",
     "standards:check": "node .standards/check.mjs",
     "lockfiles:sync": "node .standards/lockfiles.mjs --write",
-    "knip": "knip"
+    "knip": "knip",
+    "db:migrate": "npm run db:migrate -w backend --"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

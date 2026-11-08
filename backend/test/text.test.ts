@@ -3,8 +3,9 @@ import { test } from 'node:test';
 
 import type { Pool } from 'pg';
 
+import { createApp } from '../src/app.js';
 import { charCount } from '../src/text.js';
-import { withApi } from './helpers.js';
+import { listenForFetch, withApi } from './helpers.js';
 
 const recording = () => {
   const queries: unknown[] = [];
@@ -70,5 +71,29 @@ test('one emoji past a limit is refused, counted the same way', async () => {
       assert.match(String(data.error), new RegExp(message));
     }
   });
+  assert.equal(queries.length, 0);
+});
+
+test('a deeply nested or very long body is checked without failing, and a NUL in it is still found', async () => {
+  const { pool, queries } = recording();
+  // Written out by hand: JSON.stringify itself recurses and would overflow first. 10 000 levels
+  // (20 KB) would overflow a recursive check; 60 000 strings (180 KB) make a long list. Both fit
+  // within the 256kb body limit.
+  const deep = '['.repeat(10_000) + '"a\\u0000b"' + ']'.repeat(10_000);
+  const long = '[' + '"",'.repeat(60_000) + '"\\u0000"]';
+  const { server, port } = await listenForFetch(createApp(pool));
+  try {
+    for (const extra of [deep, long]) {
+      const response = await fetch(`http://127.0.0.1:${port}/api/checks/2026-03-15`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: `{"memo":"a","extra":${extra}}`,
+      });
+      assert.equal(response.status, 400);
+      assert.deepEqual(await response.json(), { error: '쓸 수 없는 문자(NUL)가 들어 있습니다' });
+    }
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
   assert.equal(queries.length, 0);
 });

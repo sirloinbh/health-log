@@ -8,11 +8,24 @@ import { sendError } from './standard/http.js';
  */
 export const charCount = (value: string) => [...value].length;
 
-const hasNul = (value: unknown): boolean => {
-  if (typeof value === 'string') return value.includes('\u0000');
-  if (Array.isArray(value)) return value.some(hasNul);
-  if (value && typeof value === 'object') {
-    return Object.entries(value).some(([key, item]) => key.includes('\u0000') || hasNul(item));
+// A loop over an explicit stack, not recursion: a deeply nested body within the size limit would
+// otherwise overflow the call stack and turn into a 500 (PR #102 review). Each value is visited
+// once, so the cost follows the size of the body.
+const hasNul = (root: unknown): boolean => {
+  const pending: unknown[] = [root];
+  while (pending.length > 0) {
+    const value = pending.pop();
+    if (typeof value === 'string') {
+      if (value.includes('\u0000')) return true;
+    } else if (Array.isArray(value)) {
+      // One by one: spreading a long array into push() can pass the engine's argument limit.
+      for (const item of value) pending.push(item);
+    } else if (value && typeof value === 'object') {
+      for (const [key, item] of Object.entries(value)) {
+        if (key.includes('\u0000')) return true;
+        pending.push(item);
+      }
+    }
   }
   return false;
 };

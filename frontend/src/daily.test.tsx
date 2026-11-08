@@ -460,3 +460,20 @@ test('a typed date outside the range is explained and does not change the page',
   expect(message()).not.toBeInTheDocument();
   expect(window.location.pathname).toBe('/daily/2026-03-02');
 });
+
+test('a word about the range left on one day does not come back after going there and back', async () => {
+  health({ today: '2026-03-15' });
+  open('/daily/2026-03-15');
+  const input = screen.getByLabelText('날짜 선택');
+  const message = () => screen.queryByText('2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
+  fireEvent.change(input, { target: { value: '0210-01-01' } });
+  fireEvent.blur(input);
+  expect(message()).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('link', { name: '다음 날' }));
+  expect(await screen.findByText('2026년 3월 16일 월요일')).toBeInTheDocument();
+  expect(message()).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('link', { name: '이전 날' }));
+  expect(await screen.findByText('2026년 3월 15일 일요일')).toBeInTheDocument();
+  expect(message()).not.toBeInTheDocument();
+});

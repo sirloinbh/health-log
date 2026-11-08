@@ -53,7 +53,8 @@ function DayLink({
         aria-disabled={to ? undefined : true}
         aria-description={to ? undefined : dailyRangeText}
         title={to ? undefined : dailyRangeText}
-        className={to ? undefined : 'opacity-50'}
+        // Not pointer-events-none: that would also hide the title that says why.
+        className={to ? undefined : 'cursor-default opacity-50 hover:bg-background'}
         onClick={to ? undefined : (event) => event.preventDefault()}
       >
         {icon}
@@ -95,8 +96,14 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
   // The field keeps what was typed until blur: writing a value back while typing makes the browser
   // restart the part being typed, so "12" as a month would become 02.
   const [draft, setDraft] = useState<string | null>(null);
-  // The day shown when the field was left holding a date out of range; moving on drops the word.
-  const [leftOutOfRange, setLeftOutOfRange] = useState<string | null>(null);
+  // Whether the field was left holding a date out of range; typing again drops the word.
+  const [leftOutOfRange, setLeftOutOfRange] = useState(false);
+  // The page stays mounted from day to day, so a word left for one day must not come back on it.
+  const [noticeDate, setNoticeDate] = useState(date);
+  if (noticeDate !== date) {
+    setNoticeDate(date);
+    setLeftOutOfRange(false);
+  }
   // Each typed digit can form a valid date; one edit of the field leaves one history entry.
   const editing = useRef(false);
 
@@ -130,7 +137,7 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
   const today = health.state === 'ok' ? health.today : null;
   const outOfRange =
     (draft !== null && isValidDate(draft) && typedYear(draft) && !inDailyRange(draft)) ||
-    leftOutOfRange === date;
+    leftOutOfRange;
   const pathOf = (value: string) => `${basePath}/${value}`;
 
   return (
@@ -157,14 +164,14 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
             // Chrome stops taking year digits at the field's max, so typing 2100 can end as 0210;
             // leaving the field with a date out of range still gets the word about the range.
             if (draft !== null && isValidDate(draft) && !inDailyRange(draft))
-              setLeftOutOfRange(date);
+              setLeftOutOfRange(true);
             editing.current = false;
             setDraft(null);
           }}
           onChange={(event) => {
             const value = event.target.value;
             setDraft(value);
-            setLeftOutOfRange(null);
+            setLeftOutOfRange(false);
             if (isValidDate(value) && inDailyRange(value) && value !== date) {
               void navigate(pathOf(value), { replace: editing.current });
               editing.current = true;

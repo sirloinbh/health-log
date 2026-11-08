@@ -75,9 +75,22 @@ export const fewNights = 5;
 
 const monthDay = (date: string) => `${Number(date.slice(5, 7))}월 ${Number(date.slice(8, 10))}일`;
 
-/** "11월 2일 ~ 11월 8일" */
-export const spanLabel = ({ from, to }: { from: string; to: string }) =>
-  `${monthDay(from)} ~ ${monthDay(to)}`;
+const yearOf = (date: string) => Number(date.slice(0, 4));
+
+/**
+ * "11월 2일 ~ 11월 8일" for a period of this year. Another year, or one the period crosses, is
+ * written out, as the daily page does ("2000년 1월 1일"): "2025년 11월 1일 ~ 11월 30일",
+ * "1999년 12월 27일 ~ 2000년 1월 2일" (#129). Without the server's today the year is written too.
+ */
+export const spanLabel = ({ from, to }: { from: string; to: string }, today: string | null) => {
+  if (yearOf(from) !== yearOf(to)) {
+    return `${yearOf(from)}년 ${monthDay(from)} ~ ${yearOf(to)}년 ${monthDay(to)}`;
+  }
+  if (today === null || yearOf(today) !== yearOf(from)) {
+    return `${yearOf(from)}년 ${monthDay(from)} ~ ${monthDay(to)}`;
+  }
+  return `${monthDay(from)} ~ ${monthDay(to)}`;
+};
 
 /** The date to ask for one period before or after the one that holds `date`. */
 export const shiftPeriod = (period: Period, from: string, step: -1 | 1) => {

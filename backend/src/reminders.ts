@@ -45,6 +45,9 @@ const targets = {
   medication: { table: 'medications', due: 'end_on', mark: 'medication_id' },
 } as const;
 
+/** On the same day, the appointment comes before the medicine. */
+const kindOrder = { visit: 0, medication: 1 } as const;
+
 /** A calendar day `days` later; counted in UTC, where no day is ever 23 or 25 hours long. */
 const addDays = (day: string, days: number) => {
   const date = new Date(`${day}T00:00:00Z`);
@@ -100,7 +103,10 @@ export function remindersRouter(pool: Pool, today: () => string, limits: RateLim
         daysLeft: row.days_left,
         name: row.name,
       })),
-    ].sort((a, b) => a.dueOn.localeCompare(b.dueOn) || a.kind.localeCompare(b.kind) || a.id - b.id);
+    ].sort(
+      (a, b) =>
+        a.dueOn.localeCompare(b.dueOn) || kindOrder[a.kind] - kindOrder[b.kind] || a.id - b.id,
+    );
     res.json({ today: day, until: addDays(day, leadDays), leadDays, reminders });
   });
 

@@ -8,9 +8,8 @@ CREATE TABLE IF NOT EXISTS reminders_done (
   due_on date NOT NULL,
   done_at timestamptz NOT NULL DEFAULT now(),
   CHECK ((visit_id IS NULL) <> (medication_id IS NULL)),
-  -- Null never equals null, so each pair only ever meets marks of its own kind.
+  -- Null never equals null, so each pair only ever meets marks of its own kind. Each also serves
+  -- as the index for its id, which the deletes of a visit or a medicine look up.
   UNIQUE (visit_id, due_on),
   UNIQUE (medication_id, due_on)
 );
-
-CREATE INDEX IF NOT EXISTS reminders_done_medication_id_idx ON reminders_done (medication_id);

@@ -35,6 +35,8 @@ export function RemindersCard() {
   const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLDivElement>(null);
   const live = useRef(true);
+  // Marked done here: a list read before the mark landed must not bring one back.
+  const done = useRef(new Set<string>());
 
   const load = useCallback(async () => {
     try {
@@ -46,7 +48,11 @@ export function RemindersCard() {
       ]);
       if (!live.current) return;
       const next = await requestJson<Reminders>(remindersPath);
-      if (live.current) setData(next);
+      if (live.current)
+        setData({
+          ...next,
+          reminders: next.reminders.filter((item) => !done.current.has(reminderKey(item))),
+        });
     } catch (cause) {
       if (live.current) error(cause);
     }
@@ -81,6 +87,7 @@ export function RemindersCard() {
           body: { kind: item.kind, id: item.id, dueOn: item.dueOn },
         }),
       );
+      done.current.add(key);
       if (!live.current) return;
       setData(
         (current) =>

@@ -96,6 +96,8 @@ test(
           procedures: [{ name: '가상시술A' }, { name: '가상시술B' }],
         });
         const dueTomorrow = await medicine(call, '1985-11-11');
+        // Saved first, yet on the same day the appointment is listed before the medicine.
+        const endsLast = await medicine(call, '1985-11-17');
         const dueLast = await visit(call, '1985-11-17');
         await visit(call, '1985-11-18'); // a day past the lead time
         await visit(call, '1985-11-09'); // already past
@@ -132,6 +134,13 @@ test(
             clinic: `${tag}의원`,
             department: null,
             procedures: [],
+          },
+          {
+            kind: 'medication',
+            id: endsLast,
+            dueOn: '1985-11-17',
+            daysLeft: 7,
+            name: `${tag}정`,
           },
         ]);
       },
@@ -248,7 +257,7 @@ test(
 
         const gone = await done(call, { kind: 'medication', id: medicineId, dueOn: '1985-11-12' });
         assert.equal(gone.status, 404);
-        // A visit id is not a medicine id.
+        // The kind picks the table: a visit's id sent as a medicine finds no medicine due that day.
         const visitId = await visit(call, '1985-11-12');
         const wrongKind = await done(call, {
           kind: 'medication',

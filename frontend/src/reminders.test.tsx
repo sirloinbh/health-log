@@ -166,6 +166,36 @@ test('a reminder moved or deleted elsewhere says so and the list is read again',
   );
 });
 
+test('a list read before a mark landed does not bring the marked one back', async () => {
+  let gets = 0;
+  let answerSecondRead: (response: Response) => void = () => {};
+  serve((url, init) => {
+    if (url === '/api/reminders/done') {
+      const body = JSON.parse(String(init?.body)) as { kind: string };
+      return body.kind === 'visit'
+        ? json({ error: '알림을 찾을 수 없습니다' }, 404)
+        : json(null, 204);
+    }
+    gets += 1;
+    return gets === 1
+      ? json(listOf([appointment, lastPill]))
+      : new Promise((resolve) => (answerSecondRead = resolve));
+  });
+  show();
+  // The 404 reads the list again; that answer is still on its way.
+  fireEvent.click(await screen.findByRole('button', { name: '가상피부과 · 피부과 예약 완료' }));
+  await screen.findByRole('alert');
+  await waitFor(() => expect(gets).toBe(2));
+  // Meanwhile the medicine is marked done, after the read had already gone out.
+  const pill = screen.getByRole('button', { name: '가상정 복용 종료 완료' });
+  await waitFor(() => expect(pill).not.toHaveAttribute('aria-disabled'));
+  fireEvent.click(pill);
+  await screen.findByText('가상정 복용 종료 알림을 완료로 표시했습니다.');
+  answerSecondRead(json(listOf([{ ...appointment, dueOn: '2026-03-18', daysLeft: 3 }, lastPill])));
+  expect(await screen.findByText('3일 뒤')).toBeInTheDocument();
+  expect(screen.queryByText('가상정 복용 종료')).not.toBeInTheDocument();
+});
+
 test('any other failure keeps the reminder for another try', async () => {
   serve((url) =>
     url === '/api/reminders/done'

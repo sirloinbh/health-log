@@ -323,7 +323,7 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
     item: Medication | null;
     start: { date: string; visitId: string; visitDate?: string };
   } | null>(null);
-  const { notice, error, clear } = useNotice();
+  const { notice, status, error, clear } = useNotice();
   const latest = useRef(0);
   const heading = useRef<HTMLHeadingElement>(null);
   const { remember, returnFocus } = useReturnFocus(heading);
@@ -336,26 +336,35 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
     return () => clearTimeout(timer);
   }, [moveFocus]);
 
-  const load = useCallback(async () => {
-    // A slow older answer must not overwrite a newer one.
-    const request = ++latest.current;
-    try {
-      const data = await requestJson<MedicationLists>(medicationsPath);
-      if (request !== latest.current) return;
-      clear();
-      setLists(data);
-    } catch (cause) {
-      if (request === latest.current) error(cause);
-    }
-  }, [clear, error]);
+  /** `done`: what to say once the list is in, for a load the person asked for. */
+  const load = useCallback(
+    async (done?: string) => {
+      // A slow older answer must not overwrite a newer one.
+      const request = ++latest.current;
+      try {
+        const data = await requestJson<MedicationLists>(medicationsPath);
+        if (request !== latest.current) return;
+        if (done) status(done);
+        else clear();
+        setLists(data);
+      } catch (cause) {
+        if (request === latest.current) error(cause);
+      }
+    },
+    [clear, error, status],
+  );
 
-  useEffect(() => {
-    void load();
-    // The recent visits offered as where a medicine was prescribed; without them it can still be saved.
+  // The recent visits offered as where a medicine was prescribed; without them it can still be saved.
+  const loadVisits = useCallback(() => {
     requestJson<{ visits: Visit[] }>(visitsPath)
       .then((data) => setVisits(data.visits))
       .catch(() => undefined);
-  }, [load]);
+  }, []);
+
+  useEffect(() => {
+    void load();
+    loadVisits();
+  }, [load, loadVisits]);
 
   // A visit links here with ?visit=<id>&date=<its date> to record what was prescribed there.
   const askedVisit = params.get('visit');
@@ -436,6 +445,23 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
         </Button>
       </div>
       <Notice notice={notice} />
+      {notice?.kind === 'error' ? (
+        <Button
+          variant="outline"
+          className="self-start"
+          onClick={() => {
+            // A word in its place: the same failure twice is announced again, and a list already
+            // on screen does not look fixed while the new one is on its way.
+            status('목록을 다시 불러오는 중…');
+            void load('목록을 다시 불러왔습니다.');
+            loadVisits();
+            // Trying again removes this button, which would drop keyboard focus to the page (#65, #127).
+            setMoveFocus((count) => count + 1);
+          }}
+        >
+          다시 시도
+        </Button>
+      ) : null}
       {lists === null && !notice ? (
         <p role="status" className="text-body-sm text-muted-foreground">
           불러오는 중…

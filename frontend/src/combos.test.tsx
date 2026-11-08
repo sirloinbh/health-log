@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
@@ -465,4 +465,65 @@ test('the same failure twice is said twice, as the message is cleared before eac
       '같은 이름의 조합이 이미 있습니다',
     );
   }
+});
+
+test('a list that failed to load can be tried again, and focus stays on the page (#127)', async () => {
+  let fail = true;
+  serve(() => (fail ? json({ error: '가상 서버 오류' }, 500) : json({ combos: [breakfast] })));
+  open();
+  expect(await screen.findByRole('alert')).toHaveTextContent('가상 서버 오류');
+  const retry = screen.getByRole('button', { name: '다시 시도' });
+  fail = false;
+  retry.focus();
+  fireEvent.click(retry);
+  expect(await screen.findByRole('heading', { name: breakfast.name })).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+  // Said once the list is in, as focus on the title alone says nothing about it.
+  expect(screen.getByRole('status')).toHaveTextContent('목록을 다시 불러왔습니다.');
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { level: 1, name: '조합' })).toHaveFocus(),
+  );
+});
+
+test('failing again says so again, and the wait is said meanwhile (#127)', async () => {
+  let answer: (response: Response) => void = () => {};
+  let calls = 0;
+  serve(() => {
+    calls += 1;
+    return calls === 1
+      ? json({ error: '가상 서버 오류' }, 500)
+      : new Promise<Response>((resolve) => (answer = resolve));
+  });
+  open();
+  await screen.findByRole('alert');
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+  // The old failure is gone, so the same one coming back is a new alert.
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('목록을 다시 불러오는 중…');
+  answer(json({ error: '가상 서버 오류' }, 500));
+  expect(await screen.findByRole('alert')).toHaveTextContent('가상 서버 오류');
+  expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+});
+
+test('a list already shown keeps a way to read again when reading after a delete fails (#127)', async () => {
+  let deleted = false;
+  let failReads = false;
+  serve((_url, init) => {
+    if (init?.method === 'DELETE') {
+      deleted = true;
+      failReads = true;
+      return json(null, 204);
+    }
+    if (failReads) return json({ error: '가상 서버 오류' }, 500);
+    return json({ combos: deleted ? [] : [breakfast] });
+  });
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '아침 세트 삭제' }));
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '삭제' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('가상 서버 오류');
+  failReads = false;
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+  expect(await screen.findByText('조합이 없습니다')).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });

@@ -645,7 +645,8 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
       <div className="flex flex-wrap items-center gap-2">
         <form
           role="search"
-          className="flex min-w-0 flex-1 gap-2"
+          // A row of its own on a phone: beside the add button the field cut its hint short (#131).
+          className="flex min-w-0 flex-1 basis-full gap-2 sm:basis-0"
           onSubmit={(event) => {
             event.preventDefault();
             void load(query.trim());

@@ -53,6 +53,10 @@ const normalize = (text: string) =>
       (_, head: string, rest: string) => head + rest.replaceAll(',', ''),
     )
     .replace(/(\d),(\d+)(?=\s*(?:mg|g|ml|kcal))/g, '$1.$2')
+    // A Markdown table's rule under its head ("|---|:---:|") is no row: it goes with its line
+    // break, so the head and the values stay together (#122). A rule without bars ("---") may part
+    // two products, so it stays and ends the table.
+    .replace(/^(?=[^\n]*\|)[ \t|:-]*-{3,}[ \t|:-]*(?:\n|$)/gm, '')
     // A table copied from a web page separates its cells with tabs: they are column bars, so an
     // empty cell ("당류\t\t5g") stays empty instead of joining the next value (#120).
     .replace(/\t/g, ' | ')
@@ -108,15 +112,18 @@ function basisCandidates(text: string, total: Size | null): Candidate[] {
     });
   }
   // "1회 제공량 30g", "1회 제공량 1개(30g)", "1회 섭취참고량 30g", and "1회 제공량당" with no size.
+  // A size right after the words comes first, so "1회 제공량 30g (100g당)" is 30g: the size in
+  // brackets is taken only when none is written before them (#122).
   const serving = new RegExp(
-    String.raw`1회\s*(?:제공량|섭취\s*참고량)\s*(?:당)?\s*[:：]?\s*(?:(?:[^\n()]*\()?\s*${number}\s*${unit})?`,
+    String.raw`1회\s*(?:제공량|섭취\s*참고량)\s*(?:당)?\s*[:：]?\s*(?:${number}\s*${unit}|[^\n()]*\(\s*${number}\s*${unit})?`,
     'g',
   );
   for (const match of text.matchAll(serving)) {
+    const [size, sizeUnit] = match[1] ? [match[1], match[2]] : [match[3], match[4]];
     found.push({
       index: match.index,
       end: match.index + match[0].length,
-      basis: match[1] ? sizeOf(match[1], match[2]) : null,
+      basis: size ? sizeOf(size, sizeUnit) : null,
       kind: 'serving',
     });
   }
@@ -234,26 +241,59 @@ function headRow(text: string, followed: Candidate, candidates: Candidate[]) {
   return row;
 }
 
-/**
- * A row of a table with `heads` value columns, cut to its name and first column's cell. With bars,
- * "당류 | | 5g" (an empty first cell) keeps only "당류", so the second column's value is never read
- * as the first's. "열량 900kcal | 300kcal" and "열량 | 900kcal | 300kcal" both keep 900kcal.
- */
-function firstColumn(line: string, heads: number) {
-  if (!line.includes('|')) return line;
+/** The cells of a row with bars, without daily-value shares and without empty cells at its end. */
+function rowCells(line: string) {
   // A daily-value share in a cell of its own ("나트륨\t300mg\t15%") is no value column.
   const cells = line
     .split('|')
     .map((cell) => cell.trim())
     .filter((cell) => !/^\d+(?:\.\d+)?\s*%$/.test(cell));
+  // Empty cells at the row's end ("열량 150kcal |", a share cell left blank) hold nothing.
+  while (cells.length > 1 && !cells[cells.length - 1]) cells.pop();
+  return cells;
+}
+
+// An amount, not a basis such as the head "100g당".
+const hasValue = /\d\s*(?:kcal|mg|g|ml)(?!\s*\)?\s*당)/;
+
+/**
+ * Whether the table's rows give the name a cell of its own ("열량 | 250kcal | 75kcal"): some full
+ * row says so, and none writes the name and first value in one cell ("열량 250kcal | 75kcal").
+ */
+function namesInOwnCell(lines: string[], heads: number) {
+  const rows = lines.filter((line) => line.includes('|')).map(rowCells);
+  return (
+    rows.some((cells) => cells.length === heads + 1 && !hasValue.test(cells[0])) &&
+    !rows.some((cells) => heads > 1 && cells.length === heads && hasValue.test(cells[0]))
+  );
+}
+
+/**
+ * A row of a table with `heads` value columns, cut to its name and first column's cell. With bars,
+ * "당류 | | 5g" (an empty first cell) keeps only "당류", so the second column's value is never read
+ * as the first's. "열량 900kcal | 300kcal" and "열량 | 900kcal | 300kcal" both keep 900kcal.
+ */
+function firstColumn(line: string, heads: number, ownCell: boolean) {
+  if (!line.includes('|')) return line;
+  const cells = rowCells(line);
   if (cells.length === 1) return cells[0];
   // Name and first value in one cell, the rest after it.
-  if (cells.length === heads) return cells[0];
-  // The name in a cell of its own.
-  if (cells.length === heads + 1) return `${cells[0]} ${cells[1]}`;
+  if (cells.length <= heads && hasValue.test(cells[0])) return cells[0];
+  // The name in a cell of its own. In a table whose rows all do that, a shorter row ("열량 |
+  // 250kcal" under two heads) lost its last cells, as a copy drops empty cells at a row's end (#122).
+  // Where names share a cell with the first value, "당류 | 5g" is an empty first cell instead.
+  if (cells.length === heads + 1 || (ownCell && cells.length <= heads)) {
+    return `${cells[0]} ${cells[1]}`;
+  }
   // Cells that do not line up with the heads: only the name, no value to trust.
   return cells[0].replace(/\d[\d.]*\s*(?:kcal|mg|g|ml|%)/g, '');
 }
+
+// The head of a column of daily-value shares ("1일 영양성분 기준치에 대한 비율", the 2021 layout):
+// its cells hold percentages, no values, so it is no value column (#122).
+const shareHead = /^(?:1일\s*)?영양\s*성분\s*기준치(?:에\s*대한\s*비율)?(?:\s*\(%\))?$/;
+const shareHeadAfter =
+  /^[ ]*\|[ ]*(?:1일[ ]*)?영양[ ]*성분[ ]*기준치(?:에[ ]*대한[ ]*비율)?(?:[ ]*\(%\))?[ ]*/;
 
 export function readNutritionLabel(pasted: string): LabelReading {
   const text = normalize(pasted);
@@ -281,7 +321,9 @@ export function readNutritionLabel(pasted: string): LabelReading {
   // The table's basis is the first one that values follow. A basis named but unreadable
   // ("1회 제공량당" with no size) is still the basis, so the package is not assumed instead.
   const followed =
-    candidates.find((candidate) => tableFollows.test(text.slice(candidate.end))) ??
+    candidates.find((candidate) =>
+      tableFollows.test(text.slice(candidate.end).replace(shareHeadAfter, '')),
+    ) ??
     candidates[0] ??
     null;
   // A row of column heads ("총 내용량당 | 100g당"): values are read from the first column, so the
@@ -327,15 +369,34 @@ export function readNutritionLabel(pasted: string): LabelReading {
     : '';
   const headCells = headLine.includes('|') ? headLine.split('|').map((cell) => cell.trim()) : [];
   const nameCell =
-    headCells.length > 0 && /^(?:구분|항목|영양\s*(?:성분|정보)|성분)?$/.test(headCells[0]);
+    headCells.length > 0 &&
+    /^(?:구분|항목|내용|영양\s*(?:성분|정보|소)(?:\s*명)?|성분(?:\s*명)?)?(?:\s*\(\s*단위\s*\))?$/.test(
+      headCells[0],
+    );
   const chosenCell = chosen
     ? text.slice(lineStart(chosen.index), chosen.index).split('|').length - 1
     : 0;
   const headInLaterColumn = headCells.length > 0 && chosenCell > (nameCell ? 1 : 0);
 
+  // "1회 제공량 30g (100g당)": the serving is named, yet the bracket says the values are for 100g.
+  // One column of values cannot be for both, so no basis is claimed. "100g당 (1회 제공량 30g)" is
+  // fine: only the 100g has 당, and the bracket notes the serving size (#122).
+  const second = row[1];
+  const bracketedBasis =
+    chosen?.kind === 'serving' &&
+    second !== undefined &&
+    second.kind !== 'serving' &&
+    text.slice(chosen.end, second.index).includes('(') &&
+    !(
+      chosen.basis &&
+      second.basis &&
+      chosen.basis.size === second.basis.size &&
+      chosen.basis.unit === second.basis.unit
+    );
+
   const basisFromTotal = candidates.length === 0 && total !== null;
   const basis =
-    stackedHeads || headInLaterColumn
+    stackedHeads || headInLaterColumn || bracketedBasis
       ? null
       : chosen
         ? (chosen.basis ??
@@ -354,13 +415,11 @@ export function readNutritionLabel(pasted: string): LabelReading {
   // recognise still counts: a 2-cell row then holds the name and the first value, not two values.
   // A name cell is not a value column.
   const heads = headCells.length
-    ? headCells.slice(nameCell ? 1 : 0).filter((cell) => cell).length
+    ? headCells.slice(nameCell ? 1 : 0).filter((cell) => cell && !shareHead.test(cell)).length
     : Math.max(row.length, 1);
-  const table = text
-    .slice(range.begin, range.end)
-    .split('\n')
-    .map((line) => firstColumn(line, heads))
-    .join('\n');
+  const lines = text.slice(range.begin, range.end).split('\n');
+  const ownCell = namesInOwnCell(lines, heads);
+  const table = lines.map((line) => firstColumn(line, heads, ownCell)).join('\n');
 
   const values: LabelReading['values'] = {};
   const lessThan: LabelNutrient[] = [];

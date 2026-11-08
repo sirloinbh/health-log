@@ -415,3 +415,81 @@ test('a name cell and Markdown edge bars do not shift the columns', () => {
   expect(markdown.basis).toEqual({ size: 100, unit: 'g' });
   expect(markdown.values).toEqual({ calories: 250 });
 });
+
+test('"1회 제공량 30g (100g당)" claims no basis: one column cannot be for both', () => {
+  const reading = readNutritionLabel('영양정보\n1회 제공량 30g (100g당)\n열량 75kcal\n나트륨 90mg');
+  expect(reading.basis).toBeNull();
+  expect(readNutritionLabel('1회 제공량 30g (100g당)\n열량 250kcal').basis).toBeNull();
+  expect(
+    readNutritionLabel('영양정보\n총 내용량 60g\n1회 제공량 30g (총 내용량당)\n열량 150kcal').basis,
+  ).toBeNull();
+  // The bracket only notes the serving: the 100g has 당.
+  expect(readNutritionLabel('영양정보\n100g당 (1회 제공량 30g)\n열량 250kcal').basis).toEqual({
+    size: 100,
+    unit: 'g',
+  });
+  // The serving's own size comes before a bracket, and a bracket alone still gives it.
+  expect(readNutritionLabel('영양정보\n1회 제공량 1개(30g)\n열량 150kcal').basis).toEqual({
+    size: 30,
+    unit: 'g',
+  });
+});
+
+test('the 2021 layout with a daily-value column reads the serving values', () => {
+  const reading = readNutritionLabel(
+    '영양정보\n총 내용량 60g\n1회 제공량 30g\n1회 제공량당 | 1일 영양성분 기준치에 대한 비율\n열량 150kcal |\n나트륨 90mg | 5%\n탄수화물 20g | 6%',
+  );
+  expect(reading.basis).toEqual({ size: 30, unit: 'g' });
+  expect(reading.values).toEqual({ calories: 150, sodium: 90, carbs: 20 });
+  const tabs = readNutritionLabel(
+    '영양정보\n1회 제공량 30g\n1회 제공량당\t1일 영양성분 기준치에 대한 비율\n열량 150kcal\t\n나트륨 90mg\t5%',
+  );
+  expect(tabs.basis).toEqual({ size: 30, unit: 'g' });
+  expect(tabs.values).toEqual({ calories: 150, sodium: 90 });
+  // A daily-value column after the basis is no value column: "열량 | 120kcal" holds the name and value.
+  expect(
+    readNutritionLabel(
+      '영양정보\n100g당 | 1일 영양성분 기준치에 대한 비율\n열량 | 120kcal\n나트륨 | 300mg | 15%',
+    ).values,
+  ).toEqual({ calories: 120, sodium: 300 });
+});
+
+test('a Markdown table is read across its |---| rule', () => {
+  const reading = readNutritionLabel(
+    '| 구분 | 100g당 | 1회 제공량(30g)당 |\n| --- | :---: | ---: |\n| 열량 | 250kcal | 75kcal |\n| 당류 | | 2g |\n| 나트륨 | 300mg | 90mg |',
+  );
+  expect(reading.basis).toEqual({ size: 100, unit: 'g' });
+  expect(reading.values).toEqual({ calories: 250, sodium: 300 });
+  // A rule without bars may part two products: the table still ends there.
+  expect(
+    readNutritionLabel(
+      '영양정보\n100g당\n열량 250kcal\n---\n다른 상품\n1회 제공량 30g\n열량 999kcal',
+    ).values,
+  ).toEqual({ calories: 250 });
+});
+
+test('a short row is read for the first column only where names have a cell of their own', () => {
+  const values = (pasted: string) => readNutritionLabel(pasted).values;
+  expect(
+    values('영양정보\n100g당 | 1회 제공량(30g)당\n열량 | 250kcal\n나트륨 | 300mg | 90mg'),
+  ).toEqual({ calories: 250, sodium: 300 });
+  expect(
+    values('영양정보\n구분\t100g당\t1회 제공량(30g)당\n열량\t250kcal\t75kcal\n당류\t5g'),
+  ).toEqual({ calories: 250, sugars: 5 });
+  // Names share a cell with the first value: "당류 | 2g" is an empty first cell.
+  expect(values('영양정보\n100g당 | 1회 제공량(30g)당\n열량 250kcal | 75kcal\n당류 | 2g')).toEqual({
+    calories: 250,
+  });
+  // Every row short: nothing tells which column the value is in.
+  expect(values('영양정보\n100g당 | 1회 제공량(30g)당\n열량 | 250kcal\n나트륨 | 300mg')).toEqual(
+    {},
+  );
+});
+
+test('more name cells are recognised before the first value column', () => {
+  for (const name of ['영양성분명', '성분명', '영양소', '영양성분(단위)', '내용']) {
+    const reading = readNutritionLabel(`영양정보\n${name} | 100g당\n열량 | 250kcal`);
+    expect(reading.basis, name).toEqual({ size: 100, unit: 'g' });
+    expect(reading.values, name).toEqual({ calories: 250 });
+  }
+});

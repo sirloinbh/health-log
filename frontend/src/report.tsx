@@ -240,10 +240,11 @@ export function ReportPage({ health }: { health: Health }) {
   const span = useRef<HTMLParagraphElement>(null);
 
   const load = useCallback(async () => {
-    if (!date) return false;
-    // A slow answer for a period already left must not replace the one on screen.
+    // A slow answer for a period already left must not replace the one on screen, nor land next
+    // to the word about a date out of range.
     const request = ++latest.current;
     clear();
+    if (!date) return false;
     try {
       const data = await requestJson<Report>(`/api/report?period=${period}&date=${date}`);
       if (request === latest.current) setReport(data);
@@ -259,12 +260,21 @@ export function ReportPage({ health }: { health: Health }) {
 
   const retry = async () => {
     setRetrying(true);
-    focusSpan.current = await load();
+    const loaded = await load();
+    // Only the latest request ends the retry; one for a period left says nothing about it.
+    if (!loaded) {
+      setRetrying(false);
+      return;
+    }
+    focusSpan.current = true;
     setRetrying(false);
   };
 
   useEffect(() => {
     setReport(null);
+    // A retry for the period left is over: the one now asked for is not a retry.
+    setRetrying(false);
+    focusSpan.current = false;
     void load();
   }, [load]);
 
@@ -277,7 +287,10 @@ export function ReportPage({ health }: { health: Health }) {
   useEffect(() => {
     if (retrying || !focusSpan.current || !shown) return;
     focusSpan.current = false;
-    span.current?.focus();
+    // Only focus that the gone button dropped; somewhere the person moved to meanwhile stays.
+    if (document.activeElement === document.body || document.activeElement === null) {
+      span.current?.focus();
+    }
   }, [retrying, shown]);
 
   // The first and last periods holding a day the daily page opens (#130).
@@ -330,7 +343,12 @@ export function ReportPage({ health }: { health: Health }) {
               title={atStart ? dailyRangeText : undefined}
               className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
               onClick={() => {
-                if (!atStart) go({ date: shiftPeriod(period, shown.current.from, -1) });
+                // The previous period may start before the range while holding 2000-01-01, as
+                // the week of 1999-12-27 does: that period is asked for by its first day in range.
+                if (!atStart) {
+                  const previous = shiftPeriod(period, shown.current.from, -1);
+                  go({ date: previous < earliestDate ? earliestDate : previous });
+                }
               }}
             >
               <ChevronLeft aria-hidden />

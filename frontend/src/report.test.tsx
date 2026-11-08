@@ -274,6 +274,45 @@ test('the first and last periods of the range do not move past it (#130)', async
   expect(screen.getByRole('button', { name: '다음 달' })).toHaveAttribute('aria-disabled', 'true');
 });
 
+test('the week before the second week of 2000 is asked for by a day in range (#130 review)', async () => {
+  const at = (from: string, to: string) => ({ ...reportOf().current, from, to });
+  const fetchMock = serve((url) =>
+    json(
+      reportOf({
+        current: url.endsWith('date=2000-01-05')
+          ? at('2000-01-03', '2000-01-09')
+          : at('1999-12-27', '2000-01-02'),
+      }),
+    ),
+  );
+  window.history.replaceState(null, '', '/?period=week&date=2000-01-05');
+  render(<App />);
+  await screen.findByText('2000년 1월 3일 ~ 1월 9일');
+  fireEvent.click(screen.getByRole('button', { name: '이전 주' }));
+  expect(await screen.findByText('1999년 12월 27일 ~ 2000년 1월 2일')).toBeInTheDocument();
+  expect(reportCalls(fetchMock).at(-1)).toBe('/api/report?period=week&date=2000-01-01');
+  expect(screen.queryByText(/기록할 수 있습니다:/)).not.toBeInTheDocument();
+});
+
+test('a report still on its way does not land next to the word about a date out of range (#130 review)', async () => {
+  let answer: (response: Response) => void = () => {};
+  serve(
+    () =>
+      new Promise<Response>((resolve) => {
+        answer = resolve;
+      }),
+  );
+  render(<App />);
+  await waitFor(() => expect(answer).not.toBe(undefined));
+  await screen.findByRole('status', { name: '리포트 불러오는 중' });
+  window.history.pushState(null, '', '/?period=week&date=1999-06-01');
+  fireEvent(window, new PopStateEvent('popstate'));
+  await screen.findByText('2000-01-01부터 2099-12-31까지 기록할 수 있습니다: 1999-06-01');
+  answer(json(reportOf()));
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(screen.queryByText('11월 2일 ~ 11월 8일')).not.toBeInTheDocument();
+});
+
 test('a date in the address outside the range is said, not shown as an empty report (#130)', async () => {
   const fetchMock = serve(() => json(reportOf()));
   window.history.replaceState(null, '', '/?period=week&date=1999-06-01');

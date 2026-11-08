@@ -305,9 +305,16 @@ export function ReportPage({ health }: { health: Health }) {
     }
   }, [focusRetry]);
 
-  const go = (next: { period?: Period; date?: string }) => {
+  // `arrival`: the pressed button goes once the period asked for is shown, so its focus moves to
+  // the period then. Any other move drops a focus still waiting from an earlier one.
+  const go = (next: { period?: Period; date?: string }, arrival = false) => {
+    const nextPeriod = next.period ?? period;
+    const nextDate = next.date ?? date ?? '';
+    // The same period and date ask for nothing: no load follows to clear the marks set here.
+    if (nextPeriod === period && nextDate === (date ?? '')) return;
+    focusOnArrival.current = arrival;
     moved.current = true;
-    setParams({ period: next.period ?? period, date: next.date ?? date ?? '' });
+    setParams({ period: nextPeriod, date: nextDate });
   };
 
   const words = periodWords[period];
@@ -422,8 +429,7 @@ export function ReportPage({ health }: { health: Health }) {
                 size="sm"
                 onClick={() => {
                   // The button goes once this period is shown; its focus moves to the period.
-                  focusOnArrival.current = true;
-                  go({ date: today });
+                  go({ date: today }, true);
                 }}
               >
                 이번 {words.name}
@@ -441,8 +447,7 @@ export function ReportPage({ health }: { health: Health }) {
               className="self-start"
               onClick={() => {
                 // The button goes with the word, which would drop keyboard focus to the page.
-                focusOnArrival.current = true;
-                go({ date: today });
+                go({ date: today }, true);
               }}
             >
               이번 {words.name}로 이동

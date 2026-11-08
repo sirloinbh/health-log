@@ -75,7 +75,7 @@ function ComboDialog({
   );
   const [query, setQuery] = useState('');
   const [saving, setSaving] = useState(false);
-  const { notice, error } = useNotice();
+  const { notice, error, clear } = useNotice();
   const { notice: searchNotice, error: searchError, clear: clearSearch } = useNotice();
   const { notice: pageNotice, error: pageError, clear: clearPage } = useNotice();
   const shown = useRef<HTMLParagraphElement>(null);
@@ -119,11 +119,15 @@ function ComboDialog({
     );
 
   const save = async () => {
+    // The button stays pressable while saving.
+    if (saving) return;
     const body = readDraft(name, items);
     if (typeof body === 'string') {
       error(body);
       return;
     }
+    // Cleared first, so the same failure twice is announced again.
+    clear();
     setSaving(true);
     try {
       await requestJson<Combo>(combo ? `/api/combos/${combo.id}` : '/api/combos', {
@@ -282,10 +286,28 @@ function ComboDialog({
           <Notice notice={notice} />
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" disabled={saving} onClick={onClose}>
+          <Button
+            type="button"
+            variant="outline"
+            // Like Save, it keeps focus while busy: Safari does not move focus to a clicked button, so
+            // focus may still be here when Save is pressed.
+            aria-disabled={saving || undefined}
+            className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+            onClick={() => {
+              if (!saving) onClose();
+            }}
+          >
             취소
           </Button>
-          <Button type="button" disabled={saving} onClick={() => void save()}>
+          <Button
+            type="button"
+            // aria-disabled, not disabled: a disabled button drops keyboard focus to the page, and a
+            // failed save would leave it there, outside the dialog (#98). The handler ignores presses.
+            aria-disabled={saving || undefined}
+            aria-busy={saving || undefined}
+            className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+            onClick={() => void save()}
+          >
             {saving ? '저장 중…' : '저장'}
           </Button>
         </DialogFooter>

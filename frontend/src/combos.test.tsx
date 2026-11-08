@@ -411,3 +411,58 @@ test('a slow reload that drops the saved combo still leaves focus on the page ti
     expect(screen.getByRole('heading', { level: 1, name: '조합' })).toHaveFocus(),
   );
 });
+
+test('while saving and after a failed save, keyboard focus stays in the dialog', async () => {
+  let finish = (_response: Response) => {};
+  const fetchMock = serve((_url, init) =>
+    init?.method === 'PUT'
+      ? new Promise((resolve) => (finish = resolve))
+      : json({ combos: [breakfast] }),
+  );
+  open();
+  const { dialog } = await openWith('아침 세트 수정');
+  const save = within(dialog).getByRole('button', { name: '저장' });
+  save.focus();
+  fireEvent.click(save);
+
+  const busy = await within(dialog).findByRole('button', { name: '저장 중…' });
+  expect(busy).toBe(save);
+  expect(busy).toHaveAttribute('aria-disabled', 'true');
+  expect(busy).toHaveFocus();
+  // A second press while busy sends nothing more.
+  fireEvent.click(busy);
+  expect(writes(fetchMock)).toHaveLength(1);
+
+  finish(json({ error: '같은 이름의 조합이 이미 있습니다' }, 409));
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+    '같은 이름의 조합이 이미 있습니다',
+  );
+  expect(within(dialog).getByRole('button', { name: '저장' })).toHaveFocus();
+});
+
+test('the same failure twice is said twice, as the message is cleared before each try', async () => {
+  const finishers: ((response: Response) => void)[] = [];
+  serve((_url, init) =>
+    init?.method === 'PUT'
+      ? new Promise((resolve) => finishers.push(resolve))
+      : json({ combos: [breakfast] }),
+  );
+  open();
+  const { dialog } = await openWith('아침 세트 수정');
+  for (const finish of [0, 1]) {
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    await within(dialog).findByRole('button', { name: '저장 중…' });
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: '취소' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    // Pressing it while busy keeps the dialog, and the save, going.
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    finishers[finish](json({ error: '같은 이름의 조합이 이미 있습니다' }, 409));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      '같은 이름의 조합이 이미 있습니다',
+    );
+  }
+});

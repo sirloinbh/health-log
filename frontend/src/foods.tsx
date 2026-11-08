@@ -161,18 +161,22 @@ function FoodDialog({
 }) {
   const [form, setForm] = useState<Form>(food ? formOf(food) : emptyForm);
   const [saving, setSaving] = useState(false);
-  const { notice, error } = useNotice();
+  const { notice, error, clear } = useNotice();
   const update = (key: keyof Form) => (event: { target: { value: string } }) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // The button stays pressable while saving, and Enter in a field submits too.
+    if (saving) return;
     // Unreadable text like "49,5" must not be saved as no value or as 495.
     const unreadable = numberFields.find(({ key }) => parseAmount(form[key]) === undefined);
     if (unreadable) {
       error(unreadableAmount(unreadable.label));
       return;
     }
+    // Cleared first, so the same failure twice is announced again.
+    clear();
     setSaving(true);
     try {
       await requestJson<Food>(food ? `/api/foods/${food.id}` : '/api/foods', {
@@ -289,10 +293,27 @@ function FoodDialog({
           </div>
           <Notice notice={notice} />
           <DialogFooter>
-            <Button type="button" variant="outline" disabled={saving} onClick={onClose}>
+            <Button
+              type="button"
+              variant="outline"
+              // Like Save, it keeps focus while busy: Safari does not move focus to a clicked button, so
+              // focus may still be here when Save is pressed.
+              aria-disabled={saving || undefined}
+              className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+              onClick={() => {
+                if (!saving) onClose();
+              }}
+            >
               취소
             </Button>
-            <Button type="submit" disabled={saving}>
+            <Button
+              type="submit"
+              // aria-disabled, not disabled: a disabled button drops keyboard focus to the page, and a
+              // failed save would leave it there, outside the dialog (#98). The handler ignores presses.
+              aria-disabled={saving || undefined}
+              aria-busy={saving || undefined}
+              className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+            >
               {saving ? '저장 중…' : '저장'}
             </Button>
           </DialogFooter>

@@ -173,17 +173,24 @@ function FoodDialog({
   const [saving, setSaving] = useState(false);
   const { notice, error, clear } = useNotice();
   const [pasted, setPasted] = useState('');
-  const [filled, setFilled] = useState<{ kind: 'status' | 'error'; lines: string[] } | null>(null);
+  // `reads` counts presses: a new key remounts the message, so the same result is read out again.
+  const [filled, setFilled] = useState<{
+    kind: 'status' | 'error';
+    lines: string[];
+    reads: number;
+  } | null>(null);
   const update = (key: keyof Form) => (event: { target: { value: string } }) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
 
   // Fills the form only; nothing is saved until 저장 is pressed, so the person checks it first.
   const fill = () => {
     const reading = readNutritionLabel(pasted);
+    const reads = (filled?.reads ?? 0) + 1;
     const found = nutrients.filter(({ key }) => reading.values[key] !== undefined);
     if (!reading.basis && found.length === 0) {
       setFilled({
         kind: 'error',
+        reads,
         lines: [
           '영양성분 표를 찾지 못했습니다. 글자로 된 표만 읽을 수 있습니다.',
           '표가 이미지로만 있으면 값을 직접 입력해 주세요.',
@@ -191,31 +198,55 @@ function FoodDialog({
       });
       return;
     }
+    const labelOf = (key: NutrientKey) => nutrients.find((nutrient) => nutrient.key === key)!.label;
+    const emptied = [...reading.lessThan, ...reading.outOfRange];
+    // A new basis makes every old value wrong, so what the table leaves out is cleared too.
+    // Without one, only what the table gives is changed.
+    const missing = nutrients.filter(
+      ({ key }) => reading.values[key] === undefined && !emptied.includes(key),
+    );
+    const cleared = [...emptied, ...(reading.basis ? missing.map(({ key }) => key) : [])];
+    const wasPublished = form.sourceType === 'official' || form.sourceType === 'public';
     setForm((current) => ({
       ...current,
       ...(reading.basis
         ? { servingSize: String(reading.basis.size), servingUnit: reading.basis.unit }
         : {}),
+      ...Object.fromEntries(cleared.map((key) => [key, ''])),
       ...Object.fromEntries(found.map(({ key }) => [key, String(reading.values[key])])),
       // Values copied from the product's own table are its label, checked today (#34).
-      sourceType: current.sourceType === 'manual' ? 'label' : current.sourceType,
-      checkedOn: current.checkedOn || serviceToday(),
+      sourceType: 'label',
+      checkedOn: serviceToday(),
     }));
-    const labelOf = (key: NutrientKey) => nutrients.find((nutrient) => nutrient.key === key)!.label;
-    const missing = nutrients.filter(
-      ({ key }) => reading.values[key] === undefined && !reading.lessThan.includes(key),
-    );
     const total = packageText(reading);
+    const basisLine = reading.basis
+      ? reading.basisFromTotal
+        ? [
+            `1회 제공량 표기가 없어 총 내용량(${reading.basis.size}${reading.basis.unit})을 기준으로 채웠습니다. 표가 다른 양 기준이면 고쳐 주세요.`,
+          ]
+        : []
+      : ['1회 제공량을 찾지 못했습니다. 직접 입력해 주세요.'];
     setFilled({
       kind: 'status',
+      reads,
       lines: [
-        `채운 칸: ${[...(reading.basis ? ['1회 제공량'] : []), ...found.map(({ label }) => label)].join(', ')}`,
-        ...(reading.basis ? [] : ['1회 제공량을 찾지 못했습니다. 직접 입력해 주세요.']),
+        `채운 칸: ${[...(reading.basis ? ['1회 제공량'] : []), ...found.map(({ label }) => label)].join(', ') || '없음'}`,
+        ...basisLine,
         ...(reading.lessThan.length
-          ? [`"미만" 표기라 비워 둔 칸: ${reading.lessThan.map(labelOf).join(', ')}`]
+          ? [`"미만" 표기라 비운 칸: ${reading.lessThan.map(labelOf).join(', ')}`]
+          : []),
+        ...(reading.outOfRange.length
+          ? [`값이 너무 커서 비운 칸: ${reading.outOfRange.map(labelOf).join(', ')}`]
           : []),
         ...(missing.length
-          ? [`표에 없어 그대로 둔 칸: ${missing.map(({ label }) => label).join(', ')}`]
+          ? [
+              `표에 없어 ${reading.basis ? '비운' : '그대로 둔'} 칸: ${missing.map(({ label }) => label).join(', ')}`,
+            ]
+          : []),
+        ...(wasPublished
+          ? [
+              '출처 종류를 "제품 표기"로 바꿨습니다. 출처 주소가 이 제품을 가리키는지 확인해 주세요.',
+            ]
           : []),
         ...(total ? [total] : []),
         '값을 확인한 뒤 저장을 눌러야 저장됩니다.',
@@ -266,7 +297,11 @@ function FoodDialog({
               aria-describedby="food-label-text-help"
               rows={4}
               value={pasted}
-              onChange={(event) => setPasted(event.target.value)}
+              onChange={(event) => {
+                setPasted(event.target.value);
+                // "Not found" no longer describes the new text.
+                setFilled((current) => (current?.kind === 'error' ? null : current));
+              }}
               className="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-body-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
               placeholder={'예: 100g당 250kcal\n나트륨 300mg 탄수화물 30g …'}
             />
@@ -279,6 +314,7 @@ function FoodDialog({
             </Button>
             {filled ? (
               <div
+                key={filled.reads}
                 role={filled.kind === 'error' ? 'alert' : 'status'}
                 className={`flex flex-col gap-1 text-body-sm break-keep ${filled.kind === 'error' ? 'text-destructive' : ''}`}
               >

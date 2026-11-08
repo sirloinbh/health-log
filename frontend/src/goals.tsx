@@ -555,7 +555,9 @@ export function GoalsCard({ date }: { date: string }) {
           // Not disabled: a disabled button drops the focus of whoever pressed it.
           aria-busy={(loading && asked) || undefined}
           onClick={() => {
-            if (loading) return;
+            // A read the person already asked for is on its way. A quiet one started by a save
+            // may have gone out before what they want to see, so pressing replaces it.
+            if (loading && asked) return;
             setAsked(true);
             void load();
           }}

@@ -292,8 +292,9 @@ test('a read started by a save is quiet; one asked for with the button says so',
   // Reading, but nothing announced while the person works in the meal card.
   expect(screen.queryByRole('status', { name: '다시 판정하는 중' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: '다시 판정' })).not.toHaveAttribute('aria-busy');
-  replies[1](dayOf());
-  await waitFor(() => expect(screen.getByRole('button', { name: '다시 판정' })).toBeEnabled());
+  // Waits for the answer on screen, so the quiet read is over before the button is pressed.
+  replies[1](over);
+  expect(await screen.findByText('미달')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: '다시 판정' }));
   await waitFor(() => expect(replies).toHaveLength(3));
@@ -302,6 +303,37 @@ test('a read started by a save is quiet; one asked for with the button says so',
   await waitFor(() =>
     expect(screen.queryByRole('status', { name: '다시 판정하는 중' })).not.toBeInTheDocument(),
   );
+});
+
+test('pressing the button during a quiet read asks again and says so', async () => {
+  const replies: ((body: unknown) => void)[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          replies.push((body) => resolve(new Response(JSON.stringify(body))));
+        }),
+    ),
+  );
+  renderCard();
+  await waitFor(() => expect(replies).toHaveLength(1));
+  replies[0](dayOf());
+  await screen.findByRole('region', { name: '식단' });
+  await trackWrite(`/api/meals/${date}`, Promise.resolve({}));
+  await waitFor(() => expect(replies).toHaveLength(2));
+
+  // The quiet read is still out; the press starts its own.
+  fireEvent.click(screen.getByRole('button', { name: '다시 판정' }));
+  await waitFor(() => expect(replies).toHaveLength(3));
+  expect(screen.getByRole('status', { name: '다시 판정하는 중' })).toBeInTheDocument();
+  replies[2](over);
+  expect(await screen.findByText('미달')).toBeInTheDocument();
+  // The quiet read's late answer is dropped.
+  replies[1](dayOf());
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(screen.getByText('미달')).toBeInTheDocument();
+  expect(screen.queryByRole('status', { name: '다시 판정하는 중' })).not.toBeInTheDocument();
 });
 
 test('when reads overlap, a late answer to the older one is not shown', async () => {

@@ -225,7 +225,7 @@ test('moving between periods keeps the row and the pressed button focused while 
   expect(previous).toBeInTheDocument();
   expect(previous).toHaveFocus();
   expect(screen.getByText('11월 2일 ~ 11월 8일').closest('[aria-busy]')).toBeNull();
-  expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
+  expect(stat('평균 수면').closest('[aria-busy="true"]')).not.toBeNull();
   answers[0]();
   expect(await screen.findByText('10월 26일 ~ 11월 1일')).toBeInTheDocument();
   expect(previous).toHaveFocus();
@@ -276,6 +276,76 @@ test('"이번 주" goes once the week is shown, and its focus moves to the perio
   const span = await screen.findByText('11월 2일 ~ 11월 8일');
   expect(screen.queryByRole('button', { name: '이번 주' })).not.toBeInTheDocument();
   await waitFor(() => expect(span).toHaveFocus());
+});
+
+test('"이번 주" keeps its focus while the week loads (#138 review)', async () => {
+  let answer: () => void = () => {};
+  serve((url) =>
+    url.endsWith(`date=${today}`)
+      ? new Promise<Response>((resolve) => {
+          answer = () => resolve(json(reportOf()));
+        })
+      : json(
+          reportOf({ current: { ...reportOf().current, from: '2026-10-26', to: '2026-11-01' } }),
+        ),
+  );
+  window.history.replaceState(null, '', '/?period=week&date=2026-10-28');
+  render(<App />);
+  await screen.findByText('10월 26일 ~ 11월 1일');
+  const thisWeek = screen.getByRole('button', { name: '이번 주' });
+  thisWeek.focus();
+  fireEvent.click(thisWeek);
+  await waitFor(() => expect(window.location.search).toBe(`?period=week&date=${today}`));
+  expect(thisWeek).toBeInTheDocument();
+  expect(thisWeek).toHaveFocus();
+  answer();
+  const span = await screen.findByText('11월 2일 ~ 11월 8일');
+  await waitFor(() => expect(span).toHaveFocus());
+});
+
+test('a move whose report fails puts focus on 다시 시도 (#138 review)', async () => {
+  let calls = 0;
+  serve(() =>
+    ++calls === 1 ? json(reportOf()) : json({ error: '서버 오류가 발생했습니다' }, 500),
+  );
+  render(<App />);
+  await screen.findByText('11월 2일 ~ 11월 8일');
+  const previous = screen.getByRole('button', { name: '이전 주' });
+  previous.focus();
+  fireEvent.click(previous);
+  const retry = await screen.findByRole('button', { name: '다시 시도' });
+  await waitFor(() => expect(retry).toHaveFocus());
+});
+
+test('a failed "이번 주" does not move focus on a later report (#138 review)', async () => {
+  serve((url) =>
+    url.endsWith(`date=${today}`) && url.includes('period=week')
+      ? json({ error: '서버 오류가 발생했습니다' }, 500)
+      : json(
+          url.includes('period=month')
+            ? reportOf({
+                period: 'month',
+                current: { ...reportOf().current, from: '2026-11-01', to: '2026-11-30' },
+              })
+            : reportOf({
+                current: { ...reportOf().current, from: '2026-10-26', to: '2026-11-01' },
+              }),
+        ),
+  );
+  window.history.replaceState(null, '', '/?period=week&date=2026-10-28');
+  render(<App />);
+  await screen.findByText('10월 26일 ~ 11월 1일');
+  fireEvent.click(screen.getByRole('button', { name: '이번 주' }));
+  await screen.findByRole('alert');
+  // Pressing 월간 without focusing it, as Safari does: the month's arrival must not take focus.
+  const outside = document.createElement('input');
+  document.body.append(outside);
+  outside.focus();
+  fireEvent.click(screen.getByRole('button', { name: '월간' }));
+  outside.remove();
+  const span = await screen.findByText('11월 1일 ~ 11월 30일');
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(span).not.toHaveFocus();
 });
 
 test('a failed report can be tried again', async () => {

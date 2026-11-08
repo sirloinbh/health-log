@@ -244,6 +244,10 @@ export function ReportPage({ health }: { health: Health }) {
   // "이번 주로 이동" goes with the word about a date out of range; its report takes the focus too.
   const focusOnArrival = useRef(false);
   const span = useRef<HTMLParagraphElement>(null);
+  // A move whose report fails takes its row away; focus goes to "다시 시도" instead (#138).
+  const moved = useRef(false);
+  const [focusRetry, setFocusRetry] = useState(0);
+  const retryButton = useRef<HTMLButtonElement>(null);
 
   const load = useCallback(async (): Promise<'ok' | 'failed' | 'stale'> => {
     // A slow answer for a period already left must not replace the one on screen, nor land next
@@ -266,6 +270,8 @@ export function ReportPage({ health }: { health: Health }) {
       if (request !== latest.current) return 'stale';
       setReport(null);
       setLoading(false);
+      // Nothing arrives, so a focus waiting for the report must not fire on a later one.
+      focusOnArrival.current = false;
       error(cause);
       return 'failed';
     }
@@ -285,11 +291,24 @@ export function ReportPage({ health }: { health: Health }) {
     // A retry for the period left is over: the one now asked for is not a retry.
     setRetrying(false);
     focusSpan.current = false;
-    void load();
+    const fromMove = moved.current;
+    moved.current = false;
+    void load().then((outcome) => {
+      if (outcome === 'failed' && fromMove) setFocusRetry((count) => count + 1);
+    });
   }, [load]);
 
-  const go = (next: { period?: Period; date?: string }) =>
+  useEffect(() => {
+    if (!focusRetry) return;
+    if (document.activeElement === document.body || document.activeElement === null) {
+      retryButton.current?.focus();
+    }
+  }, [focusRetry]);
+
+  const go = (next: { period?: Period; date?: string }) => {
+    moved.current = true;
     setParams({ period: next.period ?? period, date: next.date ?? date ?? '' });
+  };
 
   const words = periodWords[period];
   // The last report, even for the period just left while the next one is on its way.
@@ -395,7 +414,9 @@ export function ReportPage({ health }: { health: Health }) {
             >
               <ChevronRight aria-hidden />
             </Button>
-            {today && target && (today < target.from || today > target.to) ? (
+            {/* Shown by the period on screen, so the button stays, with its focus, while the next
+                period loads; it goes once that period arrives. */}
+            {today && (today < shown.current.from || today > shown.current.to) ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -432,6 +453,7 @@ export function ReportPage({ health }: { health: Health }) {
       <Notice notice={notice} />
       {(notice || retrying) && date ? (
         <Button
+          ref={retryButton}
           variant="outline"
           className="self-start aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
           aria-disabled={retrying || undefined}
@@ -457,8 +479,6 @@ export function ReportPage({ health }: { health: Health }) {
         // The earlier report stays, dimmed and marked busy, until the next one replaces it.
         <div
           aria-busy={loading || undefined}
-          aria-label={loading ? '리포트 불러오는 중' : undefined}
-          role={loading ? 'region' : undefined}
           className={`flex flex-col gap-6 transition-opacity ${loading ? 'opacity-50' : ''}`}
         >
           <Stats current={shown.current} previous={shown.previous} period={shown.period} />

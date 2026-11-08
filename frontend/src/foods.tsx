@@ -187,13 +187,16 @@ function FoodDialog({
     const reading = readNutritionLabel(pasted);
     const reads = (filled?.reads ?? 0) + 1;
     const found = nutrients.filter(({ key }) => reading.values[key] !== undefined);
-    if (!reading.basis && found.length === 0) {
+    // No value read: a basis alone would clear every field for nothing, so nothing changes.
+    if (found.length === 0) {
       setFilled({
         kind: 'error',
         reads,
         lines: [
-          '영양성분 표를 찾지 못했습니다. 글자로 된 표만 읽을 수 있습니다.',
-          '표가 이미지로만 있으면 값을 직접 입력해 주세요.',
+          reading.basis
+            ? `기준량(${reading.basis.size}${reading.basis.unit})은 찾았지만 영양성분 값을 읽지 못해 아무 칸도 바꾸지 않았습니다.`
+            : '영양성분 표를 찾지 못했습니다. 글자로 된 표만 읽을 수 있습니다.',
+          '표가 이미지로만 있거나 모양이 달라 읽지 못하면 값을 직접 입력해 주세요.',
         ],
       });
       return;
@@ -240,7 +243,7 @@ function FoodDialog({
           : []),
         ...(missing.length
           ? [
-              `표에 없어 ${reading.basis ? '비운' : '그대로 둔'} 칸: ${missing.map(({ label }) => label).join(', ')}`,
+              `표에서 읽지 못해 ${reading.basis ? '비운' : '그대로 둔'} 칸: ${missing.map(({ label }) => label).join(', ')}`,
             ]
           : []),
         ...(wasPublished

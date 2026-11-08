@@ -702,7 +702,7 @@ test('reading a table into a published food clears stale values and marks it as 
   expect(within(dialog).getByLabelText('지방 (g)')).toHaveValue('');
   expect(within(dialog).getByLabelText('칼로리 (kcal)')).toHaveValue('280');
   const summary = within(dialog).getByRole('status');
-  expect(summary).toHaveTextContent('표에 없어 비운 칸: 탄수화물, 지방, 나트륨');
+  expect(summary).toHaveTextContent('표에서 읽지 못해 비운 칸: 탄수화물, 지방, 나트륨');
   expect(summary).toHaveTextContent('출처 종류를 "제품 표기"로 바꿨습니다');
   // Read today, not the date of the official source it replaced.
   expect(within(dialog).getByRole('combobox', { name: '출처 종류' })).toHaveTextContent(
@@ -738,4 +738,22 @@ test('a table without a basis keeps the fields it does not give', async () => {
   expect(within(dialog).getByLabelText('당류 (g)')).toHaveValue('10');
   expect(within(dialog).getByLabelText('1회 제공량')).toHaveValue('120');
   expect(within(dialog).getByRole('status')).toHaveTextContent('1회 제공량을 찾지 못했습니다');
+});
+
+test('a basis read without any value changes nothing', async () => {
+  serve(() => json({ foods: [{ ...food, sugars: 10 }] }));
+  open();
+  const { dialog } = await openWith('치즈버거 수정');
+  fireEvent.change(within(dialog).getByLabelText('영양성분 표 붙여넣기'), {
+    target: { value: '100g당\n나트륨 15% 300mg\n탄수화물 9% 30g' },
+  });
+  fireEvent.click(within(dialog).getByRole('button', { name: '표 읽어 채우기' }));
+  expect(within(dialog).getByRole('alert')).toHaveTextContent(
+    '기준량(100g)은 찾았지만 영양성분 값을 읽지 못해 아무 칸도 바꾸지 않았습니다',
+  );
+  expect(within(dialog).getByLabelText('1회 제공량')).toHaveValue('120');
+  expect(within(dialog).getByLabelText('당류 (g)')).toHaveValue('10');
+  expect(within(dialog).getByRole('combobox', { name: '출처 종류' })).toHaveTextContent(
+    '공식 자료',
+  );
 });

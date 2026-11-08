@@ -180,3 +180,56 @@ test('decimal commas are read as decimals, and amounts a food cannot hold are le
   expect(huge.outOfRange).toEqual(['calories']);
   expect(readNutritionLabel('0g당 10kcal').basis).toBeNull();
 });
+
+// Regression cases from the second review of PR #119: the table must also end.
+
+test('reviews and other products after the table are not read', () => {
+  const review =
+    '영양정보\n총 내용량 90g\n1봉지(45g)당 230kcal\n나트륨 210mg\n탄수화물 30g\n\n상품평\n당류 0g이라 좋아요 단백질 20g!';
+  expect(readNutritionLabel(review).values).toEqual({ calories: 230, sodium: 210, carbs: 30 });
+  const related =
+    '영양정보\n100g당 250kcal\n나트륨 300mg\n탄수화물 30g\n\n함께 보면 좋은 상품\n제로콜라 100ml당 0kcal 당류 0g\n단백질바 1개(40g)당 단백질 15g 지방 5g';
+  expect(readNutritionLabel(related).values).toEqual({ calories: 250, sodium: 300, carbs: 30 });
+  // Another basis on a later line starts other values, even with no line in between.
+  const twoBases = readNutritionLabel(
+    '1회 제공량 30g\n열량 150kcal\n탄수화물 20g\n(100g당 500kcal 단백질 10g)',
+  );
+  expect(twoBases.values).toEqual({ calories: 150, carbs: 20 });
+});
+
+test('with a heading, a basis in the title or a review above it is not the table', () => {
+  const review = readNutritionLabel(
+    '리뷰: 이거 100g당 당류 5g이라던데?\n영양정보\n총 내용량 200g\n1회 제공량 50g\n열량 100kcal\n당류 2g',
+  );
+  expect(review.basis).toEqual({ size: 50, unit: 'g' });
+  expect(review.values).toEqual({ calories: 100, sugars: 2 });
+  const title = readNutritionLabel(
+    '닭가슴살 100g당 단백질 23g 고단백\n영양정보\n1팩(100g)당\n열량 110kcal\n단백질 22g',
+  );
+  expect(title.values).toEqual({ calories: 110, protein: 22 });
+});
+
+test('"100g당열량" written without spaces is the basis', () => {
+  const reading = readNutritionLabel(
+    '영양정보 총내용량500g 100g당열량250kcal 나트륨300mg 탄수화물30g',
+  );
+  expect(reading.basis).toEqual({ size: 100, unit: 'g' });
+  expect(reading.basisFromTotal).toBe(false);
+  expect(reading.values).toEqual({ calories: 250, sodium: 300, carbs: 30 });
+});
+
+test('"2000kcal를 기준으로" in the footer is never the energy value', () => {
+  const reading = readNutritionLabel(
+    '100g당\n나트륨 300mg\n1일 영양성분 기준치에 대한 비율(%)은 2000kcal를 기준으로 한 것',
+  );
+  expect(reading.values).toEqual({ sodium: 300 });
+});
+
+test('a shop line above the heading is ignored even when the table names no basis', () => {
+  const reading = readNutritionLabel(
+    '무료배송 100g당 최저가\n리뷰 단백질 30g!\n영양정보\n총 내용량 100g\n열량 110kcal\n단백질 23g',
+  );
+  expect(reading.basis).toEqual({ size: 100, unit: 'g' });
+  expect(reading.basisFromTotal).toBe(true);
+  expect(reading.values).toEqual({ calories: 110, protein: 23 });
+});

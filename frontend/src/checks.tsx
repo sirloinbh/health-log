@@ -1,5 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
+import { BusyButton } from './busy-button';
 import {
   answerText,
   charCount,
@@ -46,7 +47,7 @@ function CheckForm({
     memo: record?.memo ?? '',
   }));
   const [saving, setSaving] = useState(false);
-  const { notice, error } = useNotice();
+  const { notice, error, clear } = useNotice();
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -58,6 +59,8 @@ function CheckForm({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // The save button stays pressable while saving (#126), and Enter in a field submits too.
+    if (saving) return;
     const memo = form.memo.trim() || null;
     if (form.dietKept === null && form.sleepGood === null && memo === null) {
       error('체크나 메모 중 하나 이상 입력해 주세요');
@@ -67,6 +70,8 @@ function CheckForm({
       error(`메모는 ${maxMemo}자 이하로 입력해 주세요`);
       return;
     }
+    // A repeated failure then appears anew and is announced again (as in #98).
+    clear();
     setSaving(true);
     try {
       onSaved(
@@ -136,14 +141,14 @@ function CheckForm({
       </div>
       <Notice notice={notice} />
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={saving} aria-busy={saving || undefined}>
+        <BusyButton type="submit" busy={saving} aria-busy={saving || undefined}>
           {saving ? <Spinner size="sm" label="저장하는 중" /> : null}
           저장
-        </Button>
+        </BusyButton>
         {onCancel ? (
-          <Button type="button" variant="outline" disabled={saving} onClick={onCancel}>
+          <BusyButton type="button" variant="outline" busy={saving} onClick={onCancel}>
             취소
-          </Button>
+          </BusyButton>
         ) : null}
       </div>
     </form>

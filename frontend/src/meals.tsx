@@ -1,6 +1,7 @@
 import { Trash2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
+import { BusyButton } from './busy-button';
 import { type Combo, comboSummary, fullName } from './combo-text';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
@@ -191,17 +192,17 @@ function FoodChoices({
               {food.calories === null ? '칼로리 값 없음' : `${food.calories}kcal`}
             </span>
           </div>
-          <Button
+          <BusyButton
             variant="outline"
             size="sm"
-            disabled={adding}
+            busy={adding}
             aria-busy={waiting === food.id || undefined}
             aria-label={`${fullName(food)} 추가`}
             onClick={() => onAdd(food)}
           >
             {waiting === food.id ? <Spinner size="sm" label="기록하는 중" /> : null}
             추가
-          </Button>
+          </BusyButton>
         </li>
       ))}
     </ul>
@@ -316,6 +317,8 @@ function AddEntry({
 
   const copyMeal = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // The add buttons stay pressable while adding (#126), and Enter in a field submits too.
+    if (adding) return;
     clear();
     if (!isValidDate(copyFrom)) {
       copyError('복사할 날짜를 골라 주세요');
@@ -353,6 +356,7 @@ function AddEntry({
   };
 
   const addCombo = async (combo: Combo) => {
+    if (adding) return;
     clear();
     setPending(`combo-${combo.id}`);
     try {
@@ -389,6 +393,7 @@ function AddEntry({
 
   /** `from` says which list was used, so the error and the spinner show next to that list. */
   const addFood = async (food: FoodOption, from: 'search' | 'recent') => {
+    if (adding) return;
     const showError = from === 'recent' ? recentError : listError;
     const value = readServings(showError);
     if (value === null) return;
@@ -408,6 +413,7 @@ function AddEntry({
 
   const addTyped = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (adding) return;
     const value = readServings(typedError);
     if (value === null) return;
     if (!name.trim()) {
@@ -576,10 +582,11 @@ function AddEntry({
                       {comboSummary(combo)}
                     </span>
                   </div>
-                  <Button
+                  <BusyButton
                     variant="outline"
                     size="sm"
-                    disabled={adding || combo.items.length === 0}
+                    disabled={combo.items.length === 0}
+                    busy={adding}
                     aria-busy={pending === `combo-${combo.id}` || undefined}
                     aria-label={`${combo.name} 기록`}
                     onClick={() => void addCombo(combo)}
@@ -588,7 +595,7 @@ function AddEntry({
                       <Spinner size="sm" label="기록하는 중" />
                     ) : null}
                     기록
-                  </Button>
+                  </BusyButton>
                 </li>
               ))}
             </ul>
@@ -618,16 +625,16 @@ function AddEntry({
               onChange={(event) => setCopyFrom(event.target.value)}
             />
           </div>
-          <Button
+          <BusyButton
             type="submit"
             variant="outline"
-            disabled={adding}
+            busy={adding}
             aria-busy={pending === 'copy' || undefined}
             aria-describedby="meal-copy-help"
           >
             {pending === 'copy' ? <Spinner size="sm" label="복사하는 중" /> : null}
             {mealLabel} 복사
-          </Button>
+          </BusyButton>
         </div>
         <Notice notice={copyNotice} />
       </form>
@@ -665,16 +672,16 @@ function AddEntry({
           위의 이 주·이 달 정크푸드 횟수로 셉니다.
         </p>
         <Notice notice={typedNotice} />
-        <Button
+        <BusyButton
           type="submit"
           variant="outline"
           className="self-start"
-          disabled={adding}
+          busy={adding}
           aria-busy={pending === 'typed' || undefined}
         >
           {pending === 'typed' ? <Spinner size="sm" label="기록하는 중" /> : null}
           바로 기록
-        </Button>
+        </BusyButton>
       </form>
     </div>
   );

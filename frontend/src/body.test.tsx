@@ -333,7 +333,7 @@ test('a server rejection keeps the form and the typed values', async () => {
 
   expect(await screen.findByRole('alert')).toHaveTextContent('함께 입력해 주세요');
   expect(screen.getByLabelText('수축기 혈압 (mmHg)')).toHaveValue('120');
-  expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: '저장' })).not.toHaveAttribute('aria-disabled');
 });
 
 test('a comma decimal is refused, never read as ten times the value', async () => {

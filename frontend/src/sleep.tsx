@@ -1,5 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
+import { BusyButton } from './busy-button';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
@@ -48,7 +49,7 @@ function SleepForm({
   const [bed, setBed] = useState(record ? clockOf(record.bedAt) : '');
   const [wake, setWake] = useState(record ? clockOf(record.wakeAt) : '');
   const [saving, setSaving] = useState(false);
-  const { notice, error } = useNotice();
+  const { notice, error, clear } = useNotice();
   const length = bed && wake ? minutesBetween(bed, wake) : 0;
   const mounted = useRef(true);
 
@@ -61,6 +62,8 @@ function SleepForm({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // The save button stays pressable while saving (#126), and Enter in a field submits too.
+    if (saving) return;
     if (!bed || !wake) {
       error('취침 시각과 기상 시각을 입력해 주세요');
       return;
@@ -70,6 +73,8 @@ function SleepForm({
       onCancel?.();
       return;
     }
+    // A repeated failure then appears anew and is announced again (as in #98).
+    clear();
     setSaving(true);
     try {
       onSaved(
@@ -127,14 +132,14 @@ function SleepForm({
       ) : null}
       <Notice notice={notice} />
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={saving} aria-busy={saving || undefined}>
+        <BusyButton type="submit" busy={saving} aria-busy={saving || undefined}>
           {saving ? <Spinner size="sm" label="저장하는 중" /> : null}
           저장
-        </Button>
+        </BusyButton>
         {onCancel ? (
-          <Button type="button" variant="outline" disabled={saving} onClick={onCancel}>
+          <BusyButton type="button" variant="outline" busy={saving} onClick={onCancel}>
             취소
-          </Button>
+          </BusyButton>
         ) : null}
       </div>
     </form>

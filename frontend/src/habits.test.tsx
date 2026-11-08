@@ -249,7 +249,7 @@ test('a server refusal is shown and the form keeps what was typed', async () => 
   fireEvent.click(screen.getByRole('button', { name: '저장' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('200개비 이하');
   expect(screen.getByLabelText('담배 (개비)')).toHaveValue('300');
-  expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: '저장' })).not.toHaveAttribute('aria-disabled');
 });
 
 test('a failed load can be tried again', async () => {

@@ -1,6 +1,15 @@
 import { expect, test } from 'vitest';
 
-import { actualText, changeText, targetText, toTarget, toTyped } from './goal-text';
+import {
+  actualText,
+  changeText,
+  type Goals,
+  sleepParts,
+  targetText,
+  toSleepTarget,
+  toTarget,
+  withoutChange,
+} from './goal-text';
 
 test('each goal says which way it points', () => {
   expect(targetText('calories', 2000)).toBe('하루 2,000kcal 이하');
@@ -10,13 +19,49 @@ test('each goal says which way it points', () => {
   expect(changeText('sleep', null)).toBe('목표 끔');
 });
 
-test('sleep is typed in hours and kept in whole minutes', () => {
-  expect(toTarget('sleep', 7.5)).toBe(450);
-  expect(toTarget('sleep', 7.25)).toBe(435);
-  expect(toTarget('sleep', 7.33)).toMatch('분 단위로');
-  expect(toTarget('sleep', 0.5)).toMatch('1~24시간');
-  expect(toTyped('sleep', 450)).toBe('7.5');
-  expect(toTyped('sleep', 435)).toBe('7.25');
+test('sleep is typed in hours and minutes, so any whole minute can be a goal', () => {
+  expect(toSleepTarget(7, 30)).toBe(450);
+  // Not a decimal number of hours: 7.1666… could not be typed.
+  expect(toSleepTarget(7, 10)).toBe(430);
+  expect(toSleepTarget(24, 0)).toBe(1440);
+  expect(toSleepTarget(1, 0)).toBe(60);
+  expect(toSleepTarget(0, 59)).toMatch('1시간~24시간');
+  expect(toSleepTarget(24, 1)).toMatch('1시간~24시간');
+  expect(toSleepTarget(7, 60)).toMatch('0~59');
+  expect(toSleepTarget(7.5, 0)).toMatch('정수로');
+  expect(sleepParts(430)).toEqual({ hours: '7', minutes: '10' });
+  expect(sleepParts(445)).toEqual({ hours: '7', minutes: '25' });
+});
+
+test('deleting a change brings back the goal before it, as of today', () => {
+  const goals: Goals = {
+    today: '2026-11-06',
+    current: {
+      calories: { from: '2026-11-05', target: 1800 },
+      protein: null,
+      sleep: null,
+      sober_days: null,
+    },
+    history: [
+      { item: 'calories', from: '2026-12-01', target: 1500 },
+      { item: 'calories', from: '2026-11-05', target: 1800 },
+      { item: 'calories', from: '2026-11-01', target: null },
+      { item: 'calories', from: '2026-10-01', target: 2000 },
+      { item: 'protein', from: '2026-11-05', target: 100 },
+    ],
+  };
+  // A coming change goes, and today's goal stays.
+  const coming = withoutChange(goals, 'calories', '2026-12-01');
+  expect(coming.current.calories).toEqual({ from: '2026-11-05', target: 1800 });
+  expect(coming.history).toHaveLength(4);
+  // The change before today's was "off", so no goal is left.
+  expect(withoutChange(goals, 'calories', '2026-11-05').current.calories).toBeNull();
+  // Other items keep their changes.
+  expect(withoutChange(goals, 'calories', '2026-11-05').history).toContainEqual({
+    item: 'protein',
+    from: '2026-11-05',
+    target: 100,
+  });
 });
 
 test('other goals take whole numbers in their own ranges', () => {
@@ -25,7 +70,6 @@ test('other goals take whole numbers in their own ranges', () => {
   expect(toTarget('calories', 99)).toMatch('100~10000kcal');
   expect(toTarget('protein', 1001)).toMatch('1~1000g');
   expect(toTarget('sober_days', 8)).toMatch('1~7일');
-  expect(toTyped('calories', 1800)).toBe('1800');
 });
 
 test('the actual side says when nothing was recorded, and what was left out', () => {

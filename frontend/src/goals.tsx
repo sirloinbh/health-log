@@ -24,12 +24,14 @@ import {
   goalItems,
   type Goals,
   goalSettingsPath,
+  sleepParts,
   type Status,
   statusText,
   targetText,
+  toSleepTarget,
   toTarget,
-  toTyped,
   unknownReason,
+  withoutChange,
 } from './goal-text';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
@@ -65,7 +67,14 @@ function GoalForm({
   onSaved: (goals: Goals) => void;
 }) {
   const field = goalFields[item];
-  const [value, setValue] = useState(() => (goal ? toTyped(item, goal.target) : ''));
+  const isSleep = item === 'sleep';
+  // Sleep fills hours here and minutes below; every other goal is the one number.
+  const [value, setValue] = useState(() =>
+    goal ? (isSleep ? sleepParts(goal.target).hours : String(goal.target)) : '',
+  );
+  const [minutes, setMinutes] = useState(() =>
+    goal && isSleep ? sleepParts(goal.target).minutes : '',
+  );
   const [from, setFrom] = useState(today);
   const [saving, setSaving] = useState(false);
   const { notice, error } = useNotice();
@@ -102,7 +111,18 @@ function GoalForm({
       error(unreadableAmount(field.label));
       return;
     }
-    const target = toTarget(item, typed);
+    let target: number | string;
+    if (item === 'sleep') {
+      // Minutes left blank are none.
+      const typedMinutes = parseAmount(minutes) ?? 0;
+      if (typedMinutes === undefined) {
+        error(unreadableAmount('수면 시간(분)'));
+        return;
+      }
+      target = toSleepTarget(typed, typedMinutes);
+    } else {
+      target = toTarget(item, typed);
+    }
     if (typeof target === 'string') {
       error(target);
       return;
@@ -113,19 +133,35 @@ function GoalForm({
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor={`${id}-target`}>
-            {field.label} ({field.unit})
-          </Label>
-          <Input
-            id={`${id}-target`}
-            inputMode="decimal"
-            autoComplete="off"
-            placeholder={`예: ${field.example}`}
-            readOnly={saving}
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-          />
+        <div className="flex gap-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <Label htmlFor={`${id}-target`}>
+              {field.label} ({field.unit})
+            </Label>
+            <Input
+              id={`${id}-target`}
+              inputMode={isSleep ? 'numeric' : 'decimal'}
+              autoComplete="off"
+              placeholder={`예: ${field.example}`}
+              readOnly={saving}
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+            />
+          </div>
+          {isSleep ? (
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <Label htmlFor={`${id}-minutes`}>분</Label>
+              <Input
+                id={`${id}-minutes`}
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="예: 30"
+                readOnly={saving}
+                value={minutes}
+                onChange={(event) => setMinutes(event.target.value)}
+              />
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor={`${id}-from`}>적용 시작일</Label>
@@ -141,7 +177,9 @@ function GoalForm({
         </div>
       </div>
       <p className="text-caption text-muted-foreground">
-        시작일 전 날짜는 그때의 목표로 판정합니다.
+        {item === 'sober_days'
+          ? '주(월~일) 단위로 판정합니다. 주 중간에 바꾸면 그 주 전체를 새 목표로 판정하고, 그 전 주는 그때의 목표로 판정합니다.'
+          : '시작일 전 날짜는 그때의 목표로 판정합니다.'}
       </p>
       <Notice notice={notice} />
       <div className="flex flex-wrap gap-2">
@@ -166,7 +204,7 @@ function GoalHistory({
 }: {
   item: GoalItem;
   goals: Goals;
-  onRemoved: () => void;
+  onRemoved: (from: string) => void;
 }) {
   const changes = goals.history.filter((change) => change.item === item);
   if (changes.length === 0) return null;
@@ -185,7 +223,7 @@ function GoalHistory({
       }
     }
     toast.success('변경 기록을 삭제했습니다');
-    onRemoved();
+    onRemoved(from);
   };
 
   return (
@@ -339,7 +377,9 @@ export function GoalsSettings() {
                   <GoalHistory
                     item={item}
                     goals={goals}
-                    onRemoved={() => {
+                    onRemoved={(from) => {
+                      setGoals((current) => current && withoutChange(current, item, from));
+                      // Then the server's own answer, in case anything else changed meanwhile.
                       void load();
                       moveFocus(item);
                     }}

@@ -161,9 +161,9 @@ const goalsOf = (
 const cardOf = (title: string) =>
   screen.getByRole('heading', { name: title }).closest('[data-slot="card"]') as HTMLElement;
 
-test('a sleep goal is typed in hours and sent in minutes from the chosen date', async () => {
-  const saved = goalsOf({ sleep: { from: '2026-11-03', target: 450 } }, [
-    { item: 'sleep', from: '2026-11-03', target: 450 },
+test('a sleep goal is typed in hours and minutes and sent in minutes from the chosen date', async () => {
+  const saved = goalsOf({ sleep: { from: '2026-11-03', target: 430 } }, [
+    { item: 'sleep', from: '2026-11-03', target: 430 },
   ]);
   const fetchMock = server({ body: goalsOf() }, { body: saved });
   render(<GoalsSettings />);
@@ -173,8 +173,9 @@ test('a sleep goal is typed in hours and sent in minutes from the chosen date', 
   // The start date begins at the server's today.
   expect(within(sleep).getByLabelText('적용 시작일')).toHaveValue('2026-11-06');
   fireEvent.change(within(sleep).getByLabelText('하루 수면 시간 (시간)'), {
-    target: { value: '7.5' },
+    target: { value: '7' },
   });
+  fireEvent.change(within(sleep).getByLabelText('분'), { target: { value: '10' } });
   fireEvent.change(within(sleep).getByLabelText('적용 시작일'), {
     target: { value: '2026-11-03' },
   });
@@ -182,16 +183,17 @@ test('a sleep goal is typed in hours and sent in minutes from the chosen date', 
 
   await waitFor(() =>
     expect(
-      within(cardOf('수면')).getByText('지금 목표: 7시간 30분 이상 (2026-11-03부터)'),
+      within(cardOf('수면')).getByText('지금 목표: 7시간 10분 이상 (2026-11-03부터)'),
     ).toBeInTheDocument(),
   );
   expect(request(fetchMock, 1)).toEqual({
     url: '/api/goals/sleep',
     method: 'PUT',
-    body: { from: '2026-11-03', target: 450 },
+    body: { from: '2026-11-03', target: 430 },
   });
   // The form is refilled from what was saved.
-  expect(within(cardOf('수면')).getByLabelText('하루 수면 시간 (시간)')).toHaveValue('7.5');
+  expect(within(cardOf('수면')).getByLabelText('하루 수면 시간 (시간)')).toHaveValue('7');
+  expect(within(cardOf('수면')).getByLabelText('분')).toHaveValue('10');
   // The refilled form has a new Save button, so focus goes to the card's title instead of the page.
   await waitFor(() =>
     expect(document.activeElement).toBe(
@@ -289,4 +291,29 @@ test('a change after today is marked as coming, and one change can be deleted', 
     body: undefined,
   });
   expect(request(fetchMock, 2).url).toBe('/api/goals');
+  // The pressed button is gone with its row, so focus goes to the card's title.
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      within(cardOf('단백질')).getByRole('heading', { name: '단백질' }).parentElement,
+    ),
+  );
+});
+
+test('a deleted change stays gone even if reading the goals again fails', async () => {
+  const goals = goalsOf({ sleep: { from: '2026-11-05', target: 480 } }, [
+    { item: 'sleep', from: '2026-11-05', target: 480 },
+    { item: 'sleep', from, target: 420 },
+  ]);
+  server({ body: goals }, { status: 204 }, { status: 500, body: { error: '서버 오류' } });
+  render(<GoalsSettings />);
+  const history = await screen.findByRole('region', { name: '수면 목표 변경 기록' });
+  fireEvent.click(within(history).getByRole('button', { name: '2026-11-05 수면 목표 변경 삭제' }));
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '삭제' }));
+
+  expect(await screen.findByText('서버 오류')).toBeInTheDocument();
+  expect(within(history).queryByText(/2026-11-05부터/)).not.toBeInTheDocument();
+  // The goal before it holds again.
+  expect(
+    within(cardOf('수면')).getByText('지금 목표: 7시간 이상 (2026-11-01부터)'),
+  ).toBeInTheDocument();
 });

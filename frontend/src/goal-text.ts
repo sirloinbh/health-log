@@ -31,7 +31,7 @@ export type GoalDay = {
   checks: { dietKept: boolean | null; sleepGood: boolean | null } | null;
 };
 
-/** What the person types, and what it becomes for the API. Sleep is typed in hours, kept in minutes. */
+/** What the person types, and what it becomes for the API. Sleep is typed in hours and minutes. */
 export const goalFields: Record<
   GoalItem,
   { title: string; label: string; unit: string; min: number; max: number; example: string }
@@ -52,7 +52,7 @@ export const goalFields: Record<
     max: 1000,
     example: '100',
   },
-  sleep: { title: '수면', label: '하루 수면 시간', unit: '시간', min: 1, max: 24, example: '7.5' },
+  sleep: { title: '수면', label: '하루 수면 시간', unit: '시간', min: 1, max: 24, example: '7' },
   sober_days: { title: '금주', label: '주 금주 일수', unit: '일', min: 1, max: 7, example: '5' },
 };
 
@@ -76,24 +76,44 @@ export function targetText(item: GoalItem, target: number) {
 export const changeText = (item: GoalItem, target: number | null) =>
   target === null ? '목표 끔' : targetText(item, target);
 
-/** A number typed in the form, as the API takes it; a string says why it cannot be. */
-export function toTarget(item: GoalItem, value: number): number | string {
+/** A number typed in the form, as the API takes it; a string says why it cannot be. Not for sleep. */
+export function toTarget(item: Exclude<GoalItem, 'sleep'>, value: number): number | string {
   const { label, unit, min, max } = goalFields[item];
   if (value < min || value > max) return `${label}: ${min}~${max}${unit} 사이로 입력해 주세요`;
-  if (item === 'sleep') {
-    const minutes = value * 60;
-    // 7.33 hours is 439.8 minutes: no whole minute to store.
-    if (Math.abs(minutes - Math.round(minutes)) > 1e-9) {
-      return '수면 시간은 분 단위로 떨어지게 입력해 주세요 (예: 7.5)';
-    }
-    return Math.round(minutes);
-  }
   return Number.isInteger(value) ? value : `${label}: 정수로 입력해 주세요`;
 }
 
-/** The stored target as it is typed back into the form. */
-export const toTyped = (item: GoalItem, target: number) =>
-  String(item === 'sleep' ? Number((target / 60).toFixed(4)) : target);
+/**
+ * Sleep is typed as hours and minutes, like the sleep card, and kept in minutes. Hours alone as a
+ * decimal could not say 7시간 10분.
+ */
+export function toSleepTarget(hours: number, minutes: number): number | string {
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
+    return '수면 시간: 시간과 분은 정수로 입력해 주세요';
+  }
+  if (minutes > 59) return '수면 시간: 분은 0~59로 입력해 주세요';
+  const total = hours * 60 + minutes;
+  return total < 60 || total > 1440 ? '수면 시간: 1시간~24시간 사이로 입력해 주세요' : total;
+}
+
+/** A stored sleep target as its two fields. */
+export const sleepParts = (target: number) => ({
+  hours: String(Math.floor(target / 60)),
+  minutes: String(target % 60),
+});
+
+/**
+ * The goals once one change is deleted: the item's goal today is then its latest change on or
+ * before today, as the server counts it. Shown at once, so a failed reload cannot leave the deleted
+ * change on screen.
+ */
+export function withoutChange(goals: Goals, item: GoalItem, from: string): Goals {
+  const history = goals.history.filter((change) => !(change.item === item && change.from === from));
+  const latest = history.find((change) => change.item === item && change.from <= goals.today);
+  const current =
+    latest && latest.target !== null ? { from: latest.from, target: latest.target } : null;
+  return { ...goals, history, current: { ...goals.current, [item]: current } };
+}
 
 export const statusText: Record<Status, string> = {
   met: '달성',

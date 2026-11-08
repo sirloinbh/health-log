@@ -39,6 +39,25 @@ test('moving a period steps a week or a calendar month, across a year too', () =
   expect(shiftPeriod('month', '2026-12-01', 1)).toBe('2027-01-01');
 });
 
-test('a span reads as Korean month and day', () => {
-  expect(spanLabel({ from: '2026-11-02', to: '2026-11-08' })).toBe('11월 2일 ~ 11월 8일');
+test('a span of this year reads as Korean month and day', () => {
+  expect(spanLabel({ from: '2026-11-02', to: '2026-11-08' }, '2026-11-05')).toBe(
+    '11월 2일 ~ 11월 8일',
+  );
+});
+
+test('a span of another year, or across one, names the year (#129)', () => {
+  expect(spanLabel({ from: '1999-12-27', to: '2000-01-02' }, '2026-11-05')).toBe(
+    '1999년 12월 27일 ~ 2000년 1월 2일',
+  );
+  expect(spanLabel({ from: '2025-11-01', to: '2025-11-30' }, '2026-11-05')).toBe(
+    '2025년 11월 1일 ~ 11월 30일',
+  );
+  // A week across this new year names both years too.
+  expect(spanLabel({ from: '2026-12-28', to: '2027-01-03' }, '2026-12-30')).toBe(
+    '2026년 12월 28일 ~ 2027년 1월 3일',
+  );
+  // Without the server's today, which year is this one is unknown.
+  expect(spanLabel({ from: '2026-11-02', to: '2026-11-08' }, null)).toBe(
+    '2026년 11월 2일 ~ 11월 8일',
+  );
 });

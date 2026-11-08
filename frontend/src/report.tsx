@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './com
 import { Notice } from './components/ui/notice';
 import { SkeletonText } from './components/ui/skeleton';
 import { DailyBars } from './daily-bars';
-import { isValidDate } from './daily-date';
+import { dailyRangeText, earliestDate, inDailyRange, isValidDate, latestDate } from './daily-date';
 import { type Health, healthText } from './health';
 import { requestJson } from './lib/api';
 import { useNotice } from './lib/use-notice';
@@ -226,29 +226,55 @@ export function ReportPage({ health }: { health: Health }) {
   const [lastToday, setLastToday] = useState<string | null>(null);
   if (health.state === 'ok' && health.today !== lastToday) setLastToday(health.today);
   const today = health.state === 'ok' ? health.today : lastToday;
-  const date = asked && isValidDate(asked) ? asked : today;
+  // A date the daily page would not open holds no records: said, as there, instead of an empty
+  // report (#130).
+  const outOfRange = asked !== null && isValidDate(asked) && !inDailyRange(asked);
+  const date = outOfRange ? null : asked && isValidDate(asked) ? asked : today;
   const [report, setReport] = useState<Report | null>(null);
   const { notice, error, clear } = useNotice();
   const latest = useRef(0);
+  // While a retry is on its way its button stays, so keyboard focus is not dropped to the page;
+  // once the report is back, focus moves to the period it shows (#128).
+  const [retrying, setRetrying] = useState(false);
+  const focusSpan = useRef(false);
+  // "이번 주로 이동" goes with the word about a date out of range; its report takes the focus too.
+  const focusOnArrival = useRef(false);
+  const span = useRef<HTMLParagraphElement>(null);
 
-  const load = useCallback(async () => {
-    if (!date) return;
-    // A slow answer for a period already left must not replace the one on screen.
+  const load = useCallback(async (): Promise<'ok' | 'failed' | 'stale'> => {
+    // A slow answer for a period already left must not replace the one on screen, nor land next
+    // to the word about a date out of range.
     const request = ++latest.current;
     clear();
+    if (!date) return 'stale';
     try {
       const data = await requestJson<Report>(`/api/report?period=${period}&date=${date}`);
-      if (request === latest.current) setReport(data);
+      if (request !== latest.current) return 'stale';
+      setReport(data);
+      return 'ok';
     } catch (cause) {
-      if (request === latest.current) {
-        setReport(null);
-        error(cause);
-      }
+      if (request !== latest.current) return 'stale';
+      setReport(null);
+      error(cause);
+      return 'failed';
     }
   }, [clear, date, error, period]);
 
+  const retry = async () => {
+    setRetrying(true);
+    const outcome = await load();
+    // A retry for a period already left is over: the period change ended it, and a newer retry
+    // may be on its way, whose button must stay.
+    if (outcome === 'stale') return;
+    focusSpan.current = outcome === 'ok';
+    setRetrying(false);
+  };
+
   useEffect(() => {
     setReport(null);
+    // A retry for the period left is over: the one now asked for is not a retry.
+    setRetrying(false);
+    focusSpan.current = false;
     void load();
   }, [load]);
 
@@ -257,6 +283,24 @@ export function ReportPage({ health }: { health: Health }) {
 
   const words = periodWords[period];
   const shown = report && report.period === period ? report : null;
+
+  useEffect(() => {
+    if (!shown) return;
+    if (focusOnArrival.current) {
+      focusOnArrival.current = false;
+      focusSpan.current = true;
+    }
+    if (retrying || !focusSpan.current) return;
+    focusSpan.current = false;
+    // Only focus that the gone button dropped; somewhere the person moved to meanwhile stays.
+    if (document.activeElement === document.body || document.activeElement === null) {
+      span.current?.focus();
+    }
+  }, [retrying, shown]);
+
+  // The first and last periods holding a day the daily page opens (#130).
+  const atStart = shown !== null && shown.current.from <= earliestDate;
+  const atEnd = shown !== null && shown.current.to >= latestDate;
 
   return (
     <section aria-labelledby="page-title" className="flex flex-col gap-6">
@@ -293,22 +337,48 @@ export function ReportPage({ health }: { health: Health }) {
         </div>
         {shown ? (
           <div className="flex items-center gap-2">
+            {/* aria-disabled, not disabled: a disabled button drops the focus of whoever pressed
+                it, as the daily page's day links do at the range's ends. */}
             <Button
               variant="outline"
               size="icon"
               aria-label={`이전 ${words.name}`}
-              onClick={() => go({ date: shiftPeriod(period, shown.current.from, -1) })}
+              aria-disabled={atStart || undefined}
+              aria-description={atStart ? dailyRangeText : undefined}
+              title={atStart ? dailyRangeText : undefined}
+              className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+              onClick={() => {
+                // The previous period may start before the range while holding 2000-01-01, as
+                // the week of 1999-12-27 does: that period is asked for by its first day in range.
+                if (!atStart) {
+                  const previous = shiftPeriod(period, shown.current.from, -1);
+                  go({ date: previous < earliestDate ? earliestDate : previous });
+                }
+              }}
             >
               <ChevronLeft aria-hidden />
             </Button>
-            <p aria-live="polite" className="text-body-sm">
-              {spanLabel(shown.current)}
+            <p
+              ref={span}
+              tabIndex={-1}
+              aria-live="polite"
+              className="text-body-sm break-keep outline-none"
+            >
+              {/* A date with its year no longer fits a phone's row: the line breaks only at "~",
+                  never inside "2000년 1월 2일". */}
+              {spanLabel(shown.current, today).replace(/(?<!~) (?!~)/g, ' ')}
             </p>
             <Button
               variant="outline"
               size="icon"
               aria-label={`다음 ${words.name}`}
-              onClick={() => go({ date: shiftPeriod(period, shown.current.from, 1) })}
+              aria-disabled={atEnd || undefined}
+              aria-description={atEnd ? dailyRangeText : undefined}
+              title={atEnd ? dailyRangeText : undefined}
+              className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+              onClick={() => {
+                if (!atEnd) go({ date: shiftPeriod(period, shown.current.from, 1) });
+              }}
             >
               <ChevronRight aria-hidden />
             </Button>
@@ -320,19 +390,44 @@ export function ReportPage({ health }: { health: Health }) {
           </div>
         ) : null}
       </nav>
+      {outOfRange ? (
+        <>
+          <Notice notice={{ kind: 'error', text: `${dailyRangeText}: ${asked}` }} />
+          {today ? (
+            <Button
+              variant="outline"
+              className="self-start"
+              onClick={() => {
+                // The button goes with the word, which would drop keyboard focus to the page.
+                focusOnArrival.current = true;
+                go({ date: today });
+              }}
+            >
+              이번 {words.name}로 이동
+            </Button>
+          ) : null}
+        </>
+      ) : null}
       <Notice notice={notice} />
-      {notice && date ? (
-        <Button variant="outline" className="self-start" onClick={() => void load()}>
+      {(notice || retrying) && date ? (
+        <Button
+          variant="outline"
+          className="self-start aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+          aria-disabled={retrying || undefined}
+          onClick={() => {
+            if (!retrying) void retry();
+          }}
+        >
           다시 시도
         </Button>
       ) : null}
-      {!date && health.state === 'error' ? (
+      {!date && !outOfRange && health.state === 'error' ? (
         <p className="text-body-sm break-keep text-muted-foreground">
           서버의 오늘 날짜를 알 수 없어 리포트를 불러오지 못했습니다. 서버 연결이 돌아오면 다시
           불러옵니다.
         </p>
       ) : null}
-      {!shown && !notice && (date || health.state === 'loading') ? (
+      {!shown && !notice && !outOfRange && (date || health.state === 'loading') ? (
         <div role="status" aria-busy="true" aria-label="리포트 불러오는 중">
           <SkeletonText lines={3} />
         </div>

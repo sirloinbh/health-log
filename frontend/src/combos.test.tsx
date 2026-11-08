@@ -457,6 +457,9 @@ test('the same failure twice is said twice, as the message is cleared before eac
       'aria-disabled',
       'true',
     );
+    // Pressing it while busy keeps the dialog, and the save, going.
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
     finishers[finish](json({ error: '같은 이름의 조합이 이미 있습니다' }, 409));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       '같은 이름의 조합이 이미 있습니다',

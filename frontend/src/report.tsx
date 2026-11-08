@@ -11,6 +11,7 @@ import { isValidDate } from './daily-date';
 import { type Health, healthText } from './health';
 import { requestJson } from './lib/api';
 import { useNotice } from './lib/use-notice';
+import { RemindersCard } from './reminders';
 import {
   changeText,
   daysText,
@@ -274,6 +275,8 @@ export function ReportPage({ health }: { health: Health }) {
           </p>
         )}
       </header>
+      {/* Keyed by the service day, so an open dashboard moves on at midnight (#48). */}
+      {today ? <RemindersCard key={today} /> : null}
       <nav aria-label="기간 선택" className="flex flex-wrap items-center gap-2">
         <div role="group" aria-label="기간 단위" className="flex gap-2">
           {periods.map(({ value, label }) => (

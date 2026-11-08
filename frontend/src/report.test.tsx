@@ -46,10 +46,17 @@ const reportOf = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+// The dashboard also shows what is coming up (#48).
+const noReminders = { today: today, until: '2026-11-12', leadDays: 7, reminders: [] };
+
 const serve = (report: (url: string) => Response | Promise<Response>) => {
   const fetchMock = vi.fn((url: string) =>
     Promise.resolve(
-      url.startsWith('/api/report') ? report(url) : new Response(JSON.stringify({ today })),
+      url.startsWith('/api/report')
+        ? report(url)
+        : url === '/api/reminders'
+          ? json(noReminders)
+          : new Response(JSON.stringify({ today })),
     ),
   );
   vi.stubGlobal('fetch', fetchMock);
@@ -292,9 +299,11 @@ test('one failed check of the server keeps the report already on screen', async 
     Promise.resolve(
       url.startsWith('/api/report')
         ? json(reportOf())
-        : healthy
-          ? json({ today })
-          : json({ error: '서버에 연결할 수 없습니다' }, 503),
+        : url === '/api/reminders'
+          ? json(noReminders)
+          : healthy
+            ? json({ today })
+            : json({ error: '서버에 연결할 수 없습니다' }, 503),
     ),
   );
   vi.stubGlobal('fetch', fetchMock);

@@ -70,6 +70,9 @@ const noGoals = (url: string) =>
     }),
   );
 
+// Today's page shows what is coming up (#48).
+const noReminders = { today: '2026-03-15', until: '2026-03-22', leadDays: 7, reminders: [] };
+
 // The day's cards load along with the page.
 const dayCard = (url: string) =>
   url.startsWith('/api/sleep')
@@ -84,7 +87,9 @@ const dayCard = (url: string) =>
             ? noGoals(url)
             : url === '/api/foods/recent'
               ? new Response(JSON.stringify({ foods: [] }))
-              : null;
+              : url === '/api/reminders'
+                ? new Response(JSON.stringify(noReminders))
+                : null;
 
 const health = (body: object, status = 200) =>
   vi.stubGlobal(
@@ -497,4 +502,20 @@ test('a word about the range left on one day does not come back after going ther
   fireEvent.click(screen.getByRole('link', { name: '이전 날' }));
   expect(await screen.findByText('2026년 3월 15일 일요일')).toBeInTheDocument();
   expect(message()).not.toBeInTheDocument();
+});
+
+test("today's page shows what is coming up, and another day does not ask for it (#48)", async () => {
+  const fetchMock = vi.fn((url: string) =>
+    Promise.resolve(dayCard(url) ?? new Response(JSON.stringify({ today: '2026-03-15' }))),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  open('/daily/2026-03-15');
+  expect(
+    await screen.findByText('7일 안에 다가오는 병원 예약이나 약 복용 종료가 없습니다.'),
+  ).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('link', { name: '이전 날' }));
+  await screen.findByText('2026년 3월 14일 토요일');
+  await screen.findByLabelText('취침 시각');
+  expect(screen.queryByRole('heading', { name: '다가오는 일정' })).not.toBeInTheDocument();
+  expect(fetchMock.mock.calls.filter(([url]) => url === '/api/reminders')).toHaveLength(1);
 });

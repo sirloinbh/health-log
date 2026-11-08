@@ -20,6 +20,7 @@ import { GoalsCard } from './goals';
 import { HabitsCard } from './habits';
 import { type Health, healthText } from './health';
 import { MealCard } from './meals';
+import { RemindersCard } from './reminders';
 import { SleepCard } from './sleep';
 import { VisitsCard } from './visit-card';
 
@@ -194,6 +195,8 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
       </p>
       {/* An explicit column: an implicit one grows with its content, past the edge of a phone. */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {/* Coming days are counted from the real today, so only today's page shows them (#48). */}
+        {today === date ? <RemindersCard key={`reminders-${date}`} /> : null}
         <SleepCard key={date} date={date} />
         <MealCard key={`meal-${date}`} date={date} />
         <BodyCard key={`body-${date}`} date={date} />

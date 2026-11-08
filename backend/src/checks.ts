@@ -7,6 +7,7 @@ import { parseDate } from './dates.js';
 import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.js';
 import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError } from './standard/http.js';
+import { charCount } from './text.js';
 
 // null: not checked. Never read as false.
 const check = (label: string) =>
@@ -23,9 +24,9 @@ const checkInput = z
       memo: z
         .string({ error: '메모가 올바르지 않습니다' })
         .trim()
-        .max(200, '메모는 200자 이하로 입력해 주세요')
-        // PostgreSQL text cannot hold U+0000; refused here it is a 400, not a 500.
-        .refine((value) => !value.includes('\u0000'), '메모에 쓸 수 없는 문자가 있습니다')
+        // Counted as the database's char_length does, so 200 emoji fit as the screen says.
+        // U+0000 is refused for every request by rejectNul in app.ts.
+        .refine((value) => charCount(value) <= 200, '메모는 200자 이하로 입력해 주세요')
         .nullable()
         .default(null)
         .transform((value) => value || null),

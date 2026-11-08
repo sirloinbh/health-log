@@ -12,7 +12,7 @@ import { Notice } from './components/ui/notice';
 import { SkeletonText } from './components/ui/skeleton';
 import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
-import { isValidDate } from './daily-date';
+import { earliestDate, inDailyRange, isValidDate, latestDate } from './daily-date';
 import {
   actualText,
   changeText,
@@ -39,8 +39,6 @@ import { parseAmount, unreadableAmount } from './number-input';
 import { trackWrite, writesSettled } from './pending-writes';
 
 const goalsPath = '/api/goals';
-const earliestDate = '2000-01-01';
-const latestDate = '9999-12-31';
 
 const badgeVariant = {
   met: 'success',
@@ -81,8 +79,13 @@ function GoalForm({
   const id = `goal-${item}`;
 
   const save = async (target: number | null) => {
-    if (!isValidDate(from) || from < earliestDate) {
+    if (!isValidDate(from)) {
       error('적용 시작일을 골라 주세요');
+      return;
+    }
+    // The same days the daily page can show (#50), so every goal can be seen judged.
+    if (!inDailyRange(from)) {
+      error(`적용 시작일은 ${earliestDate}부터 ${latestDate}까지 고를 수 있습니다`);
       return;
     }
     setSaving(true);

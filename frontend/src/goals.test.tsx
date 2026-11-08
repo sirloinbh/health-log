@@ -245,6 +245,26 @@ test('a value the goal cannot take is refused before sending', async () => {
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
+test('a start date outside the days the daily page shows is refused', async () => {
+  const fetchMock = server({ body: goalsOf() });
+  render(<GoalsSettings />);
+  await screen.findByRole('heading', { name: '단백질' });
+  const protein = cardOf('단백질');
+  fireEvent.change(within(protein).getByLabelText('하루 단백질 하한 (g)'), {
+    target: { value: '100' },
+  });
+  fireEvent.change(within(protein).getByLabelText('적용 시작일'), {
+    target: { value: '2100-01-01' },
+  });
+  fireEvent.click(within(protein).getByRole('button', { name: '저장' }));
+  expect(
+    await within(protein).findByText(
+      '적용 시작일은 2000-01-01부터 2099-12-31까지 고를 수 있습니다',
+    ),
+  ).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
 test('unreadable sleep minutes are refused, not saved as no minutes', async () => {
   const fetchMock = server({ body: goalsOf() });
   render(<GoalsSettings />);

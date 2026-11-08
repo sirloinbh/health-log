@@ -6,6 +6,7 @@ import { z } from 'zod/v4';
 import { parseDate } from './dates.js';
 import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError } from './standard/http.js';
+import { charCount } from './text.js';
 
 const maxRangeDays = 366;
 
@@ -41,7 +42,7 @@ const bodyInput = z
       memo: z
         .string({ error: '메모가 올바르지 않습니다' })
         .trim()
-        .max(500, '메모는 500자 이하로 입력해 주세요')
+        .refine((value) => charCount(value) <= 500, '메모는 500자 이하로 입력해 주세요')
         .nullable()
         .default(null)
         .transform((value) => value || null),

@@ -13,6 +13,7 @@ import { defaultRateLimit, type RateLimitSettings } from './rate-limit.js';
 import { reportRouter } from './report.js';
 import { sleepRouter } from './sleep.js';
 import { errorHandler, notFound } from './standard/http.js';
+import { rejectNul } from './text.js';
 
 // DATE columns stay YYYY-MM-DD strings so the service time zone never shifts them.
 types.setTypeParser(1082, (value) => value);
@@ -37,6 +38,7 @@ export function createApp(
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '256kb' }));
+  app.use(rejectNul);
   app.get('/api/health', async (_req, res) => {
     await pool.query('SELECT 1');
     res.json({ ok: true, service: 'health-log', today: today() });

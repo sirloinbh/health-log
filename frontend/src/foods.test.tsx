@@ -599,3 +599,161 @@ test('Enter in a field while saving sends nothing more, and the same failure twi
   expect(await within(dialog).findByRole('alert')).toHaveTextContent('이미 등록된 항목입니다');
   expect(posts()).toHaveLength(2);
 });
+
+const label = `총 내용량 90g
+1봉지(45g)당 230kcal
+나트륨 210mg 탄수화물 25g 당류 1g 미만 지방 13g 트랜스지방 0g 포화지방 4g 단백질 3g`;
+
+test('a pasted nutrition table fills the form, and nothing is saved until 저장 is pressed', async () => {
+  const fetchMock = serve((_url, init) =>
+    init?.method === 'POST' ? json({ ...food, id: 2 }, 201) : json({ foods: [] }),
+  );
+  open();
+  const { dialog } = await openWith('음식 추가');
+  fireEvent.change(within(dialog).getByLabelText('영양성분 표 붙여넣기'), {
+    target: { value: label },
+  });
+  fireEvent.click(within(dialog).getByRole('button', { name: '표 읽어 채우기' }));
+
+  const summary = within(dialog).getByRole('status');
+  expect(summary).toHaveTextContent('채운 칸: 1회 제공량, 칼로리, 탄수화물, 단백질, 지방, 나트륨');
+  expect(summary).toHaveTextContent('"미만" 표기라 비운 칸: 당류');
+  expect(summary).toHaveTextContent('1회 제공량(45g)의 2배, 약 460kcal');
+  expect(within(dialog).getByLabelText('1회 제공량')).toHaveValue('45');
+  expect(within(dialog).getByLabelText('단위')).toHaveValue('g');
+  expect(within(dialog).getByLabelText('칼로리 (kcal)')).toHaveValue('230');
+  expect(within(dialog).getByLabelText('지방 (g)')).toHaveValue('13');
+  expect(within(dialog).getByLabelText('나트륨 (mg)')).toHaveValue('210');
+  expect(within(dialog).getByLabelText('당류 (g)')).toHaveValue('');
+  // The values are the product's own label, checked today.
+  expect(within(dialog).getByRole('combobox', { name: '출처 종류' })).toHaveTextContent(
+    '제품 표기',
+  );
+  expect(within(dialog).getByLabelText('확인 날짜')).not.toHaveValue('');
+  // Reading the table sends nothing.
+  expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
+
+  fireEvent.change(within(dialog).getByLabelText('음식 이름'), { target: { value: '감자칩' } });
+  fireEvent.change(within(dialog).getByLabelText('출처 주소'), {
+    target: { value: 'https://www.coupang.com/vp/products/1' },
+  });
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  await vi.waitFor(() =>
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1),
+  );
+  const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'POST')!;
+  expect(JSON.parse(String(init?.body))).toMatchObject({
+    name: '감자칩',
+    servingSize: 45,
+    servingUnit: 'g',
+    calories: 230,
+    carbs: 25,
+    protein: 3,
+    fat: 13,
+    sugars: null,
+    sodium: 210,
+    sourceType: 'label',
+    sourceUrl: 'https://www.coupang.com/vp/products/1',
+  });
+  // Only the app's own API was called: the shop link is never opened.
+  expect(fetchMock.mock.calls.every(([url]) => String(url).startsWith('/api/'))).toBe(true);
+});
+
+test('text without a table says so and changes nothing', async () => {
+  serve(() => json({ foods: [] }));
+  open();
+  const { dialog } = await openWith('음식 추가');
+  fireEvent.change(within(dialog).getByLabelText('영양성분 표 붙여넣기'), {
+    target: { value: '맛있는 감자칩 로켓배송' },
+  });
+  fireEvent.click(within(dialog).getByRole('button', { name: '표 읽어 채우기' }));
+  expect(within(dialog).getByRole('alert')).toHaveTextContent('영양성분 표를 찾지 못했습니다');
+  expect(within(dialog).getByLabelText('1회 제공량')).toHaveValue('');
+  expect(within(dialog).getByRole('combobox', { name: '출처 종류' })).toHaveTextContent(
+    '직접 입력',
+  );
+});
+
+test('a Coupang source link explains that the app never opens it', async () => {
+  serve(() => json({ foods: [] }));
+  open();
+  const { dialog } = await openWith('음식 추가');
+  const url = within(dialog).getByLabelText('출처 주소');
+  expect(within(dialog).queryByText(/쿠팡 링크는 출처로만 저장합니다/)).not.toBeInTheDocument();
+  fireEvent.change(url, { target: { value: 'https://link.coupang.com/a/abc' } });
+  const help = within(dialog).getByText(/쿠팡 링크는 출처로만 저장합니다/);
+  expect(url).toHaveAttribute('aria-describedby', help.id);
+  fireEvent.change(url, { target: { value: 'https://example.com/menu' } });
+  expect(within(dialog).queryByText(/쿠팡 링크는 출처로만 저장합니다/)).not.toBeInTheDocument();
+});
+
+test('reading a table into a published food clears stale values and marks it as the label', async () => {
+  serve(() => json({ foods: [{ ...food, sugars: 10, fat: 9, checkedOn: '2026-10-31' }] }));
+  open();
+  const { dialog } = await openWith('치즈버거 수정');
+  expect(within(dialog).getByLabelText('당류 (g)')).toHaveValue('10');
+  fireEvent.change(within(dialog).getByLabelText('영양성분 표 붙여넣기'), {
+    target: { value: '영양정보 1회 제공량 100g 열량 280kcal 당류 1g 미만 단백질 12g' },
+  });
+  fireEvent.click(within(dialog).getByRole('button', { name: '표 읽어 채우기' }));
+
+  // "미만" really empties the field, and so does a nutrient the new table leaves out.
+  expect(within(dialog).getByLabelText('당류 (g)')).toHaveValue('');
+  expect(within(dialog).getByLabelText('지방 (g)')).toHaveValue('');
+  expect(within(dialog).getByLabelText('칼로리 (kcal)')).toHaveValue('280');
+  const summary = within(dialog).getByRole('status');
+  expect(summary).toHaveTextContent('표에서 읽지 못해 비운 칸: 탄수화물, 지방, 나트륨');
+  expect(summary).toHaveTextContent('출처 종류를 "제품 표기"로 바꿨습니다');
+  // Read today, not the date of the official source it replaced.
+  expect(within(dialog).getByRole('combobox', { name: '출처 종류' })).toHaveTextContent(
+    '제품 표기',
+  );
+  expect(within(dialog).getByLabelText('확인 날짜')).not.toHaveValue('2026-10-31');
+});
+
+test('reading the same table again announces the result again', async () => {
+  serve(() => json({ foods: [] }));
+  open();
+  const { dialog } = await openWith('음식 추가');
+  fireEvent.change(within(dialog).getByLabelText('영양성분 표 붙여넣기'), {
+    target: { value: '100g당 250kcal 단백질 5g' },
+  });
+  const read = within(dialog).getByRole('button', { name: '표 읽어 채우기' });
+  fireEvent.click(read);
+  const first = within(dialog).getByRole('status');
+  fireEvent.click(read);
+  // A new element, so a screen reader reads it out instead of seeing no change.
+  expect(within(dialog).getByRole('status')).not.toBe(first);
+});
+
+test('a table without a basis keeps the fields it does not give', async () => {
+  serve(() => json({ foods: [{ ...food, sugars: 10 }] }));
+  open();
+  const { dialog } = await openWith('치즈버거 수정');
+  fireEvent.change(within(dialog).getByLabelText('영양성분 표 붙여넣기'), {
+    target: { value: '열량 310kcal' },
+  });
+  fireEvent.click(within(dialog).getByRole('button', { name: '표 읽어 채우기' }));
+  expect(within(dialog).getByLabelText('칼로리 (kcal)')).toHaveValue('310');
+  expect(within(dialog).getByLabelText('당류 (g)')).toHaveValue('10');
+  expect(within(dialog).getByLabelText('1회 제공량')).toHaveValue('120');
+  expect(within(dialog).getByRole('status')).toHaveTextContent('1회 제공량을 찾지 못했습니다');
+});
+
+test('a basis read without any value changes nothing', async () => {
+  serve(() => json({ foods: [{ ...food, sugars: 10 }] }));
+  open();
+  const { dialog } = await openWith('치즈버거 수정');
+  fireEvent.change(within(dialog).getByLabelText('영양성분 표 붙여넣기'), {
+    target: { value: '100g당\n나트륨 15% 300mg\n탄수화물 9% 30g' },
+  });
+  fireEvent.click(within(dialog).getByRole('button', { name: '표 읽어 채우기' }));
+  expect(within(dialog).getByRole('alert')).toHaveTextContent(
+    '기준량(100g)은 찾았지만 영양성분 값을 읽지 못해 아무 칸도 바꾸지 않았습니다',
+  );
+  expect(within(dialog).getByLabelText('1회 제공량')).toHaveValue('120');
+  expect(within(dialog).getByLabelText('당류 (g)')).toHaveValue('10');
+  expect(within(dialog).getByRole('combobox', { name: '출처 종류' })).toHaveTextContent(
+    '공식 자료',
+  );
+});

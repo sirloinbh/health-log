@@ -155,6 +155,8 @@ test.each(cases)(
 
     // Saving: still focusable, marked busy, and a second press sends nothing.
     await waitFor(() => expect(save).toHaveAttribute('aria-disabled', 'true'));
+    // The check that matters: jsdom keeps focus on a button that becomes disabled, but a browser
+    // drops it to the page, so toHaveFocus alone would pass with the old disabled button.
     expect(save).toBeEnabled();
     expect(save).toHaveFocus();
     fireEvent.click(save);
@@ -175,16 +177,19 @@ test.each(cases)(
   },
 );
 
-test('a submit while the form is saving does not send it again', async () => {
-  const { writes } = server(() => ({ record: null }));
-  render(<SleepCard date={date} />);
-  const save = await cases[0].fill();
-  fireEvent.click(save);
-  await waitFor(() => expect(save).toHaveAttribute('aria-disabled', 'true'));
-  // Enter in a field submits the form without pressing the button.
-  fireEvent.submit(save.closest('form') as HTMLElement);
-  expect(writes()).toBe(1);
-});
+test.each(cases)(
+  '$name: a submit while the form is saving does not send it again',
+  async ({ ui, empty, fill }) => {
+    const { writes } = server(empty);
+    render(ui);
+    const save = await fill();
+    fireEvent.click(save);
+    await waitFor(() => expect(save).toHaveAttribute('aria-disabled', 'true'));
+    // Enter in a field submits the form without pressing the button.
+    fireEvent.submit(save.closest('form') as HTMLElement);
+    expect(writes()).toBe(1);
+  },
+);
 
 test('a busy button ignores presses and does not submit its form', () => {
   const pressed = vi.fn();

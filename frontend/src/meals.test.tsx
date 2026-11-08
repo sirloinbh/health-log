@@ -249,7 +249,7 @@ test('the server refusing an entry shows why and keeps what was typed', async ()
   fireEvent.click(screen.getByRole('button', { name: '바로 기록' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('칼로리가 너무 큽니다');
   expect(screen.getByLabelText('음식 이름')).toHaveValue('떡볶이');
-  expect(screen.getByRole('button', { name: '바로 기록' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: '바로 기록' })).not.toHaveAttribute('aria-disabled');
 });
 
 test('an entry in flight cannot be sent twice', async () => {
@@ -264,11 +264,11 @@ test('an entry in flight cannot be sent twice', async () => {
   await screen.findByLabelText('음식 검색');
   const add = await searchFood();
   fireEvent.click(add);
-  await waitFor(() => expect(add).toBeDisabled());
+  await waitFor(() => expect(add).toHaveAttribute('aria-disabled', 'true'));
   fireEvent.click(add);
   expect(fetchMock).toHaveBeenCalledTimes(3);
   finish(new Response(JSON.stringify(oneEntry), { status: 201 }));
-  await waitFor(() => expect(add).toBeEnabled());
+  await waitFor(() => expect(add).not.toHaveAttribute('aria-disabled'));
 });
 
 test('the typed form also waits for its request, and shows that it is working', async () => {
@@ -284,7 +284,7 @@ test('the typed form also waits for its request, and shows that it is working', 
   fireEvent.change(screen.getByLabelText('1회 칼로리 (kcal)'), { target: { value: '480' } });
   const save = screen.getByRole('button', { name: /바로 기록/ });
   fireEvent.click(save);
-  await waitFor(() => expect(save).toBeDisabled());
+  await waitFor(() => expect(save).toHaveAttribute('aria-disabled', 'true'));
   expect(screen.getByRole('status', { name: '기록하는 중' })).toBeInTheDocument();
   fireEvent.click(save);
   expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -292,7 +292,7 @@ test('the typed form also waits for its request, and shows that it is working', 
   // Typed while waiting: the next entry, which finishing this one must not wipe.
   fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '김밥' } });
   finish(new Response(JSON.stringify(oneEntry), { status: 201 }));
-  await waitFor(() => expect(save).toBeEnabled());
+  await waitFor(() => expect(save).not.toHaveAttribute('aria-disabled'));
   expect(screen.getByLabelText('음식 이름')).toHaveValue('김밥');
   expect(screen.getByLabelText('1회 칼로리 (kcal)')).toHaveValue('');
 });
@@ -314,11 +314,11 @@ test('a junk food mark changed while waiting belongs to the next entry', async (
   expect(mark).toHaveAccessibleDescription('위의 이 주·이 달 정크푸드 횟수로 셉니다.');
   const save = screen.getByRole('button', { name: /바로 기록/ });
   fireEvent.click(save);
-  await waitFor(() => expect(save).toBeDisabled());
+  await waitFor(() => expect(save).toHaveAttribute('aria-disabled', 'true'));
   fireEvent.click(mark);
   expect(mark).toBeChecked();
   finish(new Response(JSON.stringify(oneEntry), { status: 201 }));
-  await waitFor(() => expect(save).toBeEnabled());
+  await waitFor(() => expect(save).not.toHaveAttribute('aria-disabled'));
   expect(screen.getByRole('checkbox', { name: '정크푸드' })).toBeChecked();
 });
 
@@ -514,7 +514,7 @@ test('a searched food the server refuses says why and can be tried again', async
   const add = await searchFood();
   fireEvent.click(add);
   expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
-  await waitFor(() => expect(add).toBeEnabled());
+  await waitFor(() => expect(add).not.toHaveAttribute('aria-disabled'));
 });
 
 test('a search says how many it found', async () => {
@@ -813,7 +813,9 @@ test('a meal with nothing to copy says which day and meal were empty', async () 
     '2026년 3월 14일 토요일 저녁에 복사할 기록이 없습니다',
   );
   expect(screen.getByText('아직 기록한 식사가 없습니다.')).toBeInTheDocument();
-  expect(within(form).getByRole('button', { name: '저녁 복사' })).toBeEnabled();
+  expect(within(form).getByRole('button', { name: '저녁 복사' })).not.toHaveAttribute(
+    'aria-disabled',
+  );
 });
 
 test('another failure to copy shows the server message next to the copy button', async () => {
@@ -838,12 +840,12 @@ test('while a copy is on its way the button says so and cannot copy twice', asyn
   expect(button).toHaveAccessibleDescription(/그대로 더합니다/);
   fireEvent.click(button);
 
-  await waitFor(() => expect(button).toBeDisabled());
+  await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'true'));
   expect(button).toHaveAttribute('aria-busy', 'true');
   fireEvent.click(button);
   finish(new Response(JSON.stringify(oneEntry), { status: 201 }));
   expect(await screen.findByText('버거집 치즈버거')).toBeInTheDocument();
-  expect(button).toBeEnabled();
+  expect(button).not.toHaveAttribute('aria-disabled');
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
 
@@ -931,7 +933,9 @@ test('recent foods that cannot be read say why and can be read again', async () 
 
   fail = false;
   fireEvent.click(within(section).getByRole('button', { name: '다시 불러오기' }));
-  expect(await within(section).findByRole('button', { name: '샘플 햇반 추가' })).toBeEnabled();
+  expect(
+    await within(section).findByRole('button', { name: '샘플 햇반 추가' }),
+  ).not.toHaveAttribute('aria-disabled');
   expect(within(section).queryByRole('button', { name: '다시 불러오기' })).not.toBeInTheDocument();
   expect(within(section).queryByRole('alert')).not.toBeInTheDocument();
   // The retry button is gone, so focus goes to the list's heading rather than the page.
@@ -954,7 +958,9 @@ test('recording a combo or a copy reads the recent foods again; typed food does 
   fireEvent.change(screen.getByLabelText('1회 칼로리 (kcal)'), { target: { value: '480' } });
   fireEvent.click(screen.getByRole('button', { name: '바로 기록' }));
   await screen.findByText('버거집 치즈버거');
-  await waitFor(() => expect(screen.getByRole('button', { name: '바로 기록' })).toBeEnabled());
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: '바로 기록' })).not.toHaveAttribute('aria-disabled'),
+  );
   expect(recentCalls).toHaveLength(1);
 
   fireEvent.click(within(copyForm()).getByRole('button', { name: '아침 복사' }));

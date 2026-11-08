@@ -94,7 +94,7 @@ test('the server refusing the times shows its reason and keeps what was typed', 
     '기상 시각은 취침 시각보다 늦어야 합니다',
   );
   expect(screen.getByLabelText('취침 시각')).toHaveValue('07:00');
-  expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: '저장' })).not.toHaveAttribute('aria-disabled');
 });
 
 test('editing starts from the saved times and cancel changes nothing', async () => {
@@ -201,7 +201,7 @@ test('a save in flight cannot be sent twice', async () => {
   typeTimes('23:30', '07:00');
   const save = screen.getByRole('button', { name: '저장' });
   fireEvent.click(save);
-  await waitFor(() => expect(save).toBeDisabled());
+  await waitFor(() => expect(save).toHaveAttribute('aria-disabled', 'true'));
   expect(screen.getByRole('status', { name: '저장하는 중' })).toBeInTheDocument();
   fireEvent.click(save);
   expect(fetchMock).toHaveBeenCalledTimes(2);

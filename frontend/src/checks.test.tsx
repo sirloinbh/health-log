@@ -194,7 +194,7 @@ test('a server refusal is shown and the answers stay', async () => {
     'aria-pressed',
     'true',
   );
-  expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: '저장' })).not.toHaveAttribute('aria-disabled');
 });
 
 test('a failed load can be tried again', async () => {

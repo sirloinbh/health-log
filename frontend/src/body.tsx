@@ -7,6 +7,7 @@ import {
   formatChange,
   formatSpan,
 } from './body-change';
+import { BusyButton } from './busy-button';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
@@ -72,7 +73,7 @@ function BodyForm({
 }) {
   const [form, setForm] = useState(() => formOf(record));
   const [saving, setSaving] = useState(false);
-  const { notice, error } = useNotice();
+  const { notice, error, clear } = useNotice();
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -84,11 +85,15 @@ function BodyForm({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // The save button stays pressable while saving (#126), and Enter in a field submits too.
+    if (saving) return;
     const unreadable = numberFields.find(({ key }) => parseAmount(form[key]) === undefined);
     if (unreadable) {
       error(unreadableAmount(unreadable.label));
       return;
     }
+    // A repeated failure then appears anew and is announced again (as in #98).
+    clear();
     setSaving(true);
     try {
       onSaved(
@@ -136,14 +141,14 @@ function BodyForm({
       </div>
       <Notice notice={notice} />
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={saving} aria-busy={saving || undefined}>
+        <BusyButton type="submit" busy={saving} aria-busy={saving || undefined}>
           {saving ? <Spinner size="sm" label="저장하는 중" /> : null}
           저장
-        </Button>
+        </BusyButton>
         {onCancel ? (
-          <Button type="button" variant="outline" disabled={saving} onClick={onCancel}>
+          <BusyButton type="button" variant="outline" busy={saving} onClick={onCancel}>
             취소
-          </Button>
+          </BusyButton>
         ) : null}
       </div>
     </form>

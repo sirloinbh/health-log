@@ -1,6 +1,7 @@
 import { Plus, X } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
+import { BusyButton } from './busy-button';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
@@ -189,7 +190,7 @@ function HabitForm({
 }) {
   const [form, setForm] = useState(() => formOf(record));
   const [saving, setSaving] = useState(false);
-  const { notice, error } = useNotice();
+  const { notice, error, clear } = useNotice();
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -204,11 +205,15 @@ function HabitForm({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // The save button stays pressable while saving (#126), and Enter in a field submits too.
+    if (saving) return;
     const body = readForm(form);
     if (typeof body === 'string') {
       error(body);
       return;
     }
+    // A repeated failure then appears anew and is announced again (as in #98).
+    clear();
     setSaving(true);
     try {
       onSaved(
@@ -297,14 +302,14 @@ function HabitForm({
       </fieldset>
       <Notice notice={notice} />
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={saving} aria-busy={saving || undefined}>
+        <BusyButton type="submit" busy={saving} aria-busy={saving || undefined}>
           {saving ? <Spinner size="sm" label="저장하는 중" /> : null}
           저장
-        </Button>
+        </BusyButton>
         {onCancel ? (
-          <Button type="button" variant="outline" disabled={saving} onClick={onCancel}>
+          <BusyButton type="button" variant="outline" busy={saving} onClick={onCancel}>
             취소
-          </Button>
+          </BusyButton>
         ) : null}
       </div>
     </form>

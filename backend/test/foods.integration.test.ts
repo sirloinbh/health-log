@@ -421,16 +421,36 @@ test('with 150 matching foods, paging reaches every one exactly once', { skip },
     assert.equal(pages, 2);
     assert.equal(seen.length, 150);
     assert.equal(new Set(seen).size, 150);
-
-    // Without a search word the pages cover the whole store too.
-    const { rows } = await pool.query<{ count: string }>('SELECT count(*) FROM foods');
-    let all = 0;
-    offset = 0;
-    while (offset !== null) {
-      const page = await call(`/api/foods?offset=${offset}`);
-      all += (page.data.foods as unknown[]).length;
-      offset = page.data.nextOffset as number | null;
-    }
-    assert.equal(all, Number(rows[0].count));
   });
+
+  // Without a search word the pages cover the whole store too. Other test files add and remove
+  // foods at the same time, so the store is read through one snapshot: the API and the check below
+  // both see the same foods, whatever the other files write meanwhile (#134).
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
+    const snapshot = { query: client.query.bind(client) } as unknown as Pool;
+    const { rows } = await client.query<{ id: string }>(
+      'SELECT id FROM foods ORDER BY name, brand NULLS FIRST, id',
+    );
+    await withApi(snapshot, async (call) => {
+      const ids: number[] = [];
+      let offset: number | null = 0;
+      while (offset !== null) {
+        const page = await call(`/api/foods?offset=${offset}`);
+        assert.equal(page.status, 200);
+        ids.push(...(page.data.foods as { id: number }[]).map((food) => food.id));
+        offset = page.data.nextOffset as number | null;
+      }
+      // Every food once, in the store's order: not only as many as there are.
+      assert.deepEqual(
+        ids,
+        rows.map((row) => Number(row.id)),
+      );
+    });
+  } finally {
+    // A lost connection fails the rollback too; the client still goes back, or pool.end() waits.
+    await client.query('ROLLBACK').catch(() => undefined);
+    client.release();
+  }
 });

@@ -92,6 +92,15 @@ test('a deeply nested or very long body is checked without failing, and a NUL in
       assert.equal(response.status, 400);
       assert.deepEqual(await response.json(), { error: '쓸 수 없는 문자(NUL)가 들어 있습니다' });
     }
+    // Without a NUL the same depth passes on to the route, whose own rule answers.
+    const clean = '['.repeat(10_000) + '"a"' + ']'.repeat(10_000);
+    const response = await fetch(`http://127.0.0.1:${port}/api/checks/2026-03-15`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: `{"memo":3,"extra":${clean}}`,
+    });
+    assert.equal(response.status, 400);
+    assert.match(String(((await response.json()) as { error: unknown }).error), /메모가 올바르지/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

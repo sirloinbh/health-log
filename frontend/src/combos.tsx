@@ -119,6 +119,8 @@ function ComboDialog({
     );
 
   const save = async () => {
+    // The button stays pressable while saving.
+    if (saving) return;
     const body = readDraft(name, items);
     if (typeof body === 'string') {
       error(body);
@@ -285,7 +287,15 @@ function ComboDialog({
           <Button type="button" variant="outline" disabled={saving} onClick={onClose}>
             취소
           </Button>
-          <Button type="button" disabled={saving} onClick={() => void save()}>
+          <Button
+            type="button"
+            // aria-disabled, not disabled: a disabled button drops keyboard focus to the page, and a
+            // failed save would leave it there, outside the dialog (#98). The handler ignores presses.
+            aria-disabled={saving || undefined}
+            aria-busy={saving || undefined}
+            className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+            onClick={() => void save()}
+          >
             {saving ? '저장 중…' : '저장'}
           </Button>
         </DialogFooter>

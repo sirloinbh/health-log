@@ -167,6 +167,8 @@ function FoodDialog({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // The button stays pressable while saving, and Enter in a field submits too.
+    if (saving) return;
     // Unreadable text like "49,5" must not be saved as no value or as 495.
     const unreadable = numberFields.find(({ key }) => parseAmount(form[key]) === undefined);
     if (unreadable) {
@@ -292,7 +294,14 @@ function FoodDialog({
             <Button type="button" variant="outline" disabled={saving} onClick={onClose}>
               취소
             </Button>
-            <Button type="submit" disabled={saving}>
+            <Button
+              type="submit"
+              // aria-disabled, not disabled: a disabled button drops keyboard focus to the page, and a
+              // failed save would leave it there, outside the dialog (#98). The handler ignores presses.
+              aria-disabled={saving || undefined}
+              aria-busy={saving || undefined}
+              className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+            >
               {saving ? '저장 중…' : '저장'}
             </Button>
           </DialogFooter>

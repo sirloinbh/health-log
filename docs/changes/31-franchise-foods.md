@@ -103,6 +103,11 @@
   - `backend/test/franchise-foods.test.ts`(DB 없이): 164행이 모두 `official`, 브랜드 공식 사이트의 https 주소, 확인 날짜 2026-11-08, `is_junk = true`이고 탄수화물·지방이 NULL인지 확인한다. 브랜드마다 출처 사이트가 하나인지도 본다.
   - `backend/test/foods.integration.test.ts`: 적용된 DB에서 브랜드·분류별 개수, 출처·날짜·표시·빈 값이 없음을 확인한다. 브랜드마다 한 메뉴의 값이 출처대로인지(열 밀림)도 본다.
 - 임시 PostgreSQL 17 클러스터(포트 5472, `health_test`): CI처럼 psql로 모두 적용한 뒤 `npm run db:migrate`로 다시 적용했다. 오류가 없었고 브랜드·분류별 행 수가 위와 같았다.
+- `origin/main`(2ee3364)을 병합한 뒤 `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5472/health_test npm run check`: 통과.
+  - 백엔드: 193개 통과, 0개 건너뜀.
+  - 프런트엔드: 370개 통과, 2개 건너뜀. 건너뛴 2개는 이 변경과 관계없는 기존 조건부 테스트다.
+  - 스킬 검사: 4개 통과.
+- `npm run knip`: 통과.
 
 ## 한계
 

@@ -237,36 +237,36 @@ export function ReportPage({ health }: { health: Health }) {
   // once the report is back, focus moves to the period it shows (#128).
   const [retrying, setRetrying] = useState(false);
   const focusSpan = useRef(false);
+  // "이번 주로 이동" goes with the word about a date out of range; its report takes the focus too.
+  const focusOnArrival = useRef(false);
   const span = useRef<HTMLParagraphElement>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<'ok' | 'failed' | 'stale'> => {
     // A slow answer for a period already left must not replace the one on screen, nor land next
     // to the word about a date out of range.
     const request = ++latest.current;
     clear();
-    if (!date) return false;
+    if (!date) return 'stale';
     try {
       const data = await requestJson<Report>(`/api/report?period=${period}&date=${date}`);
-      if (request === latest.current) setReport(data);
-      return request === latest.current;
+      if (request !== latest.current) return 'stale';
+      setReport(data);
+      return 'ok';
     } catch (cause) {
-      if (request === latest.current) {
-        setReport(null);
-        error(cause);
-      }
-      return false;
+      if (request !== latest.current) return 'stale';
+      setReport(null);
+      error(cause);
+      return 'failed';
     }
   }, [clear, date, error, period]);
 
   const retry = async () => {
     setRetrying(true);
-    const loaded = await load();
-    // Only the latest request ends the retry; one for a period left says nothing about it.
-    if (!loaded) {
-      setRetrying(false);
-      return;
-    }
-    focusSpan.current = true;
+    const outcome = await load();
+    // A retry for a period already left is over: the period change ended it, and a newer retry
+    // may be on its way, whose button must stay.
+    if (outcome === 'stale') return;
+    focusSpan.current = outcome === 'ok';
     setRetrying(false);
   };
 
@@ -285,7 +285,12 @@ export function ReportPage({ health }: { health: Health }) {
   const shown = report && report.period === period ? report : null;
 
   useEffect(() => {
-    if (retrying || !focusSpan.current || !shown) return;
+    if (!shown) return;
+    if (focusOnArrival.current) {
+      focusOnArrival.current = false;
+      focusSpan.current = true;
+    }
+    if (retrying || !focusSpan.current) return;
     focusSpan.current = false;
     // Only focus that the gone button dropped; somewhere the person moved to meanwhile stays.
     if (document.activeElement === document.body || document.activeElement === null) {
@@ -389,7 +394,15 @@ export function ReportPage({ health }: { health: Health }) {
         <>
           <Notice notice={{ kind: 'error', text: `${dailyRangeText}: ${asked}` }} />
           {today ? (
-            <Button variant="outline" className="self-start" onClick={() => go({ date: today })}>
+            <Button
+              variant="outline"
+              className="self-start"
+              onClick={() => {
+                // The button goes with the word, which would drop keyboard focus to the page.
+                focusOnArrival.current = true;
+                go({ date: today });
+              }}
+            >
               이번 {words.name}로 이동
             </Button>
           ) : null}

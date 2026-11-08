@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
+import { BusyButton } from './busy-button';
 import { answerText, questions } from './check-text';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
@@ -77,10 +78,12 @@ function GoalForm({
   );
   const [from, setFrom] = useState(today);
   const [saving, setSaving] = useState(false);
-  const { notice, error } = useNotice();
+  const { notice, error, clear } = useNotice();
   const id = `goal-${item}`;
 
   const save = async (target: number | null) => {
+    // Both buttons stay pressable while saving (#126), and Enter in a field submits too.
+    if (saving) return;
     if (!isValidDate(from)) {
       error('적용 시작일을 골라 주세요');
       return;
@@ -90,6 +93,8 @@ function GoalForm({
       error(`적용 시작일은 ${earliestDate}부터 ${latestDate}까지 고를 수 있습니다`);
       return;
     }
+    // A repeated failure then appears anew and is announced again (as in #98).
+    clear();
     setSaving(true);
     try {
       const goals = await trackWrite(
@@ -107,6 +112,7 @@ function GoalForm({
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (saving) return;
     const typed = parseAmount(value);
     if (typed === null) {
       error(`${field.label}을(를) 입력해 주세요`);
@@ -194,14 +200,14 @@ function GoalForm({
       </p>
       <Notice notice={notice} />
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={saving} aria-busy={saving || undefined}>
+        <BusyButton type="submit" busy={saving} aria-busy={saving || undefined}>
           {saving ? <Spinner size="sm" label="저장하는 중" /> : null}
           저장
-        </Button>
+        </BusyButton>
         {goal ? (
-          <Button type="button" variant="outline" disabled={saving} onClick={() => void save(null)}>
+          <BusyButton type="button" variant="outline" busy={saving} onClick={() => void save(null)}>
             시작일부터 목표 끄기
-          </Button>
+          </BusyButton>
         ) : null}
       </div>
     </form>

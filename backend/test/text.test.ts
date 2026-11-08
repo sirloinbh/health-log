@@ -137,20 +137,39 @@ test('food and meal text past its limit by one emoji is refused, counted in char
   assert.equal(queries.length, 0);
 });
 
-test('food and meal text filled to its limit with emoji passes the checks and goes on', async () => {
-  const { pool, queries } = recording();
+test('food and meal text filled to its limit with emoji passes the checks and is written', async () => {
+  // Records every statement, from the pool and from a transaction's client alike. Its empty
+  // answers make the routes fail after writing, so the statements are what this test reads.
+  const statements: { sql: string; values: unknown[] }[] = [];
+  const query = async (sql: string, values: unknown[] = []) => {
+    statements.push({ sql, values });
+    return { rows: [], rowCount: 0 };
+  };
+  const pool = { query, connect: async () => ({ query, release: () => {} }) } as unknown as Pool;
   const name = '🍙'.repeat(99) + '#';
+  const wrote = (table: string) =>
+    statements.some(
+      ({ sql, values }) => sql.includes(`INSERT INTO ${table}`) && values.includes(name),
+    );
+
   await withApi(pool, async (call) => {
-    for (const [method, path, body] of [
-      ['POST', '/api/foods', { name, servingSize: 1, servingUnit: '🍙'.repeat(10) }],
-      ['POST', '/api/meals/2026-03-15', { meal: 'lunch', name, calories: 1, servings: 1 }],
-    ] as const) {
-      const { status, data } = await call(path, { method, body });
-      // The fake database answers nothing useful, so what matters is that no length rule spoke.
-      assert.ok(status !== 400, `${method} ${path}: ${JSON.stringify(data)}`);
-    }
+    await call('/api/foods', {
+      method: 'POST',
+      body: {
+        name,
+        brand: '🍙'.repeat(50),
+        category: '🍙'.repeat(30),
+        servingSize: 1,
+        servingUnit: '🍙'.repeat(10),
+      },
+    });
+    await call('/api/meals/2026-03-15', {
+      method: 'POST',
+      body: { meal: 'lunch', name, calories: 1, servings: 1 },
+    });
     const search = await call(`/api/foods?q=${encodeURIComponent('🍙'.repeat(100))}`);
     assert.ok(search.status !== 400, JSON.stringify(search.data));
   });
-  assert.ok(queries.length > 0, 'the food request reached the database');
+  assert.ok(wrote('foods'), 'the food was written');
+  assert.ok(wrote('meal_entries'), 'the meal entry was written');
 });

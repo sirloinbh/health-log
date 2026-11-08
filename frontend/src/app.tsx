@@ -1,4 +1,11 @@
-import { CalendarDays, Layers, LayoutDashboard, Settings2, Utensils } from 'lucide-react';
+import {
+  CalendarDays,
+  Layers,
+  LayoutDashboard,
+  Settings2,
+  Stethoscope,
+  Utensils,
+} from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 
@@ -12,6 +19,8 @@ import { goalSettingsPath } from './goal-text';
 import { GoalsSettings } from './goals';
 import { type Health, healthText } from './health';
 import { ReportPage } from './report';
+import { visitsPagePath } from './visit-text';
+import { VisitsPage } from './visits';
 
 // Every page URL lives here (central docs/directory-rules.md).
 const pages = {
@@ -19,6 +28,7 @@ const pages = {
   daily: '/daily',
   foods: '/foods',
   combos: '/combos',
+  visits: visitsPagePath,
   settings: goalSettingsPath,
 } as const;
 
@@ -28,6 +38,7 @@ const nav: NavItem[] = [
   { to: pages.daily, label: '하루 기록', icon: CalendarDays },
   { to: pages.foods, label: '음식', icon: Utensils },
   { to: pages.combos, label: '조합', icon: Layers },
+  { to: pages.visits, label: '병원', icon: Stethoscope },
   { to: pages.settings, label: '설정', icon: Settings2 },
 ];
 
@@ -122,6 +133,20 @@ export function App() {
           />
           <Route path={pages.foods} element={<FoodsPage />} />
           <Route path={pages.combos} element={<CombosPage />} />
+          <Route
+            path={pages.visits}
+            element={
+              <VisitsPage
+                today={
+                  health.state === 'ok'
+                    ? health.today
+                    : health.state === 'loading'
+                      ? undefined
+                      : null
+                }
+              />
+            }
+          />
           <Route
             path={pages.settings}
             element={

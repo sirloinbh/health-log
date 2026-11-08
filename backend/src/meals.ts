@@ -8,6 +8,7 @@ import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.j
 import { hasTwoDecimalsAtMost } from './foods.js';
 import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError, parseId } from './standard/http.js';
+import { charCount } from './text.js';
 
 const nutrients = ['calories', 'carbs', 'protein', 'fat', 'sugars', 'sodium'] as const;
 
@@ -48,7 +49,7 @@ const entryInput = z
         .string({ error: '음식 이름을 입력해 주세요' })
         .trim()
         .refine((value) => value.length >= 1, '음식 이름을 입력해 주세요')
-        .refine((value) => value.length <= 100, '음식 이름은 100자 이하로 입력해 주세요')
+        .refine((value) => charCount(value) <= 100, '음식 이름은 100자 이하로 입력해 주세요')
         .optional(),
       calories: z
         .number({ error: '칼로리를 숫자로 입력해 주세요' })

@@ -17,6 +17,11 @@ let pool: Pool;
 const clean = async () => {
   await pool.query('DELETE FROM day_checks WHERE record_date = $1', [date]);
   await pool.query('DELETE FROM body_records WHERE record_date = $1', [date]);
+  await pool.query('DELETE FROM meal_entries WHERE entry_date = $1', [date]);
+  // Only the exact names the tests make, so no real food can match.
+  await pool.query('DELETE FROM foods WHERE name = ANY($1)', [
+    ['🍚'.repeat(99) + '#', '🍙'.repeat(100)],
+  ]);
   await pool.query(
     'DELETE FROM meal_combos WHERE id IN (SELECT combo_id FROM meal_combo_items i JOIN foods f ON f.id = i.food_id WHERE f.name = $1)',
     [foodName],
@@ -64,5 +69,37 @@ test('a combo name of 50 emoji is saved whole', { skip }, async () => {
     });
     assert.equal(combo.status, 201, JSON.stringify(combo.data));
     assert.equal(combo.data.name, emoji(50));
+  });
+});
+
+test('food and meal text filled to its limit with emoji is saved whole', { skip }, async () => {
+  const name = '🍚'.repeat(99) + '#';
+  await withApi(pool, async (call) => {
+    const food = await call('/api/foods', {
+      method: 'POST',
+      body: {
+        name,
+        brand: emoji(50),
+        category: emoji(30),
+        servingSize: 1,
+        servingUnit: emoji(10),
+      },
+    });
+    assert.equal(food.status, 201, JSON.stringify(food.data));
+    assert.deepEqual(
+      [food.data.name, food.data.brand, food.data.category, food.data.servingUnit],
+      [name, emoji(50), emoji(30), emoji(10)],
+    );
+    await pool.query('DELETE FROM foods WHERE id = $1', [food.data.id]);
+
+    const search = await call(`/api/foods?q=${encodeURIComponent(emoji(100))}`);
+    assert.equal(search.status, 200, JSON.stringify(search.data));
+
+    const meal = await call(`/api/meals/${date}`, {
+      method: 'POST',
+      body: { meal: 'lunch', name: emoji(100), calories: 1, servings: 1 },
+    });
+    assert.equal(meal.status, 201, JSON.stringify(meal.data));
+    assert.equal((meal.data.entries as { name: string }[])[0].name, emoji(100));
   });
 });

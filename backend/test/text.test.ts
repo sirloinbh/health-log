@@ -106,3 +106,33 @@ test('a deeply nested or very long body is checked without failing, and a NUL in
   }
   assert.equal(queries.length, 0);
 });
+
+test('food and meal text past its limit by one emoji is refused, counted in characters', async () => {
+  const { pool, queries } = recording();
+  const food = { name: '김밥', servingSize: 1, servingUnit: 'g' };
+  await withApi(pool, async (call) => {
+    for (const [method, path, body, message] of [
+      ['POST', '/api/foods', { ...food, name: '🍙'.repeat(101) }, '음식 이름은 100자 이하'],
+      ['POST', '/api/foods', { ...food, brand: '🍙'.repeat(51) }, '50자 이하'],
+      ['POST', '/api/foods', { ...food, category: '🍙'.repeat(31) }, '30자 이하'],
+      ['POST', '/api/foods', { ...food, servingUnit: '🍙'.repeat(11) }, '단위는 10자 이하'],
+      [
+        'POST',
+        '/api/meals/2026-03-15',
+        { meal: 'lunch', name: '🍙'.repeat(101), calories: 1, servings: 1 },
+        '음식 이름은 100자 이하',
+      ],
+      [
+        'GET',
+        `/api/foods?q=${encodeURIComponent('🍙'.repeat(101))}`,
+        undefined,
+        '검색어는 100자 이하',
+      ],
+    ] as const) {
+      const { status, data } = await call(path, { method, body });
+      assert.equal(status, 400, `${method} ${path}`);
+      assert.match(String(data.error), new RegExp(message), `${method} ${path}`);
+    }
+  });
+  assert.equal(queries.length, 0);
+});

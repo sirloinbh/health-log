@@ -390,24 +390,54 @@ test('an address outside the range says which days can be recorded, with a way b
   }
 });
 
-test('at either end of the range the previous or next day cannot be opened', () => {
+test('at either end of the range the previous or next day stays in place but goes nowhere', () => {
   health({ today: '2026-03-15' });
   open('/daily/2000-01-01');
-  expect(screen.queryByRole('link', { name: '이전 날' })).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '이전 날' })).toBeDisabled();
+  const previous = screen.getByRole('link', { name: '이전 날' });
+  expect(previous).toHaveAttribute('aria-disabled', 'true');
+  expect(previous).toHaveAccessibleDescription('2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
+  fireEvent.click(previous);
+  expect(window.location.pathname).toBe('/daily/2000-01-01');
   expect(screen.getByRole('link', { name: '다음 날' })).toHaveAttribute(
     'href',
     '/daily/2000-01-02',
   );
+  expect(screen.getByRole('link', { name: '다음 날' })).not.toHaveAttribute('aria-disabled');
   cleanup();
 
   open('/daily/2099-12-31');
-  expect(screen.queryByRole('link', { name: '다음 날' })).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '다음 날' })).toBeDisabled();
+  expect(screen.getByRole('link', { name: '다음 날' })).toHaveAttribute('aria-disabled', 'true');
   expect(screen.getByRole('link', { name: '이전 날' })).toHaveAttribute(
     'href',
     '/daily/2099-12-30',
   );
+});
+
+test('stepping onto the first day keeps keyboard focus on the previous day link', async () => {
+  health({ today: '2026-03-15' });
+  open('/daily/2000-01-02');
+  const previous = screen.getByRole('link', { name: '이전 날' });
+  previous.focus();
+  fireEvent.click(previous);
+  expect(await screen.findByText('2000년 1월 1일 토요일')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: '이전 날' })).toHaveAttribute('aria-disabled', 'true');
+  expect(screen.getByRole('link', { name: '이전 날' })).toHaveFocus();
+});
+
+test('leaving the field on a date out of range says why, even for a year cut short', () => {
+  health({ today: '2026-03-15' });
+  open('/daily/2026-03-15');
+  const input = screen.getByLabelText('날짜 선택');
+  const message = () => screen.queryByText('2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
+  // Chrome stops the year at the field's max, so typing 2100 can leave 0210.
+  fireEvent.change(input, { target: { value: '0210-01-01' } });
+  expect(message()).not.toBeInTheDocument();
+  fireEvent.blur(input);
+  expect(message()).toBeInTheDocument();
+  expect(input).toHaveValue('2026-03-15');
+
+  fireEvent.change(input, { target: { value: '2026-03' } });
+  expect(message()).not.toBeInTheDocument();
 });
 
 test('a typed date outside the range is explained and does not change the page', () => {

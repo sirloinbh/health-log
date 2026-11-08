@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 
 import { BodyCard } from './body';
@@ -29,6 +29,39 @@ const sections = ['병원·약'];
 // and only a year of four digits is worth a word about the range.
 const typedYear = (value: string) => value >= '1000';
 
+/**
+ * The previous or next day. At an end of the range it stays the same link, marked disabled and
+ * pointing at the day shown, so keyboard focus survives the last step there and the reason can
+ * still be read. A different element in its place would drop focus to the page.
+ */
+function DayLink({
+  label,
+  to,
+  here,
+  icon,
+}: {
+  label: string;
+  to: string | null;
+  here: string;
+  icon: ReactNode;
+}) {
+  return (
+    <Button asChild variant="outline" size="icon">
+      <Link
+        to={to ?? here}
+        aria-label={label}
+        aria-disabled={to ? undefined : true}
+        aria-description={to ? undefined : dailyRangeText}
+        title={to ? undefined : dailyRangeText}
+        className={to ? undefined : 'opacity-50'}
+        onClick={to ? undefined : (event) => event.preventDefault()}
+      >
+        {icon}
+      </Link>
+    </Button>
+  );
+}
+
 function DailyHeader({ description }: { description?: string }) {
   return (
     <header className="flex flex-col gap-2">
@@ -43,6 +76,7 @@ function DailyHeader({ description }: { description?: string }) {
 }
 
 // "Today" comes from the server, which counts it in the service time zone.
+// The server's today is always within the daily range until 2100, when latestDate needs moving.
 export function TodayRedirect({ basePath, health }: { basePath: string; health: Health }) {
   if (health.state === 'ok') return <Navigate to={`${basePath}/${health.today}`} replace />;
   return (
@@ -61,6 +95,8 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
   // The field keeps what was typed until blur: writing a value back while typing makes the browser
   // restart the part being typed, so "12" as a month would become 02.
   const [draft, setDraft] = useState<string | null>(null);
+  // The day shown when the field was left holding a date out of range; moving on drops the word.
+  const [leftOutOfRange, setLeftOutOfRange] = useState<string | null>(null);
   // Each typed digit can form a valid date; one edit of the field leaves one history entry.
   const editing = useRef(false);
 
@@ -93,7 +129,8 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
 
   const today = health.state === 'ok' ? health.today : null;
   const outOfRange =
-    draft !== null && isValidDate(draft) && typedYear(draft) && !inDailyRange(draft);
+    (draft !== null && isValidDate(draft) && typedYear(draft) && !inDailyRange(draft)) ||
+    leftOutOfRange === date;
   const pathOf = (value: string) => `${basePath}/${value}`;
 
   return (
@@ -103,18 +140,12 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
         <Notice notice={{ kind: 'error', text: health.message }} />
       ) : null}
       <nav aria-label="날짜 이동" className="flex flex-wrap items-center gap-2">
-        {/* At either end the link would lead out of range, so the button stays but does nothing. */}
-        {date > earliestDate ? (
-          <Button asChild variant="outline" size="icon">
-            <Link to={pathOf(shiftDate(date, -1))} aria-label="이전 날">
-              <ChevronLeft aria-hidden />
-            </Link>
-          </Button>
-        ) : (
-          <Button variant="outline" size="icon" disabled aria-label="이전 날">
-            <ChevronLeft aria-hidden />
-          </Button>
-        )}
+        <DayLink
+          label="이전 날"
+          to={date > earliestDate ? pathOf(shiftDate(date, -1)) : null}
+          here={pathOf(date)}
+          icon={<ChevronLeft aria-hidden />}
+        />
         <Input
           type="date"
           aria-label="날짜 선택"
@@ -123,29 +154,29 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
           max={latestDate}
           value={draft ?? date}
           onBlur={() => {
+            // Chrome stops taking year digits at the field's max, so typing 2100 can end as 0210;
+            // leaving the field with a date out of range still gets the word about the range.
+            if (draft !== null && isValidDate(draft) && !inDailyRange(draft))
+              setLeftOutOfRange(date);
             editing.current = false;
             setDraft(null);
           }}
           onChange={(event) => {
             const value = event.target.value;
             setDraft(value);
+            setLeftOutOfRange(null);
             if (isValidDate(value) && inDailyRange(value) && value !== date) {
               void navigate(pathOf(value), { replace: editing.current });
               editing.current = true;
             }
           }}
         />
-        {date < latestDate ? (
-          <Button asChild variant="outline" size="icon">
-            <Link to={pathOf(shiftDate(date, 1))} aria-label="다음 날">
-              <ChevronRight aria-hidden />
-            </Link>
-          </Button>
-        ) : (
-          <Button variant="outline" size="icon" disabled aria-label="다음 날">
-            <ChevronRight aria-hidden />
-          </Button>
-        )}
+        <DayLink
+          label="다음 날"
+          to={date < latestDate ? pathOf(shiftDate(date, 1)) : null}
+          here={pathOf(date)}
+          icon={<ChevronRight aria-hidden />}
+        />
         {today && today !== date ? (
           <Button asChild variant="outline">
             <Link to={pathOf(today)}>오늘</Link>

@@ -45,3 +45,34 @@ test('a date past either end is a 400 on every day route and the report, before 
     }
   });
 });
+
+test('the other places that take a date use the same ends', async () => {
+  await withApi(untouched(), async (call) => {
+    for (const [method, path, body, message] of [
+      ['GET', '/api/body?from=1899-12-31&to=1900-01-02', undefined, '날짜가 올바르지 않습니다'],
+      ['GET', '/api/body?from=2999-12-30&to=3000-01-01', undefined, '날짜가 올바르지 않습니다'],
+      [
+        'POST',
+        '/api/foods',
+        {
+          name: '김밥',
+          servingSize: 1,
+          servingUnit: 'g',
+          sourceType: 'label',
+          checkedOn: '9999-12-31',
+        },
+        '확인 날짜가 올바르지 않습니다',
+      ],
+      [
+        'POST',
+        '/api/meals/2026-03-15/copy',
+        { from: '0001-01-01', meal: 'lunch' },
+        '복사할 날짜가 올바르지 않습니다',
+      ],
+    ] as const) {
+      const { status, data } = await call(path, { method, body });
+      assert.equal(status, 400, path);
+      assert.match(String(data.error), new RegExp(message), path);
+    }
+  });
+});

@@ -161,7 +161,7 @@ function FoodDialog({
 }) {
   const [form, setForm] = useState<Form>(food ? formOf(food) : emptyForm);
   const [saving, setSaving] = useState(false);
-  const { notice, error } = useNotice();
+  const { notice, error, clear } = useNotice();
   const update = (key: keyof Form) => (event: { target: { value: string } }) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
 
@@ -175,6 +175,8 @@ function FoodDialog({
       error(unreadableAmount(unreadable.label));
       return;
     }
+    // Cleared first, so the same failure twice is announced again.
+    clear();
     setSaving(true);
     try {
       await requestJson<Food>(food ? `/api/foods/${food.id}` : '/api/foods', {
@@ -291,7 +293,17 @@ function FoodDialog({
           </div>
           <Notice notice={notice} />
           <DialogFooter>
-            <Button type="button" variant="outline" disabled={saving} onClick={onClose}>
+            <Button
+              type="button"
+              variant="outline"
+              // Like Save, it keeps focus while busy: Safari does not move focus to a clicked button, so
+              // focus may still be here when Save is pressed.
+              aria-disabled={saving || undefined}
+              className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+              onClick={() => {
+                if (!saving) onClose();
+              }}
+            >
               취소
             </Button>
             <Button

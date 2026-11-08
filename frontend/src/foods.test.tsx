@@ -244,7 +244,9 @@ test('a save in progress cannot be cancelled or closed', async () => {
   fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
   await within(dialog).findByRole('button', { name: '저장 중…' });
 
-  expect(within(dialog).getByRole('button', { name: '취소' })).toBeDisabled();
+  const cancel = within(dialog).getByRole('button', { name: '취소' });
+  expect(cancel).toHaveAttribute('aria-disabled', 'true');
+  fireEvent.click(cancel);
   fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
   fireEvent.keyDown(dialog, { key: 'Escape' });
   expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -564,4 +566,36 @@ test('while saving and after a failed save, keyboard focus stays in the dialog',
   expect(await within(dialog).findByRole('alert')).toHaveTextContent('이미 등록된 항목입니다');
   expect(within(dialog).getByRole('button', { name: '저장' })).toHaveFocus();
   expect(within(dialog).getByRole('button', { name: '저장' })).not.toHaveAttribute('aria-disabled');
+});
+
+test('Enter in a field while saving sends nothing more, and the same failure twice is said twice', async () => {
+  const finishers: ((response: Response) => void)[] = [];
+  const fetchMock = serve((_url, init) =>
+    init?.method === 'POST'
+      ? new Promise((resolve) => finishers.push(resolve))
+      : json({ foods: [] }),
+  );
+  open();
+  const { dialog } = await openWith('음식 추가');
+  const name = within(dialog).getByLabelText('음식 이름');
+  fireEvent.change(name, { target: { value: '김밥' } });
+  fireEvent.change(within(dialog).getByLabelText('1회 제공량'), { target: { value: '1' } });
+  const posts = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST');
+
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  await within(dialog).findByRole('button', { name: '저장 중…' });
+  // Enter in a field submits the form.
+  fireEvent.submit(name.closest('form')!);
+  expect(posts()).toHaveLength(1);
+
+  finishers[0](json({ error: '이미 등록된 항목입니다' }, 409));
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent('이미 등록된 항목입니다');
+
+  // A second try clears the message, so the same answer appears anew and is read out again.
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  await within(dialog).findByRole('button', { name: '저장 중…' });
+  expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+  finishers[1](json({ error: '이미 등록된 항목입니다' }, 409));
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent('이미 등록된 항목입니다');
+  expect(posts()).toHaveLength(2);
 });

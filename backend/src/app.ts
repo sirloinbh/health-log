@@ -14,6 +14,7 @@ import { reportRouter } from './report.js';
 import { sleepRouter } from './sleep.js';
 import { errorHandler, notFound } from './standard/http.js';
 import { rejectNul } from './text.js';
+import { visitsRouter } from './visits.js';
 
 // DATE columns stay YYYY-MM-DD strings so the service time zone never shifts them.
 types.setTypeParser(1082, (value) => value);
@@ -53,6 +54,7 @@ export function createApp(
   app.use('/api/checks', checksRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api/goals', goalsRouter(pool, today, options.rateLimit ?? defaultRateLimit));
   app.use('/api/report', reportRouter(pool, options.rateLimit ?? defaultRateLimit));
+  app.use('/api/visits', visitsRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api', notFound);
   app.use(errorHandler);
   return app;

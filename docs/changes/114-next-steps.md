@@ -34,11 +34,11 @@
 - **지금 고칠 방법:** 없다.
   - 2026-11-08 기준 상위 패키지 최신판이 모두 `minimatch ^10`을 요구한다.
     - eslint 10.14.0 `^10.2.6`
-    - @eslint/config-array `^10.2.4`
+    - @eslint/config-array 0.23.5 `^10.2.4`
     - @typescript-eslint/typescript-estree 8.72.1 `^10.2.2`
     - eslint-plugin-jsx-a11y-x 0.2.0 `^10.2.5`
   - 10.x에는 수정 버전이 없다(마지막 10.2.6).
-  - `npm audit fix --force`는 eslint-plugin-jsx-a11y-x를 0.1.1로 내리라고 제안한다. 이것은 경고를 풀지 못하고 규칙만 바꿀 수 있다.
+  - `npm audit fix --force`는 eslint-plugin-jsx-a11y-x를 0.1.1로 내리라고 제안한다. 0.1.1은 minimatch `^3.1.2`를 써서 이 경로 하나는 빠진다. 하지만 eslint·@eslint/config-array·typescript-eslint 경로가 남아 경고는 그대로이고, 플러그인 규칙만 바뀔 수 있다.
   - `overrides`로 minimatch 11을 강제하는 것은 상위가 검증하지 않은 메이저 변경이라 권하지 않는다.
 - **후속:** [#115](https://github.com/sirloinbh/health-log/issues/115)(P4, 사용자)를 [#88](https://github.com/sirloinbh/health-log/issues/88) 아래에 연결했다. 상위 패키지가 `minimatch >=11.0.1`을 받아들이면 사용자가 업데이트한다. 확인 명령과 업데이트 명령 예시는 이슈에 적었다.
 
@@ -64,6 +64,15 @@
 - **#104를 320 라이트에서:** 식단 카드의 "바로 기록"으로 1,300kcal를 더했다. 버튼을 누르지 않아도 목표 카드 칼로리가 2,870kcal에서 4,170kcal로 바로 바뀌었다.
 - 다크 모드 화면도 눈으로 확인했다(320 목표 카드, 정크푸드 배지). 글자가 배경에 묻히거나 테두리가 사라진 곳은 없었다.
 - 확인 뒤 Chrome, Vite, API, 임시 DB를 모두 껐다.
+
+## 변경 — 2026-11-08 (1차 리뷰 반영)
+
+PR #116의 1차 리뷰(작성 문맥과 분리된 읽기 전용 리뷰)는 `npm audit`, `npm ls`, `npm view`, 이슈 상태, 하위 이슈 연결, 링크를 직접 다시 확인했다. 사실 오류는 없었고 낮음 4개가 나왔다. 모두 반영했다.
+
+- `npm audit fix --force` 문장에 이유를 더했다. 0.1.1은 minimatch `^3.1.2`라 그 경로 하나는 빠지지만 나머지 경로가 남는다. #115 본문도 같이 고쳤다.
+- @eslint/config-array에 버전(0.23.5)을 적었다. #115의 확인 명령에 `npm view @eslint/config-array dependencies.minimatch`를 더했다.
+- README의 "#40 약(진행 중)"을 "(둘 다 진행 중)"으로 고쳤다. 진행 중 표시가 #40에만 붙은 것처럼 읽혔다.
+- README "진행 중"의 agent1 줄을 뺐다. 이 PR이 병합되면 #114가 닫혀 맞지 않게 된다. 분석 기록 링크는 `npm audit` 항목으로 옮겼다.
 
 ## 검증
 

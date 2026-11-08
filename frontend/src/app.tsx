@@ -8,6 +8,8 @@ import { EmptyState } from './components/ui/empty-state';
 import { Toaster } from './components/ui/sonner';
 import { DailyPage, TodayRedirect } from './daily';
 import { FoodsPage } from './foods';
+import { goalSettingsPath } from './goal-text';
+import { GoalsSettings } from './goals';
 import { type Health, healthText } from './health';
 import { ReportPage } from './report';
 
@@ -17,7 +19,7 @@ const pages = {
   daily: '/daily',
   foods: '/foods',
   combos: '/combos',
-  settings: '/settings',
+  settings: goalSettingsPath,
 } as const;
 
 // Main menu (LNB) items, in display order.
@@ -122,7 +124,11 @@ export function App() {
           <Route path={pages.combos} element={<CombosPage />} />
           <Route
             path={pages.settings}
-            element={<Page title="설정" description="앱 환경과 데이터 관리" health={health} />}
+            element={
+              <Page title="설정" description="앱 환경과 데이터 관리" health={health}>
+                <GoalsSettings />
+              </Page>
+            }
           />
           <Route path="*" element={<Navigate to={pages.overview} replace />} />
         </Routes>

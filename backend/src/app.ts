@@ -6,6 +6,7 @@ import { bodyRouter } from './body.js';
 import { checksRouter } from './checks.js';
 import { combosRouter } from './combos.js';
 import { foodsRouter } from './foods.js';
+import { goalsRouter } from './goals.js';
 import { habitsRouter } from './habits.js';
 import { mealsRouter } from './meals.js';
 import { defaultRateLimit, type RateLimitSettings } from './rate-limit.js';
@@ -50,6 +51,7 @@ export function createApp(
   app.use('/api/body', bodyRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api/habits', habitsRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api/checks', checksRouter(pool, options.rateLimit ?? defaultRateLimit));
+  app.use('/api/goals', goalsRouter(pool, today, options.rateLimit ?? defaultRateLimit));
   app.use('/api/report', reportRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api', notFound);
   app.use(errorHandler);

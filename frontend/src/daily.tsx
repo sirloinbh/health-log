@@ -17,6 +17,7 @@ import {
   latestDate,
   shiftDate,
 } from './daily-date';
+import { GoalsCard } from './goals';
 import { HabitsCard } from './habits';
 import { type Health, healthText } from './health';
 import { MealCard } from './meals';
@@ -201,6 +202,7 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
         <BodyCard key={`body-${date}`} date={date} />
         <HabitsCard key={`habits-${date}`} date={date} />
         <ChecksCard key={`checks-${date}`} date={date} />
+        <GoalsCard key={`goals-${date}`} date={date} />
         {sections.map((title) => (
           <Card key={title}>
             <CardHeader>

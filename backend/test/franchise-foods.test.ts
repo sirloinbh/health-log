@@ -29,7 +29,7 @@ sqlTest('every franchise row is official, sourced, dated and marked as junk food
 const decode = (literal: string) =>
   literal
     .replace(/^U&'|^'|'$/g, '')
-    .replace(/\\([0-9A-F]{4})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+    .replace(/\\([0-9A-F]{4})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
 
 type Row = { name: string; brand: string; host: string; numbers: number[] };
 const parsed = (): Row[] =>
@@ -64,8 +64,9 @@ sqlTest('each brand comes from its own official site', () => {
   assert.deepEqual([...seen].sort(), Object.keys(expected).sort());
 });
 
-// A value in the wrong column shows up here: protein and sugars give 4 kcal a gram, so together
-// they can never exceed the calories (sodium in milligrams would), and a soft drink has no protein.
+// Catches sodium or a whole-row shift landing in the wrong column: protein and sugars give 4 kcal a
+// gram, so together they cannot exceed the calories (sodium in milligrams would), and a soft drink has
+// no protein. Swaps between similar small numbers (protein and sugars) are not caught here.
 sqlTest('the numbers fit their columns', () => {
   for (const { brand, name, numbers } of parsed()) {
     const [, calories, protein, sugars] = numbers as [number, number, number, number, number];
@@ -80,6 +81,7 @@ sqlTest('the numbers fit their columns', () => {
 
 sqlTest('a re-run keeps the junk food mark the user changed', () => {
   const sql = readFileSync(new URL(file!, dir), 'utf8');
-  const update = sql.slice(sql.indexOf('DO UPDATE SET'));
-  assert.ok(update.length > 0 && !update.includes('is_junk'));
+  const at = sql.search(/DO UPDATE[ \n]+SET/);
+  assert.ok(at >= 0, 'the statement updates on conflict');
+  assert.ok(!sql.slice(at).includes('is_junk'));
 });

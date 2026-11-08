@@ -30,6 +30,7 @@ import { requestJson } from './lib/api';
 import { useNotice } from './lib/use-notice';
 import { MoreFoodsButton } from './more-foods-button';
 import { parseAmount, unreadableAmount } from './number-input';
+import { isCoupangUrl, packageText, readNutritionLabel } from './nutrition-label';
 import { useReturnFocus } from './return-focus';
 
 const nutrients = [
@@ -138,6 +139,15 @@ const bodyOf = (form: Form) => ({
   isJunk: form.isJunk,
 });
 
+// The checked date of a label read now, as a day in the service time zone.
+const serviceToday = () =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+
 // The server and database only store http(s) addresses; a link must never run script regardless.
 const isSafeLink = (url: string) => /^https?:\/\//i.test(url);
 
@@ -162,8 +172,56 @@ function FoodDialog({
   const [form, setForm] = useState<Form>(food ? formOf(food) : emptyForm);
   const [saving, setSaving] = useState(false);
   const { notice, error, clear } = useNotice();
+  const [pasted, setPasted] = useState('');
+  const [filled, setFilled] = useState<{ kind: 'status' | 'error'; lines: string[] } | null>(null);
   const update = (key: keyof Form) => (event: { target: { value: string } }) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
+
+  // Fills the form only; nothing is saved until 저장 is pressed, so the person checks it first.
+  const fill = () => {
+    const reading = readNutritionLabel(pasted);
+    const found = nutrients.filter(({ key }) => reading.values[key] !== undefined);
+    if (!reading.basis && found.length === 0) {
+      setFilled({
+        kind: 'error',
+        lines: [
+          '영양성분 표를 찾지 못했습니다. 글자로 된 표만 읽을 수 있습니다.',
+          '표가 이미지로만 있으면 값을 직접 입력해 주세요.',
+        ],
+      });
+      return;
+    }
+    setForm((current) => ({
+      ...current,
+      ...(reading.basis
+        ? { servingSize: String(reading.basis.size), servingUnit: reading.basis.unit }
+        : {}),
+      ...Object.fromEntries(found.map(({ key }) => [key, String(reading.values[key])])),
+      // Values copied from the product's own table are its label, checked today (#34).
+      sourceType: current.sourceType === 'manual' ? 'label' : current.sourceType,
+      checkedOn: current.checkedOn || serviceToday(),
+    }));
+    const labelOf = (key: NutrientKey) => nutrients.find((nutrient) => nutrient.key === key)!.label;
+    const missing = nutrients.filter(
+      ({ key }) => reading.values[key] === undefined && !reading.lessThan.includes(key),
+    );
+    const total = packageText(reading);
+    setFilled({
+      kind: 'status',
+      lines: [
+        `채운 칸: ${[...(reading.basis ? ['1회 제공량'] : []), ...found.map(({ label }) => label)].join(', ')}`,
+        ...(reading.basis ? [] : ['1회 제공량을 찾지 못했습니다. 직접 입력해 주세요.']),
+        ...(reading.lessThan.length
+          ? [`"미만" 표기라 비워 둔 칸: ${reading.lessThan.map(labelOf).join(', ')}`]
+          : []),
+        ...(missing.length
+          ? [`표에 없어 그대로 둔 칸: ${missing.map(({ label }) => label).join(', ')}`]
+          : []),
+        ...(total ? [total] : []),
+        '값을 확인한 뒤 저장을 눌러야 저장됩니다.',
+      ],
+    });
+  };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -201,6 +259,35 @@ function FoodDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={(event) => void submit(event)} noValidate className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="food-label-text">영양성분 표 붙여넣기</Label>
+            <textarea
+              id="food-label-text"
+              aria-describedby="food-label-text-help"
+              rows={4}
+              value={pasted}
+              onChange={(event) => setPasted(event.target.value)}
+              className="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-body-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+              placeholder={'예: 100g당 250kcal\n나트륨 300mg 탄수화물 30g …'}
+            />
+            <p id="food-label-text-help" className="text-caption break-keep text-muted-foreground">
+              상품 페이지의 영양성분 표 글자를 복사해 넣으면 아래 칸을 채웁니다. 앱은 상품 페이지를
+              열지 않습니다.
+            </p>
+            <Button type="button" variant="outline" size="sm" className="self-start" onClick={fill}>
+              표 읽어 채우기
+            </Button>
+            {filled ? (
+              <div
+                role={filled.kind === 'error' ? 'alert' : 'status'}
+                className={`flex flex-col gap-1 text-body-sm break-keep ${filled.kind === 'error' ? 'text-destructive' : ''}`}
+              >
+                {filled.lines.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <Field id="food-name" label="음식 이름">
             <Input id="food-name" value={form.name} onChange={update('name')} />
           </Field>
@@ -262,9 +349,20 @@ function FoodDialog({
             <Input
               id="food-source-url"
               type="url"
+              aria-describedby={isCoupangUrl(form.sourceUrl) ? 'food-source-url-help' : undefined}
               value={form.sourceUrl}
               onChange={update('sourceUrl')}
             />
+            {/* #34: shop pages are never read by the app; the link only says where the values came from. */}
+            {isCoupangUrl(form.sourceUrl) ? (
+              <p
+                id="food-source-url-help"
+                className="text-caption break-keep text-muted-foreground"
+              >
+                쿠팡 링크는 출처로만 저장합니다. 앱은 이 페이지를 열지 않으니, 영양성분 표 글자를
+                위에 붙여넣거나 값을 직접 입력해 주세요. 표가 이미지로만 있으면 직접 입력해 주세요.
+              </p>
+            ) : null}
           </Field>
           <Field id="food-checked-on" label="확인 날짜">
             <Input

@@ -106,3 +106,70 @@ test('a deeply nested or very long body is checked without failing, and a NUL in
   }
   assert.equal(queries.length, 0);
 });
+
+test('food and meal text past its limit by one emoji is refused, counted in characters', async () => {
+  const { pool, queries } = recording();
+  const food = { name: '김밥', servingSize: 1, servingUnit: 'g' };
+  await withApi(pool, async (call) => {
+    for (const [method, path, body, message] of [
+      ['POST', '/api/foods', { ...food, name: '🍙'.repeat(101) }, '음식 이름은 100자 이하'],
+      ['POST', '/api/foods', { ...food, brand: '🍙'.repeat(51) }, '50자 이하'],
+      ['POST', '/api/foods', { ...food, category: '🍙'.repeat(31) }, '30자 이하'],
+      ['POST', '/api/foods', { ...food, servingUnit: '🍙'.repeat(11) }, '단위는 10자 이하'],
+      [
+        'POST',
+        '/api/meals/2026-03-15',
+        { meal: 'lunch', name: '🍙'.repeat(101), calories: 1, servings: 1 },
+        '음식 이름은 100자 이하',
+      ],
+      [
+        'GET',
+        `/api/foods?q=${encodeURIComponent('🍙'.repeat(101))}`,
+        undefined,
+        '검색어는 100자 이하',
+      ],
+    ] as const) {
+      const { status, data } = await call(path, { method, body });
+      assert.equal(status, 400, `${method} ${path}`);
+      assert.match(String(data.error), new RegExp(message), `${method} ${path}`);
+    }
+  });
+  assert.equal(queries.length, 0);
+});
+
+test('food and meal text filled to its limit with emoji passes the checks and is written', async () => {
+  // Records every statement, from the pool and from a transaction's client alike. Its empty
+  // answers make the routes fail after writing, so the statements are what this test reads.
+  const statements: { sql: string; values: unknown[] }[] = [];
+  const query = async (sql: string, values: unknown[] = []) => {
+    statements.push({ sql, values });
+    return { rows: [], rowCount: 0 };
+  };
+  const pool = { query, connect: async () => ({ query, release: () => {} }) } as unknown as Pool;
+  const name = '🍙'.repeat(99) + '#';
+  const wrote = (table: string) =>
+    statements.some(
+      ({ sql, values }) => sql.includes(`INSERT INTO ${table}`) && values.includes(name),
+    );
+
+  await withApi(pool, async (call) => {
+    await call('/api/foods', {
+      method: 'POST',
+      body: {
+        name,
+        brand: '🍙'.repeat(50),
+        category: '🍙'.repeat(30),
+        servingSize: 1,
+        servingUnit: '🍙'.repeat(10),
+      },
+    });
+    await call('/api/meals/2026-03-15', {
+      method: 'POST',
+      body: { meal: 'lunch', name, calories: 1, servings: 1 },
+    });
+    const search = await call(`/api/foods?q=${encodeURIComponent('🍙'.repeat(100))}`);
+    assert.ok(search.status !== 400, JSON.stringify(search.data));
+  });
+  assert.ok(wrote('foods'), 'the food was written');
+  assert.ok(wrote('meal_entries'), 'the meal entry was written');
+});

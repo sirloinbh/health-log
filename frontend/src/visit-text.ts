@@ -52,3 +52,13 @@ export const clinicText = (visit: Pick<Visit, 'clinic' | 'department'>) =>
 
 /** The clinic page, in the app's page list and linked from the daily card. */
 export const visitsPagePath = '/visits';
+
+/**
+ * The label with 은 or 는, as its last syllable takes: "진료비는", "병원 이름은". A label that does
+ * not end in Hangul gets 은(는).
+ */
+export function withTopic(label: string) {
+  const last = label.charCodeAt(label.length - 1) - 0xac00;
+  if (last < 0 || last > 11171) return `${label}은(는)`;
+  return `${label}${last % 28 === 0 ? '는' : '은'}`;
+}

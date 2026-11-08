@@ -41,6 +41,7 @@ import {
   procedureText,
   type Visit,
   visitsPath,
+  withTopic,
   wonText,
 } from './visit-text';
 
@@ -87,15 +88,16 @@ const maxCost = 100_000_000;
 /** The first field longer than the server takes, counted in characters as it counts them (#92). */
 const tooLong = (fields: [string, string, number][]) => {
   const found = fields.find(([, value, max]) => charCount(value.trim()) > max);
-  return found ? `${found[0]}은(는) ${found[2]}자 이하로 입력해 주세요` : null;
+  return found ? `${withTopic(found[0])} ${found[2]}자 이하로 입력해 주세요` : null;
 };
 
 /** A cost in won, or the reason it cannot be read. */
 const readCost = (label: string, text: string) => {
   const value = parseWon(text);
-  if (value === undefined)
-    return `${label}은(는) 원 단위 숫자로 입력해 주세요. 예: 12000 또는 12,000`;
-  if (value !== null && value > maxCost) return `${label}은(는) 1억 원 이하로 입력해 주세요`;
+  if (value === undefined) {
+    return `${withTopic(label)} 원 단위 숫자로 입력해 주세요. 예: 12000 또는 12,000`;
+  }
+  if (value !== null && value > maxCost) return `${withTopic(label)} 1억 원 이하로 입력해 주세요`;
   return value;
 };
 
@@ -131,7 +133,7 @@ function readDraft(draft: Draft) {
       [`${label} 메모`, item.note, 500],
     ]);
     if (itemLong) return itemLong;
-    const itemCost = readCost(`${label}의 비용`, item.cost);
+    const itemCost = readCost(`${label} 비용`, item.cost);
     if (typeof itemCost === 'string') return itemCost;
     procedures.push({
       name: item.name,
@@ -500,7 +502,8 @@ function VisitCard({
 
 type Page = { visits: Visit[]; more: boolean };
 
-export function VisitsPage({ today }: { today: string | null }) {
+/** `today` is undefined while the server is still being asked, and null if it could not say. */
+export function VisitsPage({ today }: { today: string | null | undefined }) {
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const applied = useRef('');
@@ -558,7 +561,8 @@ export function VisitsPage({ today }: { today: string | null }) {
     if (asked === null) return;
     const inRange = isValidDate(asked) && inDailyRange(asked);
     // Without a usable date, wait for the server's today rather than open on a blank one.
-    if (!inRange && today === null) return;
+    // If the server cannot say, open anyway and let the date be picked.
+    if (!inRange && today === undefined) return;
     setParams({}, { replace: true });
     setEditing({ visit: null, date: inRange ? asked : (today ?? '') });
   }, [asked, setParams, today]);

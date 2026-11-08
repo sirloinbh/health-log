@@ -135,7 +135,17 @@ export function App() {
           <Route path={pages.combos} element={<CombosPage />} />
           <Route
             path={pages.visits}
-            element={<VisitsPage today={health.state === 'ok' ? health.today : null} />}
+            element={
+              <VisitsPage
+                today={
+                  health.state === 'ok'
+                    ? health.today
+                    : health.state === 'loading'
+                      ? undefined
+                      : null
+                }
+              />
+            }
           />
           <Route
             path={pages.settings}

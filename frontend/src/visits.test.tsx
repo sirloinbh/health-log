@@ -150,7 +150,7 @@ test('what cannot be sent is explained in the dialog before anything is sent', a
   fill('병원 이름', '가상의원');
   fill('진료비 (원)', '1.5');
   save();
-  await said('진료비은(는) 원 단위 숫자로 입력해 주세요');
+  await said('진료비는 원 단위 숫자로 입력해 주세요');
   fill('진료비 (원)', '');
   fill('다음 예약일', '2026-03-14');
   save();
@@ -165,11 +165,11 @@ test('what cannot be sent is explained in the dialog before anything is sent', a
   fill('방문 날짜', '2026-03-15');
   fill('진료비 (원)', '100,000,001');
   save();
-  await said('진료비은(는) 1억 원 이하로 입력해 주세요');
+  await said('진료비는 1억 원 이하로 입력해 주세요');
   fill('진료비 (원)', '');
   fill('병원 이름', '🏥'.repeat(101));
   save();
-  await said('병원 이름은(는) 100자 이하로 입력해 주세요');
+  await said('병원 이름은 100자 이하로 입력해 주세요');
   fill('병원 이름', '가상의원');
   fireEvent.click(within(dialog()).getByRole('button', { name: '시술 추가' }));
   save();
@@ -177,7 +177,7 @@ test('what cannot be sent is explained in the dialog before anything is sent', a
   fill('1번째 시술 이름', '가상 시술');
   fill('1번째 시술 메모', '가'.repeat(501));
   save();
-  await said('1번째 시술 메모은(는) 500자 이하로 입력해 주세요');
+  await said('1번째 시술 메모는 500자 이하로 입력해 주세요');
   expect(writes(fetchMock)).toHaveLength(0);
 });
 
@@ -372,4 +372,39 @@ test('while a search is on its way, the next page waits, so two lists never mix'
   expect(fetchMock.mock.calls.some(([url]) => url.includes('offset='))).toBe(false);
   finishSearch();
   expect(await screen.findByText('방문 1건')).toBeInTheDocument();
+});
+
+test('a daily link without a usable date waits for today, or opens blank if it cannot be had', async () => {
+  let answerHealth = (_response: Response) => {};
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) =>
+      url.startsWith('/api/visits')
+        ? Promise.resolve(json({ visits: [], more: false }))
+        : new Promise<Response>((resolve) => (answerHealth = resolve)),
+    ),
+  );
+  open('/visits?new=1985-07-01');
+  await screen.findByText('병원 기록이 없습니다');
+  // Today is still being asked, so nothing opens on a blank date yet.
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  answerHealth(json({ today: '2026-03-15' }));
+  expect(await screen.findByRole('dialog', { name: '병원 방문 기록' })).toBeInTheDocument();
+  expect(within(dialog()).getByLabelText('방문 날짜')).toHaveValue('2026-03-15');
+});
+
+test('a daily link without a usable date still opens when the server cannot say what day it is', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) =>
+      Promise.resolve(
+        url.startsWith('/api/visits')
+          ? json({ visits: [], more: false })
+          : json({ error: '서버 오류가 발생했습니다' }, 500),
+      ),
+    ),
+  );
+  open('/visits?new=garbage');
+  expect(await screen.findByRole('dialog', { name: '병원 방문 기록' })).toBeInTheDocument();
+  expect(within(dialog()).getByLabelText('방문 날짜')).toHaveValue('');
 });

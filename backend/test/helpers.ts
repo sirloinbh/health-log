@@ -22,6 +22,59 @@ export function testDatabaseSkip(url: string | undefined): false | string {
   return name === 'health_test' ? false : `health_test 전용 DB가 아닙니다: ${name || '없음'}`;
 }
 
+/**
+ * Runs `run` with a stand-in pool whose queries all go through one REPEATABLE READ transaction,
+ * rolled back at the end (#137; issue #134 / PR #136 did the same inline for one read).
+ * Other test files write at the same time. Inside the snapshot their later commits are invisible,
+ * and rows written here get sequence values after every row the snapshot can see, so they are the
+ * newest it holds.
+ * A route's own transaction (`pool.connect()`, then any `BEGIN …` such as snapshotRead, then COMMIT
+ * or ROLLBACK) becomes a savepoint of its own, so it runs as usual inside the snapshot. Its options
+ * are dropped: the isolation level is the snapshot's, and READ ONLY is not enforced, so a write in a
+ * read-only route would pass here. Requests must go one at a time: there is one connection.
+ */
+export async function inSnapshot(pool: Pool, run: (snapshot: Pool) => Promise<void>) {
+  const client = await pool.connect();
+  // Open savepoints, innermost last. Each has its own name, so a leftover cannot be released instead.
+  const open: string[] = [];
+  let count = 0;
+  const send = client.query.bind(client) as (...args: unknown[]) => Promise<unknown>;
+  // Async, so a mistake here rejects like a failed query and the app's .catch() still sees it.
+  const query = async (text: unknown, ...rest: unknown[]) => {
+    if (typeof text !== 'string') return send(text, ...rest);
+    const word = text.trim().split(/\s+/)[0]!.toUpperCase();
+    if (word === 'BEGIN' || word === 'START') {
+      const name = `app_transaction_${(count += 1)}`;
+      const result = await send(`SAVEPOINT ${name}`);
+      // Only once it exists, so a failed BEGIN leaves no name for a later ROLLBACK to aim at.
+      open.push(name);
+      return result;
+    }
+    if (word === 'COMMIT' || word === 'END' || word === 'ROLLBACK' || word === 'ABORT') {
+      const name = open.pop();
+      if (!name) throw new Error(`inSnapshot: ${word} without a transaction`);
+      return send(
+        word === 'COMMIT' || word === 'END'
+          ? `RELEASE SAVEPOINT ${name}`
+          : `ROLLBACK TO SAVEPOINT ${name}; RELEASE SAVEPOINT ${name}`,
+      );
+    }
+    return send(text, ...rest);
+  };
+  const inner = { query, release: () => undefined };
+  const snapshot = { query, connect: () => Promise.resolve(inner) } as unknown as Pool;
+  let broken: Error | undefined;
+  try {
+    await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
+    await run(snapshot);
+  } finally {
+    // A lost connection fails the rollback too. The client still goes back, or pool.end() waits,
+    // but marked broken so the pool drops it instead of handing it out again.
+    await client.query('ROLLBACK').catch((error: Error) => (broken = error));
+    client.release(broken);
+  }
+}
+
 // Ports fetch() refuses with "bad port" (Fetch standard, 1024 and up). Windows can hand them out when
 // its dynamic range starts low, which made tests fail now and then.
 const fetchBlockedPorts = new Set([

@@ -11,6 +11,7 @@ import { habitsRouter } from './habits.js';
 import { mealsRouter } from './meals.js';
 import { medicationsRouter } from './medications.js';
 import { defaultRateLimit, type RateLimitSettings } from './rate-limit.js';
+import { remindersRouter } from './reminders.js';
 import { reportRouter } from './report.js';
 import { sleepRouter } from './sleep.js';
 import { errorHandler, notFound } from './standard/http.js';
@@ -60,6 +61,7 @@ export function createApp(
     '/api/medications',
     medicationsRouter(pool, today, options.rateLimit ?? defaultRateLimit),
   );
+  app.use('/api/reminders', remindersRouter(pool, today, options.rateLimit ?? defaultRateLimit));
   app.use('/api', notFound);
   app.use(errorHandler);
   return app;

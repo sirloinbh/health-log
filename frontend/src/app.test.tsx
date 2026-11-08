@@ -11,12 +11,20 @@ const noGoals = {
   history: [],
 };
 
+// The dashboard also shows what is coming up (#48).
+const noReminders = { today: '2026-10-26', until: '2026-11-02', leadDays: 7, reminders: [] };
+
 const health = (body: object, status = 200) =>
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) =>
       Promise.resolve(
-        new Response(JSON.stringify(url === '/api/goals' ? noGoals : body), { status }),
+        new Response(
+          JSON.stringify(
+            url === '/api/goals' ? noGoals : url === '/api/reminders' ? noReminders : body,
+          ),
+          { status },
+        ),
       ),
     ),
   );

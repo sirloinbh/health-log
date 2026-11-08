@@ -255,7 +255,13 @@ function GoalHistory({
             </span>
             <ConfirmDialog
               title="이 변경을 삭제할까요?"
-              description="삭제하면 그 날짜부터 바로 앞의 목표로 판정합니다."
+              description={
+                // A sober goal judges whole weeks, so a deleted change stops counting from the
+                // Monday of its week.
+                item === 'sober_days'
+                  ? '삭제하면 그 날짜가 든 주부터 바로 앞의 목표로 판정합니다.'
+                  : '삭제하면 그 날짜부터 바로 앞의 목표로 판정합니다.'
+              }
               onConfirm={() => remove(change.from)}
               trigger={
                 <Button

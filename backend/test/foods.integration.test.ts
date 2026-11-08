@@ -143,6 +143,71 @@ test('popular foods are stored per serving with a checkable public source', { sk
   assert.equal(Number(stew.rows[0]!.calories), 244);
 });
 
+// #31. Franchise menus: official numbers only, each with where and when they were checked.
+const franchiseBrands = ['맥도날드', '버거킹', '롯데리아', 'KFC', '맘스터치'];
+
+test(
+  'franchise menus carry an official source, a date and the junk food mark',
+  { skip },
+  async () => {
+    const { rows } = await pool.query<{
+      brand: string;
+      burgers: string;
+      sides: string;
+      drinks: string;
+      unchecked: string;
+    }>(
+      `SELECT brand,
+            count(*) FILTER (WHERE category = '버거') AS burgers,
+            count(*) FILTER (WHERE category = '사이드') AS sides,
+            count(*) FILTER (WHERE category = '음료') AS drinks,
+            count(*) FILTER (
+              WHERE source_type <> 'official' OR source_url NOT LIKE 'https://%'
+                OR checked_on IS NULL OR NOT is_junk
+                OR carbs IS NOT NULL OR fat IS NOT NULL
+                OR calories IS NULL OR protein IS NULL OR sugars IS NULL OR sodium IS NULL
+            ) AS unchecked
+     FROM foods WHERE brand = ANY($1) GROUP BY brand`,
+      [franchiseBrands],
+    );
+    const byBrand = Object.fromEntries(
+      rows.map((row) => [
+        row.brand,
+        [Number(row.burgers), Number(row.sides), Number(row.drinks), Number(row.unchecked)],
+      ]),
+    );
+    // Burger King publishes no row for its fries and soft drinks (docs/changes/31-franchise-foods.md).
+    assert.deepEqual(byBrand, {
+      맥도날드: [21, 2, 10, 0],
+      버거킹: [37, 0, 0, 0],
+      롯데리아: [28, 2, 3, 0],
+      KFC: [12, 2, 12, 0],
+      맘스터치: [29, 2, 4, 0],
+    });
+
+    // One value per brand as the source prints it, so a shifted column would show.
+    const samples = await pool.query<{ brand: string; name: string; values: string }>(
+      `SELECT brand, name, concat_ws('/', serving_size::float8, serving_unit, calories::float8,
+              sugars::float8, protein::float8, sodium::float8) AS values
+     FROM foods
+     WHERE (brand, name) IN (('맥도날드', '빅맥'), ('버거킹', '와퍼'), ('롯데리아', '리아 불고기'),
+                             ('KFC', '징거'), ('맘스터치', '싸이버거'), ('맥도날드', '코카 콜라 미디엄'))
+     ORDER BY brand, name`,
+    );
+    assert.deepEqual(
+      samples.rows.map((row) => `${row.brand} ${row.name} ${row.values}`),
+      [
+        'KFC 징거 225/g/553/5/33/866',
+        '롯데리아 리아 불고기 192/g/462/11/21/880',
+        '맘스터치 싸이버거 230/g/594/14/28/1009',
+        '맥도날드 빅맥 223/g/582/8/27/902',
+        '맥도날드 코카 콜라 미디엄 425/ml/133/33/0/9',
+        '버거킹 와퍼 286/g/706/10/30/1098',
+      ],
+    );
+  },
+);
+
 test('popular foods can be found by the words people search for', { skip }, async () => {
   await withApi(pool, async (call) => {
     const expected = {

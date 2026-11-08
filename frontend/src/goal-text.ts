@@ -10,6 +10,9 @@ export type GoalItem = (typeof goalItems)[number];
 export type Goal = { from: string; target: number } | null;
 export type Goals = {
   today: string;
+  /** Today's Monday-to-Sunday week. */
+  week: { from: string; to: string };
+  /** Daily goals as of today; sober days as of this week's Sunday. */
   current: Record<GoalItem, Goal>;
   /** Every change, newest first within each item. A null target turned the goal off. */
   history: { item: GoalItem; from: string; target: number | null }[];
@@ -103,13 +106,28 @@ export const sleepParts = (target: number) => ({
 });
 
 /**
- * The goals once one change is deleted: the item's goal today is then its latest change on or
- * before today, as the server counts it. Shown at once, so a failed reload cannot leave the deleted
- * change on screen.
+ * The last start date that already counts now. Daily goals count from today; sober days from this
+ * week's Sunday, as the whole week is judged by that day's goal (#107).
+ */
+export const countsUntil = (goals: Goals, item: GoalItem) =>
+  item === 'sober_days' ? goals.week.to : goals.today;
+
+/** "지금 목표: …", or for sober days the goal this week is judged by, with the week. */
+export function currentText(goals: Goals, item: GoalItem) {
+  const goal = goals.current[item];
+  const label = item === 'sober_days' ? `이번 주(${spanText(goals.week)}) 목표` : '지금 목표';
+  return goal ? `${label}: ${targetText(item, goal.target)} (${goal.from}부터)` : `${label} 없음`;
+}
+
+/**
+ * The goals once one change is deleted: the item's current goal is then its latest change that
+ * already counts, as the server counts it. Shown at once, so a failed reload cannot leave the
+ * deleted change on screen.
  */
 export function withoutChange(goals: Goals, item: GoalItem, from: string): Goals {
   const history = goals.history.filter((change) => !(change.item === item && change.from === from));
-  const latest = history.find((change) => change.item === item && change.from <= goals.today);
+  const until = countsUntil(goals, item);
+  const latest = history.find((change) => change.item === item && change.from <= until);
   const current =
     latest && latest.target !== null ? { from: latest.from, target: latest.target } : null;
   return { ...goals, history, current: { ...goals.current, [item]: current } };

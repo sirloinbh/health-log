@@ -16,6 +16,8 @@ import { earliestDate, inDailyRange, isValidDate, latestDate, shiftDate } from '
 import {
   actualText,
   changeText,
+  countsUntil,
+  currentText,
   type Goal,
   type GoalDay,
   type GoalDayItem,
@@ -246,7 +248,8 @@ function GoalHistory({
           <li key={change.from} className="flex flex-wrap items-center justify-between gap-2">
             <span className="break-keep">
               {sinceText(change.from)} {changeText(item, change.target)}
-              {change.from > goals.today ? (
+              {/* A sober change later this week already judges this week, so it is not to come. */}
+              {change.from > countsUntil(goals, item) ? (
                 <span className="text-muted-foreground"> (예정)</span>
               ) : null}
             </span>
@@ -365,11 +368,7 @@ export function GoalsSettings() {
                   >
                     <CardTitle asHeading="h3">{goalFields[item].title}</CardTitle>
                   </div>
-                  <CardDescription>
-                    {goal
-                      ? `지금 목표: ${targetText(item, goal.target)} (${sinceText(goal.from)})`
-                      : '지금 목표 없음'}
-                  </CardDescription>
+                  <CardDescription>{currentText(goals, item)}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-4">
                   {/* A new key per answer refills the form from what was saved. */}

@@ -6,6 +6,7 @@ import { App } from './app';
 // The settings page loads the goals along with it.
 const noGoals = {
   today: '2026-10-26',
+  week: { from: '2026-10-26', to: '2026-11-01' },
   current: { calories: null, protein: null, sleep: null, sober_days: null },
   history: [],
 };

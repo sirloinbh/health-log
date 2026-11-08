@@ -154,8 +154,41 @@ const goalsOf = (
   today = '2026-11-06',
 ) => ({
   today,
+  // 2026-11-06 is a Friday.
+  week: { from: '2026-11-02', to: '2026-11-08' },
   current: { calories: null, protein: null, sleep: null, sober_days: null, ...current },
   history,
+});
+
+test('the sober card shows the goal this week is judged by, and a change later this week is not "to come"', async () => {
+  // Today is Friday; the sober change from Saturday already judges this week, a daily one does not.
+  const goals = goalsOf(
+    { protein: { from, target: 100 }, sober_days: { from: '2026-11-07', target: 6 } },
+    [
+      { item: 'protein', from: '2026-11-07', target: 120 },
+      { item: 'protein', from, target: 100 },
+      { item: 'sober_days', from: '2026-11-09', target: 7 },
+      { item: 'sober_days', from: '2026-11-07', target: 6 },
+      { item: 'sober_days', from, target: 5 },
+    ],
+  );
+  server({ body: goals });
+  render(<GoalsSettings />);
+  await screen.findByRole('heading', { name: '금주' });
+  expect(
+    within(cardOf('금주')).getByText(
+      '이번 주(11.02~11.08) 목표: 주 6일 이상 금주 (2026-11-07부터)',
+    ),
+  ).toBeInTheDocument();
+  const sober = screen.getByRole('region', { name: '금주 목표 변경 기록' });
+  expect(within(sober.querySelector('li') as HTMLElement).getByText('(예정)')).toBeInTheDocument();
+  expect(within(sober).getAllByText('(예정)')).toHaveLength(1);
+  // The daily goal from Saturday is still to come.
+  const protein = screen.getByRole('region', { name: '단백질 목표 변경 기록' });
+  expect(within(protein).getAllByText('(예정)')).toHaveLength(1);
+  expect(
+    within(cardOf('단백질')).getByText('지금 목표: 하루 100g 이상 (2026-11-01부터)'),
+  ).toBeInTheDocument();
 });
 
 const cardOf = (title: string) =>

@@ -19,9 +19,7 @@ const clean = async () => {
   await pool.query('DELETE FROM body_records WHERE record_date = $1', [date]);
   await pool.query('DELETE FROM meal_entries WHERE entry_date = $1', [date]);
   // Only the exact names the tests make, so no real food can match.
-  await pool.query('DELETE FROM foods WHERE name = ANY($1)', [
-    ['🍚'.repeat(99) + '#', '🍙'.repeat(100)],
-  ]);
+  await pool.query('DELETE FROM foods WHERE name = $1', ['🍚'.repeat(99) + '#']);
   await pool.query(
     'DELETE FROM meal_combos WHERE id IN (SELECT combo_id FROM meal_combo_items i JOIN foods f ON f.id = i.food_id WHERE f.name = $1)',
     [foodName],

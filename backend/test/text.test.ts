@@ -136,3 +136,21 @@ test('food and meal text past its limit by one emoji is refused, counted in char
   });
   assert.equal(queries.length, 0);
 });
+
+test('food and meal text filled to its limit with emoji passes the checks and goes on', async () => {
+  const { pool, queries } = recording();
+  const name = '🍙'.repeat(99) + '#';
+  await withApi(pool, async (call) => {
+    for (const [method, path, body] of [
+      ['POST', '/api/foods', { name, servingSize: 1, servingUnit: '🍙'.repeat(10) }],
+      ['POST', '/api/meals/2026-03-15', { meal: 'lunch', name, calories: 1, servings: 1 }],
+    ] as const) {
+      const { status, data } = await call(path, { method, body });
+      // The fake database answers nothing useful, so what matters is that no length rule spoke.
+      assert.ok(status !== 400, `${method} ${path}: ${JSON.stringify(data)}`);
+    }
+    const search = await call(`/api/foods?q=${encodeURIComponent('🍙'.repeat(100))}`);
+    assert.ok(search.status !== 400, JSON.stringify(search.data));
+  });
+  assert.ok(queries.length > 0, 'the food request reached the database');
+});

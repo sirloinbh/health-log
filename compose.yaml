@@ -18,6 +18,8 @@ services:
     restart: unless-stopped
   api:
     build: { context: ./backend, secrets: [npm_token] }
+    # Tagged by commit on the server so the previous version can be restarted (#74).
+    image: health-backend:${IMAGE_TAG:-local}
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-health}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-health}
       PORT: 3103
@@ -27,7 +29,9 @@ services:
     restart: unless-stopped
   web:
     build: { context: ./frontend, secrets: [npm_token] }
-    ports: ['127.0.0.1:8103:80']
+    image: health-frontend:${IMAGE_TAG:-local}
+    # Local default stays 127.0.0.1:8103; the server sets WEB_BIND/WEB_PORT in .env (#74).
+    ports: ['${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8103}:80']
     depends_on: [api]
     restart: unless-stopped
 volumes:

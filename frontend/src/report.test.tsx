@@ -196,8 +196,95 @@ test('a failed report can be tried again', async () => {
   render(<App />);
   expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
   fail = false;
-  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+  const retry = screen.getByRole('button', { name: '다시 시도' });
+  retry.focus();
+  fireEvent.click(retry);
+  const span = await screen.findByText('11월 2일 ~ 11월 8일');
+  // The button is gone, so focus moves to the period shown, not to the page (#128).
+  await waitFor(() => expect(span).toHaveFocus());
+});
+
+test('a retry that fails again keeps focus on its button', async () => {
+  let answer: (response: Response) => void = () => {};
+  let calls = 0;
+  serve(() =>
+    ++calls === 1
+      ? json({ error: '서버 오류가 발생했습니다' }, 500)
+      : new Promise<Response>((resolve) => {
+          answer = resolve;
+        }),
+  );
+  render(<App />);
+  await screen.findByRole('alert');
+  const retry = screen.getByRole('button', { name: '다시 시도' });
+  retry.focus();
+  fireEvent.click(retry);
+  // While the retry is on its way the button stays, marked busy, and keeps focus.
+  await waitFor(() => expect(retry).toHaveAttribute('aria-disabled', 'true'));
+  expect(retry).toHaveFocus();
+  answer(json({ error: '서버 오류가 발생했습니다' }, 500));
+  await waitFor(() => expect(retry).not.toHaveAttribute('aria-disabled'));
+  expect(screen.getByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  expect(retry).toHaveFocus();
+});
+
+test('the first and last periods of the range do not move past it (#130)', async () => {
+  const at = (from: string, to: string) => ({ ...reportOf().current, from, to });
+  const fetchMock = serve((url) => {
+    const month = url.includes('period=month');
+    const date = new URL(url, 'http://test').searchParams.get('date')!;
+    if (date.startsWith('2099')) {
+      return json(
+        reportOf({
+          period: month ? 'month' : 'week',
+          current: month ? at('2099-12-01', '2099-12-31') : at('2099-12-28', '2100-01-03'),
+        }),
+      );
+    }
+    return json(
+      reportOf({
+        period: month ? 'month' : 'week',
+        current: month ? at('2000-01-01', '2000-01-31') : at('1999-12-27', '2000-01-02'),
+      }),
+    );
+  });
+  window.history.replaceState(null, '', '/?period=week&date=2000-01-01');
+  render(<App />);
+  await screen.findByText('1999년 12월 27일 ~ 2000년 1월 2일');
+  const previous = screen.getByRole('button', { name: '이전 주' });
+  expect(previous).toHaveAttribute('aria-disabled', 'true');
+  expect(previous).toHaveAccessibleDescription('2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
+  expect(screen.getByRole('button', { name: '다음 주' })).not.toHaveAttribute('aria-disabled');
+  const before = reportCalls(fetchMock).length;
+  fireEvent.click(previous);
+  expect(window.location.search).toBe('?period=week&date=2000-01-01');
+  expect(reportCalls(fetchMock)).toHaveLength(before);
+
+  fireEvent.click(screen.getByRole('button', { name: '월간' }));
+  await screen.findByText('2000년 1월 1일 ~ 1월 31일');
+  expect(screen.getByRole('button', { name: '이전 달' })).toHaveAttribute('aria-disabled', 'true');
+
+  window.history.pushState({}, '', '/?period=week&date=2099-12-31');
+  fireEvent(window, new PopStateEvent('popstate'));
+  await screen.findByText('2099년 12월 28일 ~ 2100년 1월 3일');
+  expect(screen.getByRole('button', { name: '다음 주' })).toHaveAttribute('aria-disabled', 'true');
+  expect(screen.getByRole('button', { name: '이전 주' })).not.toHaveAttribute('aria-disabled');
+  fireEvent.click(screen.getByRole('button', { name: '월간' }));
+  await screen.findByText('2099년 12월 1일 ~ 12월 31일');
+  expect(screen.getByRole('button', { name: '다음 달' })).toHaveAttribute('aria-disabled', 'true');
+});
+
+test('a date in the address outside the range is said, not shown as an empty report (#130)', async () => {
+  const fetchMock = serve(() => json(reportOf()));
+  window.history.replaceState(null, '', '/?period=week&date=1999-06-01');
+  render(<App />);
+  expect(
+    await screen.findByText('2000-01-01부터 2099-12-31까지 기록할 수 있습니다: 1999-06-01'),
+  ).toBeInTheDocument();
+  expect(reportCalls(fetchMock)).toEqual([]);
+  fireEvent.click(await screen.findByRole('button', { name: '이번 주로 이동' }));
   expect(await screen.findByText('11월 2일 ~ 11월 8일')).toBeInTheDocument();
+  expect(reportCalls(fetchMock)).toEqual([`/api/report?period=week&date=${today}`]);
 });
 
 test('drinking compares the share of recorded days, since the periods may hold different numbers', async () => {

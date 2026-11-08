@@ -12,7 +12,7 @@ import { Notice } from './components/ui/notice';
 import { SkeletonText } from './components/ui/skeleton';
 import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
-import { earliestDate, inDailyRange, isValidDate, latestDate } from './daily-date';
+import { earliestDate, inDailyRange, isValidDate, latestDate, shiftDate } from './daily-date';
 import {
   actualText,
   changeText,
@@ -36,7 +36,7 @@ import {
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
 import { parseAmount, unreadableAmount } from './number-input';
-import { trackWrite, writesSettled } from './pending-writes';
+import { onWriteSettled, trackWrite, writesSettled } from './pending-writes';
 
 const goalsPath = '/api/goals';
 
@@ -138,11 +138,15 @@ function GoalForm({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex gap-2">
           <div className="flex min-w-0 flex-1 flex-col gap-2">
+            {/* Sleep's two fields sit side by side, so their visible labels stay one word each; the
+                full name is on the field, as for minutes. A long label wrapped in a half-width
+                card and pushed the hours field below the minutes field. */}
             <Label htmlFor={`${id}-target`}>
-              {field.label} ({field.unit})
+              {isSleep ? field.unit : `${field.label} (${field.unit})`}
             </Label>
             <Input
               id={`${id}-target`}
+              aria-label={isSleep ? `${field.label} (${field.unit})` : undefined}
               inputMode={isSleep ? 'numeric' : 'decimal'}
               autoComplete="off"
               placeholder={`예: ${field.example}`}
@@ -429,44 +433,65 @@ function Verdict({ day }: { day: GoalDayItem }) {
 }
 
 // The daily page gives this a key per date, so nothing here outlives the day it was loaded for.
-// Sober days count the whole week, so any day's drinks can change this one.
-const judgedPaths = (date: string) => [
-  `/api/meals/${date}`,
-  `/api/sleep/${date}`,
-  '/api/habits/',
-  `/api/checks/${date}`,
-  goalsPath,
-];
+// Every write that can change this day's verdicts. Sober days count the Monday-to-Sunday week, so
+// any day of that week's drinks can.
+const judgedPaths = (date: string) => {
+  const sinceMonday = (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
+  const week = Array.from(
+    { length: 7 },
+    (_, day) => `/api/habits/${shiftDate(date, day - sinceMonday)}`,
+  );
+  return [`/api/meals/${date}`, `/api/sleep/${date}`, `/api/checks/${date}`, ...week, goalsPath];
+};
+
+// A write under a path that starts with one of these, as writesSettled matches them.
+const judges = (date: string, path: string) =>
+  judgedPaths(date).some((prefix) => path.startsWith(prefix));
 
 export function GoalsCard({ date }: { date: string }) {
   const [day, setDay] = useState<GoalDay | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  // Only a read the person asked for says so. Saving each meal would otherwise have a screen reader
+  // announce "다시 판정하는 중" from this card while they work in another one.
+  const [asked, setAsked] = useState(false);
   const { notice, error, clear } = useNotice();
   const live = useRef(true);
+  // Reads can overlap once saves start them; only the latest one may show its answer.
+  const latest = useRef(0);
 
   const load = useCallback(async () => {
+    const request = ++latest.current;
+    const current = () => live.current && request === latest.current;
     clear();
     setLoading(true);
     try {
       // Saves still on their way in the cards this judges, or to the goals, would be missed.
       await Promise.all(judgedPaths(date).map((prefix) => writesSettled(prefix)));
-      if (!live.current) return;
+      if (!current()) return;
       const data = await requestJson<GoalDay>(`${goalsPath}/days/${date}`);
-      if (live.current) setDay(data);
+      if (current()) setDay(data);
     } catch (cause) {
-      if (live.current) error(cause);
+      if (current()) error(cause);
     } finally {
-      if (live.current) setLoading(false);
+      if (current()) {
+        setLoading(false);
+        setAsked(false);
+      }
     }
   }, [clear, date, error]);
 
   useEffect(() => {
     live.current = true;
     void load();
+    // A save in another card of this day, or of this week's drinks, changes what this judges.
+    const stop = onWriteSettled((path) => {
+      if (judges(date, path)) void load();
+    });
     return () => {
       live.current = false;
+      stop();
     };
-  }, [load]);
+  }, [date, load]);
 
   const byItem = new Map(day?.items.map((entry) => [entry.item, entry]));
   const noGoal = day ? day.items.every((entry) => entry.goal === null) : false;
@@ -522,18 +547,22 @@ export function GoalsCard({ date }: { date: string }) {
             ))}
           </>
         ) : null}
-        {/* Saves in the other cards do not reach this one, so it can be asked again. */}
+        {/* Saves in this page's cards read again on their own (#104); this is for anything else, such as another tab. */}
         <Button
           variant="outline"
           size="sm"
           className="self-start"
           // Not disabled: a disabled button drops the focus of whoever pressed it.
-          aria-busy={loading || undefined}
+          aria-busy={(loading && asked) || undefined}
           onClick={() => {
-            if (!loading) void load();
+            // A read the person already asked for is on its way. A quiet one started by a save
+            // may have gone out before what they want to see, so pressing replaces it.
+            if (loading && asked) return;
+            setAsked(true);
+            void load();
           }}
         >
-          {loading && day ? <Spinner size="sm" label="다시 판정하는 중" /> : null}
+          {loading && asked && day ? <Spinner size="sm" label="다시 판정하는 중" /> : null}
           {day === undefined && notice ? '다시 시도' : '다시 판정'}
         </Button>
       </CardContent>

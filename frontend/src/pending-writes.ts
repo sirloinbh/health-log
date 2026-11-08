@@ -2,6 +2,7 @@
 // Each card is keyed by date, so leaving a day and coming back mounts a new card. Reading before an
 // earlier save has landed would show the old record, and a blank form saved over it would erase it.
 const pending = new Map<string, Set<Promise<void>>>();
+const listeners = new Set<(path: string) => void>();
 
 /** Registers a write under `path` until it settles, and passes its result through unchanged. */
 export function trackWrite<T>(path: string, write: Promise<T>): Promise<T> {
@@ -15,8 +16,23 @@ export function trackWrite<T>(path: string, write: Promise<T>): Promise<T> {
   void settled.then(() => {
     writes.delete(settled);
     if (writes.size === 0 && pending.get(path) === writes) pending.delete(path);
+    // After the bookkeeping, so a listener that reads at once does not wait for this write.
+    for (const listener of [...listeners]) listener(path);
   });
   return write;
+}
+
+/**
+ * Calls `listener` with the path of every write that settles from now on, succeeded or not, so a
+ * card that adds up other cards' records can read again (#104). A failed write changes nothing,
+ * but reading again then costs one request and needs no guess about what reached the server.
+ * Returns the function that stops it.
+ */
+export function onWriteSettled(listener: (path: string) => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 /**

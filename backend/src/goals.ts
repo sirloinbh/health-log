@@ -107,7 +107,15 @@ const readGoals = async (db: Db, today: string) => {
   const { rows } = await db.query<GoalRow>(
     'SELECT item, effective_from, target FROM goals ORDER BY item, effective_from DESC',
   );
-  return { today, current: await goalsOn(db, today, today), history: rows.map(toGoal) };
+  // Sober days are judged by the goal on the week's Sunday, so "current" for them is that one too:
+  // the settings page then shows the number this week is judged by (#107).
+  const { week } = periodsOf(today);
+  return {
+    today,
+    week,
+    current: await goalsOn(db, today, week.to),
+    history: rows.map(toGoal),
+  };
 };
 
 type MealRow = {

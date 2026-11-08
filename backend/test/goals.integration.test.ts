@@ -47,6 +47,7 @@ type Day = {
 };
 type Goals = {
   today: string;
+  week: { from: string; to: string };
   current: Record<string, Goal>;
   history: { item: string; from: string; target: number | null }[];
 };
@@ -280,6 +281,32 @@ test(
     );
   },
 );
+
+test('the current sober goal is the one this week is judged by', { skip }, async (t) => {
+  t.after(clean);
+  // Wednesday 1981-03-04; its week runs 03-02 to 03-08.
+  await withApi(
+    pool,
+    async (call) => {
+      await setGoal(call, 'sober_days', '1981-03-01', 5);
+      await setGoal(call, 'calories', '1981-03-01', 2000);
+      // Both changed from Friday of the same week.
+      await setGoal(call, 'calories', '1981-03-06', 1800);
+      const goals = await setGoal(call, 'sober_days', '1981-03-06', 6);
+      assert.deepEqual(goals.week, { from: '1981-03-02', to: '1981-03-08' });
+      // A daily goal from Friday is not today's yet; a weekly one already judges this week.
+      assert.deepEqual(goals.current.calories, { from: '1981-03-01', target: 2000 });
+      assert.deepEqual(goals.current.sober_days, { from: '1981-03-06', target: 6 });
+      // The daily page judges today's week by the same number.
+      const today = itemOf(await day(call, '1981-03-04'), 'sober_days');
+      assert.deepEqual(today.goal, goals.current.sober_days);
+      // A change from next Monday is still to come.
+      const next = await setGoal(call, 'sober_days', '1981-03-09', 7);
+      assert.deepEqual(next.current.sober_days, { from: '1981-03-06', target: 6 });
+    },
+    { today: () => '1981-03-04' },
+  );
+});
 
 test('the database refuses goals the API would never write', { skip }, async (t) => {
   t.after(clean);

@@ -44,3 +44,12 @@
 - **반영(낮음)** #74 댓글의 `plan` 기대 결과를 "변경 하나"에서 "교체(-/+) 하나"로 고쳤다. `aws_lightsail_instance_public_ports`는 `port_info`를 바꾸면 다시 만들어지고, apply 동안 22·80·8103이 잠깐 닫힐 수 있다.
 - **반영(낮음)** `docs/access-protection.md`의 "지켜야 할 것"에서 지금 쓰는 길(새 포트 8103)을 밝혔다.
 - **남김(낮음)** `AGENTS.md`의 "포트(127.0.0.1 바인딩)"는 로컬 기준이다. 서버 웹은 `0.0.0.0:8103`이다. `AGENTS.md`는 중앙 관리 파일(`sirloinbh/project-standards`의 `templates/app/`)이라 이 PR에서 고치지 않았다. 서버 값은 `docs/access-protection.md`의 "서버 설정"이 원본이다.
+
+## 변경 — 2026-11-08 (2차 리뷰 반영)
+
+2차 리뷰(마지막)도 막는 문제를 찾지 못했다. CI(`ci.yml`은 compose를 쓰지 않음), `deploy/backup.sh`, `deploy/report.sh`, `deploy/notify.sh`, `docker compose build`는 그대로 동작한다.
+
+- **반영(낮음)** 이미지 이름이 정해져 한 PC의 worktree들이 `health-*:local`을 함께 쓴다. `docs/access-protection.md`에 worktree마다 `IMAGE_TAG`를 따로 두는 방법을 적었다.
+- **반영(낮음)** `.env.example` 주석에 셸 환경 변수로도 `WEB_BIND`, `WEB_PORT`를 두지 말라고 더했다. `WEB_BIND=0.0.0.0`이 로컬에 남으면 같은 네트워크에 웹이 열린다.
+- **반영(낮음)** 서버 `.env`를 바꾸면 다음 배포나 `docker compose up -d` 때 반영된다고 적었다.
+- 규칙에 따라 3차 리뷰는 하지 않는다.

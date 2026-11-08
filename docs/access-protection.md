@@ -33,6 +33,8 @@
 | 접속 주소                | `http://<static_ip>:8103`                 | 허용한 IP에서만                                                                |
 
 - `IMAGE_TAG`는 `.env`에 적지 않는다. 배포 스크립트가 커밋으로 넣는다.
+- `.env`를 바꾸면 다음 배포(또는 `/opt/health-log`에서 `docker compose up -d`) 때 반영된다.
+- **로컬 주의:** 이미지 이름이 `health-*:local`로 정해졌다. 한 PC의 여러 worktree가 같은 이름을 쓰므로, 한 곳에서 빌드하면 다른 worktree도 다음 `up` 때 그 이미지로 뜬다. worktree마다 따로 두려면 그 worktree의 `.env`에 `IMAGE_TAG=<worktree 이름>`을 적는다.
 - 웹을 `0.0.0.0`에 열면, 서버 밖에서 닿을지는 방화벽이 정한다. 그래서 **실제 경계는 방화벽**이다. `.env`를 먼저 바꾸고 방화벽을 나중에 열어도 그 사이에 밖에서 닿지 않는다.
 - DB(`127.0.0.1:15403`)와 API(호스트 포트 없음)는 그대로다.
 - 방화벽 변경안(`port_info`) 초안은 [#74 댓글](https://github.com/sirloinbh/health-log/issues/74)에 있다. plan과 apply는 사용자가 `shared-aws-infrastructure`의 [운영 문서](https://github.com/sirloinbh/shared-aws-infrastructure/blob/main/docs/operations.md)대로 실행한다.

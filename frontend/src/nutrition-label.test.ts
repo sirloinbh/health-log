@@ -353,3 +353,65 @@ test('heads stacked on two lines, with cells one per line, claim no basis', () =
   );
   expect(reading.basis).toBeNull();
 });
+
+// Regression cases from the second review of PR #121.
+
+test('the next product\'s "1회 제공량 50g" is never borrowed, a footnote after the values is', () => {
+  const basis = (pasted: string) => readNutritionLabel(pasted).basis;
+  expect(
+    basis(
+      '영양정보\n1회 제공량당\n열량 150kcal\n나트륨 90mg\n영양정보\n1회 제공량 50g\n열량 300kcal\n나트륨 200mg',
+    ),
+  ).toBeNull();
+  expect(
+    basis('[A맛] 영양정보 1회 제공량당\n열량 150kcal\n[B맛] 영양정보 1회 제공량 50g\n열량 300kcal'),
+  ).toBeNull();
+  expect(basis('영양정보\n1회 제공량당\n열량 100kcal\n나트륨 50mg\n(1회 제공량 50g)')).toEqual({
+    size: 50,
+    unit: 'g',
+  });
+});
+
+test('without a heading, only a bare serving-size line right above the table lends its size', () => {
+  const basis = (pasted: string) => readNutritionLabel(pasted).basis;
+  expect(
+    basis('리뷰: 1회 제공량 40g씩 먹어요 맛있음\n1회 제공량당\n열량 150kcal\n나트륨 90mg'),
+  ).toBeNull();
+  expect(
+    basis('하루 1회 제공량 40g 권장해요\n1회 제공량당 | 총 내용량당\n열량 150kcal | 300kcal'),
+  ).toBeNull();
+  expect(basis('배송비 무료 당류 0g\n1회 제공량 30g\n1회 제공량당\n열량 150kcal')).toEqual({
+    size: 30,
+    unit: 'g',
+  });
+});
+
+test('a table copied with tabs keeps an empty first cell empty', () => {
+  const reading = readNutritionLabel(
+    '영양정보\n100g당\t1회 제공량(30g)당\n열량\t250kcal\t75kcal\n당류\t\t5g\n나트륨\t300mg\t90mg',
+  );
+  expect(reading.basis).toEqual({ size: 100, unit: 'g' });
+  expect(reading.values).toEqual({ calories: 250, sodium: 300 });
+  // A daily-value share in its own cell is not a column.
+  expect(readNutritionLabel('100g당 250kcal\n나트륨\t300mg\t15%').values.sodium).toBe(300);
+});
+
+test('a first column whose head is not recognised claims no basis', () => {
+  const basis = (pasted: string) => readNutritionLabel(pasted).basis;
+  expect(
+    basis('영양정보\n총 내용량 500ml | 100ml당\n열량 200kcal | 40kcal\n당류 20g | 4g'),
+  ).toBeNull();
+  expect(basis('영양정보\n총 내용량(500ml) | 100ml당\n열량 | 200kcal | 40kcal')).toBeNull();
+  expect(basis('영양정보\n1병 | 100ml당\n열량 | 200kcal | 40kcal')).toBeNull();
+});
+
+test('a name cell and Markdown edge bars do not shift the columns', () => {
+  const named = readNutritionLabel('구분 | 100g당 | 1회 제공량(30g)당\n열량 | 250kcal | 75kcal');
+  expect(named.basis).toEqual({ size: 100, unit: 'g' });
+  expect(named.values).toEqual({ calories: 250 });
+  const markdown = readNutritionLabel(
+    '| 100g당 | 1회 제공량(30g)당 |\n| 열량 250kcal | 75kcal |\n| 당류 | 5g |',
+  );
+  expect(markdown.basis).toEqual({ size: 100, unit: 'g' });
+  expect(markdown.values).toEqual({ calories: 250 });
+});

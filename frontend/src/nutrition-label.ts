@@ -53,7 +53,12 @@ const normalize = (text: string) =>
       (_, head: string, rest: string) => head + rest.replaceAll(',', ''),
     )
     .replace(/(\d),(\d+)(?=\s*(?:mg|g|ml|kcal))/g, '$1.$2')
-    .replace(/[ \t]+/g, ' ');
+    // A table copied from a web page separates its cells with tabs: they are column bars, so an
+    // empty cell ("당류\t\t5g") stays empty instead of joining the next value (#120).
+    .replace(/\t/g, ' | ')
+    // Bars at both ends of a row ("| 열량 | 250kcal |", a Markdown table) frame it; they are no cell.
+    .replace(/^[ ]*\|(.*)\|[ ]*$/gm, '$1')
+    .replace(/ +/g, ' ');
 
 // Stored amounts have two decimals at most.
 const twoDecimals = (value: number) => Math.round(value * 100) / 100;
@@ -179,28 +184,28 @@ function borrowedServing(
       candidate.kind === 'serving' &&
       candidate.basis &&
       candidate.index >= from &&
-      // The size that cut the table ("(1회 제공량 50g)") still belongs to it.
-      candidate.index <= to &&
+      // The size that cut the table ("(1회 제공량 50g)") still belongs to it, unless values follow
+      // it: then it heads the next product's table ("영양정보 1회 제공량 50g / 열량 300kcal").
+      (candidate.index < to ||
+        (candidate.index === to && !tableFollows.test(text.slice(candidate.end)))) &&
       text.slice(candidate.index, candidate.end).includes('제공량'),
   );
   lenders.sort((a, b) => Math.abs(a.index - chosen.index) - Math.abs(b.index - chosen.index));
   return lenders[0]?.basis ?? null;
 }
 
+// A line that only states a serving size: "1회 제공량 30g", "1회 제공량: 1개(30g)", "(1회 제공량 50g)".
+const servingSizeLine =
+  /^\s*\(?\s*1회\s*제공량\s*[:：]?\s*(?:\d+(?:\.\d+)?\s*[가-힣]{1,3}\s*\()?\s*\d+(?:\.\d+)?\s*(?:g|ml)\s*\)?\s*\)?\s*$/;
+
 /**
- * Where the table lines directly above `index` start, so a "1회 제공량 30g" on the line above a
- * table with no heading still belongs to it. A blank or other line stops it.
+ * Where a table with no heading may lend a serving size from: the line right above it, if that
+ * line states nothing but a serving size. A review above it ("1회 제공량 40g씩 먹어요") does not.
  */
-function tableLinesAbove(text: string, index: number) {
-  let start = index;
-  for (;;) {
-    const lineEnd = start - 1;
-    if (lineEnd < 0) return start;
-    const lineStart = text.lastIndexOf('\n', lineEnd - 1) + 1;
-    const line = text.slice(lineStart, lineEnd);
-    if (!line.trim() || !tableLine.test(line)) return start;
-    start = lineStart;
-  }
+function servingLineAbove(text: string, index: number) {
+  if (index === 0) return index;
+  const lineStart = text.lastIndexOf('\n', index - 2) + 1;
+  return servingSizeLine.test(text.slice(lineStart, index - 1)) ? lineStart : index;
 }
 
 // Only separators between two column heads: "총 내용량당 | 100g당", "1회 제공량당 / 총 내용량당".
@@ -236,7 +241,12 @@ function headRow(text: string, followed: Candidate, candidates: Candidate[]) {
  */
 function firstColumn(line: string, heads: number) {
   if (!line.includes('|')) return line;
-  const cells = line.split('|').map((cell) => cell.trim());
+  // A daily-value share in a cell of its own ("나트륨\t300mg\t15%") is no value column.
+  const cells = line
+    .split('|')
+    .map((cell) => cell.trim())
+    .filter((cell) => !/^\d+(?:\.\d+)?\s*%$/.test(cell));
+  if (cells.length === 1) return cells[0];
   // Name and first value in one cell, the rest after it.
   if (cells.length === heads) return cells[0];
   // The name in a cell of its own.
@@ -308,29 +318,43 @@ export function readNutritionLabel(pasted: string): LabelReading {
         ),
     );
 
-  const basisFromTotal = candidates.length === 0 && total !== null;
-  const basis = stackedHeads
-    ? null
-    : chosen
-      ? (chosen.basis ??
-        borrowedServing(
-          chosen,
-          candidates,
-          text,
-          header ? header.index : tableLinesAbove(text, range.begin),
-          range.end,
-        ))
-      : basisFromTotal
-        ? total
-        : null;
-
-  // Columns are counted on the head line itself when it has bars, so a head the row did not
-  // recognise still counts: a 2-cell row then holds the name and the first value, not two values.
+  // A head line with bars: its first cell may name the rows ("구분 | 100g당 | …"); the values read
+  // are the next cell's. When the chosen head sits in a later cell, the first value column has a
+  // head this reader did not recognise ("총 내용량 500ml | 100ml당", "1병 | 100ml당"), so the basis
+  // of the values read is unknown (#120).
   const headLine = chosen
     ? text.slice(lineStart(chosen.index), text.indexOf('\n', chosen.index) + 1 || text.length)
     : '';
-  const heads = headLine.includes('|')
-    ? headLine.split('|').filter((cell) => cell.trim()).length
+  const headCells = headLine.includes('|') ? headLine.split('|').map((cell) => cell.trim()) : [];
+  const nameCell =
+    headCells.length > 0 && /^(?:구분|항목|영양\s*(?:성분|정보)|성분)?$/.test(headCells[0]);
+  const chosenCell = chosen
+    ? text.slice(lineStart(chosen.index), chosen.index).split('|').length - 1
+    : 0;
+  const headInLaterColumn = headCells.length > 0 && chosenCell > (nameCell ? 1 : 0);
+
+  const basisFromTotal = candidates.length === 0 && total !== null;
+  const basis =
+    stackedHeads || headInLaterColumn
+      ? null
+      : chosen
+        ? (chosen.basis ??
+          borrowedServing(
+            chosen,
+            candidates,
+            text,
+            header ? header.index : servingLineAbove(text, range.begin),
+            range.end,
+          ))
+        : basisFromTotal
+          ? total
+          : null;
+
+  // Columns are counted on the head line itself when it has bars, so a head the row did not
+  // recognise still counts: a 2-cell row then holds the name and the first value, not two values.
+  // A name cell is not a value column.
+  const heads = headCells.length
+    ? headCells.slice(nameCell ? 1 : 0).filter((cell) => cell).length
     : Math.max(row.length, 1);
   const table = text
     .slice(range.begin, range.end)

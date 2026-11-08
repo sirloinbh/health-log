@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { answerText, rateText } from './check-text';
+import { answerText, charCount, rateText } from './check-text';
 
 test('unchecked, yes and no read differently', () => {
   expect(answerText(null, '지킴', '못 지킴')).toBe('체크 안 함');
@@ -13,4 +13,10 @@ test('a rate is out of the days answered, and no answered day is not 0%', () => 
   expect(rateText({ days: 5, yes: 4 }, '지킴')).toBe('4/5일 지킴 (80%)');
   expect(rateText({ days: 3, yes: 0 }, '잘 잠')).toBe('0/3일 잘 잠 (0%)');
   expect(rateText({ days: 3, yes: 2 }, '지킴')).toBe('2/3일 지킴 (67%)');
+});
+
+test('an emoji counts as one character, as the server counts it', () => {
+  expect(charCount('밥')).toBe(1);
+  expect(charCount('🍙'.repeat(200))).toBe(200);
+  expect('🍙'.repeat(200).length).toBe(400);
 });

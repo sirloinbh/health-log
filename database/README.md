@@ -30,6 +30,8 @@ PostgreSQL 17. 마이그레이션 원본은 `migrations/NNN_<설명>.sql` 한 �
 
 백업에는 건강·의료 기록이 그대로 들어 있다. 공개 저장소이므로 절대 커밋하지 않는다. `backups/`는 Git에서 제외되어 있다.
 
+이 절의 명령은 DB 이름을 기본값 `health`로 적었다. `.env`에서 `POSTGRES_DB`를 바꿨다면 `health`를 그 이름으로 바꿔 실행한다.
+
 ### 백업
 
 ```powershell
@@ -57,20 +59,20 @@ docker compose exec -T db rm -f /tmp/restore.sql
 
 ```powershell
 docker compose cp database/restore-check.sql db:/tmp/restore-check.sql
-foreach ($db in 'health', 'health_restore') { docker compose exec -T db sh -c "psql -U `"`$POSTGRES_USER`" -d $db -At -v ON_ERROR_STOP=1 -f /tmp/restore-check.sql" > "backups/check-$db.txt" }
+foreach ($db in 'health', 'health_restore') { docker compose exec -T db sh -c "psql -U `"`$POSTGRES_USER`" -d $db -At -v ON_ERROR_STOP=1 -f /tmp/restore-check.sql" > "backups/check-$db.txt"; if ($LASTEXITCODE -ne 0) { throw "check failed: $db" } }
 docker compose exec -T db rm -f /tmp/restore-check.sql
 Compare-Object (Get-Content backups/check-health.txt) (Get-Content backups/check-health_restore.txt)
 ```
 
-마지막 명령이 아무것도 출력하지 않고, 두 파일이 비어 있지 않으면 같다. 확인한 뒤 두 파일을 지운다.
+오류 없이 끝나고 마지막 명령이 아무것도 출력하지 않으면 같다. 두 파일이 비어 있지 않은지도 본다. 확인한 뒤 두 파일을 지운다.
 
 ### 교체
 
-결과가 같으면 앱을 멈추고 DB를 바꾼다. 교체 전 DB는 지우지 않고 이름만 바꿔 둔다.
+결과가 같으면 앱을 멈추고 DB를 바꾼다. 교체 전 DB는 지우지 않고 이름만 바꿔 둔다. 두 이름 바꾸기는 한 트랜잭션(`-1`)이라, 하나라도 실패하면 둘 다 취소되고 `health`가 그대로 남는다. `health_restore`에 접속한 세션이 있으면 실패하므로 확인 명령을 모두 마친 뒤 실행한다.
 
 ```powershell
 docker compose stop api
-docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d postgres -c "ALTER DATABASE health RENAME TO health_old" -c "ALTER DATABASE health_restore RENAME TO health"'
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d postgres -1 -v ON_ERROR_STOP=1 -c "ALTER DATABASE health RENAME TO health_old" -c "ALTER DATABASE health_restore RENAME TO health"'
 docker compose start api
 ```
 

@@ -69,3 +69,9 @@ Docker 데몬이 `500 Internal Server Error`로 응답하지 않아 `scripts/bac
 - **Docker로 실제 실행:** `scripts/backup.ps1`과 `database/README.md`의 Docker 명령(PowerShell 비교 명령 포함)은 실행하지 않았다. 사용자가 문서대로 처음부터 복원해 본다.
 - **PC 밖 보관 위치:** 사용자가 정한다. 선택지는 `database/README.md`의 "PC 밖 보관"에 있다.
 - 서버의 `deploy/backup.sh`는 이번 범위가 아니다. 서버 배포 전에 확인한다.
+
+## 변경 — 리뷰 반영
+
+- 교체의 두 이름 바꾸기를 `psql -1 -v ON_ERROR_STOP=1`로 한 트랜잭션에 묶었다. 임시 PostgreSQL 17에서 두 번째 이름 바꾸기를 일부러 실패시키면 첫 번째도 취소되어 `health`가 남는 것을 확인했다.
+- 확인 명령이 psql 오류에서 바로 멈추도록 `$LASTEXITCODE`를 검사한다.
+- 명령의 DB 이름이 기본값 `health`이고, `POSTGRES_DB`를 바꿨으면 그 이름으로 바꿔야 한다고 적었다.

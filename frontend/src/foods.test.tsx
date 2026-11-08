@@ -726,18 +726,24 @@ test('reading the same table again announces the result again', async () => {
   expect(within(dialog).getByRole('status')).not.toBe(first);
 });
 
-test('a table without a basis keeps the fields it does not give', async () => {
+test('values without a basis change nothing and are shown to type in', async () => {
   serve(() => json({ foods: [{ ...food, sugars: 10 }] }));
   open();
   const { dialog } = await openWith('치즈버거 수정');
   fireEvent.change(within(dialog).getByLabelText('영양성분 표 붙여넣기'), {
-    target: { value: '열량 310kcal' },
+    target: { value: '열량 310kcal 단백질 12g' },
   });
   fireEvent.click(within(dialog).getByRole('button', { name: '표 읽어 채우기' }));
-  expect(within(dialog).getByLabelText('칼로리 (kcal)')).toHaveValue('310');
+  // Values of an unknown amount would sit next to the official 120g serving: nothing changes (#120).
+  expect(within(dialog).getByLabelText('칼로리 (kcal)')).toHaveValue('300');
   expect(within(dialog).getByLabelText('당류 (g)')).toHaveValue('10');
   expect(within(dialog).getByLabelText('1회 제공량')).toHaveValue('120');
-  expect(within(dialog).getByRole('status')).toHaveTextContent('1회 제공량을 찾지 못했습니다');
+  expect(within(dialog).getByRole('combobox', { name: '출처 종류' })).toHaveTextContent(
+    '공식 자료',
+  );
+  const alert = within(dialog).getByRole('alert');
+  expect(alert).toHaveTextContent('1회 제공량을 찾지 못해 아무 칸도 바꾸지 않았습니다');
+  expect(alert).toHaveTextContent('읽은 값: 칼로리 310kcal, 단백질 12g');
 });
 
 test('a basis read without any value changes nothing', async () => {
@@ -745,7 +751,8 @@ test('a basis read without any value changes nothing', async () => {
   open();
   const { dialog } = await openWith('치즈버거 수정');
   fireEvent.change(within(dialog).getByLabelText('영양성분 표 붙여넣기'), {
-    target: { value: '100g당\n나트륨 15% 300mg\n탄수화물 9% 30g' },
+    // A table whose numbers are only in an image: the basis is there, no value is.
+    target: { value: '100g당\n수치는 상세 이미지를 참고하세요' },
   });
   fireEvent.click(within(dialog).getByRole('button', { name: '표 읽어 채우기' }));
   expect(within(dialog).getByRole('alert')).toHaveTextContent(

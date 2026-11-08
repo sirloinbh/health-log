@@ -201,20 +201,34 @@ function FoodDialog({
       });
       return;
     }
+    // Values without the amount they are for would sit next to a serving size from somewhere else,
+    // such as an official source's (#120). They are shown so they can be typed in with the size.
+    if (!reading.basis) {
+      const units = Object.fromEntries(nutrients.map(({ key, unit }) => [key, unit]));
+      setFilled({
+        kind: 'error',
+        reads,
+        lines: [
+          '1회 제공량을 찾지 못해 아무 칸도 바꾸지 않았습니다. 값이 어느 양의 것인지 알 수 없습니다.',
+          `읽은 값: ${found.map(({ key, label }) => `${label} ${reading.values[key]}${units[key]}`).join(', ')}`,
+          '1회 제공량을 확인해 직접 입력해 주세요.',
+        ],
+      });
+      return;
+    }
     const labelOf = (key: NutrientKey) => nutrients.find((nutrient) => nutrient.key === key)!.label;
     const emptied = [...reading.lessThan, ...reading.outOfRange];
+    const { basis } = reading;
     // A new basis makes every old value wrong, so what the table leaves out is cleared too.
-    // Without one, only what the table gives is changed.
     const missing = nutrients.filter(
       ({ key }) => reading.values[key] === undefined && !emptied.includes(key),
     );
-    const cleared = [...emptied, ...(reading.basis ? missing.map(({ key }) => key) : [])];
+    const cleared = [...emptied, ...missing.map(({ key }) => key)];
     const wasPublished = form.sourceType === 'official' || form.sourceType === 'public';
     setForm((current) => ({
       ...current,
-      ...(reading.basis
-        ? { servingSize: String(reading.basis.size), servingUnit: reading.basis.unit }
-        : {}),
+      servingSize: String(basis.size),
+      servingUnit: basis.unit,
       ...Object.fromEntries(cleared.map((key) => [key, ''])),
       ...Object.fromEntries(found.map(({ key }) => [key, String(reading.values[key])])),
       // Values copied from the product's own table are its label, checked today (#34).
@@ -222,18 +236,16 @@ function FoodDialog({
       checkedOn: serviceToday(),
     }));
     const total = packageText(reading);
-    const basisLine = reading.basis
-      ? reading.basisFromTotal
-        ? [
-            `1회 제공량 표기가 없어 총 내용량(${reading.basis.size}${reading.basis.unit})을 기준으로 채웠습니다. 표가 다른 양 기준이면 고쳐 주세요.`,
-          ]
-        : []
-      : ['1회 제공량을 찾지 못했습니다. 직접 입력해 주세요.'];
+    const basisLine = reading.basisFromTotal
+      ? [
+          `1회 제공량 표기가 없어 총 내용량(${basis.size}${basis.unit})을 기준으로 채웠습니다. 표가 다른 양 기준이면 고쳐 주세요.`,
+        ]
+      : [];
     setFilled({
       kind: 'status',
       reads,
       lines: [
-        `채운 칸: ${[...(reading.basis ? ['1회 제공량'] : []), ...found.map(({ label }) => label)].join(', ') || '없음'}`,
+        `채운 칸: ${['1회 제공량', ...found.map(({ label }) => label)].join(', ')}`,
         ...basisLine,
         ...(reading.lessThan.length
           ? [`"미만" 표기라 비운 칸: ${reading.lessThan.map(labelOf).join(', ')}`]
@@ -242,9 +254,7 @@ function FoodDialog({
           ? [`값이 너무 커서 비운 칸: ${reading.outOfRange.map(labelOf).join(', ')}`]
           : []),
         ...(missing.length
-          ? [
-              `표에서 읽지 못해 ${reading.basis ? '비운' : '그대로 둔'} 칸: ${missing.map(({ label }) => label).join(', ')}`,
-            ]
+          ? [`표에서 읽지 못해 비운 칸: ${missing.map(({ label }) => label).join(', ')}`]
           : []),
         ...(wasPublished
           ? [

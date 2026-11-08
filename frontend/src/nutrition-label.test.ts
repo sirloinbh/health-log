@@ -233,3 +233,62 @@ test('a shop line above the heading is ignored even when the table names no basi
   expect(reading.basisFromTotal).toBe(true);
   expect(reading.values).toEqual({ calories: 110, protein: 23 });
 });
+
+// #120: the table shapes left from #35.
+
+test('two columns whose first head has no size are read for the package', () => {
+  const reading = readNutritionLabel(
+    '영양정보\n총 내용량당 | 100g당\n총 내용량 300g\n열량 900kcal | 300kcal\n나트륨 600mg | 200mg',
+  );
+  // The values read are the first column's, so the basis is the package, not the second head.
+  expect(reading.basis).toEqual({ size: 300, unit: 'g' });
+  expect(reading.values).toEqual({ calories: 900, sodium: 600 });
+  // With no package size anywhere, the first column's amount is unknown: no basis.
+  expect(
+    readNutritionLabel('영양정보\n총 내용량당 | 100g당\n열량 900kcal | 300kcal').basis,
+  ).toBeNull();
+  // A first head with its own size is that column's basis.
+  expect(
+    readNutritionLabel('총 내용량(60g)당 | 1회 제공량(30g)당\n열량 300kcal | 150kcal').basis,
+  ).toEqual({ size: 60, unit: 'g' });
+});
+
+test('"1회 제공량당" without a size takes the nearest stated serving', () => {
+  const before = readNutritionLabel(
+    '영양정보 총 내용량 60g\n1회 제공량 30g\n1회 제공량당 | 총 내용량당\n열량 150kcal | 300kcal\n나트륨 90mg | 180mg',
+  );
+  expect(before.basis).toEqual({ size: 30, unit: 'g' });
+  expect(before.values).toEqual({ calories: 150, sodium: 90 });
+  const after = readNutritionLabel('총 내용량 200g\n1회 제공량당\n열량 100kcal\n(1회 제공량 50g)');
+  expect(after.basis).toEqual({ size: 50, unit: 'g' });
+  expect(after.values).toEqual({ calories: 100 });
+  // A package size is never lent to a serving.
+  expect(readNutritionLabel('총 내용량 60g\n1회 제공량당\n열량 150kcal').basis).toBeNull();
+});
+
+test('values after a column bar, on the next line, or after a percentage are read', () => {
+  expect(readNutritionLabel('100g당\n열량 | 250kcal\n나트륨 | 300mg').values).toEqual({
+    calories: 250,
+    sodium: 300,
+  });
+  expect(readNutritionLabel('100g당\n열량\n250kcal\n나트륨\n300mg').values).toEqual({
+    calories: 250,
+    sodium: 300,
+  });
+  expect(readNutritionLabel('100g당 250kcal\n나트륨 15% 300mg\n탄수화물 9% 30g').values).toEqual({
+    calories: 250,
+    sodium: 300,
+    carbs: 30,
+  });
+  // The usual order still wins: the value, then its share.
+  expect(readNutritionLabel('100g당 250kcal\n나트륨 300mg 15%').values.sodium).toBe(300);
+});
+
+test('the 2021 layout, package and energy above a "총 내용량당" head, is read whole', () => {
+  const reading = readNutritionLabel(
+    '(100g당 3,330원)\n영양정보\n총 내용량 30g\n130kcal\n총 내용량당 1일 영양성분 기준치에 대한 비율\n나트륨 100mg 5%\n탄수화물 20g 6%\n당류 2g\n단백질 2g',
+  );
+  expect(reading.basis).toEqual({ size: 30, unit: 'g' });
+  expect(reading.basisFromTotal).toBe(false);
+  expect(reading.values).toEqual({ calories: 130, sodium: 100, carbs: 20, sugars: 2, protein: 2 });
+});

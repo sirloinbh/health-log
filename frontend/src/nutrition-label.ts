@@ -68,10 +68,16 @@ const tableFollows = new RegExp(
   String.raw`^[^\n]{0,15}(?:\n[^\n]{0,15})?(?:\d+(?:\.\d+)?\s*kcal|열량|에너지|${nutrientWords})`,
 );
 
-type Candidate = { index: number; end: number; basis: Size | null };
+type Candidate = {
+  index: number;
+  end: number;
+  basis: Size | null;
+  /** per: "100g당". serving: "1회 제공량 …". total: "총 내용량당", the package's column. */
+  kind: 'per' | 'serving' | 'total';
+};
 
 /** Every place that names the amount the values are for, in order. */
-function basisCandidates(text: string): Candidate[] {
+function basisCandidates(text: string, total: Size | null): Candidate[] {
   const found: Candidate[] = [];
   // "100g당", "1봉지(45g)당", "100g당열량", but not 당류 or 당알코올, and not a price
   // ("100g당 2211원", "100g당 가격").
@@ -84,6 +90,16 @@ function basisCandidates(text: string): Candidate[] {
       index: match.index,
       end: match.index + match[0].length,
       basis: sizeOf(match[1], match[2]),
+      kind: 'per',
+    });
+  }
+  // "총 내용량당" with no size of its own: the package, whose size "총 내용량 300g" gives (#120).
+  for (const match of text.matchAll(/총\s*내용량\s*당/g)) {
+    found.push({
+      index: match.index,
+      end: match.index + match[0].length,
+      basis: total,
+      kind: 'total',
     });
   }
   // "1회 제공량 30g", "1회 제공량 1개(30g)", "1회 섭취참고량 30g", and "1회 제공량당" with no size.
@@ -96,14 +112,16 @@ function basisCandidates(text: string): Candidate[] {
       index: match.index,
       end: match.index + match[0].length,
       basis: match[1] ? sizeOf(match[1], match[2]) : null,
+      kind: 'serving',
     });
   }
   return found.sort((a, b) => a.index - b.index);
 }
 
-// A line that belongs to a nutrition table: a nutrient, energy, a percentage, the footer, a size.
+// A line that belongs to a nutrition table: a nutrient, energy, a percentage, the footer, a size,
+// or a value alone, as when a table is copied one cell per line ("나트륨\n300mg").
 const tableLine = new RegExp(
-  String.raw`열량|에너지|칼로리|kcal|kj|${nutrientWords}|당알코올|콜레스테롤|식이섬유|기준치|영양|내용량|제공량|섭취|\d\s*%|\d\s*(?:g|mg|ml)\s*\)?\s*당`,
+  String.raw`열량|에너지|칼로리|kcal|kj|${nutrientWords}|당알코올|콜레스테롤|식이섬유|기준치|영양|내용량|제공량|섭취|\d\s*%|\d\s*(?:g|mg|ml)\s*\)?\s*당|^[\s|]*\d+(?:\.\d+)?\s*(?:mg|g|ml|kcal)\b`,
 );
 
 /**
@@ -111,7 +129,13 @@ const tableLine = new RegExp(
  * first table line) to the first line that is not part of a table, such as "상품평" or "함께 보면
  * 좋은 상품", or to a basis on a later line, which starts another product's or column's values.
  */
-function tableText(text: string, start: number | null, candidates: Candidate[]) {
+function tableText(
+  text: string,
+  start: number | null,
+  candidates: Candidate[],
+  // The chosen basis, when the table starts before it (the package's line above "총 내용량당").
+  head: number | null = start,
+) {
   const lines = text.split('\n');
   let offset = 0;
   let inTable = false;
@@ -131,13 +155,21 @@ function tableText(text: string, start: number | null, candidates: Candidate[]) 
     offset = lineEnd + 1;
   }
   if (start === null && !inTable) return '';
-  // A basis on a later line than the first one starts other values: "(100g당 500kcal)".
-  const firstLineEnd = text.indexOf('\n', beginsAt);
-  const next = candidates.find(
-    (candidate) =>
-      candidate.index > beginsAt && firstLineEnd !== -1 && candidate.index > firstLineEnd,
-  );
+  // A basis on a later line than the chosen one starts other values: "(100g당 500kcal)".
+  const headLineEnd = text.indexOf('\n', Math.max(beginsAt, head ?? beginsAt));
+  const next = candidates.find((candidate) => headLineEnd !== -1 && candidate.index > headLineEnd);
   return text.slice(beginsAt, Math.min(endsAt, next ? next.index : text.length));
+}
+
+/**
+ * The size for a "1회 제공량당" column head without one, from the nearest "1회 제공량 30g" in the
+ * same table, before or after it (#120). Only a serving lends to a serving.
+ */
+function borrowedServing(chosen: Candidate, candidates: Candidate[]) {
+  if (chosen.kind !== 'serving') return null;
+  const sized = candidates.filter((candidate) => candidate.kind === 'serving' && candidate.basis);
+  sized.sort((a, b) => Math.abs(a.index - chosen.index) - Math.abs(b.index - chosen.index));
+  return sized[0]?.basis ?? null;
 }
 
 export function readNutritionLabel(pasted: string): LabelReading {
@@ -147,20 +179,45 @@ export function readNutritionLabel(pasted: string): LabelReading {
   // The table's heading, not the footer's "1일 영양성분 기준치".
   const header = /(?<!1일\s*)영양\s*(?:정보|성분)(?!\s*기준)/.exec(text);
 
-  const all = basisCandidates(text);
+  const all = basisCandidates(text, total);
   // With a heading, nothing above it is the table: not a title ("닭가슴살 100g당 단백질 23g"), nor
   // a shop line ("무료배송 100g당 최저가") when the table itself names no basis.
   const candidates = header ? all.filter((candidate) => candidate.index >= header.index) : all;
   // The table's basis is the first one that values follow. A basis named but unreadable
   // ("1회 제공량당" with no size) is still the basis, so the package is not assumed instead.
-  const chosen =
+  const followed =
     candidates.find((candidate) => tableFollows.test(text.slice(candidate.end))) ??
     candidates[0] ??
     null;
+  // A row of column heads ("총 내용량당 | 100g당"): values are read from the first column, so the
+  // basis is that column's, whichever head the values seemed to follow (#120).
+  const lineStart = (index: number) => text.lastIndexOf('\n', index - 1) + 1;
+  const chosen = followed
+    ? (candidates.find((candidate) => lineStart(candidate.index) === lineStart(followed.index)) ??
+      followed)
+    : null;
   const basisFromTotal = candidates.length === 0 && total !== null;
-  const basis = chosen ? chosen.basis : basisFromTotal ? total : null;
+  const basis = chosen
+    ? (chosen.basis ?? borrowedServing(chosen, candidates))
+    : basisFromTotal
+      ? total
+      : null;
 
-  const table = tableText(text, chosen ? chosen.index : header ? header.index : null, all);
+  // The 2021 layout puts the package and its energy above the "총 내용량당" head:
+  // "총 내용량 30g / 130kcal / 총 내용량당 / 나트륨 …". That line belongs to the table too.
+  const packageLine =
+    chosen?.kind === 'total' &&
+    totalMatch &&
+    totalMatch.index < chosen.index &&
+    (!header || totalMatch.index >= header.index)
+      ? totalMatch.index
+      : null;
+  const table = tableText(
+    text,
+    packageLine ?? (chosen ? chosen.index : header ? header.index : null),
+    all,
+    chosen ? chosen.index : null,
+  );
 
   const values: LabelReading['values'] = {};
   const lessThan: LabelNutrient[] = [];
@@ -173,8 +230,11 @@ export function readNutritionLabel(pasted: string): LabelReading {
 
   // An energy line wins over any other kcal; "2,000kcal 기준" in the footer is never a value.
   const kcal = String.raw`${number}\s*kcal(?!\s*(?:을|를)?\s*기준)(\s*미만)?`;
+  // Between a name and its value: spaces, a line break, a colon or a column bar ("열량 | 250kcal"),
+  // and a share of the daily value written first ("나트륨 15% 300mg").
+  const gap = String.raw`[\s:：|]*(?:\d+(?:\.\d+)?\s*%[\s|]*)?`;
   const energy =
-    new RegExp(String.raw`(?:열량|에너지)\s*[:：]?\s*${kcal}`).exec(table) ??
+    new RegExp(String.raw`(?:열량|에너지)${gap}${kcal}`).exec(table) ??
     new RegExp(kcal).exec(table);
   if (energy) {
     if (energy[2]) lessThan.push('calories');
@@ -182,7 +242,7 @@ export function readNutritionLabel(pasted: string): LabelReading {
   }
   for (const { key, name, mg } of nutrientNames) {
     const found = new RegExp(
-      String.raw`(?<![가-힣])(?<!트랜스\s)(?<!포화\s)${name}\s*[:：]?\s*${number}\s*(mg|g)(\s*미만)?`,
+      String.raw`(?<![가-힣])(?<!트랜스\s)(?<!포화\s)${name}${gap}${number}\s*(mg|g)(\s*미만)?`,
     ).exec(table);
     if (!found) continue;
     if (found[3]) {

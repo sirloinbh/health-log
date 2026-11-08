@@ -2,6 +2,7 @@ import {
   CalendarDays,
   Layers,
   LayoutDashboard,
+  Pill,
   Settings2,
   Stethoscope,
   Utensils,
@@ -18,6 +19,8 @@ import { FoodsPage } from './foods';
 import { goalSettingsPath } from './goal-text';
 import { GoalsSettings } from './goals';
 import { type Health, healthText } from './health';
+import { medicationsPagePath } from './med-text';
+import { MedicationsPage } from './medications';
 import { ReportPage } from './report';
 import { visitsPagePath } from './visit-text';
 import { VisitsPage } from './visits';
@@ -29,6 +32,7 @@ const pages = {
   foods: '/foods',
   combos: '/combos',
   visits: visitsPagePath,
+  medications: medicationsPagePath,
   settings: goalSettingsPath,
 } as const;
 
@@ -39,6 +43,7 @@ const nav: NavItem[] = [
   { to: pages.foods, label: '음식', icon: Utensils },
   { to: pages.combos, label: '조합', icon: Layers },
   { to: pages.visits, label: '병원', icon: Stethoscope },
+  { to: pages.medications, label: '약', icon: Pill },
   { to: pages.settings, label: '설정', icon: Settings2 },
 ];
 
@@ -118,6 +123,9 @@ function Page({
 
 export function App() {
   const health = useHealth();
+  // Pages that start a record on today: undefined while asking, null when the server cannot say.
+  const pageToday =
+    health.state === 'ok' ? health.today : health.state === 'loading' ? undefined : null;
   return (
     <BrowserRouter>
       <AppShell appName="식단·수면·건강 기록" nav={nav}>
@@ -133,20 +141,8 @@ export function App() {
           />
           <Route path={pages.foods} element={<FoodsPage />} />
           <Route path={pages.combos} element={<CombosPage />} />
-          <Route
-            path={pages.visits}
-            element={
-              <VisitsPage
-                today={
-                  health.state === 'ok'
-                    ? health.today
-                    : health.state === 'loading'
-                      ? undefined
-                      : null
-                }
-              />
-            }
-          />
+          <Route path={pages.visits} element={<VisitsPage today={pageToday} />} />
+          <Route path={pages.medications} element={<MedicationsPage today={pageToday} />} />
           <Route
             path={pages.settings}
             element={

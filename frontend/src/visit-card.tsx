@@ -9,6 +9,7 @@ import { SkeletonText } from './components/ui/skeleton';
 import { formatDate } from './daily-date';
 import { requestJson } from './lib/api';
 import { useNotice } from './lib/use-notice';
+import { howText, type Medication, medicationsPagePath, medicationsPath } from './med-text';
 import { writesSettled } from './pending-writes';
 import {
   clinicText,
@@ -23,6 +24,7 @@ import {
 // Visits are written on the clinic page; this card shows the day's and links there (#39).
 export function VisitsCard({ date }: { date: string }) {
   const [visits, setVisits] = useState<Visit[] | undefined>(undefined);
+  const [medications, setMedications] = useState<Medication[] | undefined>(undefined);
   const { notice, error, clear } = useNotice();
   const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLDivElement>(null);
@@ -31,12 +33,17 @@ export function VisitsCard({ date }: { date: string }) {
   const load = useCallback(async () => {
     clear();
     try {
-      // A save from the clinic page may still be on its way; read after it lands (#71).
-      await writesSettled(`${visitsPath}/`);
+      // A save from the clinic or medicine page may still be on its way; read after it lands (#71).
+      await Promise.all([writesSettled(`${visitsPath}/`), writesSettled(`${medicationsPath}/`)]);
       // Left again while waiting: nothing would show the answer.
       if (!live.current) return;
-      const data = await requestJson<{ visits: Visit[] }>(`${visitsPath}?date=${date}`);
-      if (live.current) setVisits(data.visits);
+      const [day, taken] = await Promise.all([
+        requestJson<{ visits: Visit[] }>(`${visitsPath}?date=${date}`),
+        requestJson<{ medications: Medication[] }>(`${medicationsPath}?date=${date}`),
+      ]);
+      if (!live.current) return;
+      setVisits(day.visits);
+      setMedications(taken.medications);
     } catch (cause) {
       if (live.current) error(cause);
     }
@@ -80,7 +87,7 @@ export function VisitsCard({ date }: { date: string }) {
           </Button>
         ) : null}
         {!notice && visits === undefined ? (
-          <div role="status" aria-busy="true" aria-label="병원 기록 불러오는 중">
+          <div role="status" aria-busy="true" aria-label="병원·약 기록 불러오는 중">
             <SkeletonText lines={2} />
           </div>
         ) : null}
@@ -122,6 +129,31 @@ export function VisitsCard({ date }: { date: string }) {
               </Button>
             ) : null}
           </div>
+        ) : null}
+        {medications !== undefined ? (
+          <section aria-labelledby={`meds-${date}`} className="flex flex-col gap-2 text-body-sm">
+            <h3 id={`meds-${date}`} className="font-medium">
+              이 날 먹은 약
+            </h3>
+            {medications.length ? (
+              <ul className="flex flex-col gap-1">
+                {medications.map((item) => {
+                  const how = howText(item);
+                  return (
+                    <li key={item.id} className="wrap-anywhere">
+                      {item.name}
+                      {how ? <span className="text-muted-foreground"> · {how}</span> : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-muted-foreground">이 날 먹은 약 기록이 없습니다.</p>
+            )}
+            <Button asChild variant="ghost" size="sm" className="self-start">
+              <Link to={medicationsPagePath}>약 기록 보기</Link>
+            </Button>
+          </section>
         ) : null}
       </CardContent>
     </Card>

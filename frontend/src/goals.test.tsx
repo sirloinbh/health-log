@@ -175,7 +175,9 @@ test('a sleep goal is typed in hours and minutes and sent in minutes from the ch
   fireEvent.change(within(sleep).getByLabelText('하루 수면 시간 (시간)'), {
     target: { value: '7' },
   });
-  fireEvent.change(within(sleep).getByLabelText('분'), { target: { value: '10' } });
+  fireEvent.change(within(sleep).getByLabelText('하루 수면 시간 (분)'), {
+    target: { value: '10' },
+  });
   fireEvent.change(within(sleep).getByLabelText('적용 시작일'), {
     target: { value: '2026-11-03' },
   });
@@ -193,7 +195,7 @@ test('a sleep goal is typed in hours and minutes and sent in minutes from the ch
   });
   // The form is refilled from what was saved.
   expect(within(cardOf('수면')).getByLabelText('하루 수면 시간 (시간)')).toHaveValue('7');
-  expect(within(cardOf('수면')).getByLabelText('분')).toHaveValue('10');
+  expect(within(cardOf('수면')).getByLabelText('하루 수면 시간 (분)')).toHaveValue('10');
   // The refilled form has a new Save button, so focus goes to the card's title instead of the page.
   await waitFor(() =>
     expect(document.activeElement).toBe(
@@ -240,6 +242,31 @@ test('a value the goal cannot take is refused before sending', async () => {
   fireEvent.change(field, { target: { value: '2천' } });
   fireEvent.click(save);
   expect(await within(calories).findByText(/숫자만 입력해 주세요/)).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+test('unreadable sleep minutes are refused, not saved as no minutes', async () => {
+  const fetchMock = server({ body: goalsOf() });
+  render(<GoalsSettings />);
+  await screen.findByRole('heading', { name: '수면' });
+  const sleep = cardOf('수면');
+  fireEvent.change(within(sleep).getByLabelText('하루 수면 시간 (시간)'), {
+    target: { value: '7' },
+  });
+  for (const value of ['3O', '-10', '30분']) {
+    fireEvent.change(within(sleep).getByLabelText('하루 수면 시간 (분)'), { target: { value } });
+    fireEvent.click(within(sleep).getByRole('button', { name: '저장' }));
+    expect(
+      await within(sleep).findByText(/하루 수면 시간\(분\): 숫자만 입력해 주세요/),
+    ).toBeInTheDocument();
+  }
+  fireEvent.change(within(sleep).getByLabelText('하루 수면 시간 (분)'), {
+    target: { value: '75' },
+  });
+  fireEvent.click(within(sleep).getByRole('button', { name: '저장' }));
+  expect(
+    await within(sleep).findByText('수면 시간: 분은 0~59로 입력해 주세요'),
+  ).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 

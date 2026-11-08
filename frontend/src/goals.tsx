@@ -113,13 +113,13 @@ function GoalForm({
     }
     let target: number | string;
     if (item === 'sleep') {
-      // Minutes left blank are none.
-      const typedMinutes = parseAmount(minutes) ?? 0;
+      const typedMinutes = parseAmount(minutes);
+      // Unreadable is refused; only a blank field means no minutes.
       if (typedMinutes === undefined) {
-        error(unreadableAmount('수면 시간(분)'));
+        error(unreadableAmount('하루 수면 시간(분)'));
         return;
       }
-      target = toSleepTarget(typed, typedMinutes);
+      target = toSleepTarget(typed, typedMinutes ?? 0);
     } else {
       target = toTarget(item, typed);
     }
@@ -153,6 +153,8 @@ function GoalForm({
               <Label htmlFor={`${id}-minutes`}>분</Label>
               <Input
                 id={`${id}-minutes`}
+                // The full name, so a list of fields says whose minutes these are.
+                aria-label={`${field.label} (분)`}
                 inputMode="numeric"
                 autoComplete="off"
                 placeholder="예: 30"

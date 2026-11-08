@@ -29,35 +29,38 @@ export function testDatabaseSkip(url: string | undefined): false | string {
  * and rows written here get sequence values after every row the snapshot can see, so they are the
  * newest it holds.
  * A route's own transaction (`pool.connect()`, then any `BEGIN …` such as snapshotRead, then COMMIT
- * or ROLLBACK) becomes a savepoint of its own, so it runs as usual inside the snapshot; its isolation
- * level is the snapshot's. Requests must go one at a time: there is one connection.
+ * or ROLLBACK) becomes a savepoint of its own, so it runs as usual inside the snapshot. Its options
+ * are dropped: the isolation level is the snapshot's, and READ ONLY is not enforced, so a write in a
+ * read-only route would pass here. Requests must go one at a time: there is one connection.
  */
 export async function inSnapshot(pool: Pool, run: (snapshot: Pool) => Promise<void>) {
   const client = await pool.connect();
   // Open savepoints, innermost last. Each has its own name, so a leftover cannot be released instead.
   const open: string[] = [];
   let count = 0;
-  const translate = (text: string) => {
+  const send = client.query.bind(client) as (...args: unknown[]) => Promise<unknown>;
+  // Async, so a mistake here rejects like a failed query and the app's .catch() still sees it.
+  const query = async (text: unknown, ...rest: unknown[]) => {
+    if (typeof text !== 'string') return send(text, ...rest);
     const word = text.trim().split(/\s+/)[0]!.toUpperCase();
     if (word === 'BEGIN' || word === 'START') {
       const name = `app_transaction_${(count += 1)}`;
+      const result = await send(`SAVEPOINT ${name}`);
+      // Only once it exists, so a failed BEGIN leaves no name for a later ROLLBACK to aim at.
       open.push(name);
-      return `SAVEPOINT ${name}`;
+      return result;
     }
     if (word === 'COMMIT' || word === 'END' || word === 'ROLLBACK' || word === 'ABORT') {
       const name = open.pop();
       if (!name) throw new Error(`inSnapshot: ${word} without a transaction`);
-      return word === 'COMMIT' || word === 'END'
-        ? `RELEASE SAVEPOINT ${name}`
-        : `ROLLBACK TO SAVEPOINT ${name}; RELEASE SAVEPOINT ${name}`;
+      return send(
+        word === 'COMMIT' || word === 'END'
+          ? `RELEASE SAVEPOINT ${name}`
+          : `ROLLBACK TO SAVEPOINT ${name}; RELEASE SAVEPOINT ${name}`,
+      );
     }
-    return text;
+    return send(text, ...rest);
   };
-  const query = (text: unknown, ...rest: unknown[]) =>
-    (client.query as (...args: unknown[]) => Promise<unknown>)(
-      typeof text === 'string' ? translate(text) : text,
-      ...rest,
-    );
   const inner = { query, release: () => undefined };
   const snapshot = { query, connect: () => Promise.resolve(inner) } as unknown as Pool;
   let broken: Error | undefined;

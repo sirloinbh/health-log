@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { forgetPendingWrites, trackWrite, writesSettled } from './pending-writes';
+import { forgetPendingWrites, onWriteSettled, trackWrite, writesSettled } from './pending-writes';
 
 const deferred = <T>() => {
   let resolve = (_value: T) => {};
@@ -81,4 +81,31 @@ test('a write from before a reset settling late does not end the wait for a newe
   expect(await settledYet(waiting)).toBe(false);
   newer.resolve(null);
   expect(await settledYet(waiting)).toBe(true);
+});
+
+test('a listener hears every write that settles, after it no longer holds up a read', async () => {
+  const heard: { path: string; clear: boolean }[] = [];
+  const stop = onWriteSettled((path) => {
+    // By now a read of the same path would go ahead.
+    void settledYet(writesSettled(path)).then((clear) => heard.push({ path, clear }));
+  });
+  const save = deferred<string>();
+  const failure = deferred<string>();
+  const saved = trackWrite('/api/meals/2026-03-15', save.promise);
+  const failed = trackWrite('/api/sleep/2026-03-15', failure.promise).catch(() => 'failed');
+  expect(heard).toEqual([]);
+  save.resolve('ok');
+  failure.reject(new Error('no'));
+  await saved;
+  await failed;
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(heard).toEqual([
+    { path: '/api/meals/2026-03-15', clear: true },
+    { path: '/api/sleep/2026-03-15', clear: true },
+  ]);
+
+  stop();
+  await trackWrite('/api/meals/2026-03-15', Promise.resolve('again'));
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(heard).toHaveLength(2);
 });

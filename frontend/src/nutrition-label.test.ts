@@ -435,6 +435,13 @@ test('"1회 제공량 30g (100g당)" claims no basis: one column cannot be for b
     '1회 제공량 30g [100g당]',
     '1회 제공량 30g, 100g당',
     '1회 섭취참고량 30g (100g당)',
+    // Other words for the same, and a bare size (2nd review).
+    '1회 제공량 30g (100g 중)',
+    '1회 제공량 30g (100g에 대해)',
+    '1회 제공량 30g (100g 대비)',
+    '1회 제공량 30g (100g/당)',
+    '1회 제공량 30g (100g)',
+    '1회 제공량 30g (100ml당)',
   ]) {
     expect(readNutritionLabel(`영양정보\n${head}\n열량 250kcal`).basis, head).toBeNull();
   }
@@ -459,6 +466,17 @@ test('"1회 제공량 30g (100g당)" claims no basis: one column cannot be for b
     size: 30,
     unit: 'g',
   });
+  // The package and a price are no other basis (2nd review).
+  for (const pasted of [
+    '1회 제공량 30g당 (총 내용량 300g)\n열량 120kcal',
+    '1회 제공량(30g)당 총 내용량 300g\n열량 120kcal',
+    '영양정보 1회 제공량 30g당 / 총 내용량 300g\n열량 120kcal',
+    '1회 제공량 30g / 총 2회 제공량(60g)\n열량 120kcal',
+    '영양정보 총 내용량 300g (100g당 2,211원)\n1회 제공량 30g\n열량 120kcal',
+    '영양정보 (100g당 가격 2,211원)\n1회 제공량 30g\n열량 120kcal',
+  ]) {
+    expect(readNutritionLabel(pasted).basis, pasted).toEqual({ size: 30, unit: 'g' });
+  }
 });
 
 test('the 2021 layout with a daily-value column reads the serving values', () => {

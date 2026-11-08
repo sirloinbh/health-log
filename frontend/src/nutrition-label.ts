@@ -383,22 +383,32 @@ export function readNutritionLabel(pasted: string): LabelReading {
   // claimed. So for a heading "영양정보 (100g당)" above the serving. "100g당 (1회 제공량 30g)" is
   // fine: only the 100g has 당, and the bracket notes the serving size. A head row with bars is a
   // row of columns, read from the first (#122).
+  // Sizes in a stretch of text. A basis is marked "당" or "기준", but not a price ("100g당 2211원").
+  // The package ("총 내용량 300g", "총 2회 제공량(60g)") is a note, not a basis.
   const sizesIn = (from: number, to: number) =>
     [
       ...text
         .slice(from, to)
-        .matchAll(/(\d+(?:\.\d+)?)\s*(g|ml)(?![a-z])(\s*[\])]?\s*(?:당(?![가-힣])|기준))?/g),
+        .matchAll(
+          /(?<package>총[^\n\d]{0,10}(?:\d+\s*회[^\n\d]{0,8})?)?(?<![\d.])(\d+(?:\.\d+)?)\s*(g|ml)(?![a-z])(\s*[\])]?\s*(?:당(?![가-힣])|기준)(?!\s*(?:가격|\d+(?:\.\d+)?\s*원)))?/g,
+        ),
     ].map((match) => ({
-      size: `${twoDecimals(Number(match[1]))}${match[2]}`,
-      isBasis: !!match[3],
+      size: `${twoDecimals(Number(match[2]))}${match[3]}`,
+      unit: match[3],
+      isBasis: !!match[4],
+      isPackage: !!match.groups?.package,
     }));
   const chosenSize = chosen?.basis ? `${chosen.basis.size}${chosen.basis.unit}` : null;
-  // Two sizes on the serving's head, one of them a basis ("30g (100g당)"); a weight noted beside
-  // a volume ("200ml (206g)") or "1개(30g)" names one serving.
-  const twoBases = (from: number, to: number) => {
-    const sizes = sizesIn(from, to);
-    return sizes.some(({ isBasis }) => isBasis) && new Set(sizes.map(({ size }) => size)).size > 1;
-  };
+  // Another size on the serving's head: "30g (100g당)", "30g (100g 중)", "약 30g (100g)". Values
+  // for 30g or 100g cannot be told apart. A weight beside a volume ("200ml (206g)"), "1개(30g)",
+  // the serving's own "30g당" and the package ("총 내용량 300g") name no other basis.
+  const otherSize = (from: number, to: number) =>
+    sizesIn(from, to).some(
+      ({ size, unit, isBasis, isPackage }) =>
+        !isPackage &&
+        size !== chosenSize &&
+        (isBasis || (chosenSize !== null && unit === chosen?.basis?.unit)),
+    );
   // A basis on the heading line above the serving ("영양정보 (100g당)") that is another size.
   const otherBasis = (from: number, to: number) =>
     sizesIn(from, to).some(({ size, isBasis }) => isBasis && size !== chosenSize);
@@ -411,7 +421,7 @@ export function readNutritionLabel(pasted: string): LabelReading {
   const bracketedBasis =
     chosen?.kind === 'serving' &&
     !servingHead.includes('|') &&
-    (twoBases(chosen.index, chosen.index + servingHead.length) ||
+    (otherSize(chosen.index, chosen.index + servingHead.length) ||
       // "1회 제공량 30g (총 내용량당)": the package, another size than the serving.
       candidates.some(
         (candidate) =>

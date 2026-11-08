@@ -403,18 +403,23 @@ export function CombosPage() {
     return () => clearTimeout(timer);
   }, [moveFocus]);
 
-  const load = useCallback(async () => {
-    // A slow older read must not overwrite a newer one.
-    const request = ++latestLoad.current;
-    try {
-      const data = await requestJson<{ combos: Combo[] }>('/api/combos');
-      if (request !== latestLoad.current) return;
-      clear();
-      setCombos(data.combos);
-    } catch (cause) {
-      if (request === latestLoad.current) error(cause);
-    }
-  }, [clear, error]);
+  /** `done`: what to say once the list is in, for a load the person asked for. */
+  const load = useCallback(
+    async (done?: string) => {
+      // A slow older read must not overwrite a newer one.
+      const request = ++latestLoad.current;
+      try {
+        const data = await requestJson<{ combos: Combo[] }>('/api/combos');
+        if (request !== latestLoad.current) return;
+        if (done) status(done);
+        else clear();
+        setCombos(data.combos);
+      } catch (cause) {
+        if (request === latestLoad.current) error(cause);
+      }
+    },
+    [clear, error, status],
+  );
 
   useEffect(() => {
     void load();
@@ -469,7 +474,7 @@ export function CombosPage() {
             // A word in its place: the same failure twice is announced again, and a list already
             // on screen does not look fixed while the new one is on its way.
             status('목록을 다시 불러오는 중…');
-            void load();
+            void load('목록을 다시 불러왔습니다.');
             // Trying again removes this button, which would drop keyboard focus to the page (#65, #127).
             setMoveFocus((count) => count + 1);
           }}

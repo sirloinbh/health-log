@@ -359,6 +359,8 @@ test('a list that failed to load can be tried again, and focus stays on the page
   expect(await screen.findByRole('region', { name: '복용 중 1' })).toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+  // Said once the list is in, as focus on the title alone says nothing about it.
+  expect(screen.getByRole('status')).toHaveTextContent('목록을 다시 불러왔습니다.');
   await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: '약' })).toHaveFocus());
 });
 

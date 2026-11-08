@@ -336,18 +336,23 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
     return () => clearTimeout(timer);
   }, [moveFocus]);
 
-  const load = useCallback(async () => {
-    // A slow older answer must not overwrite a newer one.
-    const request = ++latest.current;
-    try {
-      const data = await requestJson<MedicationLists>(medicationsPath);
-      if (request !== latest.current) return;
-      clear();
-      setLists(data);
-    } catch (cause) {
-      if (request === latest.current) error(cause);
-    }
-  }, [clear, error]);
+  /** `done`: what to say once the list is in, for a load the person asked for. */
+  const load = useCallback(
+    async (done?: string) => {
+      // A slow older answer must not overwrite a newer one.
+      const request = ++latest.current;
+      try {
+        const data = await requestJson<MedicationLists>(medicationsPath);
+        if (request !== latest.current) return;
+        if (done) status(done);
+        else clear();
+        setLists(data);
+      } catch (cause) {
+        if (request === latest.current) error(cause);
+      }
+    },
+    [clear, error, status],
+  );
 
   // The recent visits offered as where a medicine was prescribed; without them it can still be saved.
   const loadVisits = useCallback(() => {
@@ -448,7 +453,7 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
             // A word in its place: the same failure twice is announced again, and a list already
             // on screen does not look fixed while the new one is on its way.
             status('목록을 다시 불러오는 중…');
-            void load();
+            void load('목록을 다시 불러왔습니다.');
             loadVisits();
             // Trying again removes this button, which would drop keyboard focus to the page (#65, #127).
             setMoveFocus((count) => count + 1);

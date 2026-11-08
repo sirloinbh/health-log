@@ -32,7 +32,11 @@ const json = (body: object | null, status = 200) =>
 const serve = (visits: Handler) => {
   const fetchMock = vi.fn((url: string, init?: RequestInit) =>
     Promise.resolve(
-      url.startsWith('/api/visits') ? visits(url, init) : json({ today: '2026-03-15' }),
+      url.startsWith('/api/visits')
+        ? visits(url, init)
+        : url.startsWith('/api/medications')
+          ? json({ date: '2026-03-10', medications: [] })
+          : json({ today: '2026-03-15' }),
     ),
   );
   vi.stubGlobal('fetch', fetchMock);

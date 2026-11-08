@@ -87,7 +87,7 @@ export function VisitsCard({ date }: { date: string }) {
           </Button>
         ) : null}
         {!notice && visits === undefined ? (
-          <div role="status" aria-busy="true" aria-label="병원 기록 불러오는 중">
+          <div role="status" aria-busy="true" aria-label="병원·약 기록 불러오는 중">
             <SkeletonText lines={2} />
           </div>
         ) : null}

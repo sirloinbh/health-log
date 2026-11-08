@@ -43,7 +43,10 @@ type Draft = {
   visitId: string;
 };
 
-const draftOf = (item: Medication | null, start: { date: string; visitId: string }): Draft => ({
+const draftOf = (
+  item: Medication | null,
+  start: { date: string; visitId: string; visitDate?: string },
+): Draft => ({
   name: item?.name ?? '',
   dose: item?.dose ?? '',
   directions: item?.directions ?? '',
@@ -103,7 +106,7 @@ function MedicationDialog({
   onSaved,
 }: {
   item: Medication | null;
-  start: { date: string; visitId: string };
+  start: { date: string; visitId: string; visitDate?: string };
   visits: Visit[];
   onClose: () => void;
   onSaved: () => void;
@@ -121,7 +124,12 @@ function MedicationDialog({
   ];
   if (linked && !options.some((option) => option.id === linked.id)) options.unshift(linked);
   if (draft.visitId && !options.some((option) => String(option.id) === draft.visitId)) {
-    options.unshift({ id: Number(draft.visitId), date: start.date, clinic: '선택한 방문' });
+    // Its date is known only when the visit's own link gave it.
+    options.unshift({
+      id: Number(draft.visitId),
+      date: start.visitDate ?? '',
+      clinic: '선택한 방문',
+    });
   }
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -316,7 +324,7 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
   // null: closed. Otherwise the medicine being edited (null for a new one) and where it starts.
   const [editing, setEditing] = useState<{
     item: Medication | null;
-    start: { date: string; visitId: string };
+    start: { date: string; visitId: string; visitDate?: string };
   } | null>(null);
   const { notice, error, clear } = useNotice();
   const latest = useRef(0);
@@ -366,6 +374,7 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
       start: {
         date: inRange ? askedDate : (today ?? ''),
         visitId: /^[1-9]\d*$/.test(askedVisit) ? askedVisit : '',
+        visitDate: inRange ? askedDate : undefined,
       },
     });
   }, [askedDate, askedVisit, setParams, today]);

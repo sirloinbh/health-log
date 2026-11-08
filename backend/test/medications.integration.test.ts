@@ -185,3 +185,59 @@ test('the database refuses an end before the start', { skip }, async () => {
     /violates check constraint/,
   );
 });
+
+test(
+  'saving again can keep, change or drop the visit link, but not point it at no visit',
+  { skip },
+  async (t) => {
+    t.after(clean);
+    await withApi(pool, async (call) => {
+      const addVisit = async (date: string) =>
+        Number(
+          (await call('/api/visits', { method: 'POST', body: { date, clinic: `${tag}의원` } })).data
+            .id,
+        );
+      const firstVisit = await addVisit('1985-10-01');
+      const secondVisit = await addVisit('1985-10-02');
+      const saved = await create(call, {
+        name: `${tag}정`,
+        startOn: '1985-10-03',
+        visitId: firstVisit,
+      });
+      const put = async (visitId: number | null) =>
+        call(`/api/medications/${saved.id}`, {
+          method: 'PUT',
+          body: { name: `${tag}정`, startOn: '1985-10-03', visitId },
+        });
+      const linkOf = async (visitId: number | null) =>
+        ((await put(visitId)).data as unknown as Medication).visit?.id ?? null;
+
+      assert.equal(await linkOf(firstVisit), firstVisit);
+      assert.equal(await linkOf(secondVisit), secondVisit);
+      assert.equal(await linkOf(null), null);
+      const unknown = await put(999999999);
+      assert.equal(unknown.status, 400);
+      assert.equal(unknown.data.error, '연결할 병원 방문을 찾을 수 없습니다');
+      // The refused change left the record as it was.
+      const day = (await call('/api/medications?date=1985-10-03')).data as {
+        medications: Medication[];
+      };
+      assert.equal(day.medications.find((m) => m.id === saved.id)?.visit, null);
+    });
+  },
+);
+
+test('a medicine counts on its first day as well as its last', { skip }, async (t) => {
+  t.after(clean);
+  await withApi(pool, async (call) => {
+    await create(call, { name: `${tag}하루약`, startOn: '1985-10-10', endOn: '1985-10-10' });
+    const day = async (date: string) =>
+      names(
+        ((await call(`/api/medications?date=${date}`)).data as { medications: Medication[] })
+          .medications,
+      );
+    assert.deepEqual(await day('1985-10-09'), []);
+    assert.deepEqual(await day('1985-10-10'), [`${tag}하루약`]);
+    assert.deepEqual(await day('1985-10-11'), []);
+  });
+});

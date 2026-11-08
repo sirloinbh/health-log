@@ -5,6 +5,7 @@ import { expect, test, vi } from 'vitest';
 import { App } from './app';
 import { toast } from './components/ui/sonner';
 import type { Medication, MedicationLists } from './med-text';
+import { trackWrite } from './pending-writes';
 import { VisitsCard } from './visit-card';
 import type { Visit } from './visit-text';
 
@@ -260,4 +261,88 @@ test('a day without medicines says so', async () => {
   serve(() => json({ date: '2026-03-12', medications: [] }));
   renderCard();
   expect(await screen.findByText('이 날 먹은 약 기록이 없습니다.')).toBeInTheDocument();
+});
+
+test('a linked visit older than the recent ones is still offered, and an unknown one is named plainly', async () => {
+  const older: Medication = {
+    ...prescribed,
+    id: 5,
+    name: '가상오래된약',
+    visit: { id: 2, date: '2025-01-05', clinic: '가상옛의원' },
+  };
+  serve(() => json(lists({ current: [older] })));
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '가상오래된약 수정' }));
+  const select = within(dialog()).getByLabelText('처방받은 병원 방문');
+  expect(select).toHaveValue('2');
+  expect(within(select).getByRole('option', { name: '2025-01-05 가상옛의원' })).toBeInTheDocument();
+  fireEvent.click(within(dialog()).getByRole('button', { name: '취소' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+  // A link without a date names the visit without inventing one.
+  window.history.pushState(null, '', '/medications?visit=99');
+  window.dispatchEvent(new PopStateEvent('popstate'));
+  const linked = await screen.findByRole('dialog', { name: '약 기록' });
+  await waitFor(() =>
+    expect(within(linked).getByLabelText('처방받은 병원 방문')).toHaveValue('99'),
+  );
+  expect(within(linked).getByRole('option', { name: '선택한 방문' })).toBeInTheDocument();
+  expect(within(linked).getByLabelText('시작일')).toHaveValue('2026-03-15');
+});
+
+test('medicines starting later have their own list', async () => {
+  serve(() =>
+    json(
+      lists({
+        upcoming: [{ ...finished, id: 6, name: '가상예정약', startOn: '2026-04-01', endOn: null }],
+      }),
+    ),
+  );
+  open();
+  const upcoming = await screen.findByRole('region', { name: '시작 예정 1' });
+  expect(within(upcoming).getByText('2026-04-01부터')).toBeInTheDocument();
+});
+
+test('when the day’s medicines fail to load, trying again brings both parts back with focus on the card', async () => {
+  let medicineCalls = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) => {
+      if (url.startsWith('/api/medications')) {
+        medicineCalls += 1;
+        return Promise.resolve(
+          medicineCalls === 1
+            ? json({ error: '서버 오류가 발생했습니다' }, 500)
+            : json({ date: '2026-03-12', medications: [prescribed] }),
+        );
+      }
+      return Promise.resolve(json({ visits: [visit], more: false }));
+    }),
+  );
+  renderCard();
+  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  const again = screen.getByRole('button', { name: '다시 시도' });
+  again.focus();
+  fireEvent.click(again);
+  expect(await screen.findByRole('region', { name: '이 날 먹은 약' })).toBeInTheDocument();
+  expect(screen.getByRole('list', { name: '이 날 병원 방문' })).toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: '병원·약' }).parentElement).toHaveFocus(),
+  );
+});
+
+test('the daily card waits for a medicine save still on its way', async () => {
+  let finish = () => {};
+  void trackWrite(
+    '/api/medications/',
+    new Promise<void>((resolve) => {
+      finish = resolve;
+    }),
+  );
+  const fetchMock = serve(() => json({ date: '2026-03-12', medications: [prescribed] }));
+  renderCard();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(fetchMock).not.toHaveBeenCalled();
+  finish();
+  expect(await screen.findByRole('region', { name: '이 날 먹은 약' })).toBeInTheDocument();
 });

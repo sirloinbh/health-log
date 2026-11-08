@@ -82,7 +82,7 @@ test('ids and dates are checked before the database', async () => {
 });
 
 test('today is the calendar day in Asia/Seoul, not the server clock’s zone', () => {
-  // 23:30 UTC on the 14th is already the 15th in Seoul (UTC+9).
+  // 15:30 UTC on the 14th is already 00:30 on the 15th in Seoul (UTC+9).
   assert.equal(serviceDate(new Date('2026-03-14T15:30:00Z')), '2026-03-15');
   assert.equal(serviceDate(new Date('2026-03-14T14:59:59Z')), '2026-03-14');
 });

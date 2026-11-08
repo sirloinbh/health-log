@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
@@ -245,10 +245,13 @@ test('going back ends a typed edit, so the field matches the page and history st
   await screen.findByText('2026년 3월 20일 금요일');
 });
 
-test('the date input limits the year to four digits', () => {
+test('the date input offers the range the page opens', () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  expect(screen.getByLabelText('날짜 선택')).toHaveAttribute('max', '9999-12-31');
+  const input = screen.getByLabelText('날짜 선택');
+  expect(input).toHaveAttribute('min', '2000-01-01');
+  // A max also keeps Chrome from taking a sixth digit into the year.
+  expect(input).toHaveAttribute('max', '2099-12-31');
 });
 
 test('typing the date already shown leaves no history entry', () => {
@@ -372,4 +375,58 @@ test('a day shows a place for each record kind', () => {
   for (const name of ['수면', '식단', '신체', '술·담배', '하루 체크', '병원·약']) {
     expect(screen.getByRole('heading', { level: 2, name })).toBeInTheDocument();
   }
+});
+
+test('an address outside the range says which days can be recorded, with a way back', () => {
+  health({ today: '2026-03-15' });
+  for (const date of ['1999-12-31', '2100-01-01', '0002-03-15', '9999-12-31']) {
+    open(`/daily/${date}`);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      `2000-01-01부터 2099-12-31까지 기록할 수 있습니다: ${date}`,
+    );
+    expect(screen.getByRole('link', { name: '오늘 기록으로 이동' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '수면' })).not.toBeInTheDocument();
+    cleanup();
+  }
+});
+
+test('at either end of the range the previous or next day cannot be opened', () => {
+  health({ today: '2026-03-15' });
+  open('/daily/2000-01-01');
+  expect(screen.queryByRole('link', { name: '이전 날' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '이전 날' })).toBeDisabled();
+  expect(screen.getByRole('link', { name: '다음 날' })).toHaveAttribute(
+    'href',
+    '/daily/2000-01-02',
+  );
+  cleanup();
+
+  open('/daily/2099-12-31');
+  expect(screen.queryByRole('link', { name: '다음 날' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '다음 날' })).toBeDisabled();
+  expect(screen.getByRole('link', { name: '이전 날' })).toHaveAttribute(
+    'href',
+    '/daily/2099-12-30',
+  );
+});
+
+test('a typed date outside the range is explained and does not change the page', () => {
+  health({ today: '2026-03-15' });
+  open('/daily/2026-03-15');
+  const input = screen.getByLabelText('날짜 선택');
+  const message = () => screen.queryByText('2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
+
+  // A year still being typed is not worth a word yet.
+  fireEvent.change(input, { target: { value: '0199-12-31' } });
+  expect(message()).not.toBeInTheDocument();
+
+  fireEvent.change(input, { target: { value: '1999-12-31' } });
+  expect(message()).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/daily/2026-03-15');
+  fireEvent.change(input, { target: { value: '2100-01-01' } });
+  expect(message()).toBeInTheDocument();
+
+  fireEvent.change(input, { target: { value: '2026-03-02' } });
+  expect(message()).not.toBeInTheDocument();
+  expect(window.location.pathname).toBe('/daily/2026-03-02');
 });

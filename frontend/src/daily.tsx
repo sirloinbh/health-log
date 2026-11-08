@@ -8,7 +8,15 @@ import { Button } from './components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from './components/ui/card';
 import { Input } from './components/ui/input';
 import { Notice } from './components/ui/notice';
-import { formatDate, isValidDate, shiftDate } from './daily-date';
+import {
+  dailyRangeText,
+  earliestDate,
+  formatDate,
+  inDailyRange,
+  isValidDate,
+  latestDate,
+  shiftDate,
+} from './daily-date';
 import { HabitsCard } from './habits';
 import { type Health, healthText } from './health';
 import { MealCard } from './meals';
@@ -17,10 +25,9 @@ import { SleepCard } from './sleep';
 // Each feature replaces its placeholder here as its issue lands.
 const sections = ['병원·약'];
 
-// Typing a year passes through values like 0002-10-31; those must not change the page.
-const earliestDate = '2000-01-01';
-// Without a max, Chrome keeps taking digits as a six-digit year instead of moving on to the month.
-const latestDate = '9999-12-31';
+// Typing a year passes through values like 0002-10-31: they stay out of range and change nothing,
+// and only a year of four digits is worth a word about the range.
+const typedYear = (value: string) => value >= '1000';
 
 function DailyHeader({ description }: { description?: string }) {
   return (
@@ -67,11 +74,16 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
     return () => window.removeEventListener('popstate', endEdit);
   }, []);
 
-  if (!isValidDate(date)) {
+  if (!isValidDate(date) || !inDailyRange(date)) {
     return (
       <section aria-labelledby="page-title" className="flex flex-col gap-6">
         <DailyHeader />
-        <Notice notice={{ kind: 'error', text: `없는 날짜입니다: ${date}` }} />
+        <Notice
+          notice={{
+            kind: 'error',
+            text: isValidDate(date) ? `${dailyRangeText}: ${date}` : `없는 날짜입니다: ${date}`,
+          }}
+        />
         <Button asChild variant="outline" className="self-start">
           <Link to={basePath}>오늘 기록으로 이동</Link>
         </Button>
@@ -80,6 +92,8 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
   }
 
   const today = health.state === 'ok' ? health.today : null;
+  const outOfRange =
+    draft !== null && isValidDate(draft) && typedYear(draft) && !inDailyRange(draft);
   const pathOf = (value: string) => `${basePath}/${value}`;
 
   return (
@@ -89,11 +103,18 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
         <Notice notice={{ kind: 'error', text: health.message }} />
       ) : null}
       <nav aria-label="날짜 이동" className="flex flex-wrap items-center gap-2">
-        <Button asChild variant="outline" size="icon">
-          <Link to={pathOf(shiftDate(date, -1))} aria-label="이전 날">
+        {/* At either end the link would lead out of range, so the button stays but does nothing. */}
+        {date > earliestDate ? (
+          <Button asChild variant="outline" size="icon">
+            <Link to={pathOf(shiftDate(date, -1))} aria-label="이전 날">
+              <ChevronLeft aria-hidden />
+            </Link>
+          </Button>
+        ) : (
+          <Button variant="outline" size="icon" disabled aria-label="이전 날">
             <ChevronLeft aria-hidden />
-          </Link>
-        </Button>
+          </Button>
+        )}
         <Input
           type="date"
           aria-label="날짜 선택"
@@ -108,23 +129,33 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
           onChange={(event) => {
             const value = event.target.value;
             setDraft(value);
-            if (isValidDate(value) && value >= earliestDate && value !== date) {
+            if (isValidDate(value) && inDailyRange(value) && value !== date) {
               void navigate(pathOf(value), { replace: editing.current });
               editing.current = true;
             }
           }}
         />
-        <Button asChild variant="outline" size="icon">
-          <Link to={pathOf(shiftDate(date, 1))} aria-label="다음 날">
+        {date < latestDate ? (
+          <Button asChild variant="outline" size="icon">
+            <Link to={pathOf(shiftDate(date, 1))} aria-label="다음 날">
+              <ChevronRight aria-hidden />
+            </Link>
+          </Button>
+        ) : (
+          <Button variant="outline" size="icon" disabled aria-label="다음 날">
             <ChevronRight aria-hidden />
-          </Link>
-        </Button>
+          </Button>
+        )}
         {today && today !== date ? (
           <Button asChild variant="outline">
             <Link to={pathOf(today)}>오늘</Link>
           </Button>
         ) : null}
       </nav>
+      {/* Always in the page: a live region added along with its text may not be read out. */}
+      <p aria-live="polite" className="text-body-sm text-destructive empty:hidden">
+        {outOfRange ? dailyRangeText : null}
+      </p>
       {/* An explicit column: an implicit one grows with its content, past the edge of a phone. */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <SleepCard key={date} date={date} />

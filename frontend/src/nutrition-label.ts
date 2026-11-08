@@ -378,21 +378,52 @@ export function readNutritionLabel(pasted: string): LabelReading {
     : 0;
   const headInLaterColumn = headCells.length > 0 && chosenCell > (nameCell ? 1 : 0);
 
-  // "1회 제공량 30g (100g당)": the serving is named, yet the bracket says the values are for 100g.
-  // One column of values cannot be for both, so no basis is claimed. "100g당 (1회 제공량 30g)" is
-  // fine: only the 100g has 당, and the bracket notes the serving size (#122).
-  const second = row[1];
+  // "1회 제공량 30g (100g당)", "1회 제공량 약 30g (100g 기준)": the serving is named, yet the same
+  // head says the values are for 100g. One column of values cannot be for both, so no basis is
+  // claimed. So for a heading "영양정보 (100g당)" above the serving. "100g당 (1회 제공량 30g)" is
+  // fine: only the 100g has 당, and the bracket notes the serving size. A head row with bars is a
+  // row of columns, read from the first (#122).
+  const sizesIn = (from: number, to: number) =>
+    [
+      ...text
+        .slice(from, to)
+        .matchAll(/(\d+(?:\.\d+)?)\s*(g|ml)(?![a-z])(\s*[\])]?\s*(?:당(?![가-힣])|기준))?/g),
+    ].map((match) => ({
+      size: `${twoDecimals(Number(match[1]))}${match[2]}`,
+      isBasis: !!match[3],
+    }));
+  const chosenSize = chosen?.basis ? `${chosen.basis.size}${chosen.basis.unit}` : null;
+  // Two sizes on the serving's head, one of them a basis ("30g (100g당)"); a weight noted beside
+  // a volume ("200ml (206g)") or "1개(30g)" names one serving.
+  const twoBases = (from: number, to: number) => {
+    const sizes = sizesIn(from, to);
+    return sizes.some(({ isBasis }) => isBasis) && new Set(sizes.map(({ size }) => size)).size > 1;
+  };
+  // A basis on the heading line above the serving ("영양정보 (100g당)") that is another size.
+  const otherBasis = (from: number, to: number) =>
+    sizesIn(from, to).some(({ size, isBasis }) => isBasis && size !== chosenSize);
+  const chosenLineEnd = chosen ? text.indexOf('\n', chosen.index) : -1;
+  const servingHead = chosen
+    ? text
+        .slice(chosen.index, chosenLineEnd === -1 ? text.length : chosenLineEnd)
+        .split(new RegExp(String.raw`열량|에너지|칼로리|\d\s*kcal|${nutrientWords}`))[0]
+    : '';
   const bracketedBasis =
     chosen?.kind === 'serving' &&
-    second !== undefined &&
-    second.kind !== 'serving' &&
-    text.slice(chosen.end, second.index).includes('(') &&
-    !(
-      chosen.basis &&
-      second.basis &&
-      chosen.basis.size === second.basis.size &&
-      chosen.basis.unit === second.basis.unit
-    );
+    !servingHead.includes('|') &&
+    (twoBases(chosen.index, chosen.index + servingHead.length) ||
+      // "1회 제공량 30g (총 내용량당)": the package, another size than the serving.
+      candidates.some(
+        (candidate) =>
+          candidate.kind === 'total' &&
+          candidate.index > chosen.index &&
+          candidate.index < chosen.index + servingHead.length &&
+          (candidate.basis === null ||
+            `${candidate.basis.size}${candidate.basis.unit}` !== chosenSize),
+      ) ||
+      (header !== null &&
+        lineStart(header.index) < lineStart(chosen.index) &&
+        otherBasis(header.index, text.indexOf('\n', header.index))));
 
   const basisFromTotal = candidates.length === 0 && total !== null;
   const basis =

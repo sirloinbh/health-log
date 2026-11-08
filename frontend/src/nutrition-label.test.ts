@@ -423,6 +423,23 @@ test('"1회 제공량 30g (100g당)" claims no basis: one column cannot be for b
   expect(
     readNutritionLabel('영양정보\n총 내용량 60g\n1회 제공량 30g (총 내용량당)\n열량 150kcal').basis,
   ).toBeNull();
+  // However the serving and the other basis are written (PR #123 review).
+  for (const head of [
+    '1회 제공량 30g (100g 기준)',
+    '1회 제공량 약 30g (100g당)',
+    '1회 제공량은 30g (100g당)',
+    '1회 제공량 1/2봉지 30g (100g당)',
+    '1회 제공량 1개(30g) (100g당)',
+    '1회 제공량(30g) (100g당)',
+    '1회 제공량 30g (1봉지 100g당)',
+    '1회 제공량 30g [100g당]',
+    '1회 제공량 30g, 100g당',
+    '1회 섭취참고량 30g (100g당)',
+  ]) {
+    expect(readNutritionLabel(`영양정보\n${head}\n열량 250kcal`).basis, head).toBeNull();
+  }
+  // A basis on the heading above the serving.
+  expect(readNutritionLabel('영양정보 (100g당)\n1회 제공량 30g\n열량 250kcal').basis).toBeNull();
   // The bracket only notes the serving: the 100g has 당.
   expect(readNutritionLabel('영양정보\n100g당 (1회 제공량 30g)\n열량 250kcal').basis).toEqual({
     size: 100,
@@ -430,6 +447,15 @@ test('"1회 제공량 30g (100g당)" claims no basis: one column cannot be for b
   });
   // The serving's own size comes before a bracket, and a bracket alone still gives it.
   expect(readNutritionLabel('영양정보\n1회 제공량 1개(30g)\n열량 150kcal').basis).toEqual({
+    size: 30,
+    unit: 'g',
+  });
+  // A weight beside a volume names the same serving: the size written first is kept.
+  expect(readNutritionLabel('영양정보\n1회 제공량 200ml (206g)\n열량 100kcal').basis).toEqual({
+    size: 200,
+    unit: 'ml',
+  });
+  expect(readNutritionLabel('영양정보\n1회 제공량(30g)당\n열량 75kcal').basis).toEqual({
     size: 30,
     unit: 'g',
   });

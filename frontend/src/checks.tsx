@@ -2,6 +2,7 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 
 import {
   answerText,
+  charCount,
   type CheckDay,
   type CheckSummary,
   type DayCheck,
@@ -62,7 +63,7 @@ function CheckForm({
       error('체크나 메모 중 하나 이상 입력해 주세요');
       return;
     }
-    if (memo && memo.length > maxMemo) {
+    if (memo && charCount(memo) > maxMemo) {
       error(`메모는 ${maxMemo}자 이하로 입력해 주세요`);
       return;
     }
@@ -122,7 +123,7 @@ function CheckForm({
         <Input
           id="check-memo"
           autoComplete="off"
-          maxLength={maxMemo}
+          // No maxLength: it counts UTF-16 units and would stop at 100 emoji, half of what is allowed.
           aria-describedby="check-memo-hint"
           // Read-only, not disabled: a disabled field drops the focus of someone who pressed Enter in it.
           readOnly={saving}

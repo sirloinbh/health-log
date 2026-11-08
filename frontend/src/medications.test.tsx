@@ -361,3 +361,41 @@ test('a list that failed to load can be tried again, and focus stays on the page
   expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
   await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: '약' })).toHaveFocus());
 });
+
+test('trying again also asks again for the visits a medicine can be linked to (#127)', async () => {
+  let down = true;
+  const fetchMock = vi.fn((url: string) =>
+    Promise.resolve(
+      url.startsWith('/api/medications') || url.startsWith('/api/visits')
+        ? down
+          ? json({ error: '가상 서버 오류' }, 500)
+          : url.startsWith('/api/visits')
+            ? json({ visits: [visit], more: false })
+            : json(lists())
+        : json({ today: '2026-03-15' }),
+    ),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  open();
+  await screen.findByRole('alert');
+  down = false;
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+  expect(screen.getByRole('status')).toHaveTextContent('목록을 다시 불러오는 중…');
+  await screen.findByRole('region', { name: '복용 중 1' });
+  fireEvent.click(screen.getByRole('button', { name: '약 기록' }));
+  const choices = within(dialog()).getByLabelText('처방받은 병원 방문');
+  await waitFor(() => expect(within(choices).getAllByRole('option')).toHaveLength(2));
+  expect(
+    fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/visits')),
+  ).toHaveLength(2);
+});
+
+test('failing again says so again (#127)', async () => {
+  serve(() => json({ error: '가상 서버 오류' }, 500));
+  open();
+  await screen.findByRole('alert');
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(await screen.findByRole('alert')).toHaveTextContent('가상 서버 오류');
+  expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+});

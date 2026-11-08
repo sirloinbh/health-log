@@ -323,7 +323,7 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
     item: Medication | null;
     start: { date: string; visitId: string; visitDate?: string };
   } | null>(null);
-  const { notice, error, clear } = useNotice();
+  const { notice, status, error, clear } = useNotice();
   const latest = useRef(0);
   const heading = useRef<HTMLHeadingElement>(null);
   const { remember, returnFocus } = useReturnFocus(heading);
@@ -349,13 +349,17 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
     }
   }, [clear, error]);
 
-  useEffect(() => {
-    void load();
-    // The recent visits offered as where a medicine was prescribed; without them it can still be saved.
+  // The recent visits offered as where a medicine was prescribed; without them it can still be saved.
+  const loadVisits = useCallback(() => {
     requestJson<{ visits: Visit[] }>(visitsPath)
       .then((data) => setVisits(data.visits))
       .catch(() => undefined);
-  }, [load]);
+  }, []);
+
+  useEffect(() => {
+    void load();
+    loadVisits();
+  }, [load, loadVisits]);
 
   // A visit links here with ?visit=<id>&date=<its date> to record what was prescribed there.
   const askedVisit = params.get('visit');
@@ -441,9 +445,11 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
           variant="outline"
           className="self-start"
           onClick={() => {
-            // Cleared first, so the same failure twice is announced again.
-            clear();
+            // A word in its place: the same failure twice is announced again, and a list already
+            // on screen does not look fixed while the new one is on its way.
+            status('목록을 다시 불러오는 중…');
             void load();
+            loadVisits();
             // Trying again removes this button, which would drop keyboard focus to the page (#65, #127).
             setMoveFocus((count) => count + 1);
           }}

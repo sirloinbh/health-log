@@ -381,7 +381,7 @@ export function CombosPage() {
   const [combos, setCombos] = useState<Combo[] | null>(null);
   // null: closed, 'new': adding, a combo: editing it.
   const [editing, setEditing] = useState<Combo | 'new' | null>(null);
-  const { notice, error, clear } = useNotice();
+  const { notice, status, error, clear } = useNotice();
   const latestLoad = useRef(0);
   const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -466,8 +466,9 @@ export function CombosPage() {
           variant="outline"
           className="self-start"
           onClick={() => {
-            // Cleared first, so the same failure twice is announced again.
-            clear();
+            // A word in its place: the same failure twice is announced again, and a list already
+            // on screen does not look fixed while the new one is on its way.
+            status('목록을 다시 불러오는 중…');
             void load();
             // Trying again removes this button, which would drop keyboard focus to the page (#65, #127).
             setMoveFocus((count) => count + 1);

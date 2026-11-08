@@ -10,7 +10,8 @@
 - 같은 음식의 자료가 여러 개면 **실제 분석값 → 수집값 → 산출값, 총 내용량이 기준량과 다른 자료, 외식 → 가정식 → 급식, 최신 생성일** 순서로 고른다. 산출값은 출처도 참고치로 안내하므로 분석 자료가 없을 때만 쓴다. 총 내용량이 `100g`이거나 `-`이면 1인분 정보가 없는 것으로 본다.
 - 후보를 찾을 때는 출처의 다른 표기까지 찾는다. 띄어쓰기와 이름 순서가 달라 정확히 일치하는 이름으로는 빠진다. 예: `짜장면`은 `자장면`, `참치김밥`은 `김밥_참치`, `제육볶음`은 `돼지고기볶음(제육볶음)`.
 - 칼로리는 kcal, 탄수화물·단백질·지방·당류는 g, 나트륨은 mg이다.
-- **모르는 값은 NULL로 둔다. 0으로 적지 않는다.** 0은 실제로 0일 때만 쓴다.
+- **모르는 값은 NULL로 둔다. 0으로 적지 않는다.** 0은 실제로 0일 때만 쓴다. "1g 미만"처럼 범위로만 표기된 값도 NULL이다.
+- 포장 제품(#32)은 이름 끝에 총 내용량을 적고(`갈비탕 400g`), 1회 제공량에는 영양성분 표기의 기준량을 적는다. 둘이 같으면 총 내용량 기준 표기이고, 1회 제공량이 더 작으면 일부 중량 기준 표기다.
 - 숫자는 소수 둘째 자리까지 저장한다. 화면과 API는 더 세밀한 값을 거부한다.
 - 확인 날짜는 미래일 수 없다.
 - 같은 메뉴의 크기가 다르면 이름으로 구분한다. 예: `와퍼`, `와퍼 주니어`.
@@ -27,7 +28,9 @@
 | `manual`      | 직접 입력 (출처 미상)   | 선택      | 선택      |
 
 - 추정값을 `official`로 적지 않는다.
-- 쇼핑몰이나 블로그에 옮겨 적힌 수치는 `official`이 아니다. 원본을 찾지 못하면 `estimate`로 적는다.
+- 쇼핑몰이나 블로그에 옮겨 적힌 수치는 `official`이 아니다. 원본을 찾지 못하면 `estimate`로 적는다. 제조사가 직접 운영하는 공식몰(예: CJ제일제당의 CJ더마켓, #32)의 제품 표기는 `official`이다.
+- 프랜차이즈 공식 표(#31)는 대개 포화지방만 있고 총지방과 탄수화물이 없다. 포화지방을 `fat`에 넣지 않는다. 없는 값은 NULL로 둔다.
+- 표가 이미지로만 공개되면 확대해 읽고, 따로 한 번 더 읽어 맞춰 본다. 표에 함께 적힌 1일 기준치 비율(단백질 55g, 나트륨 2,000mg)과도 대조한다. 출처 주소는 그 이미지 주소로 적는다. 방법과 결과는 [#31 기록](changes/31-franchise-foods.md)에 있다.
 
 ## 조사 데이터 넣기
 
@@ -43,9 +46,9 @@
 | 이름이나 브랜드를 바꿈              | 조사값이 새 음식으로 하나 더 생김 |
 
 ```sql
-INSERT INTO foods (name, brand, category, serving_size, serving_unit, calories, carbs, protein, fat, sugars, sodium, source_type, source_url, checked_on)
+INSERT INTO foods (name, brand, category, serving_size, serving_unit, calories, carbs, protein, fat, sugars, sodium, source_type, source_url, checked_on, is_junk)
 VALUES
-  (U&'\C608\C2DC', U&'\BE0C\B79C\B4DC', NULL, 100, 'g', 250, NULL, 10, 8, NULL, 500, 'official', 'https://example.com/nutrition', '2026-10-31')
+  (U&'\C608\C2DC', U&'\BE0C\B79C\B4DC', NULL, 100, 'g', 250, NULL, 10, 8, NULL, 500, 'official', 'https://example.com/nutrition', '2026-10-31', true)
 ON CONFLICT (name, COALESCE(brand, '')) DO UPDATE SET
   category = EXCLUDED.category,
   serving_size = EXCLUDED.serving_size,
@@ -63,6 +66,7 @@ ON CONFLICT (name, COALESCE(brand, '')) DO UPDATE SET
 WHERE EXCLUDED.checked_on > foods.checked_on;
 ```
 
+- **정크푸드 표시(`is_junk`, #38)는 처음 넣을 때만 정한다.** 프랜차이즈 패스트푸드 메뉴(햄버거·피자·치킨 프랜차이즈 등)는 `true`, 그 밖의 음식은 `false`로 넣는다. `DO UPDATE SET`에는 넣지 않는다. 그래서 사용자가 화면에서 바꾼 표시는 새 조사로 갱신돼도 유지된다. 식사 기록은 기록할 때의 표시를 따로 가지므로, 표시를 바꿔도 지난 기록의 집계는 바뀌지 않는다.
 - 위 예시는 `backend/test/foods.integration.test.ts`가 그대로 실행해 검사한다. 형식을 바꾸면 테스트도 함께 확인한다.
 - **조사 데이터에는 출처 종류와 관계없이 확인 날짜를 적는다.** 날짜가 없으면 나중에 새 조사로 갱신할 수 없다.
 - **날짜 없는 음식은 조사 데이터로 바뀌지 않는다.** 화면에서 직접 입력한 값을 지키기 위해서다. 조사값으로 바꾸려면 아래 정정 방식을 쓴다.

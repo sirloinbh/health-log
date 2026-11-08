@@ -1,22 +1,49 @@
-import { CalendarDays, LayoutDashboard, Settings2, Utensils } from 'lucide-react';
+import {
+  CalendarDays,
+  Layers,
+  LayoutDashboard,
+  Pill,
+  Settings2,
+  Stethoscope,
+  Utensils,
+} from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 
+import { CombosPage } from './combos';
 import { AppShell, type NavItem } from './components/layout/app-shell';
 import { EmptyState } from './components/ui/empty-state';
 import { Toaster } from './components/ui/sonner';
 import { DailyPage, TodayRedirect } from './daily';
 import { FoodsPage } from './foods';
+import { goalSettingsPath } from './goal-text';
+import { GoalsSettings } from './goals';
 import { type Health, healthText } from './health';
+import { medicationsPagePath } from './med-text';
+import { MedicationsPage } from './medications';
+import { ReportPage } from './report';
+import { visitsPagePath } from './visit-text';
+import { VisitsPage } from './visits';
 
 // Every page URL lives here (central docs/directory-rules.md).
-const pages = { overview: '/', daily: '/daily', foods: '/foods', settings: '/settings' } as const;
+const pages = {
+  overview: '/',
+  daily: '/daily',
+  foods: '/foods',
+  combos: '/combos',
+  visits: visitsPagePath,
+  medications: medicationsPagePath,
+  settings: goalSettingsPath,
+} as const;
 
 // Main menu (LNB) items, in display order.
 const nav: NavItem[] = [
   { to: pages.overview, label: '대시보드', icon: LayoutDashboard },
   { to: pages.daily, label: '하루 기록', icon: CalendarDays },
   { to: pages.foods, label: '음식', icon: Utensils },
+  { to: pages.combos, label: '조합', icon: Layers },
+  { to: pages.visits, label: '병원', icon: Stethoscope },
+  { to: pages.medications, label: '약', icon: Pill },
   { to: pages.settings, label: '설정', icon: Settings2 },
 ];
 
@@ -96,20 +123,14 @@ function Page({
 
 export function App() {
   const health = useHealth();
+  // Pages that start a record on today: undefined while asking, null when the server cannot say.
+  const pageToday =
+    health.state === 'ok' ? health.today : health.state === 'loading' ? undefined : null;
   return (
     <BrowserRouter>
       <AppShell appName="식단·수면·건강 기록" nav={nav}>
         <Routes>
-          <Route
-            path={pages.overview}
-            element={
-              <Page
-                title="대시보드"
-                description="식단, 수면, 건강 상태를 날짜별로 기록하고 변화를 확인하는 개인 서비스"
-                health={health}
-              />
-            }
-          />
+          <Route path={pages.overview} element={<ReportPage health={health} />} />
           <Route
             path={pages.daily}
             element={<TodayRedirect basePath={pages.daily} health={health} />}
@@ -119,9 +140,16 @@ export function App() {
             element={<DailyPage basePath={pages.daily} health={health} />}
           />
           <Route path={pages.foods} element={<FoodsPage />} />
+          <Route path={pages.combos} element={<CombosPage />} />
+          <Route path={pages.visits} element={<VisitsPage today={pageToday} />} />
+          <Route path={pages.medications} element={<MedicationsPage today={pageToday} />} />
           <Route
             path={pages.settings}
-            element={<Page title="설정" description="앱 환경과 데이터 관리" health={health} />}
+            element={
+              <Page title="설정" description="앱 환경과 데이터 관리" health={health}>
+                <GoalsSettings />
+              </Page>
+            }
           />
           <Route path="*" element={<Navigate to={pages.overview} replace />} />
         </Routes>

@@ -68,7 +68,12 @@ test('typed entries have limits of their own', async () => {
 });
 
 // A change whose answer cannot be read must not stay, or a retry would repeat it.
-const rollsBack = async (target: string, method: 'POST' | 'DELETE', change: string) => {
+const rollsBack = async (
+  target: string,
+  method: 'POST' | 'DELETE',
+  change: string,
+  body: object = typed,
+) => {
   const statements: string[] = [];
   let released = false;
   const client = {
@@ -88,7 +93,7 @@ const rollsBack = async (target: string, method: 'POST' | 'DELETE', change: stri
     await withApi(pool, async (call) => {
       const { status } = await call(target, {
         method,
-        body: method === 'POST' ? typed : undefined,
+        body: method === 'POST' ? body : undefined,
       });
       assert.equal(status, 500);
     });
@@ -117,7 +122,13 @@ test('a date in the path has to exist', async () => {
 });
 
 test('the meals API is rate limited', async () => {
-  const pool = { query: async () => ({ rows: [] }) } as unknown as Pool;
+  // A day is read in one snapshot: no entries, and periods with no junk food.
+  const noJunk = { times: '0', days: '0', calories: null, calories_missing: '0' };
+  const client = {
+    query: async (sql: string) => ({ rows: sql.includes('is_junk AND') ? [noJunk] : [] }),
+    release: () => {},
+  };
+  const pool = { connect: async () => client } as unknown as Pool;
   await withApi(
     pool,
     async (call) => {
@@ -128,4 +139,26 @@ test('the meals API is rate limited', async () => {
     },
     { rateLimit: { max: 1, windowMs: 60_000 } },
   );
+});
+
+const copy = { from: '2026-03-14', meal: 'breakfast' };
+
+test('copying needs another real day and one of the four meals', async () => {
+  await rejects(`${path}/copy`, { ...copy, meal: 'brunch' }, '끼니를 선택해 주세요');
+  await rejects(`${path}/copy`, { meal: 'lunch' }, '복사할 날짜를 골라 주세요');
+  await rejects(`${path}/copy`, { ...copy, from: '2026-02-30' }, '복사할 날짜가 올바르지 않습니다');
+  await rejects(`${path}/copy`, { ...copy, from: '2026/03/14' }, '복사할 날짜가 올바르지 않습니다');
+  await rejects(`${path}/copy`, { ...copy, from: '2026-03-15' }, '다른 날짜를 골라 주세요');
+  await rejects('/api/meals/2026-02-30/copy', copy, '날짜가 올바르지 않습니다');
+});
+
+test('a copy whose answer cannot be read is rolled back, so a retry cannot double it', async () => {
+  await rollsBack(`${path}/copy`, 'POST', 'INSERT', copy);
+});
+
+// #38. A stored food brings its own junk food mark; only typed-in food is marked in the request.
+test('the junk food mark is a yes or no, and only for typed-in food', async () => {
+  await rejects(path, { ...typed, isJunk: 'true' }, '정크푸드 표시가 올바르지 않습니다');
+  await rejects(path, { ...typed, isJunk: 1 }, '정크푸드 표시가 올바르지 않습니다');
+  await rejects(path, { ...fromFood, isJunk: true }, '음식 선택과 직접 입력은 함께 쓸 수 없습니다');
 });

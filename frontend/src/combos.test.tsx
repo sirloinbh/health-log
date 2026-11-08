@@ -1,0 +1,468 @@
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { expect, test, vi } from 'vitest';
+
+import { App } from './app';
+import type { Combo } from './combo-text';
+import { toast } from './components/ui/sonner';
+
+const rice = {
+  id: 3,
+  name: '햇반',
+  brand: '샘플',
+  servingSize: 210,
+  servingUnit: 'g',
+  calories: 300,
+};
+const egg = {
+  id: 5,
+  name: '삶은 달걀',
+  brand: null,
+  servingSize: 50,
+  servingUnit: 'g',
+  calories: null,
+};
+
+const breakfast: Combo = {
+  id: 9,
+  name: '아침 세트',
+  items: [
+    {
+      foodId: 3,
+      name: '햇반',
+      brand: '샘플',
+      servings: 1,
+      servingSize: 210,
+      servingUnit: 'g',
+      calories: 300,
+    },
+    {
+      foodId: 5,
+      name: '삶은 달걀',
+      brand: null,
+      servings: 2,
+      servingSize: 50,
+      servingUnit: 'g',
+      calories: null,
+    },
+  ],
+  calories: { value: 300, missing: 1 },
+};
+
+type Handler = (url: string, init?: RequestInit) => Response | Promise<Response>;
+
+const json = (body: object | null, status = 200) =>
+  new Response(body === null ? null : JSON.stringify(body), { status });
+
+/** `combos` answers /api/combos; food searches answer with rice and egg. */
+const serve = (combos: Handler) => {
+  const fetchMock = vi.fn((url: string, init?: RequestInit) =>
+    Promise.resolve(
+      url.startsWith('/api/combos')
+        ? combos(url, init)
+        : url.startsWith('/api/foods')
+          ? json({ foods: [rice, egg] })
+          : json({ today: '2026-10-31' }),
+    ),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+};
+
+const open = () => {
+  window.history.replaceState(null, '', '/combos');
+  render(<App />);
+};
+
+const writes = (fetchMock: ReturnType<typeof serve>) =>
+  fetchMock.mock.calls.filter(
+    ([url, init]) => url.startsWith('/api/combos') && (init?.method ?? 'GET') !== 'GET',
+  );
+
+const search = async (dialog: HTMLElement) => {
+  fireEvent.change(within(dialog).getByLabelText('넣을 음식 검색'), { target: { value: '아침' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '검색' }));
+  return within(dialog).findByRole('list', { name: '검색 결과' });
+};
+
+test('the main menu opens the combos page', async () => {
+  serve(() => json({ combos: [] }));
+  render(<App />);
+  const menu = screen.getByRole('navigation', { name: '주 메뉴' });
+  fireEvent.click(within(menu).getByRole('link', { name: '조합' }));
+  expect(await screen.findByRole('heading', { level: 1, name: '조합' })).toBeInTheDocument();
+  expect(await screen.findByText('조합이 없습니다')).toBeInTheDocument();
+});
+
+test('a combo shows its foods and says when a calorie is unknown', async () => {
+  serve(() => json({ combos: [breakfast] }));
+  open();
+  const heading = await screen.findByRole('heading', { level: 2, name: '아침 세트' });
+  const card = heading.closest<HTMLElement>('[data-slot=card]')!;
+  expect(
+    within(card).getByText('음식 2개 · 300kcal (칼로리를 모르는 음식 1개 제외)'),
+  ).toBeInTheDocument();
+  expect(within(card).getByText('샘플 햇반 · 1회분 · 300kcal')).toBeInTheDocument();
+  expect(within(card).getByText('삶은 달걀 · 2회분 · 칼로리 값 없음')).toBeInTheDocument();
+});
+
+test('a combo whose foods are all gone says how to fix it', async () => {
+  serve(() =>
+    json({ combos: [{ ...breakfast, items: [], calories: { value: null, missing: 0 } }] }),
+  );
+  open();
+  expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
+  expect(screen.getByText(/수정해서 음식을 넣어 주세요/)).toBeInTheDocument();
+});
+
+test('adding finds foods, takes quantities, saves, and shows the list again', async () => {
+  let saved = false;
+  const success = vi.spyOn(toast, 'success');
+  const fetchMock = serve((_url, init) => {
+    if (init?.method === 'POST') {
+      saved = true;
+      return json(breakfast, 201);
+    }
+    return json({ combos: saved ? [breakfast] : [] });
+  });
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '조합 추가' }));
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.change(within(dialog).getByLabelText('조합 이름'), { target: { value: '아침 세트' } });
+  const results = await search(dialog);
+  fireEvent.click(within(results).getByRole('button', { name: '샘플 햇반 넣기' }));
+  fireEvent.click(within(results).getByRole('button', { name: '삶은 달걀 넣기' }));
+  // A food already in the combo is not offered twice.
+  expect(within(results).getByRole('button', { name: '샘플 햇반 넣음' })).toBeDisabled();
+  fireEvent.change(within(dialog).getByLabelText('삶은 달걀 수량'), { target: { value: '1.5' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+
+  expect(await screen.findByRole('heading', { level: 2, name: '아침 세트' })).toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(success).toHaveBeenCalledWith('저장했습니다');
+  const [post] = writes(fetchMock);
+  expect(post[0]).toBe('/api/combos');
+  expect(JSON.parse(String(post[1]?.body))).toEqual({
+    name: '아침 세트',
+    items: [
+      { foodId: 3, servings: 1 },
+      { foodId: 5, servings: 1.5 },
+    ],
+  });
+});
+
+test.each([
+  ['', [], '조합 이름을 입력해 주세요'],
+  ['세트', [], '조합에 음식을 하나 이상 넣어 주세요'],
+  ['세트', ['1,5'], '샘플 햇반 수량: 숫자만 입력해 주세요. 소수점은 마침표로 씁니다'],
+  ['세트', ['0'], '샘플 햇반 수량을 0보다 큰 숫자로 입력해 주세요'],
+  ['세트', ['1.555'], '샘플 햇반 수량은 소수 둘째 자리까지 입력해 주세요'],
+  ['세트', ['1000'], '샘플 햇반 수량은 999 이하로 입력해 주세요'],
+])('name %j with quantities %j is refused before sending', async (name, quantities, message) => {
+  const fetchMock = serve(() => json({ combos: [] }));
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '조합 추가' }));
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.change(within(dialog).getByLabelText('조합 이름'), { target: { value: name } });
+  if (quantities.length) {
+    const results = await search(dialog);
+    fireEvent.click(within(results).getByRole('button', { name: '샘플 햇반 넣기' }));
+    fireEvent.change(within(dialog).getByLabelText('샘플 햇반 수량'), {
+      target: { value: quantities[0] },
+    });
+  }
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent(message);
+  expect(writes(fetchMock)).toHaveLength(0);
+});
+
+test('editing starts from the combo, can take a food out, and saves to its address', async () => {
+  const fetchMock = serve((_url, init) =>
+    init?.method === 'PUT' ? json(breakfast) : json({ combos: [breakfast] }),
+  );
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '아침 세트 수정' }));
+  const dialog = await screen.findByRole('dialog');
+  expect(within(dialog).getByLabelText('조합 이름')).toHaveValue('아침 세트');
+  expect(within(dialog).getByLabelText('삶은 달걀 수량')).toHaveValue('2');
+  fireEvent.click(within(dialog).getByRole('button', { name: '삶은 달걀 빼기' }));
+  expect(within(dialog).queryByLabelText('삶은 달걀 수량')).not.toBeInTheDocument();
+  fireEvent.change(within(dialog).getByLabelText('샘플 햇반 수량'), { target: { value: '2' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+
+  await vi.waitFor(() => expect(writes(fetchMock)).toHaveLength(1));
+  const [put] = writes(fetchMock);
+  expect(put[0]).toBe('/api/combos/9');
+  expect(put[1]?.method).toBe('PUT');
+  expect(JSON.parse(String(put[1]?.body))).toEqual({
+    name: '아침 세트',
+    items: [{ foodId: 3, servings: 2 }],
+  });
+});
+
+test('a full combo takes no more foods', async () => {
+  const items = Array.from({ length: 20 }, (_, index) => ({
+    ...breakfast.items[0],
+    foodId: 100 + index,
+    name: `음식 ${index}`,
+  }));
+  serve(() => json({ combos: [{ ...breakfast, items }] }));
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '아침 세트 수정' }));
+  const dialog = await screen.findByRole('dialog');
+  expect(within(dialog).getByText('넣은 음식 20/20')).toBeInTheDocument();
+  const results = await search(dialog);
+  expect(within(results).getByRole('button', { name: '샘플 햇반 넣기' })).toBeDisabled();
+  expect(within(dialog).getByText(/음식은 20개까지 넣을 수 있습니다/)).toBeInTheDocument();
+});
+
+test('a server rejection keeps the dialog open with its message and what was typed', async () => {
+  serve((_url, init) =>
+    init?.method === 'PUT'
+      ? json({ error: '같은 이름의 조합이 이미 있습니다' }, 409)
+      : json({ combos: [breakfast] }),
+  );
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '아침 세트 수정' }));
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.change(within(dialog).getByLabelText('조합 이름'), { target: { value: '점심 세트' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+    '같은 이름의 조합이 이미 있습니다',
+  );
+  expect(within(dialog).getByLabelText('조합 이름')).toHaveValue('점심 세트');
+  expect(within(dialog).getByRole('button', { name: '저장' })).toBeEnabled();
+});
+
+test('deleting asks first, reads the list again, and keeps keyboard focus on the page', async () => {
+  let deleted = false;
+  const fetchMock = serve((_url, init) => {
+    if (init?.method === 'DELETE') {
+      deleted = true;
+      return json(null, 204);
+    }
+    return json({ combos: deleted ? [] : [breakfast] });
+  });
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '아침 세트 삭제' }));
+  const question = await screen.findByRole('dialog');
+  expect(question).toHaveTextContent('이미 기록한 식사는 그대로 남습니다');
+  fireEvent.click(within(question).getByRole('button', { name: '삭제' }));
+
+  expect(await screen.findByText('조합이 없습니다')).toBeInTheDocument();
+  expect(writes(fetchMock).map(([url, init]) => [url, init?.method])).toEqual([
+    ['/api/combos/9', 'DELETE'],
+  ]);
+  // The deleted card took its buttons with it; focus goes to the page title, not to the body.
+  await vi.waitFor(() =>
+    expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1, name: '조합' })),
+  );
+});
+
+test('a deleted combo leaves the screen before the list is read again', async () => {
+  let deleted = false;
+  let finish = (_response: Response) => {};
+  serve((_url, init) => {
+    if (init?.method === 'DELETE') {
+      deleted = true;
+      return json(null, 204);
+    }
+    // The reload after deleting hangs until the test lets it go.
+    return deleted
+      ? new Promise<Response>((resolve) => (finish = resolve))
+      : json({ combos: [breakfast] });
+  });
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '아침 세트 삭제' }));
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '삭제' }));
+
+  await vi.waitFor(() =>
+    expect(screen.queryByRole('heading', { level: 2, name: '아침 세트' })).not.toBeInTheDocument(),
+  );
+  expect(screen.queryByRole('button', { name: '아침 세트 삭제' })).not.toBeInTheDocument();
+  finish(json({ combos: [] }));
+  expect(await screen.findByText('조합이 없습니다')).toBeInTheDocument();
+});
+
+test('a combo already gone counts as deleted', async () => {
+  let deleted = false;
+  serve((_url, init) => {
+    if (init?.method === 'DELETE') {
+      deleted = true;
+      return json({ error: '조합을 찾을 수 없습니다' }, 404);
+    }
+    return json({ combos: deleted ? [] : [breakfast] });
+  });
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '아침 세트 삭제' }));
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '삭제' }));
+  expect(await screen.findByText('조합이 없습니다')).toBeInTheDocument();
+});
+
+test('a failed load shows the server message', async () => {
+  serve(() => json({ error: '서버 오류가 발생했습니다' }, 500));
+  open();
+  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+});
+
+test('the food search in a combo also reads the next page', async () => {
+  const fetchMock = vi.fn((url: string) =>
+    Promise.resolve(
+      url.startsWith('/api/combos')
+        ? json({ combos: [] })
+        : url.startsWith('/api/foods')
+          ? json(
+              url.endsWith('offset=100')
+                ? { foods: [egg], nextOffset: null }
+                : { foods: [rice], nextOffset: 100 },
+            )
+          : json({ today: '2026-10-31' }),
+    ),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '조합 추가' }));
+  const dialog = await screen.findByRole('dialog');
+  await search(dialog);
+  expect(within(dialog).getByText('검색 결과 1건 표시 중, 결과가 더 있습니다')).toBeInTheDocument();
+
+  fireEvent.click(within(dialog).getByRole('button', { name: '결과 더 보기' }));
+  expect(await within(dialog).findByRole('button', { name: '삶은 달걀 넣기' })).toBeInTheDocument();
+  expect(within(dialog).getByRole('button', { name: '샘플 햇반 넣기' })).toBeInTheDocument();
+  expect(within(dialog).getByText('검색 결과 2건')).toBeInTheDocument();
+});
+
+// Focuses the button first, as a keyboard user would; a pointer click does not in every browser.
+const openWith = async (name: string) => {
+  const opener = await screen.findByRole('button', { name });
+  opener.focus();
+  fireEvent.click(opener);
+  return { opener, dialog: await screen.findByRole('dialog') };
+};
+
+test('cancelling the add dialog returns focus to the add button', async () => {
+  serve(() => json({ combos: [] }));
+  open();
+  const { opener, dialog } = await openWith('조합 추가');
+  fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+});
+
+test('closing the edit dialog with Escape returns focus to that combo’s edit button', async () => {
+  serve(() => json({ combos: [breakfast, { ...breakfast, id: 10, name: '점심 세트' }] }));
+  open();
+  const { opener, dialog } = await openWith('아침 세트 수정');
+  fireEvent.keyDown(dialog, { key: 'Escape' });
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('saving an edit returns focus to the combo’s edit button', async () => {
+  serve((_url, init) => (init?.method === 'PUT' ? json(breakfast) : json({ combos: [breakfast] })));
+  open();
+  const { dialog } = await openWith('아침 세트 수정');
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  await vi.waitFor(() =>
+    expect(screen.getByRole('button', { name: '아침 세트 수정' })).toHaveFocus(),
+  );
+});
+
+test('a combo gone when the list is read again leaves focus on the page title, not the body', async () => {
+  let saved = false;
+  serve((_url, init) => {
+    if (init?.method === 'PUT') {
+      saved = true;
+      return json(breakfast);
+    }
+    return json({ combos: saved ? [] : [breakfast] });
+  });
+  open();
+  const { dialog } = await openWith('아침 세트 수정');
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  expect(await screen.findByText('조합이 없습니다')).toBeInTheDocument();
+  await vi.waitFor(() =>
+    expect(screen.getByRole('heading', { level: 1, name: '조합' })).toHaveFocus(),
+  );
+});
+
+test('a slow reload that drops the saved combo still leaves focus on the page title', async () => {
+  let saved = false;
+  let finishReload: (() => void) | undefined;
+  serve((_url, init) => {
+    if (init?.method === 'PUT') {
+      saved = true;
+      return json(breakfast);
+    }
+    if (!saved) return json({ combos: [breakfast] });
+    // Slower than the dialog's close, so focus is back on the edit button when the list changes.
+    return new Promise<Response>((resolve) => (finishReload = () => resolve(json({ combos: [] }))));
+  });
+  open();
+  const { opener, dialog } = await openWith('아침 세트 수정');
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+
+  // The reload has to be on its way, or finishing it would do nothing.
+  await vi.waitFor(() => expect(finishReload).toBeDefined());
+  finishReload?.();
+  expect(await screen.findByText('조합이 없습니다')).toBeInTheDocument();
+  await vi.waitFor(() =>
+    expect(screen.getByRole('heading', { level: 1, name: '조합' })).toHaveFocus(),
+  );
+});
+
+test('while saving and after a failed save, keyboard focus stays in the dialog', async () => {
+  let finish = (_response: Response) => {};
+  const fetchMock = serve((_url, init) =>
+    init?.method === 'PUT'
+      ? new Promise((resolve) => (finish = resolve))
+      : json({ combos: [breakfast] }),
+  );
+  open();
+  const { dialog } = await openWith('아침 세트 수정');
+  const save = within(dialog).getByRole('button', { name: '저장' });
+  save.focus();
+  fireEvent.click(save);
+
+  const busy = await within(dialog).findByRole('button', { name: '저장 중…' });
+  expect(busy).toBe(save);
+  expect(busy).toHaveAttribute('aria-disabled', 'true');
+  expect(busy).toHaveFocus();
+  // A second press while busy sends nothing more.
+  fireEvent.click(busy);
+  expect(writes(fetchMock)).toHaveLength(1);
+
+  finish(json({ error: '같은 이름의 조합이 이미 있습니다' }, 409));
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+    '같은 이름의 조합이 이미 있습니다',
+  );
+  expect(within(dialog).getByRole('button', { name: '저장' })).toHaveFocus();
+});
+
+test('the same failure twice is said twice, as the message is cleared before each try', async () => {
+  const finishers: ((response: Response) => void)[] = [];
+  serve((_url, init) =>
+    init?.method === 'PUT'
+      ? new Promise((resolve) => finishers.push(resolve))
+      : json({ combos: [breakfast] }),
+  );
+  open();
+  const { dialog } = await openWith('아침 세트 수정');
+  for (const finish of [0, 1]) {
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    await within(dialog).findByRole('button', { name: '저장 중…' });
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: '취소' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    // Pressing it while busy keeps the dialog, and the save, going.
+    fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    finishers[finish](json({ error: '같은 이름의 조합이 이미 있습니다' }, 409));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      '같은 이름의 조합이 이미 있습니다',
+    );
+  }
+});

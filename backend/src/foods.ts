@@ -6,6 +6,7 @@ import { z } from 'zod/v4';
 import { isRealDate } from './dates.js';
 import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError, parseId } from './standard/http.js';
+import { charCount } from './text.js';
 
 const maxAmount = 99_999;
 
@@ -22,12 +23,13 @@ const amount = (label: string) =>
     .default(null);
 
 // Not .min()/.max(): those also run on a non-string with a length and add a second message.
+// Lengths count characters, as the rest of the API does, so an emoji is one, not two (#101).
 const optionalText = (label: string, max: number) =>
   z
     .string({ error: `${label}이(가) 올바르지 않습니다` })
     .trim()
     // abort: the source rules below would otherwise add their messages to this one.
-    .refine((value) => value.length <= max, {
+    .refine((value) => charCount(value) <= max, {
       message: `${label}은(는) ${max}자 이하로 입력해 주세요`,
       abort: true,
     })
@@ -53,7 +55,7 @@ const foodInput = z
         .string({ error: '음식 이름을 입력해 주세요' })
         .trim()
         .refine((value) => value.length >= 1, '음식 이름을 입력해 주세요')
-        .refine((value) => value.length <= 100, '음식 이름은 100자 이하로 입력해 주세요'),
+        .refine((value) => charCount(value) <= 100, '음식 이름은 100자 이하로 입력해 주세요'),
       brand: optionalText('브랜드', 50),
       category: optionalText('분류', 30),
       servingSize: z
@@ -65,7 +67,7 @@ const foodInput = z
         .string({ error: '1회 제공량 단위를 입력해 주세요' })
         .trim()
         .refine((value) => value.length >= 1, '1회 제공량 단위를 입력해 주세요')
-        .refine((value) => value.length <= 10, '1회 제공량 단위는 10자 이하로 입력해 주세요'),
+        .refine((value) => charCount(value) <= 10, '1회 제공량 단위는 10자 이하로 입력해 주세요'),
       calories: amount('칼로리'),
       carbs: amount('탄수화물'),
       protein: amount('단백질'),
@@ -80,7 +82,7 @@ const foodInput = z
       sourceUrl: z
         .string({ error: '출처 주소가 올바르지 않습니다' })
         .trim()
-        .refine((value) => value.length <= 2000, '출처 주소가 너무 깁니다')
+        .refine((value) => charCount(value) <= 2000, '출처 주소가 너무 깁니다')
         .refine(isHttpUrl, '출처 주소는 http 또는 https로 시작해야 합니다')
         .nullable()
         .default(null),
@@ -89,6 +91,9 @@ const foodInput = z
         .refine(isRealDate, '확인 날짜가 올바르지 않습니다')
         .nullable()
         .default(null),
+      // Left out, a new food is not junk food and an edited one keeps its mark, so a screen that
+      // predates the mark cannot clear it.
+      isJunk: z.boolean({ error: '정크푸드 표시가 올바르지 않습니다' }).optional(),
     },
     { error: '요청 본문이 올바르지 않습니다' },
   )
@@ -109,9 +114,17 @@ const searchQuery = z.object({
   q: z
     .string({ error: '검색어가 올바르지 않습니다' })
     .trim()
-    .refine((value) => value.length <= 100, '검색어는 100자 이하로 입력해 주세요')
+    .refine((value) => charCount(value) <= 100, '검색어는 100자 이하로 입력해 주세요')
     .default(''),
+  offset: z
+    .string({ error: '목록 위치가 올바르지 않습니다' })
+    .regex(/^\d{1,7}$/, '목록 위치가 올바르지 않습니다')
+    .transform(Number)
+    .default(0),
 });
+
+/** How many foods one list or search request returns; the response says where the next page starts. */
+const foodPageSize = 100;
 
 type FoodRow = {
   id: string;
@@ -129,10 +142,11 @@ type FoodRow = {
   source_type: string;
   source_url: string | null;
   checked_on: string | null;
+  is_junk: boolean;
 };
 
 const columns =
-  'id, name, brand, category, serving_size, serving_unit, calories, carbs, protein, fat, sugars, sodium, source_type, source_url, checked_on';
+  'id, name, brand, category, serving_size, serving_unit, calories, carbs, protein, fat, sugars, sodium, source_type, source_url, checked_on, is_junk';
 
 // pg returns BIGINT and NUMERIC as strings.
 const optionalNumber = (value: string | null) => (value === null ? null : Number(value));
@@ -153,6 +167,7 @@ const toFood = (row: FoodRow) => ({
   sourceType: row.source_type,
   sourceUrl: row.source_url,
   checkedOn: row.checked_on,
+  isJunk: row.is_junk,
 });
 
 const inputValues = (food: z.infer<typeof foodInput>) => [
@@ -172,6 +187,9 @@ const inputValues = (food: z.infer<typeof foodInput>) => [
   food.checkedOn,
 ];
 
+/** How many recently eaten foods the meal card offers before any search. */
+const recentLimit = 10;
+
 // A search for "100%" means those characters, not a LIKE wildcard.
 const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, '\\$&')}%`;
 
@@ -189,13 +207,37 @@ export function foodsRouter(pool: Pool, today: () => string, limits: RateLimitSe
   };
 
   router.get('/', async (req, res) => {
-    const { q } = searchQuery.parse(req.query);
+    const { q, offset } = searchQuery.parse(req.query);
+    // One row past the page says whether another page exists, without counting every match.
+    // Pages only add up if every food has one place in the order. A name and brand are already
+    // unique; id keeps that true even if the rule is ever relaxed.
     const { rows } = await pool.query<FoodRow>(
       `SELECT ${columns} FROM foods
        WHERE $1 = '' OR name ILIKE $2 OR brand ILIKE $2
-       ORDER BY name, brand NULLS FIRST
-       LIMIT 100`,
-      [q, likePattern(q)],
+       ORDER BY name, brand NULLS FIRST, id
+       LIMIT $3 OFFSET $4`,
+      [q, likePattern(q), foodPageSize + 1, offset],
+    );
+    const more = rows.length > foodPageSize;
+    res.json({
+      foods: rows.slice(0, foodPageSize).map(toFood),
+      nextOffset: more ? offset + foodPageSize : null,
+    });
+  });
+
+  // Stored foods by when they were last recorded, each once. Typed-in entries have no food, and an
+  // entry whose food was removed has lost its link, so neither can show up.
+  router.get('/recent', async (_req, res) => {
+    const { rows } = await pool.query<FoodRow>(
+      `SELECT ${columns} FROM foods
+       JOIN (
+         SELECT food_id, max(id) AS last_entry FROM meal_entries
+         WHERE food_id IS NOT NULL
+         GROUP BY food_id
+         ORDER BY last_entry DESC
+         LIMIT ${recentLimit}
+       ) recent ON recent.food_id = foods.id
+       ORDER BY recent.last_entry DESC`,
     );
     res.json({ foods: rows.map(toFood) });
   });
@@ -204,10 +246,10 @@ export function foodsRouter(pool: Pool, today: () => string, limits: RateLimitSe
     const food = parseFood(req.body);
     const { rows } = await pool.query<FoodRow>(
       `INSERT INTO foods (name, brand, category, serving_size, serving_unit, calories, carbs, protein,
-         fat, sugars, sodium, source_type, source_url, checked_on)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         fat, sugars, sodium, source_type, source_url, checked_on, is_junk)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING ${columns}`,
-      inputValues(food),
+      [...inputValues(food), food.isJunk ?? false],
     );
     res.status(201).json(toFood(rows[0]));
   });
@@ -218,10 +260,11 @@ export function foodsRouter(pool: Pool, today: () => string, limits: RateLimitSe
     const { rows } = await pool.query<FoodRow>(
       `UPDATE foods SET name = $1, brand = $2, category = $3, serving_size = $4, serving_unit = $5,
          calories = $6, carbs = $7, protein = $8, fat = $9, sugars = $10, sodium = $11,
-         source_type = $12, source_url = $13, checked_on = $14, updated_at = now()
-       WHERE id = $15
+         source_type = $12, source_url = $13, checked_on = $14,
+         is_junk = COALESCE($15, is_junk), updated_at = now()
+       WHERE id = $16
        RETURNING ${columns}`,
-      [...inputValues(food), id],
+      [...inputValues(food), food.isJunk ?? null, id],
     );
     if (!rows[0]) throw new HttpError(404, '음식을 찾을 수 없습니다');
     res.json(toFood(rows[0]));

@@ -19,7 +19,8 @@ import { Spinner } from './components/ui/spinner';
 import { shiftDate } from './daily-date';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
-import { parseAmount } from './number-input';
+import { parseAmount, unreadableAmount } from './number-input';
+import { trackWrite, writesSettled } from './pending-writes';
 
 const pathOf = (date: string) => `/api/body/${date}`;
 
@@ -85,12 +86,17 @@ function BodyForm({
     event.preventDefault();
     const unreadable = numberFields.find(({ key }) => parseAmount(form[key]) === undefined);
     if (unreadable) {
-      error(`${unreadable.label}: 숫자만 입력해 주세요. 소수점은 마침표로 씁니다 (예: 70.5)`);
+      error(unreadableAmount(unreadable.label));
       return;
     }
     setSaving(true);
     try {
-      onSaved(await requestJson<BodyRecord>(pathOf(date), { method: 'PUT', body: bodyOf(form) }));
+      onSaved(
+        await trackWrite(
+          pathOf(date),
+          requestJson<BodyRecord>(pathOf(date), { method: 'PUT', body: bodyOf(form) }),
+        ),
+      );
     } catch (cause) {
       // Moving to another day removes this form, and the record still was not saved.
       if (!mounted.current) {
@@ -271,6 +277,10 @@ export function BodyCard({ date }: { date: string }) {
   const load = useCallback(async () => {
     clear();
     try {
+      // A save from before leaving this day may still be on its way; read after it lands.
+      await writesSettled(pathOf(date));
+      // Left again while waiting: nothing would show the answer.
+      if (!live.current) return;
       const data = await requestJson<{ record: BodyRecord | null }>(pathOf(date));
       if (live.current) setRecord(data.record);
     } catch (cause) {
@@ -284,6 +294,10 @@ export function BodyCard({ date }: { date: string }) {
     const request = ++latestHistory.current;
     const from = shiftDate(date, 1 - Math.max(...changeWindows));
     try {
+      // A save to a day in the window changes the trend; waiting for every body write is simplest.
+      await writesSettled(pathOf(''));
+      // Left again while waiting: nothing would show the answer.
+      if (!live.current) return;
       const data = await requestJson<{ records?: BodyRecord[] }>(
         `/api/body?from=${from}&to=${date}`,
       );
@@ -332,7 +346,7 @@ export function BodyCard({ date }: { date: string }) {
 
   const remove = async () => {
     try {
-      await requestJson(pathOf(date), { method: 'DELETE' });
+      await trackWrite(pathOf(date), requestJson(pathOf(date), { method: 'DELETE' }));
     } catch (cause) {
       // Already gone counts as deleted; anything else keeps the dialog open with the reason.
       if (!(cause instanceof RequestError && cause.status === 404)) {
@@ -361,6 +375,8 @@ export function BodyCard({ date }: { date: string }) {
             onClick={() => {
               void load();
               void loadHistory();
+              // Trying again removes this button, which would drop keyboard focus to the page.
+              setMoveFocus((count) => count + 1);
             }}
           >
             다시 시도

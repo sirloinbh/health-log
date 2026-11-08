@@ -232,3 +232,88 @@ test('a save that fails after leaving the day still says so', async () => {
   );
   shown.mockRestore();
 });
+
+test('coming back while a save is on its way shows the saved night, not a blank form', async () => {
+  let saved = false;
+  let finishSave = () => {};
+  const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+    if (init?.method === 'PUT') {
+      return new Promise<Response>((resolve) => {
+        finishSave = () => {
+          saved = true;
+          resolve(new Response(JSON.stringify(record)));
+        };
+      });
+    }
+    return Promise.resolve(new Response(JSON.stringify({ record: saved ? record : null })));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const first = render(<SleepCard date={date} />);
+  await screen.findByLabelText('취침 시각');
+  typeTimes('23:30', '07:00');
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  first.unmount();
+  render(<SleepCard date={date} />);
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(screen.queryByLabelText('취침 시각')).not.toBeInTheDocument();
+  finishSave();
+  expect(await screen.findByText('7시간 30분')).toBeInTheDocument();
+  expect(screen.queryByLabelText('취침 시각')).not.toBeInTheDocument();
+});
+
+test('leaving again while waiting for a save sends no read for the day left', async () => {
+  let finishSave = () => {};
+  const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+    if (init?.method === 'PUT') {
+      return new Promise<Response>((resolve) => {
+        finishSave = () => resolve(new Response(JSON.stringify(record)));
+      });
+    }
+    return Promise.resolve(new Response(JSON.stringify({ record: null })));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const first = render(<SleepCard date={date} />);
+  await screen.findByLabelText('취침 시각');
+  typeTimes('23:30', '07:00');
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  first.unmount();
+  render(<SleepCard date={date} />).unmount();
+
+  finishSave();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+test('trying again moves focus to the card, as the button it was on goes away', async () => {
+  server({ status: 500, body: { error: '서버 오류가 발생했습니다' } }, { body: { record } });
+  render(<SleepCard date={date} />);
+  const again = await screen.findByRole('button', { name: '다시 시도' });
+  again.focus();
+  fireEvent.click(again);
+  expect(await screen.findByText('7시간 30분')).toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: '수면' }).parentElement).toHaveFocus(),
+  );
+});
+
+test('a retry cannot be started twice, so no older answer can land after a newer one', async () => {
+  const finishers: ((response: Response) => void)[] = [];
+  const fetchMock = server({ status: 500, body: { error: '서버 오류가 발생했습니다' } });
+  render(<SleepCard date={date} />);
+  const again = await screen.findByRole('button', { name: '다시 시도' });
+  fetchMock.mockImplementation(() => new Promise<Response>((resolve) => finishers.push(resolve)));
+  const before = fetchMock.mock.calls.length;
+  fireEvent.click(again);
+  fireEvent.click(again);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  // The button goes with the first press; the second reaches nothing.
+  expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+  expect(fetchMock.mock.calls.length - before).toBe(1);
+  for (const finish of finishers) {
+    finish(new Response(JSON.stringify({ error: 'x' }), { status: 500 }));
+  }
+  // Settles before the test ends, so nothing updates the card afterwards.
+  expect(await screen.findByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+});

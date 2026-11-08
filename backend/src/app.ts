@@ -3,11 +3,19 @@ import type { Pool } from 'pg';
 import { types } from 'pg';
 
 import { bodyRouter } from './body.js';
+import { checksRouter } from './checks.js';
+import { combosRouter } from './combos.js';
 import { foodsRouter } from './foods.js';
+import { goalsRouter } from './goals.js';
+import { habitsRouter } from './habits.js';
 import { mealsRouter } from './meals.js';
+import { medicationsRouter } from './medications.js';
 import { defaultRateLimit, type RateLimitSettings } from './rate-limit.js';
+import { reportRouter } from './report.js';
 import { sleepRouter } from './sleep.js';
 import { errorHandler, notFound } from './standard/http.js';
+import { rejectNul } from './text.js';
+import { visitsRouter } from './visits.js';
 
 // DATE columns stay YYYY-MM-DD strings so the service time zone never shifts them.
 types.setTypeParser(1082, (value) => value);
@@ -32,6 +40,7 @@ export function createApp(
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '256kb' }));
+  app.use(rejectNul);
   app.get('/api/health', async (_req, res) => {
     await pool.query('SELECT 1');
     res.json({ ok: true, service: 'health-log', today: today() });
@@ -39,8 +48,18 @@ export function createApp(
   // Not on health, so monitoring still answers while a client is being limited.
   app.use('/api/foods', foodsRouter(pool, today, options.rateLimit ?? defaultRateLimit));
   app.use('/api/meals', mealsRouter(pool, options.rateLimit ?? defaultRateLimit));
+  app.use('/api/combos', combosRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api/sleep', sleepRouter(pool, options.rateLimit ?? defaultRateLimit));
   app.use('/api/body', bodyRouter(pool, options.rateLimit ?? defaultRateLimit));
+  app.use('/api/habits', habitsRouter(pool, options.rateLimit ?? defaultRateLimit));
+  app.use('/api/checks', checksRouter(pool, options.rateLimit ?? defaultRateLimit));
+  app.use('/api/goals', goalsRouter(pool, today, options.rateLimit ?? defaultRateLimit));
+  app.use('/api/report', reportRouter(pool, options.rateLimit ?? defaultRateLimit));
+  app.use('/api/visits', visitsRouter(pool, options.rateLimit ?? defaultRateLimit));
+  app.use(
+    '/api/medications',
+    medicationsRouter(pool, today, options.rateLimit ?? defaultRateLimit),
+  );
   app.use('/api', notFound);
   app.use(errorHandler);
   return app;

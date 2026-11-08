@@ -4,15 +4,10 @@ import { after, before, test } from 'node:test';
 
 import { Pool } from 'pg';
 
-import { withApi } from './helpers.js';
+import { testDatabaseSkip, withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
-// These tests write. A shared machine's variable may name another project's test database.
-const databaseName = url ? new URL(url).pathname.slice(1) : null;
-const skip =
-  databaseName === 'health_test'
-    ? false
-    : `health_test 전용 DB가 아닙니다: ${databaseName ?? '없음'}`;
+const skip = testDatabaseSkip(url);
 
 const prefix = 'integration-test-';
 const base = { servingSize: 100, servingUnit: 'g' };
@@ -44,7 +39,7 @@ const importFood = (name: string, calories: number, checkedOn: string) =>
   pool.query(
     documentedSql.replace(
       /VALUES[\s\S]*?ON CONFLICT/,
-      `VALUES ($1, 'integration-brand', NULL, 100, 'g', $2, NULL, NULL, NULL, NULL, NULL, 'official', 'https://example.com/menu', $3)\nON CONFLICT`,
+      `VALUES ($1, 'integration-brand', NULL, 100, 'g', $2, NULL, NULL, NULL, NULL, NULL, 'official', 'https://example.com/menu', $3, true)\nON CONFLICT`,
     ),
     [name, calories, checkedOn],
   );
@@ -74,6 +69,20 @@ test('only newer research replaces a food, so a re-run keeps later edits', { ski
 
   await importFood(name, 520, '2026-11-30');
   assert.equal((await countAndCalories(name)).calories, 520);
+});
+
+// #38. Franchise fast food is imported marked; a newer research updates the numbers, not the mark.
+test('an imported food keeps the junk food mark the user changed', { skip }, async () => {
+  const name = `${prefix}junk-mark`;
+  const mark = async () =>
+    (await pool.query<{ is_junk: boolean }>('SELECT is_junk FROM foods WHERE name = $1', [name]))
+      .rows[0]?.is_junk;
+  await importFood(name, 500, '2026-10-31');
+  assert.equal(await mark(), true);
+  await pool.query('UPDATE foods SET is_junk = false WHERE name = $1', [name]);
+  await importFood(name, 520, '2026-11-30');
+  assert.equal((await countAndCalories(name)).calories, 520);
+  assert.equal(await mark(), false);
 });
 
 test('a re-run never overwrites a food whose date was cleared by an edit', { skip }, async () => {
@@ -132,6 +141,115 @@ test('popular foods are stored per serving with a checkable public source', { sk
   assert.equal(Number(stew.rows[0]!.serving_size), 400);
   assert.equal(stew.rows[0]!.serving_unit, 'g');
   assert.equal(Number(stew.rows[0]!.calories), 244);
+});
+
+// #31. Franchise menus: official numbers only, each with where and when they were checked.
+const franchiseBrands = ['맥도날드', '버거킹', '롯데리아', 'KFC', '맘스터치'];
+
+test(
+  'franchise menus carry an official source, a date and the junk food mark',
+  { skip },
+  async () => {
+    const { rows } = await pool.query<{
+      brand: string;
+      burgers: string;
+      sides: string;
+      drinks: string;
+      unchecked: string;
+    }>(
+      `SELECT brand,
+            count(*) FILTER (WHERE category = '버거') AS burgers,
+            count(*) FILTER (WHERE category = '사이드') AS sides,
+            count(*) FILTER (WHERE category = '음료') AS drinks,
+            count(*) FILTER (
+              WHERE source_type <> 'official' OR source_url NOT LIKE 'https://%'
+                OR checked_on IS NULL OR NOT is_junk
+                OR carbs IS NOT NULL OR fat IS NOT NULL
+                OR calories IS NULL OR protein IS NULL OR sugars IS NULL OR sodium IS NULL
+            ) AS unchecked
+     FROM foods WHERE brand = ANY($1) GROUP BY brand`,
+      [franchiseBrands],
+    );
+    const byBrand = Object.fromEntries(
+      rows.map((row) => [
+        row.brand,
+        [Number(row.burgers), Number(row.sides), Number(row.drinks), Number(row.unchecked)],
+      ]),
+    );
+    // Burger King publishes no row for its fries and soft drinks (docs/changes/31-franchise-foods.md).
+    assert.deepEqual(byBrand, {
+      맥도날드: [21, 2, 10, 0],
+      버거킹: [37, 0, 0, 0],
+      롯데리아: [28, 2, 3, 0],
+      KFC: [12, 2, 12, 0],
+      맘스터치: [29, 2, 4, 0],
+    });
+
+    // One value per brand as the source prints it, so a shifted column would show.
+    const samples = await pool.query<{ brand: string; name: string; values: string }>(
+      `SELECT brand, name, concat_ws('/', serving_size::float8, serving_unit, calories::float8,
+              sugars::float8, protein::float8, sodium::float8) AS values
+     FROM foods
+     WHERE (brand, name) IN (('맥도날드', '빅맥'), ('버거킹', '와퍼'), ('롯데리아', '리아 불고기'),
+                             ('KFC', '징거'), ('맘스터치', '싸이버거'), ('맥도날드', '코카 콜라 미디엄'))
+     ORDER BY brand, name`,
+    );
+    assert.deepEqual(
+      samples.rows.map((row) => `${row.brand} ${row.name} ${row.values}`),
+      [
+        'KFC 징거 225/g/553/5/33/866',
+        '롯데리아 리아 불고기 192/g/462/11/21/880',
+        '맘스터치 싸이버거 230/g/594/14/28/1009',
+        '맥도날드 빅맥 223/g/582/8/27/902',
+        '맥도날드 코카 콜라 미디엄 425/ml/133/33/0/9',
+        '버거킹 와퍼 286/g/706/10/30/1098',
+      ],
+    );
+  },
+);
+
+// #32. Bibigo retort soups: official, labelled for the whole package, not junk food.
+test('Bibigo soups are found by name and keep their label values', { skip }, async () => {
+  const { rows } = await pool.query<{ total: string; unchecked: string }>(
+    `SELECT count(*) AS total,
+            count(*) FILTER (
+              WHERE source_type <> 'official' OR checked_on IS NULL OR is_junk
+                OR source_url NOT LIKE 'https://www.cjthemarket.com/the/product/product-main?prdCd=%'
+                OR calories IS NULL OR protein IS NULL OR fat IS NULL OR sodium IS NULL
+            ) AS unchecked
+     FROM foods WHERE brand = '비비고' AND category = '국·탕·찌개'`,
+  );
+  assert.deepEqual(rows[0], { total: '27', unchecked: '0' });
+
+  await withApi(pool, async (call) => {
+    const { data } = await call(`/api/foods?q=${encodeURIComponent('갈비탕')}`);
+    const galbitang = (data.foods as Record<string, unknown>[]).find(
+      (food) => food.brand === '비비고',
+    );
+    // "Less than 4 g" on the label is not a value, so carbohydrate stays unknown.
+    assert.deepEqual(
+      galbitang && {
+        name: galbitang.name,
+        servingSize: galbitang.servingSize,
+        calories: galbitang.calories,
+        carbs: galbitang.carbs,
+        protein: galbitang.protein,
+        fat: galbitang.fat,
+        sodium: galbitang.sodium,
+        isJunk: galbitang.isJunk,
+      },
+      {
+        name: '갈비탕 400g',
+        servingSize: 400,
+        calories: 85,
+        carbs: null,
+        protein: 13,
+        fat: 4.8,
+        sodium: 810,
+        isJunk: false,
+      },
+    );
+  });
 });
 
 test('popular foods can be found by the words people search for', { skip }, async () => {
@@ -269,4 +387,50 @@ test('the database itself refuses negative nutrients', { skip }, async () => {
     ),
     { code: '23514' },
   );
+});
+
+test('with 150 matching foods, paging reaches every one exactly once', { skip }, async () => {
+  const name = `${prefix}paging-`;
+  // Names come in pairs, without and with a brand, after one food alone: in the order the 100th
+  // and 101st foods are then one pair, so the page edge falls inside a name.
+  for (let index = 0; index < 150; index += 1) {
+    const pair = Math.floor((index + 1) / 2);
+    await pool.query(
+      `INSERT INTO foods (name, brand, serving_size, serving_unit) VALUES ($1, $2, 100, 'g')`,
+      [`${name}${String(pair).padStart(3, '0')}`, index % 2 ? 'brand' : null],
+    );
+  }
+  await withApi(pool, async (call) => {
+    const edge = await call(`/api/foods?q=${encodeURIComponent(name)}&offset=99`);
+    const [last, first] = (edge.data.foods as { name: string; brand: string | null }[]).slice(0, 2);
+    assert.equal(last.name, first.name);
+    assert.deepEqual([last.brand, first.brand], [null, 'brand']);
+
+    const seen: string[] = [];
+    let offset: number | null = 0;
+    let pages = 0;
+    while (offset !== null) {
+      const page = await call(`/api/foods?q=${encodeURIComponent(name)}&offset=${offset}`);
+      assert.equal(page.status, 200);
+      for (const food of page.data.foods as { name: string; brand: string | null }[]) {
+        seen.push(`${food.name}/${food.brand ?? ''}`);
+      }
+      offset = page.data.nextOffset as number | null;
+      pages += 1;
+    }
+    assert.equal(pages, 2);
+    assert.equal(seen.length, 150);
+    assert.equal(new Set(seen).size, 150);
+
+    // Without a search word the pages cover the whole store too.
+    const { rows } = await pool.query<{ count: string }>('SELECT count(*) FROM foods');
+    let all = 0;
+    offset = 0;
+    while (offset !== null) {
+      const page = await call(`/api/foods?offset=${offset}`);
+      all += (page.data.foods as unknown[]).length;
+      offset = page.data.nextOffset as number | null;
+    }
+    assert.equal(all, Number(rows[0].count));
+  });
 });

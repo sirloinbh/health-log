@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
@@ -14,12 +14,77 @@ const noMeals = () =>
           { value: null, missing: 0 },
         ]),
       ),
+      junk: Object.fromEntries(
+        ['week', 'month'].map((key) => [
+          key,
+          {
+            from: '2026-03-01',
+            to: '2026-03-31',
+            times: 0,
+            days: 0,
+            calories: { value: null, missing: 0 },
+          },
+        ]),
+      ),
+    }),
+  );
+
+const emptyPeriod = {
+  smoking: { days: 0, cigarettes: null },
+  drinking: { days: 0, drinkingDays: 0, totals: [] },
+};
+const noHabits = () =>
+  new Response(
+    JSON.stringify({
+      record: null,
+      week: { from: '2026-03-09', to: '2026-03-15', ...emptyPeriod },
+      month: { from: '2026-03-01', to: '2026-03-31', ...emptyPeriod },
+    }),
+  );
+const noRate = { days: 0, yes: 0 };
+const noChecks = () =>
+  new Response(
+    JSON.stringify({
+      record: null,
+      week: { from: '2026-03-09', to: '2026-03-15', diet: noRate, sleep: noRate },
+      month: { from: '2026-03-01', to: '2026-03-31', diet: noRate, sleep: noRate },
+    }),
+  );
+
+const noGoals = (url: string) =>
+  new Response(
+    JSON.stringify({
+      date: url.slice(-10),
+      items: ['calories', 'protein', 'sleep', 'sober_days'].map((item) => ({
+        item,
+        goal: null,
+        status: null,
+        actual:
+          item === 'sleep'
+            ? { minutes: null }
+            : item === 'sober_days'
+              ? { from: '2026-03-09', to: '2026-03-15', recordedDays: 0, soberDays: 0 }
+              : { entries: 0, total: null, missing: 0 },
+      })),
+      checks: null,
     }),
   );
 
 // The day's cards load along with the page.
 const dayCard = (url: string) =>
-  url.startsWith('/api/sleep') ? noSleep() : url.startsWith('/api/meals') ? noMeals() : null;
+  url.startsWith('/api/sleep')
+    ? noSleep()
+    : url.startsWith('/api/meals')
+      ? noMeals()
+      : url.startsWith('/api/habits')
+        ? noHabits()
+        : url.startsWith('/api/checks')
+          ? noChecks()
+          : url.startsWith('/api/goals/days/')
+            ? noGoals(url)
+            : url === '/api/foods/recent'
+              ? new Response(JSON.stringify({ foods: [] }))
+              : null;
 
 const health = (body: object, status = 200) =>
   vi.stubGlobal(
@@ -201,10 +266,13 @@ test('going back ends a typed edit, so the field matches the page and history st
   await screen.findByText('2026년 3월 20일 금요일');
 });
 
-test('the date input limits the year to four digits', () => {
+test('the date input offers the range the page opens', () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  expect(screen.getByLabelText('날짜 선택')).toHaveAttribute('max', '9999-12-31');
+  const input = screen.getByLabelText('날짜 선택');
+  expect(input).toHaveAttribute('min', '2000-01-01');
+  // A max also keeps Chrome from taking a sixth digit into the year.
+  expect(input).toHaveAttribute('max', '2099-12-31');
 });
 
 test('typing the date already shown leaves no history entry', () => {
@@ -314,9 +382,9 @@ test('a slow meal reply for the day just left does not fill in the new day', asy
     servingUnit: null,
     calories: 300,
   };
-  const body = (await noMeals().json()) as { totals: object };
+  const body = (await noMeals().json()) as { totals: object; junk: object };
   replies.get('/api/meals/2026-03-15')?.(
-    new Response(JSON.stringify({ entries: [eaten], totals: body.totals })),
+    new Response(JSON.stringify({ entries: [eaten], totals: body.totals, junk: body.junk })),
   );
   await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
   expect(screen.queryByText('어제의 김밥')).not.toBeInTheDocument();
@@ -328,4 +396,105 @@ test('a day shows a place for each record kind', () => {
   for (const name of ['수면', '식단', '신체', '술·담배', '하루 체크', '병원·약']) {
     expect(screen.getByRole('heading', { level: 2, name })).toBeInTheDocument();
   }
+});
+
+test('an address outside the range says which days can be recorded, with a way back', () => {
+  health({ today: '2026-03-15' });
+  for (const date of ['1999-12-31', '2100-01-01', '0002-03-15', '9999-12-31']) {
+    open(`/daily/${date}`);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      `2000-01-01부터 2099-12-31까지 기록할 수 있습니다: ${date}`,
+    );
+    expect(screen.getByRole('link', { name: '오늘 기록으로 이동' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '수면' })).not.toBeInTheDocument();
+    cleanup();
+  }
+});
+
+test('at either end of the range the previous or next day stays in place but goes nowhere', () => {
+  health({ today: '2026-03-15' });
+  open('/daily/2000-01-01');
+  const previous = screen.getByRole('link', { name: '이전 날' });
+  expect(previous).toHaveAttribute('aria-disabled', 'true');
+  expect(previous).toHaveAccessibleDescription('2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
+  fireEvent.click(previous);
+  expect(window.location.pathname).toBe('/daily/2000-01-01');
+  expect(screen.getByRole('link', { name: '다음 날' })).toHaveAttribute(
+    'href',
+    '/daily/2000-01-02',
+  );
+  expect(screen.getByRole('link', { name: '다음 날' })).not.toHaveAttribute('aria-disabled');
+  cleanup();
+
+  open('/daily/2099-12-31');
+  expect(screen.getByRole('link', { name: '다음 날' })).toHaveAttribute('aria-disabled', 'true');
+  expect(screen.getByRole('link', { name: '이전 날' })).toHaveAttribute(
+    'href',
+    '/daily/2099-12-30',
+  );
+});
+
+test('stepping onto the first day keeps keyboard focus on the previous day link', async () => {
+  health({ today: '2026-03-15' });
+  open('/daily/2000-01-02');
+  const previous = screen.getByRole('link', { name: '이전 날' });
+  previous.focus();
+  fireEvent.click(previous);
+  expect(await screen.findByText('2000년 1월 1일 토요일')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: '이전 날' })).toHaveAttribute('aria-disabled', 'true');
+  expect(screen.getByRole('link', { name: '이전 날' })).toHaveFocus();
+});
+
+test('leaving the field on a date out of range says why, even for a year cut short', () => {
+  health({ today: '2026-03-15' });
+  open('/daily/2026-03-15');
+  const input = screen.getByLabelText('날짜 선택');
+  const message = () => screen.queryByText('2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
+  // Chrome stops the year at the field's max, so typing 2100 can leave 0210.
+  fireEvent.change(input, { target: { value: '0210-01-01' } });
+  expect(message()).not.toBeInTheDocument();
+  fireEvent.blur(input);
+  expect(message()).toBeInTheDocument();
+  expect(input).toHaveValue('2026-03-15');
+
+  fireEvent.change(input, { target: { value: '2026-03' } });
+  expect(message()).not.toBeInTheDocument();
+});
+
+test('a typed date outside the range is explained and does not change the page', () => {
+  health({ today: '2026-03-15' });
+  open('/daily/2026-03-15');
+  const input = screen.getByLabelText('날짜 선택');
+  const message = () => screen.queryByText('2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
+
+  // A year still being typed is not worth a word yet.
+  fireEvent.change(input, { target: { value: '0199-12-31' } });
+  expect(message()).not.toBeInTheDocument();
+
+  fireEvent.change(input, { target: { value: '1999-12-31' } });
+  expect(message()).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/daily/2026-03-15');
+  fireEvent.change(input, { target: { value: '2100-01-01' } });
+  expect(message()).toBeInTheDocument();
+
+  fireEvent.change(input, { target: { value: '2026-03-02' } });
+  expect(message()).not.toBeInTheDocument();
+  expect(window.location.pathname).toBe('/daily/2026-03-02');
+});
+
+test('a word about the range left on one day does not come back after going there and back', async () => {
+  health({ today: '2026-03-15' });
+  open('/daily/2026-03-15');
+  const input = screen.getByLabelText('날짜 선택');
+  const message = () => screen.queryByText('2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
+  fireEvent.change(input, { target: { value: '0210-01-01' } });
+  fireEvent.blur(input);
+  expect(message()).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('link', { name: '다음 날' }));
+  expect(await screen.findByText('2026년 3월 16일 월요일')).toBeInTheDocument();
+  expect(message()).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('link', { name: '이전 날' }));
+  expect(await screen.findByText('2026년 3월 15일 일요일')).toBeInTheDocument();
+  expect(message()).not.toBeInTheDocument();
 });

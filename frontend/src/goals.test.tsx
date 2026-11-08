@@ -266,6 +266,42 @@ test('only saves that can change this day read again', async () => {
   await settle('/api/checks/2026-11-04');
   await settle('/api/goals');
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+  // Exactly one read each, not more after a while.
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(fetchMock).toHaveBeenCalledTimes(4);
+});
+
+test('a read started by a save is quiet; one asked for with the button says so', async () => {
+  const replies: ((body: unknown) => void)[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          replies.push((body) => resolve(new Response(JSON.stringify(body))));
+        }),
+    ),
+  );
+  renderCard();
+  await waitFor(() => expect(replies).toHaveLength(1));
+  replies[0](dayOf());
+  await screen.findByRole('region', { name: '식단' });
+
+  await trackWrite(`/api/meals/${date}`, Promise.resolve({}));
+  await waitFor(() => expect(replies).toHaveLength(2));
+  // Reading, but nothing announced while the person works in the meal card.
+  expect(screen.queryByRole('status', { name: '다시 판정하는 중' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '다시 판정' })).not.toHaveAttribute('aria-busy');
+  replies[1](dayOf());
+  await waitFor(() => expect(screen.getByRole('button', { name: '다시 판정' })).toBeEnabled());
+
+  fireEvent.click(screen.getByRole('button', { name: '다시 판정' }));
+  await waitFor(() => expect(replies).toHaveLength(3));
+  expect(screen.getByRole('status', { name: '다시 판정하는 중' })).toBeInTheDocument();
+  replies[2](dayOf());
+  await waitFor(() =>
+    expect(screen.queryByRole('status', { name: '다시 판정하는 중' })).not.toBeInTheDocument(),
+  );
 });
 
 test('when reads overlap, a late answer to the older one is not shown', async () => {

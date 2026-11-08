@@ -451,6 +451,9 @@ const judges = (date: string, path: string) =>
 export function GoalsCard({ date }: { date: string }) {
   const [day, setDay] = useState<GoalDay | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  // Only a read the person asked for says so. Saving each meal would otherwise have a screen reader
+  // announce "다시 판정하는 중" from this card while they work in another one.
+  const [asked, setAsked] = useState(false);
   const { notice, error, clear } = useNotice();
   const live = useRef(true);
   // Reads can overlap once saves start them; only the latest one may show its answer.
@@ -470,7 +473,10 @@ export function GoalsCard({ date }: { date: string }) {
     } catch (cause) {
       if (current()) error(cause);
     } finally {
-      if (current()) setLoading(false);
+      if (current()) {
+        setLoading(false);
+        setAsked(false);
+      }
     }
   }, [clear, date, error]);
 
@@ -547,12 +553,14 @@ export function GoalsCard({ date }: { date: string }) {
           size="sm"
           className="self-start"
           // Not disabled: a disabled button drops the focus of whoever pressed it.
-          aria-busy={loading || undefined}
+          aria-busy={(loading && asked) || undefined}
           onClick={() => {
-            if (!loading) void load();
+            if (loading) return;
+            setAsked(true);
+            void load();
           }}
         >
-          {loading && day ? <Spinner size="sm" label="다시 판정하는 중" /> : null}
+          {loading && asked && day ? <Spinner size="sm" label="다시 판정하는 중" /> : null}
           {day === undefined && notice ? '다시 시도' : '다시 판정'}
         </Button>
       </CardContent>

@@ -32,3 +32,15 @@
   - 기본값: web `127.0.0.1:8103`, 이미지 `health-frontend:local`, `health-backend:local`. DB는 `127.0.0.1:15403` 그대로다.
   - 서버 값(`WEB_BIND=0.0.0.0`, `WEB_PORT=8103`, `IMAGE_TAG=0123abc`): web `0.0.0.0:8103`, 이미지 `health-*:0123abc`. DB는 `127.0.0.1:15403` 그대로다.
 - `npm run check`(DB 없이): 아래 PR 기록 참고.
+
+## 변경 — 2026-11-08 (1차 리뷰 반영)
+
+1차 리뷰(작성 문맥과 분리된 읽기 전용 리뷰)는 막는 문제를 찾지 못했다.
+
+- 배포 스크립트 확인 결과:
+  - `deploy/remote-deploy.sh`는 `health-backend`·`health-frontend` 이미지를 커밋 태그로 붙이고 정리한다.
+  - `WEB_PORT`는 `/opt/health-log/.env`에서 읽어 `127.0.0.1:$WEB_PORT/api/health` 상태 확인에만 쓴다. `WEB_BIND=0.0.0.0`이어도 동작한다.
+  - `deploy/notify.sh`도 같은 방식으로 읽는다.
+- **반영(낮음)** #74 댓글의 `plan` 기대 결과를 "변경 하나"에서 "교체(-/+) 하나"로 고쳤다. `aws_lightsail_instance_public_ports`는 `port_info`를 바꾸면 다시 만들어지고, apply 동안 22·80·8103이 잠깐 닫힐 수 있다.
+- **반영(낮음)** `docs/access-protection.md`의 "지켜야 할 것"에서 지금 쓰는 길(새 포트 8103)을 밝혔다.
+- **남김(낮음)** `AGENTS.md`의 "포트(127.0.0.1 바인딩)"는 로컬 기준이다. 서버 웹은 `0.0.0.0:8103`이다. `AGENTS.md`는 중앙 관리 파일(`sirloinbh/project-standards`의 `templates/app/`)이라 이 PR에서 고치지 않았다. 서버 값은 `docs/access-protection.md`의 "서버 설정"이 원본이다.

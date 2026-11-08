@@ -150,15 +150,34 @@ test('what cannot be sent is explained in the dialog before anything is sent', a
   fill('병원 이름', '가상의원');
   fill('진료비 (원)', '1.5');
   save();
-  await said('진료비는 원 단위 숫자로 입력해 주세요');
+  await said('진료비은(는) 원 단위 숫자로 입력해 주세요');
   fill('진료비 (원)', '');
   fill('다음 예약일', '2026-03-14');
   save();
   await said('다음 예약일은 방문 날짜보다 빠를 수 없습니다');
+  fill('다음 예약일', '2100-01-01');
+  save();
+  await said('다음 예약일: 2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
   fill('다음 예약일', '');
+  fill('방문 날짜', '1999-12-31');
+  save();
+  await said('방문 날짜: 2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
+  fill('방문 날짜', '2026-03-15');
+  fill('진료비 (원)', '100,000,001');
+  save();
+  await said('진료비은(는) 1억 원 이하로 입력해 주세요');
+  fill('진료비 (원)', '');
+  fill('병원 이름', '🏥'.repeat(101));
+  save();
+  await said('병원 이름은(는) 100자 이하로 입력해 주세요');
+  fill('병원 이름', '가상의원');
   fireEvent.click(within(dialog()).getByRole('button', { name: '시술 추가' }));
   save();
   await said('1번째 시술의 이름을 입력해 주세요');
+  fill('1번째 시술 이름', '가상 시술');
+  fill('1번째 시술 메모', '가'.repeat(501));
+  save();
+  await said('1번째 시술 메모은(는) 500자 이하로 입력해 주세요');
   expect(writes(fetchMock)).toHaveLength(0);
 });
 
@@ -167,8 +186,17 @@ test('a visit takes at most ten procedures', async () => {
   open();
   fireEvent.click(await screen.findByRole('button', { name: '방문 기록' }));
   const add = within(dialog()).getByRole('button', { name: '시술 추가' });
-  for (let count = 0; count < 10; count += 1) fireEvent.click(add);
-  expect(add).toBeDisabled();
+  for (let count = 0; count < 10; count += 1) {
+    add.focus();
+    fireEvent.click(add);
+  }
+  // The new row's name takes focus each time.
+  await waitFor(() => expect(within(dialog()).getByLabelText('10번째 시술 이름')).toHaveFocus());
+  expect(add).toHaveAttribute('aria-disabled', 'true');
+  add.focus();
+  fireEvent.click(add);
+  expect(within(dialog()).queryByLabelText('11번째 시술 이름')).not.toBeInTheDocument();
+  expect(add).toHaveFocus();
   expect(
     within(dialog()).getByText('시술은 한 번에 10개까지 기록할 수 있습니다.'),
   ).toBeInTheDocument();
@@ -299,4 +327,49 @@ test('the daily card reads only after a visit save still on its way', async () =
   expect(fetchMock).not.toHaveBeenCalled();
   finish();
   expect(await screen.findByRole('list', { name: '이 날 병원 방문' })).toBeInTheDocument();
+});
+
+test('removing a procedure row moves focus to the add button, not the page', async () => {
+  serve(() => json({ visits: [], more: false }));
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '방문 기록' }));
+  fireEvent.click(within(dialog()).getByRole('button', { name: '시술 추가' }));
+  const remove = within(dialog()).getByRole('button', { name: '1번째 시술 빼기' });
+  remove.focus();
+  fireEvent.click(remove);
+  await waitFor(() =>
+    expect(within(dialog()).getByRole('button', { name: '시술 추가' })).toHaveFocus(),
+  );
+});
+
+test('a daily link outside the daily range starts on today instead', async () => {
+  serve(() => json({ visits: [], more: false }));
+  open('/visits?new=1985-07-01');
+  expect(await screen.findByRole('dialog', { name: '병원 방문 기록' })).toBeInTheDocument();
+  await waitFor(() =>
+    expect(within(dialog()).getByLabelText('방문 날짜')).toHaveValue('2026-03-15'),
+  );
+});
+
+test('while a search is on its way, the next page waits, so two lists never mix', async () => {
+  let finishSearch = () => {};
+  const fetchMock = serve((url) => {
+    if (url.includes('q=%EA%B0%80')) {
+      return new Promise<Response>((resolve) => {
+        finishSearch = () => resolve(json({ visits: [{ ...visit, id: 9 }], more: false }));
+      });
+    }
+    return json({ visits: [visit], more: true });
+  });
+  open();
+  const more = await screen.findByRole('button', { name: '결과 더 보기' });
+  fireEvent.change(screen.getByRole('searchbox', { name: '병원 기록 검색' }), {
+    target: { value: '가' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  await waitFor(() => expect(more).toHaveAttribute('aria-disabled', 'true'));
+  fireEvent.click(more);
+  expect(fetchMock.mock.calls.some(([url]) => url.includes('offset='))).toBe(false);
+  finishSearch();
+  expect(await screen.findByText('방문 1건')).toBeInTheDocument();
 });

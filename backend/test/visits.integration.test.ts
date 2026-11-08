@@ -122,6 +122,52 @@ test('clinics and procedures can be found by name', { skip }, async (t) => {
   });
 });
 
+test(
+  'visits come twenty at a time, newest first, and say when more are left',
+  { skip },
+  async (t) => {
+    t.after(clean);
+    // 21 visits over 21 days, each with a clinic only this test uses.
+    const days = Array.from(
+      { length: 21 },
+      (_, index) => `1985-08-${String(index + 5).padStart(2, '0')}`,
+    );
+    await withApi(pool, async (call) => {
+      for (const date of days) await create(call, { date, clinic: `${tag}쪽${date}` });
+      const first = await call(`/api/visits?q=${encodeURIComponent(`${tag}쪽`)}`);
+      const firstPage = first.data as unknown as { visits: Visit[]; more: boolean };
+      assert.equal(firstPage.visits.length, 20);
+      assert.equal(firstPage.more, true);
+      assert.equal(firstPage.visits[0].date, '1985-08-25');
+      const second = await call(`/api/visits?q=${encodeURIComponent(`${tag}쪽`)}&offset=20`);
+      const secondPage = second.data as unknown as { visits: Visit[]; more: boolean };
+      assert.deepEqual(
+        secondPage.visits.map((visit) => visit.date),
+        ['1985-08-05'],
+      );
+      assert.equal(secondPage.more, false);
+    });
+  },
+);
+
+test(
+  'an underscore in the search words is matched as written, not as any character',
+  { skip },
+  async (t) => {
+    t.after(clean);
+    await withApi(pool, async (call) => {
+      const underscore = await create(call, { date: '1985-07-20', clinic: `${tag}A_B의원` });
+      await create(call, { date: '1985-07-21', clinic: `${tag}AXB의원` });
+      const found = (await call(`/api/visits?q=${encodeURIComponent(`${tag}A_B`)}`)).data
+        .visits as Visit[];
+      assert.deepEqual(
+        found.map((visit) => visit.id),
+        [underscore.id],
+      );
+    });
+  },
+);
+
 test('saving again replaces the visit and its whole list of procedures', { skip }, async (t) => {
   t.after(clean);
   await withApi(pool, async (call) => {

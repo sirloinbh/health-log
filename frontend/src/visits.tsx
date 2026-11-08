@@ -2,6 +2,7 @@ import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
+import { charCount } from './check-text';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
@@ -18,7 +19,14 @@ import { Input } from './components/ui/input';
 import { Label } from './components/ui/label';
 import { Notice } from './components/ui/notice';
 import { toast } from './components/ui/sonner';
-import { earliestDate, formatDate, isValidDate, latestDate } from './daily-date';
+import {
+  dailyRangeText,
+  earliestDate,
+  formatDate,
+  inDailyRange,
+  isValidDate,
+  latestDate,
+} from './daily-date';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
 import { cn } from './lib/utils';
@@ -74,24 +82,57 @@ const draftOf = (visit: Visit | null, date: string): Draft => ({
   procedures: visit?.procedures.map(procedureDraft) ?? [],
 });
 
+const maxCost = 100_000_000;
+
+/** The first field longer than the server takes, counted in characters as it counts them (#92). */
+const tooLong = (fields: [string, string, number][]) => {
+  const found = fields.find(([, value, max]) => charCount(value.trim()) > max);
+  return found ? `${found[0]}은(는) ${found[2]}자 이하로 입력해 주세요` : null;
+};
+
+/** A cost in won, or the reason it cannot be read. */
+const readCost = (label: string, text: string) => {
+  const value = parseWon(text);
+  if (value === undefined)
+    return `${label}은(는) 원 단위 숫자로 입력해 주세요. 예: 12000 또는 12,000`;
+  if (value !== null && value > maxCost) return `${label}은(는) 1억 원 이하로 입력해 주세요`;
+  return value;
+};
+
 /** The request body, or the first reason it cannot be sent. */
 function readDraft(draft: Draft) {
   if (!isValidDate(draft.date)) return '방문 날짜를 골라 주세요';
+  // The daily page opens only these days (#50); a visit outside them could never be seen there.
+  if (!inDailyRange(draft.date)) return `방문 날짜: ${dailyRangeText}`;
   if (!draft.clinic.trim()) return '병원 이름을 입력해 주세요';
-  const cost = parseWon(draft.cost);
-  if (cost === undefined) return '진료비는 원 단위 숫자로 입력해 주세요. 예: 12000 또는 12,000';
+  const long = tooLong([
+    ['병원 이름', draft.clinic, 100],
+    ['진료과', draft.department, 50],
+    ['증상·진단 메모', draft.note, 1000],
+  ]);
+  if (long) return long;
+  const cost = readCost('진료비', draft.cost);
+  if (typeof cost === 'string') return cost;
   if (draft.nextVisitOn && !isValidDate(draft.nextVisitOn))
     return '다음 예약일이 올바르지 않습니다';
+  if (draft.nextVisitOn && !inDailyRange(draft.nextVisitOn))
+    return `다음 예약일: ${dailyRangeText}`;
   if (draft.nextVisitOn && draft.nextVisitOn < draft.date) {
     return '다음 예약일은 방문 날짜보다 빠를 수 없습니다';
   }
   const procedures = [];
   for (const [index, item] of draft.procedures.entries()) {
-    if (!item.name.trim()) return `${index + 1}번째 시술의 이름을 입력해 주세요`;
-    const itemCost = parseWon(item.cost);
-    if (itemCost === undefined) {
-      return `${index + 1}번째 시술의 비용은 원 단위 숫자로 입력해 주세요`;
-    }
+    const label = `${index + 1}번째 시술`;
+    if (!item.name.trim()) return `${label}의 이름을 입력해 주세요`;
+    const itemLong = tooLong([
+      [`${label} 이름`, item.name, 100],
+      [`${label} 부위`, item.area, 50],
+      [`${label} 용량·횟수`, item.amount, 50],
+      [`${label} 메모`, item.note, 500],
+    ]);
+    if (itemLong) return itemLong;
+    const itemCost = readCost(`${label}의 비용`, item.cost);
+    if (typeof itemCost === 'string') return itemCost;
     procedures.push({
       name: item.name,
       area: item.area,
@@ -150,6 +191,14 @@ function VisitDialog({
         ),
       }));
   const full = draft.procedures.length >= maxProcedures;
+  // Where focus goes after the rows change: the new row's name, or the add button when the
+  // pressed remove button has gone with its row.
+  const focusNext = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusNext.current) return;
+    document.getElementById(focusNext.current)?.focus();
+    focusNext.current = null;
+  });
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -179,7 +228,7 @@ function VisitDialog({
   return (
     // Closing during a save would not cancel it, and its late reply would close whatever opened next.
     <Dialog open onOpenChange={(open) => (open || saving ? undefined : onClose())}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{visit ? '병원 방문 수정' : '병원 방문 기록'}</DialogTitle>
           <DialogDescription>비용은 원 단위로 씁니다. 모르는 값은 비워 두세요.</DialogDescription>
@@ -258,14 +307,15 @@ function VisitDialog({
                         variant="ghost"
                         size="icon"
                         aria-label={`${label} 빼기`}
-                        onClick={() =>
+                        onClick={() => {
+                          focusNext.current = 'procedure-add';
                           setDraft((current) => ({
                             ...current,
                             procedures: current.procedures.filter(
                               (other) => other.key !== item.key,
                             ),
-                          }))
-                        }
+                          }));
+                        }}
                       >
                         <X aria-hidden />
                       </Button>
@@ -321,14 +371,16 @@ function VisitDialog({
               type="button"
               variant="outline"
               size="sm"
-              className="self-start"
-              disabled={full}
-              onClick={() =>
-                setDraft((current) => ({
-                  ...current,
-                  procedures: [...current.procedures, procedureDraft()],
-                }))
-              }
+              id="procedure-add"
+              className="self-start aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+              // aria-disabled, not disabled: adding the tenth row must not drop focus to the page.
+              aria-disabled={full || undefined}
+              onClick={() => {
+                if (full) return;
+                const added = procedureDraft();
+                focusNext.current = `procedure-${added.key}-name`;
+                setDraft((current) => ({ ...current, procedures: [...current.procedures, added] }));
+              }}
             >
               <Plus aria-hidden />
               시술 추가
@@ -455,6 +507,8 @@ export function VisitsPage({ today }: { today: string | null }) {
   const [visits, setVisits] = useState<Visit[] | null>(null);
   const [more, setMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  // While a search or a reload runs, the next page would be read for the list being replaced.
+  const [searching, setSearching] = useState(false);
   // null: closed. Otherwise the visit being edited (null for a new one) and the date it starts on.
   const [editing, setEditing] = useState<{ visit: Visit | null; date: string } | null>(null);
   const { notice, error, clear } = useNotice();
@@ -477,6 +531,7 @@ export function VisitsPage({ today }: { today: string | null }) {
       // A slow older answer must not overwrite a newer one.
       const request = ++latest.current;
       clearPage();
+      setSearching(true);
       try {
         const page = await requestJson<Page>(`${visitsPath}?q=${encodeURIComponent(words)}`);
         if (request !== latest.current) return;
@@ -486,6 +541,8 @@ export function VisitsPage({ today }: { today: string | null }) {
         setMore(page.more);
       } catch (cause) {
         if (request === latest.current) error(cause);
+      } finally {
+        if (request === latest.current) setSearching(false);
       }
     },
     [clear, clearPage, error],
@@ -499,8 +556,11 @@ export function VisitsPage({ today }: { today: string | null }) {
   const asked = params.get('new');
   useEffect(() => {
     if (asked === null) return;
+    const inRange = isValidDate(asked) && inDailyRange(asked);
+    // Without a usable date, wait for the server's today rather than open on a blank one.
+    if (!inRange && today === null) return;
     setParams({}, { replace: true });
-    setEditing({ visit: null, date: asked && isValidDate(asked) ? asked : (today ?? '') });
+    setEditing({ visit: null, date: inRange ? asked : (today ?? '') });
   }, [asked, setParams, today]);
 
   const loadMore = async () => {
@@ -635,7 +695,7 @@ export function VisitsPage({ today }: { today: string | null }) {
           : null}
       </p>
       {visits?.length && more ? (
-        <MoreFoodsButton loading={loadingMore} onLoad={loadMore} afterLast={shown} />
+        <MoreFoodsButton loading={loadingMore || searching} onLoad={loadMore} afterLast={shown} />
       ) : null}
       <Notice notice={pageNotice} />
       {editing ? (

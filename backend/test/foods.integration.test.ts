@@ -208,6 +208,50 @@ test(
   },
 );
 
+// #32. Bibigo retort soups: official, labelled for the whole package, not junk food.
+test('Bibigo soups are found by name and keep their label values', { skip }, async () => {
+  const { rows } = await pool.query<{ total: string; unchecked: string }>(
+    `SELECT count(*) AS total,
+            count(*) FILTER (
+              WHERE source_type <> 'official' OR checked_on IS NULL OR is_junk
+                OR source_url NOT LIKE 'https://www.cjthemarket.com/the/product/product-main?prdCd=%'
+                OR calories IS NULL OR protein IS NULL OR fat IS NULL OR sodium IS NULL
+            ) AS unchecked
+     FROM foods WHERE brand = '비비고'`,
+  );
+  assert.deepEqual(rows[0], { total: '27', unchecked: '0' });
+
+  await withApi(pool, async (call) => {
+    const { data } = await call(`/api/foods?q=${encodeURIComponent('갈비탕')}`);
+    const galbitang = (data.foods as Record<string, unknown>[]).find(
+      (food) => food.brand === '비비고',
+    );
+    // "Less than 4 g" on the label is not a value, so carbohydrate stays unknown.
+    assert.deepEqual(
+      galbitang && {
+        name: galbitang.name,
+        servingSize: galbitang.servingSize,
+        calories: galbitang.calories,
+        carbs: galbitang.carbs,
+        protein: galbitang.protein,
+        fat: galbitang.fat,
+        sodium: galbitang.sodium,
+        isJunk: galbitang.isJunk,
+      },
+      {
+        name: '갈비탕 400g',
+        servingSize: 400,
+        calories: 85,
+        carbs: null,
+        protein: 13,
+        fat: 4.8,
+        sodium: 810,
+        isJunk: false,
+      },
+    );
+  });
+});
+
 test('popular foods can be found by the words people search for', { skip }, async () => {
   await withApi(pool, async (call) => {
     const expected = {

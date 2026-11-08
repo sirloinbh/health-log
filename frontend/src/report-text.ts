@@ -92,6 +92,22 @@ export const spanLabel = ({ from, to }: { from: string; to: string }, today: str
   return `${monthDay(from)} ~ ${monthDay(to)}`;
 };
 
+/**
+ * The period holding `date`, as the server counts it (backend/src/day-records.ts `periodsOf`):
+ * weeks run Monday to Sunday. The buttons step from the period asked for, so pressing twice
+ * before the first answer arrives moves two periods (#138).
+ */
+export const periodSpan = (period: Period, date: string) => {
+  const day = Date.parse(`${date}T00:00:00Z`);
+  const toDate = (time: number) => new Date(time).toISOString().slice(0, 10);
+  if (period === 'week') {
+    const monday = day - ((new Date(day).getUTCDay() + 6) % 7) * 86_400_000;
+    return { from: toDate(monday), to: toDate(monday + 6 * 86_400_000) };
+  }
+  const [year, month] = date.split('-').map(Number);
+  return { from: `${date.slice(0, 7)}-01`, to: toDate(Date.UTC(year, month, 0)) };
+};
+
 /** The date to ask for one period before or after the one that holds `date`. */
 export const shiftPeriod = (period: Period, from: string, step: -1 | 1) => {
   const start = Date.parse(`${from}T00:00:00Z`);

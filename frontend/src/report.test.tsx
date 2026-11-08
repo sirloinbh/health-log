@@ -190,6 +190,94 @@ test('switching to months and stepping back asks for those periods', async () =>
   expect(screen.getByRole('button', { name: '월간' })).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('moving between periods keeps the row and the pressed button focused while loading (#138)', async () => {
+  // The first answer comes at once; the later ones wait to be answered by hand.
+  const answers: (() => void)[] = [];
+  let calls = 0;
+  serve((url) =>
+    ++calls === 1
+      ? json(reportOf())
+      : new Promise<Response>((resolve) => {
+          answers.push(() =>
+            resolve(
+              json(
+                url.includes('period=month')
+                  ? reportOf({
+                      period: 'month',
+                      current: { ...reportOf().current, from: '2026-10-01', to: '2026-10-31' },
+                    })
+                  : reportOf({
+                      current: { ...reportOf().current, from: '2026-10-26', to: '2026-11-01' },
+                    }),
+              ),
+            ),
+          );
+        }),
+  );
+  render(<App />);
+  await screen.findByText('11월 2일 ~ 11월 8일');
+
+  const previous = screen.getByRole('button', { name: '이전 주' });
+  previous.focus();
+  fireEvent.click(previous);
+  await waitFor(() => expect(answers).toHaveLength(1));
+  // While the next week is on its way the row stays, the earlier report marked busy.
+  expect(previous).toBeInTheDocument();
+  expect(previous).toHaveFocus();
+  expect(screen.getByText('11월 2일 ~ 11월 8일').closest('[aria-busy]')).toBeNull();
+  expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
+  answers[0]();
+  expect(await screen.findByText('10월 26일 ~ 11월 1일')).toBeInTheDocument();
+  expect(previous).toHaveFocus();
+  expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+
+  const monthly = screen.getByRole('button', { name: '월간' });
+  monthly.focus();
+  fireEvent.click(monthly);
+  await waitFor(() => expect(answers).toHaveLength(2));
+  expect(monthly).toHaveFocus();
+  expect(screen.getByRole('button', { name: '이전 달' })).toBeInTheDocument();
+  answers[1]();
+  expect(await screen.findByText('10월 1일 ~ 10월 31일')).toBeInTheDocument();
+  expect(monthly).toHaveFocus();
+});
+
+test('pressing a period button twice before the answer moves two periods (#138)', async () => {
+  let calls = 0;
+  const fetchMock = serve(() =>
+    ++calls === 1 ? json(reportOf()) : new Promise<Response>(() => {}),
+  );
+  render(<App />);
+  await screen.findByText('11월 2일 ~ 11월 8일');
+  const previous = screen.getByRole('button', { name: '이전 주' });
+  fireEvent.click(previous);
+  await waitFor(() => expect(window.location.search).toBe('?period=week&date=2026-10-26'));
+  fireEvent.click(previous);
+  await waitFor(() => expect(window.location.search).toBe('?period=week&date=2026-10-19'));
+  await waitFor(() =>
+    expect(reportCalls(fetchMock).at(-1)).toBe('/api/report?period=week&date=2026-10-19'),
+  );
+});
+
+test('"이번 주" goes once the week is shown, and its focus moves to the period (#138)', async () => {
+  serve((url) =>
+    json(
+      url.endsWith(`date=${today}`)
+        ? reportOf()
+        : reportOf({ current: { ...reportOf().current, from: '2026-10-26', to: '2026-11-01' } }),
+    ),
+  );
+  window.history.replaceState(null, '', '/?period=week&date=2026-10-28');
+  render(<App />);
+  await screen.findByText('10월 26일 ~ 11월 1일');
+  const thisWeek = screen.getByRole('button', { name: '이번 주' });
+  thisWeek.focus();
+  fireEvent.click(thisWeek);
+  const span = await screen.findByText('11월 2일 ~ 11월 8일');
+  expect(screen.queryByRole('button', { name: '이번 주' })).not.toBeInTheDocument();
+  await waitFor(() => expect(span).toHaveFocus());
+});
+
 test('a failed report can be tried again', async () => {
   let fail = true;
   serve(() => (fail ? json({ error: '서버 오류가 발생했습니다' }, 500) : json(reportOf())));

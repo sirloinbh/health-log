@@ -18,6 +18,7 @@ import {
   fewNights,
   minutesText,
   type Period,
+  periodSpan,
   periodWords,
   type Report,
   type ReportSummary,
@@ -231,6 +232,9 @@ export function ReportPage({ health }: { health: Health }) {
   const outOfRange = asked !== null && isValidDate(asked) && !inDailyRange(asked);
   const date = outOfRange ? null : asked && isValidDate(asked) ? asked : today;
   const [report, setReport] = useState<Report | null>(null);
+  // Moving to another period keeps the report on screen, dimmed, until the next one arrives: the
+  // period row and the button just pressed stay, and so does keyboard focus (#138).
+  const [loading, setLoading] = useState(false);
   const { notice, error, clear } = useNotice();
   const latest = useRef(0);
   // While a retry is on its way its button stays, so keyboard focus is not dropped to the page;
@@ -246,15 +250,22 @@ export function ReportPage({ health }: { health: Health }) {
     // to the word about a date out of range.
     const request = ++latest.current;
     clear();
-    if (!date) return 'stale';
+    if (!date) {
+      setReport(null);
+      setLoading(false);
+      return 'stale';
+    }
+    setLoading(true);
     try {
       const data = await requestJson<Report>(`/api/report?period=${period}&date=${date}`);
       if (request !== latest.current) return 'stale';
       setReport(data);
+      setLoading(false);
       return 'ok';
     } catch (cause) {
       if (request !== latest.current) return 'stale';
       setReport(null);
+      setLoading(false);
       error(cause);
       return 'failed';
     }
@@ -271,7 +282,6 @@ export function ReportPage({ health }: { health: Health }) {
   };
 
   useEffect(() => {
-    setReport(null);
     // A retry for the period left is over: the one now asked for is not a retry.
     setRetrying(false);
     focusSpan.current = false;
@@ -282,7 +292,8 @@ export function ReportPage({ health }: { health: Health }) {
     setParams({ period: next.period ?? period, date: next.date ?? date ?? '' });
 
   const words = periodWords[period];
-  const shown = report && report.period === period ? report : null;
+  // The last report, even for the period just left while the next one is on its way.
+  const shown = report && report.period in periodWords ? report : null;
 
   useEffect(() => {
     if (!shown) return;
@@ -299,8 +310,10 @@ export function ReportPage({ health }: { health: Health }) {
   }, [retrying, shown]);
 
   // The first and last periods holding a day the daily page opens (#130).
-  const atStart = shown !== null && shown.current.from <= earliestDate;
-  const atEnd = shown !== null && shown.current.to >= latestDate;
+  // The period asked for, which the shown one may still trail while it loads (#138).
+  const target = date ? periodSpan(period, date) : null;
+  const atStart = target !== null && target.from <= earliestDate;
+  const atEnd = target !== null && target.to >= latestDate;
 
   return (
     <section aria-labelledby="page-title" className="flex flex-col gap-6">
@@ -350,8 +363,8 @@ export function ReportPage({ health }: { health: Health }) {
               onClick={() => {
                 // The previous period may start before the range while holding 2000-01-01, as
                 // the week of 1999-12-27 does: that period is asked for by its first day in range.
-                if (!atStart) {
-                  const previous = shiftPeriod(period, shown.current.from, -1);
+                if (!atStart && target) {
+                  const previous = shiftPeriod(period, target.from, -1);
                   go({ date: previous < earliestDate ? earliestDate : previous });
                 }
               }}
@@ -377,13 +390,21 @@ export function ReportPage({ health }: { health: Health }) {
               title={atEnd ? dailyRangeText : undefined}
               className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
               onClick={() => {
-                if (!atEnd) go({ date: shiftPeriod(period, shown.current.from, 1) });
+                if (!atEnd && target) go({ date: shiftPeriod(period, target.from, 1) });
               }}
             >
               <ChevronRight aria-hidden />
             </Button>
-            {today && (today < shown.current.from || today > shown.current.to) ? (
-              <Button variant="outline" size="sm" onClick={() => go({ date: today })}>
+            {today && target && (today < target.from || today > target.to) ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  // The button goes once this period is shown; its focus moves to the period.
+                  focusOnArrival.current = true;
+                  go({ date: today });
+                }}
+              >
                 이번 {words.name}
               </Button>
             ) : null}
@@ -433,8 +454,14 @@ export function ReportPage({ health }: { health: Health }) {
         </div>
       ) : null}
       {shown ? (
-        <>
-          <Stats current={shown.current} previous={shown.previous} period={period} />
+        // The earlier report stays, dimmed and marked busy, until the next one replaces it.
+        <div
+          aria-busy={loading || undefined}
+          aria-label={loading ? '리포트 불러오는 중' : undefined}
+          role={loading ? 'region' : undefined}
+          className={`flex flex-col gap-6 transition-opacity ${loading ? 'opacity-50' : ''}`}
+        >
+          <Stats current={shown.current} previous={shown.previous} period={shown.period} />
           <Card>
             <CardHeader>
               <CardTitle asHeading="h2">날짜별 기록</CardTitle>
@@ -457,7 +484,7 @@ export function ReportPage({ health }: { health: Health }) {
             </CardContent>
           </Card>
           <SleepAfterDrinking report={shown} />
-        </>
+        </div>
       ) : null}
     </section>
   );

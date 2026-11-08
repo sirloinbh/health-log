@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
@@ -465,4 +465,30 @@ test('the same failure twice is said twice, as the message is cleared before eac
       '같은 이름의 조합이 이미 있습니다',
     );
   }
+});
+
+test('a list that failed to load can be tried again, and focus stays on the page (#127)', async () => {
+  let fail = true;
+  serve(() => (fail ? json({ error: '가상 서버 오류' }, 500) : json({ combos: [breakfast] })));
+  open();
+  expect(await screen.findByRole('alert')).toHaveTextContent('가상 서버 오류');
+  const retry = screen.getByRole('button', { name: '다시 시도' });
+  fail = false;
+  retry.focus();
+  fireEvent.click(retry);
+  expect(await screen.findByRole('heading', { name: breakfast.name })).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { level: 1, name: '조합' })).toHaveFocus(),
+  );
+});
+
+test('failing again says so again (#127)', async () => {
+  serve(() => json({ error: '가상 서버 오류' }, 500));
+  open();
+  await screen.findByRole('alert');
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('가상 서버 오류');
+  expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
 });

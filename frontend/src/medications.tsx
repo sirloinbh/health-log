@@ -436,6 +436,21 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
         </Button>
       </div>
       <Notice notice={notice} />
+      {notice?.kind === 'error' ? (
+        <Button
+          variant="outline"
+          className="self-start"
+          onClick={() => {
+            // Cleared first, so the same failure twice is announced again.
+            clear();
+            void load();
+            // Trying again removes this button, which would drop keyboard focus to the page (#65, #127).
+            setMoveFocus((count) => count + 1);
+          }}
+        >
+          다시 시도
+        </Button>
+      ) : null}
       {lists === null && !notice ? (
         <p role="status" className="text-body-sm text-muted-foreground">
           불러오는 중…

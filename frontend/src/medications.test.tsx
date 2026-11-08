@@ -346,3 +346,18 @@ test('the daily card waits for a medicine save still on its way', async () => {
   finish();
   expect(await screen.findByRole('region', { name: '이 날 먹은 약' })).toBeInTheDocument();
 });
+
+test('a list that failed to load can be tried again, and focus stays on the page (#127)', async () => {
+  let fail = true;
+  serve(() => (fail ? json({ error: '가상 서버 오류' }, 500) : json(lists())));
+  open();
+  expect(await screen.findByRole('alert')).toHaveTextContent('가상 서버 오류');
+  const retry = screen.getByRole('button', { name: '다시 시도' });
+  fail = false;
+  retry.focus();
+  fireEvent.click(retry);
+  expect(await screen.findByRole('region', { name: '복용 중 1' })).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: '약' })).toHaveFocus());
+});

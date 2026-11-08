@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { formatDate, isValidDate, shiftDate } from './daily-date';
+import { formatDate, inDailyRange, isValidDate, shiftDate } from './daily-date';
 
 test.each(['2026-10-31', '2028-02-29'])('accepts the real date %s', (value) => {
   expect(isValidDate(value)).toBe(true);
@@ -21,4 +21,12 @@ test('shifting crosses month, year and leap day boundaries', () => {
 
 test('formats the date with its weekday in Korean', () => {
   expect(formatDate('2026-10-31')).toBe('2026년 10월 31일 토요일');
+});
+
+test('the daily page opens 2000-01-01 to 2099-12-31', () => {
+  expect(inDailyRange('2000-01-01')).toBe(true);
+  expect(inDailyRange('2099-12-31')).toBe(true);
+  expect(inDailyRange('1999-12-31')).toBe(false);
+  expect(inDailyRange('2100-01-01')).toBe(false);
+  expect(inDailyRange('0002-03-15')).toBe(false);
 });

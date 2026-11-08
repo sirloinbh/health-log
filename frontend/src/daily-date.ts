@@ -21,3 +21,16 @@ export function shiftDate(value: string, days: number) {
 export function formatDate(value: string) {
   return fullDate.format(toDate(value));
 }
+
+/**
+ * The days the daily page opens (#50): the address, the previous and next day links and the date
+ * field all follow this. Years before 2000 have no records to keep, and some of them had other
+ * clock offsets in Asia/Seoul. 2099 leaves room for future entries such as appointments while
+ * keeping the next day a four-digit date.
+ */
+export const earliestDate = '2000-01-01';
+export const latestDate = '2099-12-31';
+
+export const inDailyRange = (value: string) => value >= earliestDate && value <= latestDate;
+
+export const dailyRangeText = `${earliestDate}부터 ${latestDate}까지 기록할 수 있습니다`;

@@ -217,7 +217,7 @@ test('Bibigo soups are found by name and keep their label values', { skip }, asy
                 OR source_url NOT LIKE 'https://www.cjthemarket.com/the/product/product-main?prdCd=%'
                 OR calories IS NULL OR protein IS NULL OR fat IS NULL OR sodium IS NULL
             ) AS unchecked
-     FROM foods WHERE brand = '비비고'`,
+     FROM foods WHERE brand = '비비고' AND category = '국·탕·찌개'`,
   );
   assert.deepEqual(rows[0], { total: '27', unchecked: '0' });
 

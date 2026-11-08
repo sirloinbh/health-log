@@ -82,7 +82,8 @@
 
 ### 명령
 
-- 임시 `health_test`(`npm run db:migrate`)로 `TEST_DATABASE_URL=<임시 health_test> npm run check`: 아래 "origin/main 병합 뒤"에 적는다.
+- `origin/main`(#32의 014, #104 포함)을 병합한 뒤 임시 `health_test`를 `npm run db:migrate`로 새로 만들어(001~015) `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과
+  - 백엔드 238개 통과, 0개 건너뜀(DB 통합 테스트 포함). 프런트 419개 통과, 2개 건너뜀. 스킬 4개 통과.
 - `npm run knip`: 통과
 
 ## 한계

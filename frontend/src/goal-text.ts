@@ -109,6 +109,8 @@ export function actualText(day: GoalDayItem) {
     case 'protein': {
       const { entries, total, missing } = day.actual;
       if (entries === 0) return '식사 기록 없음';
+      // Nothing known to add up is not zero.
+      if (total === null) return `값을 모르는 음식 ${missing}개`;
       const unit = day.item === 'calories' ? 'kcal' : 'g';
       const sum = `${number(total ?? 0)}${unit}`;
       return missing ? `${sum} (값을 모르는 음식 ${missing}개 제외)` : sum;

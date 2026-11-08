@@ -8,7 +8,7 @@ import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.j
 import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError } from './standard/http.js';
 
-export const goalItems = ['calories', 'protein', 'sleep', 'sober_days'] as const;
+const goalItems = ['calories', 'protein', 'sleep', 'sober_days'] as const;
 type GoalItem = (typeof goalItems)[number];
 
 // The same ranges as the database's goals_target_range.

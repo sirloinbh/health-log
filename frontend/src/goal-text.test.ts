@@ -41,6 +41,15 @@ test('the actual side says when nothing was recorded, and what was left out', ()
       actual: { entries: 3, total: 82.5, missing: 1 },
     }),
   ).toBe('82.5g (값을 모르는 음식 1개 제외)');
+  // Every entry unknown: no sum to show, not 0g.
+  expect(
+    actualText({
+      item: 'protein',
+      goal: null,
+      status: null,
+      actual: { entries: 2, total: null, missing: 2 },
+    }),
+  ).toBe('값을 모르는 음식 2개');
   expect(actualText({ item: 'sleep', goal: null, status: null, actual: { minutes: null } })).toBe(
     '수면 기록 없음',
   );

@@ -3,15 +3,10 @@ import { after, before, test } from 'node:test';
 
 import { Pool } from 'pg';
 
-import { withApi } from './helpers.js';
+import { testDatabaseSkip, withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
-// These tests write. A shared machine's variable may name another project's test database.
-const databaseName = url ? new URL(url).pathname.slice(1) : null;
-const skip =
-  databaseName === 'health_test'
-    ? false
-    : `health_test 전용 DB가 아닙니다: ${databaseName ?? '없음'}`;
+const skip = testDatabaseSkip(url);
 
 // 1981 is used by no other test file. 1981-03-02 and 03-09 are Mondays.
 const first = '1981-01-01';
@@ -259,13 +254,19 @@ test(
         assert.deepEqual(goals.current.sleep, { from: '1981-09-20', target: 480 });
         assert.equal(goals.current.calories, null);
         assert.deepEqual(
-          goals.history.filter((goal) => goal.item === 'sleep').map((goal) => goal.from),
+          goals.history
+            .filter((goal) => goal.item === 'sleep' && goal.from.startsWith('1981'))
+            .map((goal) => goal.from),
           ['1981-10-01', '1981-09-20', '1981-09-01'],
         );
         // Setting the same start date again replaces that change only.
         const replaced = await setGoal(call, 'sleep', '1981-09-20', 450);
         assert.deepEqual(replaced.current.sleep, { from: '1981-09-20', target: 450 });
-        assert.equal(replaced.history.filter((goal) => goal.item === 'sleep').length, 3);
+        assert.equal(
+          replaced.history.filter((goal) => goal.item === 'sleep' && goal.from.startsWith('1981'))
+            .length,
+          3,
+        );
 
         assert.equal((await call('/api/goals/sleep/1981-09-20', { method: 'DELETE' })).status, 204);
         const { data } = await call('/api/goals');

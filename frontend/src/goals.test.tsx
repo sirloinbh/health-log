@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router';
 import { expect, test, vi } from 'vitest';
 
 import { GoalsCard, GoalsSettings } from './goals';
+import { trackWrite } from './pending-writes';
 
 const date = '2026-11-04';
 const week = { from: '2026-11-02', to: '2026-11-08' };
@@ -191,6 +192,30 @@ test('a sleep goal is typed in hours and sent in minutes from the chosen date', 
   });
   // The form is refilled from what was saved.
   expect(within(cardOf('수면')).getByLabelText('하루 수면 시간 (시간)')).toHaveValue('7.5');
+  // The refilled form has a new Save button, so focus goes to the card's title instead of the page.
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      within(cardOf('수면')).getByRole('heading', { name: '수면' }).parentElement,
+    ),
+  );
+});
+
+test('the card reads only after a save of the same day has landed', async () => {
+  let land: (value: unknown) => void = () => undefined;
+  const save = trackWrite(
+    `/api/meals/${date}`,
+    new Promise((resolve) => {
+      land = resolve;
+    }),
+  );
+  const fetchMock = server({ body: dayOf() });
+  renderCard();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(fetchMock).not.toHaveBeenCalled();
+  land(undefined);
+  await save;
+  expect(await screen.findByRole('region', { name: '식단' })).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
 test('a value the goal cannot take is refused before sending', async () => {

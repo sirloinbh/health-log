@@ -34,6 +34,7 @@ import {
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
 import { parseAmount, unreadableAmount } from './number-input';
+import { trackWrite, writesSettled } from './pending-writes';
 
 const goalsPath = '/api/goals';
 const earliestDate = '2000-01-01';
@@ -77,10 +78,10 @@ function GoalForm({
     }
     setSaving(true);
     try {
-      const goals = await requestJson<Goals>(`${goalsPath}/${item}`, {
-        method: 'PUT',
-        body: { from, target },
-      });
+      const goals = await trackWrite(
+        goalsPath,
+        requestJson<Goals>(`${goalsPath}/${item}`, { method: 'PUT', body: { from, target } }),
+      );
       toast.success(target === null ? '목표를 껐습니다' : '목표를 저장했습니다');
       onSaved(goals);
     } catch (cause) {
@@ -172,7 +173,10 @@ function GoalHistory({
 
   const remove = async (from: string) => {
     try {
-      await requestJson(`${goalsPath}/${item}/${from}`, { method: 'DELETE' });
+      await trackWrite(
+        goalsPath,
+        requestJson(`${goalsPath}/${item}/${from}`, { method: 'DELETE' }),
+      );
     } catch (cause) {
       // Already gone counts as removed; anything else keeps the dialog open with the reason.
       if (!(cause instanceof RequestError && cause.status === 404)) {
@@ -224,10 +228,21 @@ export function GoalsSettings() {
   const [goals, setGoals] = useState<Goals | undefined>(undefined);
   const { notice, error, clear } = useNotice();
   const live = useRef(true);
+  // Where focus goes when the button that had it is gone: the section, or one goal's card.
+  const [focusOn, setFocusOn] = useState<{ target: 'section' | GoalItem; count: number }>({
+    target: 'section',
+    count: 0,
+  });
+  const headings = useRef<Partial<Record<'section' | GoalItem, HTMLElement | null>>>({});
+  const moveFocus = (target: 'section' | GoalItem) =>
+    setFocusOn((current) => ({ target, count: current.count + 1 }));
 
   const load = useCallback(async () => {
     clear();
     try {
+      // A change from before leaving the page may still be on its way; read after it lands.
+      await writesSettled(goalsPath);
+      if (!live.current) return;
       const data = await requestJson<Goals>(goalsPath);
       if (live.current) setGoals(data);
     } catch (cause) {
@@ -243,10 +258,26 @@ export function GoalsSettings() {
     };
   }, [load]);
 
+  // A save refills its form and a delete redraws its list, so the pressed button is gone by then.
+  useEffect(() => {
+    if (!focusOn.count) return;
+    const timer = setTimeout(() => headings.current[focusOn.target]?.focus(), 0);
+    return () => clearTimeout(timer);
+  }, [focusOn, goals]);
+
   return (
     <section aria-labelledby="goals-title" className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 id="goals-title">목표</h2>
+        <h2
+          id="goals-title"
+          ref={(element) => {
+            headings.current.section = element;
+          }}
+          tabIndex={-1}
+          className="outline-none"
+        >
+          목표
+        </h2>
         <p className="text-body-sm text-muted-foreground">
           하루 기록에서 목표를 지켰는지 자동으로 판정합니다. 목표를 바꿔도 지난 날짜는 그때의 목표로
           판정합니다.
@@ -254,7 +285,15 @@ export function GoalsSettings() {
       </div>
       <Notice notice={notice} />
       {notice && goals === undefined ? (
-        <Button variant="outline" className="self-start" onClick={() => void load()}>
+        <Button
+          variant="outline"
+          className="self-start"
+          onClick={() => {
+            void load();
+            // Trying again removes this button, which would drop keyboard focus to the page.
+            moveFocus('section');
+          }}
+        >
           다시 시도
         </Button>
       ) : null}
@@ -270,7 +309,15 @@ export function GoalsSettings() {
             return (
               <Card key={item}>
                 <CardHeader>
-                  <CardTitle asHeading="h3">{goalFields[item].title}</CardTitle>
+                  <div
+                    ref={(element) => {
+                      headings.current[item] = element;
+                    }}
+                    tabIndex={-1}
+                    className="outline-none"
+                  >
+                    <CardTitle asHeading="h3">{goalFields[item].title}</CardTitle>
+                  </div>
                   <CardDescription>
                     {goal
                       ? `지금 목표: ${targetText(item, goal.target)} (${sinceText(goal.from)})`
@@ -284,9 +331,19 @@ export function GoalsSettings() {
                     item={item}
                     goal={goal}
                     today={goals.today}
-                    onSaved={setGoals}
+                    onSaved={(saved) => {
+                      setGoals(saved);
+                      moveFocus(item);
+                    }}
                   />
-                  <GoalHistory item={item} goals={goals} onRemoved={() => void load()} />
+                  <GoalHistory
+                    item={item}
+                    goals={goals}
+                    onRemoved={() => {
+                      void load();
+                      moveFocus(item);
+                    }}
+                  />
                 </CardContent>
               </Card>
             );
@@ -327,6 +384,15 @@ function Verdict({ day }: { day: GoalDayItem }) {
 }
 
 // The daily page gives this a key per date, so nothing here outlives the day it was loaded for.
+// Sober days count the whole week, so any day's drinks can change this one.
+const judgedPaths = (date: string) => [
+  `/api/meals/${date}`,
+  `/api/sleep/${date}`,
+  '/api/habits/',
+  `/api/checks/${date}`,
+  goalsPath,
+];
+
 export function GoalsCard({ date }: { date: string }) {
   const [day, setDay] = useState<GoalDay | undefined>(undefined);
   const [loading, setLoading] = useState(true);
@@ -337,6 +403,9 @@ export function GoalsCard({ date }: { date: string }) {
     clear();
     setLoading(true);
     try {
+      // Saves still on their way in the cards this judges, or to the goals, would be missed.
+      await Promise.all(judgedPaths(date).map((prefix) => writesSettled(prefix)));
+      if (!live.current) return;
       const data = await requestJson<GoalDay>(`${goalsPath}/days/${date}`);
       if (live.current) setDay(data);
     } catch (cause) {
@@ -413,9 +482,11 @@ export function GoalsCard({ date }: { date: string }) {
           variant="outline"
           size="sm"
           className="self-start"
-          disabled={loading}
+          // Not disabled: a disabled button drops the focus of whoever pressed it.
           aria-busy={loading || undefined}
-          onClick={() => void load()}
+          onClick={() => {
+            if (!loading) void load();
+          }}
         >
           {loading && day ? <Spinner size="sm" label="다시 판정하는 중" /> : null}
           {day === undefined && notice ? '다시 시도' : '다시 판정'}

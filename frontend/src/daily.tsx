@@ -99,6 +99,9 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
   const [leftOutOfRange, setLeftOutOfRange] = useState(false);
   // The page stays mounted from day to day, so a word left for one day must not come back on it.
   const [noticeDate, setNoticeDate] = useState(date);
+  // The last today the server gave: one failed check must not take today's cards away (#48).
+  const [lastToday, setLastToday] = useState<string | null>(null);
+  if (health.state === 'ok' && health.today !== lastToday) setLastToday(health.today);
   if (noticeDate !== date) {
     setNoticeDate(date);
     setLeftOutOfRange(false);
@@ -196,7 +199,7 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
       {/* An explicit column: an implicit one grows with its content, past the edge of a phone. */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Coming days are counted from the real today, so only today's page shows them (#48). */}
-        {today === date ? <RemindersCard key={`reminders-${date}`} /> : null}
+        {lastToday === date ? <RemindersCard key={`reminders-${date}`} /> : null}
         <SleepCard key={date} date={date} />
         <MealCard key={`meal-${date}`} date={date} />
         <BodyCard key={`body-${date}`} date={date} />

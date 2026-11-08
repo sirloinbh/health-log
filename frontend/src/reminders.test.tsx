@@ -115,13 +115,13 @@ test('marking one done sends its day, takes it off and keeps focus in the card',
       : json(listOf([appointment, lastPill])),
   );
   show();
-  const button = await screen.findByRole('button', { name: '가상정 복용 종료 완료' });
+  const button = await screen.findByRole('button', { name: '가상정 복용 종료 알림 완료' });
   button.focus();
   fireEvent.click(button);
   expect(button).toHaveAttribute('aria-busy', 'true');
   expect(button).toHaveTextContent('처리 중…');
   // Every done button waits while one is on its way, so a second press is not sent.
-  const other = screen.getByRole('button', { name: '가상피부과 · 피부과 예약 완료' });
+  const other = screen.getByRole('button', { name: '가상피부과 · 피부과 예약 알림 완료' });
   expect(other).toHaveAttribute('aria-disabled', 'true');
   fireEvent.click(other);
   const posts = fetchMock.mock.calls.filter(([url]) => url === '/api/reminders/done');
@@ -147,7 +147,7 @@ test('marking one done sends its day, takes it off and keeps focus in the card',
   expect(other).not.toHaveAttribute('aria-disabled');
 });
 
-test('a reminder moved or deleted elsewhere says so and the list is read again', async () => {
+test('a reminder moved or deleted elsewhere: the list is read again, then said so', async () => {
   let reminders = [appointment];
   const fetchMock = serve((url) =>
     url === '/api/reminders/done'
@@ -155,45 +155,55 @@ test('a reminder moved or deleted elsewhere says so and the list is read again',
       : json(listOf(reminders)),
   );
   show();
-  const button = await screen.findByRole('button', { name: '가상피부과 · 피부과 예약 완료' });
+  const button = await screen.findByRole('button', { name: '가상피부과 · 피부과 예약 알림 완료' });
   reminders = [{ ...appointment, dueOn: '2026-03-18', daysLeft: 3 }];
   fireEvent.click(button);
-  expect(await screen.findByRole('alert')).toHaveTextContent('알림을 찾을 수 없습니다');
-  expect(await screen.findByText('3일 뒤')).toBeInTheDocument();
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    '다른 화면에서 날짜가 바뀌었거나 지워진 일정이라 목록을 새로 불러왔습니다.',
+  );
+  expect(screen.getByText('3일 뒤')).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   expect(reads(fetchMock)).toHaveLength(2);
   await waitFor(() =>
     expect(screen.getByRole('heading', { name: '다가오는 일정' }).parentElement).toHaveFocus(),
   );
 });
 
-test('a list read before a mark landed does not bring the marked one back', async () => {
+test('while the list is read again, no other reminder can be marked from the old one', async () => {
   let gets = 0;
   let answerSecondRead: (response: Response) => void = () => {};
-  serve((url, init) => {
-    if (url === '/api/reminders/done') {
-      const body = JSON.parse(String(init?.body)) as { kind: string };
-      return body.kind === 'visit'
-        ? json({ error: '알림을 찾을 수 없습니다' }, 404)
-        : json(null, 204);
-    }
+  const fetchMock = serve((url) => {
+    if (url === '/api/reminders/done') return json({ error: '알림을 찾을 수 없습니다' }, 404);
     gets += 1;
     return gets === 1
       ? json(listOf([appointment, lastPill]))
       : new Promise((resolve) => (answerSecondRead = resolve));
   });
   show();
-  // The 404 reads the list again; that answer is still on its way.
-  fireEvent.click(await screen.findByRole('button', { name: '가상피부과 · 피부과 예약 완료' }));
-  await screen.findByRole('alert');
+  fireEvent.click(
+    await screen.findByRole('button', { name: '가상피부과 · 피부과 예약 알림 완료' }),
+  );
   await waitFor(() => expect(gets).toBe(2));
-  // Meanwhile the medicine is marked done, after the read had already gone out.
-  const pill = screen.getByRole('button', { name: '가상정 복용 종료 완료' });
-  await waitFor(() => expect(pill).not.toHaveAttribute('aria-disabled'));
+  const pill = screen.getByRole('button', { name: '가상정 복용 종료 알림 완료' });
+  expect(pill).toHaveAttribute('aria-disabled', 'true');
   fireEvent.click(pill);
-  await screen.findByText('가상정 복용 종료 알림을 완료로 표시했습니다.');
-  answerSecondRead(json(listOf([{ ...appointment, dueOn: '2026-03-18', daysLeft: 3 }, lastPill])));
-  expect(await screen.findByText('3일 뒤')).toBeInTheDocument();
-  expect(screen.queryByText('가상정 복용 종료')).not.toBeInTheDocument();
+  expect(fetchMock.mock.calls.filter(([url]) => url === '/api/reminders/done')).toHaveLength(1);
+  answerSecondRead(json(listOf([lastPill])));
+  await screen.findByText(/목록을 새로 불러왔습니다/);
+  expect(screen.getByRole('button', { name: '가상정 복용 종료 알림 완료' })).not.toHaveAttribute(
+    'aria-disabled',
+  );
+});
+
+test('the done button says what it hides, and that it is busy', async () => {
+  serve((url) =>
+    url === '/api/reminders/done' ? new Promise(() => {}) : json(listOf([lastPill])),
+  );
+  show();
+  fireEvent.click(await screen.findByRole('button', { name: '가상정 복용 종료 알림 완료' }));
+  expect(
+    screen.getByRole('button', { name: '가상정 복용 종료 알림 완료 처리 중' }),
+  ).toHaveTextContent('처리 중…');
 });
 
 test('any other failure keeps the reminder for another try', async () => {
@@ -203,7 +213,7 @@ test('any other failure keeps the reminder for another try', async () => {
       : json(listOf([appointment])),
   );
   show();
-  const button = await screen.findByRole('button', { name: '가상피부과 · 피부과 예약 완료' });
+  const button = await screen.findByRole('button', { name: '가상피부과 · 피부과 예약 알림 완료' });
   fireEvent.click(button);
   expect(await screen.findByRole('alert')).toHaveTextContent('서버에 연결할 수 없습니다');
   expect(button).toBeInTheDocument();
@@ -257,4 +267,26 @@ const app = (path: string) => {
 test('the dashboard shows what is coming up', async () => {
   app('/');
   expect(await screen.findByText('가상피부과 · 피부과 예약')).toBeInTheDocument();
+});
+
+test('reminders failing to load leave the rest of the dashboard alone', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) =>
+      Promise.resolve(
+        url === '/api/reminders'
+          ? json({ error: '서버에 연결할 수 없습니다' }, 503)
+          : url.startsWith('/api/report')
+            ? json({ error: '리포트 없음' }, 500)
+            : json({ today: '2026-03-15' }),
+      ),
+    ),
+  );
+  window.history.replaceState(null, '', '/');
+  render(<App />);
+  // Each keeps its own word and its own retry.
+  expect(await screen.findByText('서버에 연결할 수 없습니다')).toBeInTheDocument();
+  expect(await screen.findByText('리포트 없음')).toBeInTheDocument();
+  expect(screen.getAllByRole('button', { name: '다시 시도' })).toHaveLength(2);
+  expect(screen.getByRole('heading', { level: 1, name: '대시보드' })).toBeInTheDocument();
 });

@@ -519,3 +519,23 @@ test("today's page shows what is coming up, and another day does not ask for it 
   expect(screen.queryByRole('heading', { name: '다가오는 일정' })).not.toBeInTheDocument();
   expect(fetchMock.mock.calls.filter(([url]) => url === '/api/reminders')).toHaveLength(1);
 });
+
+test("one failed check of the server keeps today's coming-up card (#48)", async () => {
+  let healthy = true;
+  const fetchMock = vi.fn((url: string) =>
+    Promise.resolve(
+      dayCard(url) ??
+        (healthy
+          ? new Response(JSON.stringify({ today: '2026-03-15' }))
+          : new Response(JSON.stringify({ error: '서버에 연결할 수 없습니다' }), { status: 503 })),
+    ),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  open('/daily/2026-03-15');
+  await screen.findByText('7일 안에 다가오는 병원 예약이나 약 복용 종료가 없습니다.');
+  healthy = false;
+  fireEvent(document, new Event('visibilitychange'));
+  expect(await screen.findByText('서버에 연결할 수 없습니다')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '다가오는 일정' })).toBeInTheDocument();
+  expect(fetchMock.mock.calls.filter(([url]) => url === '/api/reminders')).toHaveLength(1);
+});

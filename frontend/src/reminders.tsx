@@ -35,8 +35,6 @@ export function RemindersCard() {
   const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLDivElement>(null);
   const live = useRef(true);
-  // Marked done here: a list read before the mark landed must not bring one back.
-  const done = useRef(new Set<string>());
 
   const load = useCallback(async () => {
     try {
@@ -46,15 +44,14 @@ export function RemindersCard() {
         writesSettled(`${medicationsPath}/`),
         writesSettled(`${remindersPath}/`),
       ]);
-      if (!live.current) return;
+      if (!live.current) return false;
       const next = await requestJson<Reminders>(remindersPath);
-      if (live.current)
-        setData({
-          ...next,
-          reminders: next.reminders.filter((item) => !done.current.has(reminderKey(item))),
-        });
+      if (!live.current) return false;
+      setData(next);
+      return true;
     } catch (cause) {
       if (live.current) error(cause);
+      return false;
     }
   }, [error]);
 
@@ -87,7 +84,6 @@ export function RemindersCard() {
           body: { kind: item.kind, id: item.id, dueOn: item.dueOn },
         }),
       );
-      done.current.add(key);
       if (!live.current) return;
       setData(
         (current) =>
@@ -100,10 +96,17 @@ export function RemindersCard() {
       setMoveFocus((count) => count + 1);
     } catch (cause) {
       if (!live.current) return;
-      error(cause);
+      if (!(cause instanceof RequestError && cause.status === 404)) {
+        error(cause);
+        return;
+      }
       // Moved to another day or deleted on another screen: the list on screen is out of date.
-      if (cause instanceof RequestError && cause.status === 404) {
-        void load();
+      // Focus moves once the new list is in, so it does not cut off the word about it, and the
+      // pressed button is gone by then. The buttons wait until then as well: a mark sent meanwhile
+      // could land before the read and be brought back by it.
+      if (await load()) {
+        if (!live.current) return;
+        status('다른 화면에서 날짜가 바뀌었거나 지워진 일정이라 목록을 새로 불러왔습니다.');
         setMoveFocus((count) => count + 1);
       }
     } finally {
@@ -188,7 +191,9 @@ export function RemindersCard() {
                     <Button
                       variant="outline"
                       size="sm"
-                      aria-label={`${title} 완료`}
+                      // It hides the reminder only, so the name says so; while busy, it says that
+                      // too, as aria-busy alone is not read out.
+                      aria-label={`${title} 알림 ${busy ? '완료 처리 중' : '완료'}`}
                       // aria-disabled, not disabled: a disabled button drops keyboard focus (#98).
                       aria-disabled={marking !== null || undefined}
                       aria-busy={busy || undefined}

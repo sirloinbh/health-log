@@ -1,6 +1,6 @@
-import { Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Pencil, Pill, Plus, Trash2, X } from 'lucide-react';
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 
 import { charCount } from './check-text';
 import { Button } from './components/ui/button';
@@ -30,6 +30,7 @@ import {
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
 import { cn } from './lib/utils';
+import { medicationsPagePath } from './med-text';
 import { MoreFoodsButton } from './more-foods-button';
 import { trackWrite } from './pending-writes';
 import { useReturnFocus } from './return-focus';
@@ -485,6 +486,16 @@ function VisitCard({
               </Button>
             }
           />
+          <Button asChild variant="outline" size="sm">
+            {/* Records what was prescribed here, linked to this visit (#40). */}
+            <Link
+              to={`${medicationsPagePath}?visit=${visit.id}&date=${visit.date}`}
+              aria-label={`${visit.date} ${visit.clinic} 처방 약 기록`}
+            >
+              <Pill aria-hidden />
+              처방 약
+            </Link>
+          </Button>
           <Button
             variant="outline"
             size="sm"

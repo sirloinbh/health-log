@@ -148,14 +148,43 @@ test('a failed load can be tried again', async () => {
   expect(await screen.findByRole('region', { name: '식단' })).toBeInTheDocument();
 });
 
-const goalsOf = (
-  current: Record<string, unknown> = {},
-  history: unknown[] = [],
-  today = '2026-11-06',
-) => ({
-  today,
+// Today and its week as the server would answer them: 2026-11-06 is a Friday.
+const goalsOf = (current: Record<string, unknown> = {}, history: unknown[] = []) => ({
+  today: '2026-11-06',
+  week: { from: '2026-11-02', to: '2026-11-08' },
   current: { calories: null, protein: null, sleep: null, sober_days: null, ...current },
   history,
+});
+
+test('the sober card shows the goal this week is judged by, and a change later this week is not "to come"', async () => {
+  // Today is Friday; the sober change from Saturday already judges this week, a daily one does not.
+  const goals = goalsOf(
+    { protein: { from, target: 100 }, sober_days: { from: '2026-11-07', target: 6 } },
+    [
+      { item: 'protein', from: '2026-11-07', target: 120 },
+      { item: 'protein', from, target: 100 },
+      { item: 'sober_days', from: '2026-11-09', target: 7 },
+      { item: 'sober_days', from: '2026-11-07', target: 6 },
+      { item: 'sober_days', from, target: 5 },
+    ],
+  );
+  server({ body: goals });
+  render(<GoalsSettings />);
+  await screen.findByRole('heading', { name: '금주' });
+  expect(
+    within(cardOf('금주')).getByText(
+      '이번 주(11.02~11.08) 목표: 주 6일 이상 금주 (2026-11-07부터)',
+    ),
+  ).toBeInTheDocument();
+  const sober = screen.getByRole('region', { name: '금주 목표 변경 기록' });
+  expect(within(sober.querySelector('li') as HTMLElement).getByText('(예정)')).toBeInTheDocument();
+  expect(within(sober).getAllByText('(예정)')).toHaveLength(1);
+  // The daily goal from Saturday is still to come.
+  const protein = screen.getByRole('region', { name: '단백질 목표 변경 기록' });
+  expect(within(protein).getAllByText('(예정)')).toHaveLength(1);
+  expect(
+    within(cardOf('단백질')).getByText('지금 목표: 하루 100g 이상 (2026-11-01부터)'),
+  ).toBeInTheDocument();
 });
 
 const cardOf = (title: string) =>
@@ -519,5 +548,28 @@ test('a deleted change stays gone even if reading the goals again fails', async 
   // The goal before it holds again.
   expect(
     within(cardOf('수면')).getByText('지금 목표: 7시간 이상 (2026-11-01부터)'),
+  ).toBeInTheDocument();
+});
+
+test('deleting a sober change says it stops counting from the week of its date', async () => {
+  server({
+    body: goalsOf({ sober_days: { from, target: 5 }, sleep: { from, target: 420 } }, [
+      { item: 'sober_days', from, target: 5 },
+      { item: 'sleep', from, target: 420 },
+    ]),
+  });
+  render(<GoalsSettings />);
+  const sober = await screen.findByRole('region', { name: '금주 목표 변경 기록' });
+  fireEvent.click(within(sober).getByRole('button', { name: `${from} 금주 목표 변경 삭제` }));
+  expect(
+    await screen.findByText('삭제하면 그 날짜가 든 주부터 바로 앞의 목표로 판정합니다.'),
+  ).toBeInTheDocument();
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '취소' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+  const sleep = screen.getByRole('region', { name: '수면 목표 변경 기록' });
+  fireEvent.click(within(sleep).getByRole('button', { name: `${from} 수면 목표 변경 삭제` }));
+  expect(
+    await screen.findByText('삭제하면 그 날짜부터 바로 앞의 목표로 판정합니다.'),
   ).toBeInTheDocument();
 });

@@ -3,6 +3,8 @@ import { expect, test } from 'vitest';
 import {
   actualText,
   changeText,
+  countsUntil,
+  currentText,
   type Goals,
   sleepParts,
   targetText,
@@ -36,6 +38,7 @@ test('sleep is typed in hours and minutes, so any whole minute can be a goal', (
 test('deleting a change brings back the goal before it, as of today', () => {
   const goals: Goals = {
     today: '2026-11-06',
+    week: { from: '2026-11-02', to: '2026-11-08' },
     current: {
       calories: { from: '2026-11-05', target: 1800 },
       protein: null,
@@ -114,4 +117,79 @@ test('the actual side says when nothing was recorded, and what was left out', ()
       actual: { ...week, recordedDays: 4, soberDays: 3 },
     }),
   ).toBe('이 주(11.02~11.08) 금주 3일 / 기록 4일');
+});
+
+test('sober days count a change up to this Sunday as current, daily goals only up to today', () => {
+  const goals: Goals = {
+    today: '2026-11-06',
+    week: { from: '2026-11-02', to: '2026-11-08' },
+    current: {
+      calories: { from: '2026-11-01', target: 2000 },
+      protein: null,
+      sleep: null,
+      sober_days: { from: '2026-11-07', target: 6 },
+    },
+    history: [
+      { item: 'calories', from: '2026-11-07', target: 1800 },
+      { item: 'calories', from: '2026-11-01', target: 2000 },
+      { item: 'sober_days', from: '2026-11-09', target: 7 },
+      { item: 'sober_days', from: '2026-11-07', target: 6 },
+      { item: 'sober_days', from: '2026-11-01', target: 5 },
+    ],
+  };
+  expect(currentText(goals, 'sober_days')).toBe(
+    '이번 주(11.02~11.08) 목표: 주 6일 이상 금주 (2026-11-07부터)',
+  );
+  expect(currentText(goals, 'calories')).toBe('지금 목표: 하루 2,000kcal 이하 (2026-11-01부터)');
+  expect(currentText(goals, 'protein')).toBe('지금 목표 없음');
+  // Deleting next week's sober change leaves Saturday's as this week's.
+  expect(withoutChange(goals, 'sober_days', '2026-11-09').current.sober_days).toEqual({
+    from: '2026-11-07',
+    target: 6,
+  });
+  // Deleting Saturday's brings back the one before it.
+  expect(withoutChange(goals, 'sober_days', '2026-11-07').current.sober_days).toEqual({
+    from: '2026-11-01',
+    target: 5,
+  });
+  // A daily change from Saturday never counted today, so deleting it changes nothing current.
+  expect(withoutChange(goals, 'calories', '2026-11-07').current.calories).toEqual({
+    from: '2026-11-01',
+    target: 2000,
+  });
+});
+
+test('a sober change on this Sunday already counts, and one turning it off leaves no goal', () => {
+  const base = {
+    today: '2026-11-06',
+    week: { from: '2026-11-02', to: '2026-11-08' },
+    current: { calories: null, protein: null, sleep: null, sober_days: null },
+  };
+  // Sunday is the week's last day, the day its goal is read on.
+  const sunday: Goals = {
+    ...base,
+    history: [
+      { item: 'sober_days', from: '2026-11-09', target: 7 },
+      { item: 'sober_days', from: '2026-11-08', target: 6 },
+      { item: 'sober_days', from: '2026-11-01', target: 5 },
+    ],
+  };
+  expect(withoutChange(sunday, 'sober_days', '2026-11-09').current.sober_days).toEqual({
+    from: '2026-11-08',
+    target: 6,
+  });
+  expect(countsUntil(sunday, 'sober_days')).toBe('2026-11-08');
+  expect(countsUntil(sunday, 'calories')).toBe('2026-11-06');
+  // Turned off from Saturday: this week has no sober goal, and the card says so.
+  const off: Goals = {
+    ...base,
+    history: [
+      { item: 'sober_days', from: '2026-11-09', target: 7 },
+      { item: 'sober_days', from: '2026-11-07', target: null },
+      { item: 'sober_days', from: '2026-11-01', target: 5 },
+    ],
+  };
+  const afterDelete = withoutChange(off, 'sober_days', '2026-11-09');
+  expect(afterDelete.current.sober_days).toBeNull();
+  expect(currentText(afterDelete, 'sober_days')).toBe('이번 주(11.02~11.08) 목표 없음');
 });

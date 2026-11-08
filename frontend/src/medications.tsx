@@ -43,10 +43,7 @@ type Draft = {
   visitId: string;
 };
 
-const draftOf = (
-  item: Medication | null,
-  start: { date: string; visitId: string; visitDate?: string },
-): Draft => ({
+const draftOf = (item: Medication | null, start: { date: string; visitId: string }): Draft => ({
   name: item?.name ?? '',
   dose: item?.dose ?? '',
   directions: item?.directions ?? '',
@@ -214,7 +211,7 @@ function MedicationDialog({
               <option value="">연결 안 함 (처방 없이 산 약)</option>
               {options.map((option) => (
                 <option key={option.id} value={String(option.id)}>
-                  {option.date} {option.clinic}
+                  {[option.date, option.clinic].filter(Boolean).join(' ')}
                 </option>
               ))}
             </select>

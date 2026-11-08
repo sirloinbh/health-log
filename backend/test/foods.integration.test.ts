@@ -449,7 +449,8 @@ test('with 150 matching foods, paging reaches every one exactly once', { skip },
       );
     });
   } finally {
-    await client.query('ROLLBACK');
+    // A lost connection fails the rollback too; the client still goes back, or pool.end() waits.
+    await client.query('ROLLBACK').catch(() => undefined);
     client.release();
   }
 });

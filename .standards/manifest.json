@@ -1,5 +1,5 @@
 {
-  "centralSha": "5c3039c306b546445b55697f9b716b1f6b24f6be",
+  "centralSha": "94790218848f47ad87d02b536cce7fdb1d13993d",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -20,7 +20,7 @@
     },
     ".claude/skills/std-backlog/SKILL.md": {
       "mode": "full",
-      "sha256": "24fc15a48fd17e3ef9f6b0468593ddfac0f5269b9357fbe14f19f9baf7bee2b5",
+      "sha256": "b34e21e85a76c995249d7acc73baebd75804208f46ec49581b48aad8f0822215",
       "source": "templates/common/skills/std-backlog/SKILL.md"
     },
     ".claude/skills/std-communication/SKILL.md": {
@@ -228,7 +228,7 @@
     },
     "deploy/autodeploy.sh": {
       "mode": "full",
-      "sha256": "b441bbdbc71190446c132623637f1a99608aed1a81cf427e7845098823749aba",
+      "sha256": "a3e3512f89717433deb2051ae2b49f776e8718a6eec4d4cfeb074962a5c06271",
       "source": "templates/app/deploy/autodeploy.sh.tmpl"
     },
     "deploy/autodeploy.timer": {
@@ -243,7 +243,7 @@
     },
     "deploy/backup.sh": {
       "mode": "full",
-      "sha256": "9141d3f0279cab37f601fc6d57864ce5dec5440e57bc5a1159f67c218e6d0876",
+      "sha256": "9f0953d394505c91748e60f1aaf7fdee2deb85b1483ed264917d2b407ffea1c3",
       "source": "templates/app/deploy/backup.sh.tmpl"
     },
     "deploy/backup.timer": {
@@ -431,12 +431,12 @@
     },
     "frontend/src/components/ui/checkbox.test.tsx": {
       "mode": "full",
-      "sha256": "c828586f600a9d7cecd0cd4773962213caaa25789b37c7e648cfc1d00040b52f",
+      "sha256": "93b7c258bf63d3ff59c8f6558dab0c8ee608e66b2a254b24801ef623e96a2bd6",
       "source": "templates/ui/frontend/src/components/ui/checkbox.test.tsx"
     },
     "frontend/src/components/ui/checkbox.tsx": {
       "mode": "full",
-      "sha256": "8a7e6fc99e7581ed6ca600f70ac908dd535b003e1a1bca2bbc1563f54e59bfe8",
+      "sha256": "d24a1ad67fcbc8649f4d30a2081ab2d766aeaa6289f19642f653973e39d4c94b",
       "source": "templates/ui/frontend/src/components/ui/checkbox.tsx"
     },
     "frontend/src/components/ui/confirm-dialog.test.tsx": {
@@ -677,7 +677,7 @@
     },
     "skills/std-backlog/SKILL.md": {
       "mode": "full",
-      "sha256": "24fc15a48fd17e3ef9f6b0468593ddfac0f5269b9357fbe14f19f9baf7bee2b5",
+      "sha256": "b34e21e85a76c995249d7acc73baebd75804208f46ec49581b48aad8f0822215",
       "source": "templates/common/skills/std-backlog/SKILL.md"
     },
     "skills/std-communication/SKILL.md": {

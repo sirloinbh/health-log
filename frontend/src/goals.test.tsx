@@ -515,7 +515,7 @@ test('a change after today is marked as coming, and one change can be deleted', 
     within(history).getByRole('button', { name: '2026-12-01 단백질 목표 변경 삭제' }),
   );
   const dialog = await screen.findByRole('dialog');
-  fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
   await waitFor(() => expect(screen.queryByText('(예정)')).not.toBeInTheDocument());
   expect(request(fetchMock, 1)).toEqual({
@@ -541,7 +541,9 @@ test('a deleted change stays gone even if reading the goals again fails', async 
   render(<GoalsSettings />);
   const history = await screen.findByRole('region', { name: '수면 목표 변경 기록' });
   fireEvent.click(within(history).getByRole('button', { name: '2026-11-05 수면 목표 변경 삭제' }));
-  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '삭제' }));
+  fireEvent.click(
+    within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }),
+  );
 
   expect(await screen.findByText('서버 오류')).toBeInTheDocument();
   expect(within(history).queryByText(/2026-11-05부터/)).not.toBeInTheDocument();
@@ -564,7 +566,7 @@ test('deleting a sober change says it stops counting from the week of its date',
   expect(
     await screen.findByText('삭제하면 그 날짜가 든 주부터 바로 앞의 목표로 판정합니다.'),
   ).toBeInTheDocument();
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '취소' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
   const sleep = screen.getByRole('region', { name: '수면 목표 변경 기록' });

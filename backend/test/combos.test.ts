@@ -114,13 +114,8 @@ test('each food in a combo follows the meal quantity rule', async () => {
 });
 
 test('a combo address must hold a valid id', async () => {
-  await rejects(
-    '/api/combos/abc',
-    { method: 'PUT', body: combo },
-    400,
-    '조합 ID가 올바르지 않습니다',
-  );
-  await rejects('/api/combos/0', { method: 'DELETE' }, 400, '조합 ID가 올바르지 않습니다');
+  await rejects('/api/combos/abc', { method: 'PUT', body: combo }, 400, 'Invalid 조합 ID');
+  await rejects('/api/combos/0', { method: 'DELETE' }, 400, 'Invalid 조합 ID');
 });
 
 test('recording a combo needs a meal, a real date and a valid combo id', async () => {
@@ -136,12 +131,7 @@ test('recording a combo needs a meal, a real date and a valid combo id', async (
     400,
     '요청 본문이 올바르지 않습니다',
   );
-  await rejects(
-    '/api/meals/2026-03-15/combos/x',
-    post({ meal: 'lunch' }),
-    400,
-    '조합 ID가 올바르지 않습니다',
-  );
+  await rejects('/api/meals/2026-03-15/combos/x', post({ meal: 'lunch' }), 400, 'Invalid 조합 ID');
   await rejects(
     '/api/meals/2026-02-30/combos/3',
     post({ meal: 'lunch' }),

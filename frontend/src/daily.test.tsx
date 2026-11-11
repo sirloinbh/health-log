@@ -108,7 +108,7 @@ test('the main menu opens the day the server counts as today', async () => {
   // Far from any real clock, so a browser-computed "today" would fail this.
   health({ today: '2026-03-15' });
   render(<App />);
-  const menu = screen.getByRole('navigation', { name: '주 메뉴' });
+  const menu = screen.getByRole('navigation', { name: 'Main menu' });
   fireEvent.click(within(menu).getByRole('link', { name: '하루 기록' }));
   expect(await screen.findByText('2026년 3월 15일 일요일')).toBeInTheDocument();
   expect(window.location.pathname).toBe('/daily/2026-03-15');
@@ -178,7 +178,7 @@ test('an unreachable server is reported instead of guessing today', async () => 
     vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
   );
   open('/daily');
-  expect(await screen.findByRole('alert')).toHaveTextContent('서버에 연결할 수 없습니다');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Cannot reach the server');
   expect(window.location.pathname).toBe('/daily');
 });
 
@@ -527,7 +527,7 @@ test("one failed check of the server keeps today's coming-up card (#48)", async 
       dayCard(url) ??
         (healthy
           ? new Response(JSON.stringify({ today: '2026-03-15' }))
-          : new Response(JSON.stringify({ error: '서버에 연결할 수 없습니다' }), { status: 503 })),
+          : new Response(JSON.stringify({ error: 'Cannot reach the server' }), { status: 503 })),
     ),
   );
   vi.stubGlobal('fetch', fetchMock);
@@ -535,7 +535,7 @@ test("one failed check of the server keeps today's coming-up card (#48)", async 
   await screen.findByText('7일 안에 다가오는 병원 예약이나 약 복용 종료가 없습니다.');
   healthy = false;
   fireEvent(document, new Event('visibilitychange'));
-  expect(await screen.findByText('서버에 연결할 수 없습니다')).toBeInTheDocument();
+  expect(await screen.findByText('Cannot reach the server')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: '다가오는 일정' })).toBeInTheDocument();
   expect(fetchMock.mock.calls.filter(([url]) => url === '/api/reminders')).toHaveLength(1);
 });

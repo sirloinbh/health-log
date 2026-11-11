@@ -324,7 +324,7 @@ test('the same name and brand conflict, while another brand does not', { skip },
 
     const again = await call('/api/foods', { method: 'POST', body: food });
     assert.equal(again.status, 409);
-    assert.equal(again.data.error, '이미 등록된 항목입니다');
+    assert.equal(again.data.error, 'This item already exists');
 
     const other = await call('/api/foods', { method: 'POST', body: { ...food, brand: 'B' } });
     assert.equal(other.status, 201);

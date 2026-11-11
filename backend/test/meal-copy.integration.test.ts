@@ -166,7 +166,7 @@ test('if one entry fails to copy, none of the meal is copied', { skip }, async (
         body: { from, meal: 'dinner' },
       });
       assert.equal(status, 500);
-      assert.equal(data.error, '서버 오류가 발생했습니다');
+      assert.equal(data.error, 'Server error');
     } finally {
       await dropTrigger();
     }

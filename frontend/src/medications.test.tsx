@@ -90,7 +90,7 @@ test('the main menu opens the medicine page, split into taken now and finished',
   serve(() => json(lists()));
   window.history.replaceState(null, '', '/');
   render(<App />);
-  const menu = screen.getByRole('navigation', { name: '주 메뉴' });
+  const menu = screen.getByRole('navigation', { name: 'Main menu' });
   fireEvent.click(within(menu).getByRole('link', { name: '약' }));
   expect(await screen.findByRole('heading', { level: 1, name: '약' })).toBeInTheDocument();
 
@@ -200,7 +200,7 @@ test('deleting asks first, removes the medicine and keeps keyboard focus on the 
   open();
   fireEvent.click(await screen.findByRole('button', { name: '가상캡슐 삭제' }));
   const confirm = screen.getByRole('dialog', { name: '약 기록을 삭제할까요?' });
-  fireEvent.click(within(confirm).getByRole('button', { name: '삭제' }));
+  fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
 
   expect(await screen.findByText('끝난 약이 없습니다.')).toBeInTheDocument();
   expect(writes(fetchMock)[0][0]).toBe('/api/medications/4');

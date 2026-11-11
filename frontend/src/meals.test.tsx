@@ -408,7 +408,7 @@ test('deleting asks first, updates the totals, and returns focus to the card', a
   render(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: '버거집 치즈버거 삭제' }));
   expect(fetchMock).toHaveBeenCalledTimes(1);
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
 
   expect(await screen.findByText('아직 기록한 식사가 없습니다.')).toBeInTheDocument();
   expect(request(fetchMock, 1)).toEqual({
@@ -425,7 +425,7 @@ test('cancelling a delete returns focus to its own button', async () => {
   const remove = await screen.findByRole('button', { name: '버거집 치즈버거 삭제' });
   remove.focus();
   fireEvent.click(remove);
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '취소' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
   await waitFor(() =>
     expect(screen.getByRole('button', { name: '버거집 치즈버거 삭제' })).toHaveFocus(),
   );
@@ -441,7 +441,7 @@ test('an entry gone but the day unreadable does not claim success, and offers an
   );
   render(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: '버거집 치즈버거 삭제' }));
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
   expect(shown).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
@@ -458,7 +458,7 @@ test('an entry already gone counts as deleted and the day is read again', async 
   );
   render(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: '버거집 치즈버거 삭제' }));
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
   expect(await screen.findByText('아직 기록한 식사가 없습니다.')).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(3);
 });
@@ -468,7 +468,7 @@ test('a failed delete says why and keeps the entry and the dialog', async () => 
   server({ body: oneEntry }, { status: 500, body: { error: '서버 오류가 발생했습니다' } });
   render(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: '버거집 치즈버거 삭제' }));
-  const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' });
+  const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' });
   fireEvent.click(confirm);
   await waitFor(() => expect(confirm).toBeEnabled());
   expect(shown).toHaveBeenCalledWith('서버 오류가 발생했습니다');
@@ -576,7 +576,7 @@ test('a read started before an entry was recorded does not undo it on screen', a
   );
   render(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: '버거집 치즈버거 삭제' }));
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
   await screen.findByRole('alert');
   fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
 
@@ -638,7 +638,7 @@ test('losing the answer after leaving the day does not claim it was not recorded
   lose(new TypeError('Failed to fetch'));
   await waitFor(() =>
     expect(shown).toHaveBeenCalledWith(
-      '2026-03-15 식사를 기록했는지 확인하지 못했습니다: 서버에 연결할 수 없습니다',
+      '2026-03-15 식사를 기록했는지 확인하지 못했습니다: Cannot reach the server',
     ),
   );
   shown.mockRestore();

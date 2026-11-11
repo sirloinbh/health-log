@@ -87,7 +87,7 @@ const search = async (dialog: HTMLElement) => {
 test('the main menu opens the combos page', async () => {
   serve(() => json({ combos: [] }));
   render(<App />);
-  const menu = screen.getByRole('navigation', { name: '주 메뉴' });
+  const menu = screen.getByRole('navigation', { name: 'Main menu' });
   fireEvent.click(within(menu).getByRole('link', { name: '조합' }));
   expect(await screen.findByRole('heading', { level: 1, name: '조합' })).toBeInTheDocument();
   expect(await screen.findByText('조합이 없습니다')).toBeInTheDocument();
@@ -248,7 +248,7 @@ test('deleting asks first, reads the list again, and keeps keyboard focus on the
   fireEvent.click(await screen.findByRole('button', { name: '아침 세트 삭제' }));
   const question = await screen.findByRole('dialog');
   expect(question).toHaveTextContent('이미 기록한 식사는 그대로 남습니다');
-  fireEvent.click(within(question).getByRole('button', { name: '삭제' }));
+  fireEvent.click(within(question).getByRole('button', { name: 'Delete' }));
 
   expect(await screen.findByText('조합이 없습니다')).toBeInTheDocument();
   expect(writes(fetchMock).map(([url, init]) => [url, init?.method])).toEqual([
@@ -275,7 +275,9 @@ test('a deleted combo leaves the screen before the list is read again', async ()
   });
   open();
   fireEvent.click(await screen.findByRole('button', { name: '아침 세트 삭제' }));
-  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '삭제' }));
+  fireEvent.click(
+    within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }),
+  );
 
   await vi.waitFor(() =>
     expect(screen.queryByRole('heading', { level: 2, name: '아침 세트' })).not.toBeInTheDocument(),
@@ -296,7 +298,9 @@ test('a combo already gone counts as deleted', async () => {
   });
   open();
   fireEvent.click(await screen.findByRole('button', { name: '아침 세트 삭제' }));
-  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '삭제' }));
+  fireEvent.click(
+    within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }),
+  );
   expect(await screen.findByText('조합이 없습니다')).toBeInTheDocument();
 });
 
@@ -520,7 +524,9 @@ test('a list already shown keeps a way to read again when reading after a delete
   });
   open();
   fireEvent.click(await screen.findByRole('button', { name: '아침 세트 삭제' }));
-  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '삭제' }));
+  fireEvent.click(
+    within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }),
+  );
   expect(await screen.findByRole('alert')).toHaveTextContent('가상 서버 오류');
   failReads = false;
   fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));

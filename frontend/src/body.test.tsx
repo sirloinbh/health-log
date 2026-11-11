@@ -391,7 +391,7 @@ test('deleting asks first, then offers the form again and reloads the trend', as
       (args) => (args as unknown as [string, RequestInit])[1]?.method === 'DELETE',
     ),
   ).toBe(false);
-  fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
   expect(await screen.findByLabelText('체중 (kg)')).toHaveValue('');
   expect(success).toHaveBeenCalledWith('삭제했습니다');
@@ -413,7 +413,7 @@ test('a record another tab already deleted counts as deleted', async () => {
   render(<BodyCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
   const dialog = screen.getByRole('dialog', { name: '신체 기록을 삭제할까요?' });
-  fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
   expect(await screen.findByLabelText('체중 (kg)')).toBeInTheDocument();
 });
 
@@ -469,7 +469,7 @@ test('a failed delete says why and keeps the record and the dialog', async () =>
   });
   render(<BodyCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
-  const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' });
+  const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' });
   fireEvent.click(confirm);
   await waitFor(() => expect(confirm).toBeEnabled());
   expect(shown).toHaveBeenCalledWith('서버 오류가 발생했습니다');

@@ -18,14 +18,7 @@ function deferred() {
 
 test('the trigger opens a named dialog; confirming runs the action and closes it', () => {
   const onConfirm = vi.fn();
-  render(
-    <ConfirmDialog
-      title="Delete this entry?"
-      description="This cannot be undone."
-      onConfirm={onConfirm}
-      trigger={<Button>Delete item</Button>}
-    />,
-  );
+  render(<ConfirmDialog title="Delete this entry?" description="This cannot be undone." onConfirm={onConfirm} trigger={<Button>Delete item</Button>} />);
   fireEvent.click(screen.getByRole('button', { name: 'Delete item' }));
   const dialog = screen.getByRole('dialog', { name: 'Delete this entry?' });
   expect(dialog).toHaveAccessibleDescription('This cannot be undone.');
@@ -37,13 +30,7 @@ test('the trigger opens a named dialog; confirming runs the action and closes it
 
 test('cancel closes without running the action', () => {
   const onConfirm = vi.fn();
-  render(
-    <ConfirmDialog
-      title="Delete this goal?"
-      onConfirm={onConfirm}
-      trigger={<Button>Delete item</Button>}
-    />,
-  );
+  render(<ConfirmDialog title="Delete this goal?" onConfirm={onConfirm} trigger={<Button>Delete item</Button>} />);
   fireEvent.click(screen.getByRole('button', { name: 'Delete item' }));
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(onConfirm).not.toHaveBeenCalled();
@@ -52,13 +39,7 @@ test('cancel closes without running the action', () => {
 
 test('while the action runs the buttons wait; the dialog closes when it succeeds', async () => {
   const work = deferred();
-  render(
-    <ConfirmDialog
-      title="Delete it?"
-      onConfirm={() => work.promise}
-      trigger={<Button>Open</Button>}
-    />,
-  );
+  render(<ConfirmDialog title="Delete it?" onConfirm={() => work.promise} trigger={<Button>Open</Button>} />);
   fireEvent.click(screen.getByRole('button', { name: 'Open' }));
   fireEvent.click(screen.getByRole('button', { name: /Delete/ }));
   expect(screen.getByRole('button', { name: /Delete/ })).toBeDisabled();
@@ -70,13 +51,7 @@ test('while the action runs the buttons wait; the dialog closes when it succeeds
 
 test('a failed action leaves the dialog open so the screen can show why', async () => {
   const work = deferred();
-  render(
-    <ConfirmDialog
-      title="Delete it?"
-      onConfirm={() => work.promise}
-      trigger={<Button>Open</Button>}
-    />,
-  );
+  render(<ConfirmDialog title="Delete it?" onConfirm={() => work.promise} trigger={<Button>Open</Button>} />);
   fireEvent.click(screen.getByRole('button', { name: 'Open' }));
   fireEvent.click(screen.getByRole('button', { name: /Delete/ }));
   work.reject();
@@ -90,14 +65,7 @@ test('it can be controlled, e.g. opened for the row the user picked', () => {
     return (
       <>
         <Button onClick={() => setTarget('Mar 2')}>Delete Mar 2</Button>
-        <ConfirmDialog
-          open={target !== null}
-          onOpenChange={(open) => !open && setTarget(null)}
-          title={`Delete the ${target ?? ''} entry?`}
-          confirmLabel="Remove"
-          destructive={false}
-          onConfirm={() => setTarget(null)}
-        />
+        <ConfirmDialog open={target !== null} onOpenChange={(open) => !open && setTarget(null)} title={`Delete the ${target ?? ''} entry?`} confirmLabel="Remove" destructive={false} onConfirm={() => setTarget(null)} />
       </>
     );
   }
@@ -116,13 +84,7 @@ function ControlledWithReturn() {
       <Button ref={opener} onClick={() => setOpen(true)}>
         Change status
       </Button>
-      <ConfirmDialog
-        open={open}
-        onOpenChange={setOpen}
-        title="Change it?"
-        onConfirm={() => setOpen(false)}
-        returnFocusRef={opener}
-      />
+      <ConfirmDialog open={open} onOpenChange={setOpen} title="Change it?" onConfirm={() => setOpen(false)} returnFocusRef={opener} />
     </>
   );
 }
@@ -143,14 +105,7 @@ test('with a trigger, closing still returns focus to the trigger', async () => {
 
 test('an empty returnFocusRef keeps the trigger behaviour', async () => {
   const empty = React.createRef<HTMLElement>();
-  render(
-    <ConfirmDialog
-      title="Delete it?"
-      onConfirm={vi.fn()}
-      trigger={<Button>Open</Button>}
-      returnFocusRef={empty}
-    />,
-  );
+  render(<ConfirmDialog title="Delete it?" onConfirm={vi.fn()} trigger={<Button>Open</Button>} returnFocusRef={empty} />);
   fireEvent.click(screen.getByRole('button', { name: 'Open' }));
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Open' })).toHaveFocus());

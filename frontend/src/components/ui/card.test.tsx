@@ -3,15 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
 import { Badge } from './badge';
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from './card';
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './card';
 
 test('a card shows its parts, and the title heading level follows the page', () => {
   render(

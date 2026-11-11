@@ -21,9 +21,7 @@ test('an empty state names the situation and offers the next step', () => {
 });
 
 test('the heading level can follow the page, and the icon is decorative', () => {
-  const { container } = render(
-    <EmptyState title="No results" headingLevel="h3" icon={<InboxIcon />} />,
-  );
+  const { container } = render(<EmptyState title="No results" headingLevel="h3" icon={<InboxIcon />} />);
   expect(screen.getByRole('heading', { level: 3, name: 'No results' })).toBeInTheDocument();
   expect(container.querySelector('[aria-hidden="true"] svg')).not.toBeNull();
 });

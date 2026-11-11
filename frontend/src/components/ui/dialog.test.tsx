@@ -3,16 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
 import { Button } from './button';
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from './dialog';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './dialog';
 
 function Confirm() {
   return (

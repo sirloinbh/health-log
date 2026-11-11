@@ -3,16 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, expect, test } from 'vitest';
 
 import { Button } from './button';
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from './drawer';
+import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from './drawer';
 
 // jsdom has no matchMedia, which vaul reads.
 beforeAll(() => {

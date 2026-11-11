@@ -46,18 +46,12 @@ function DropdownMenuItem({
   className,
   variant = 'default',
   ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Item> & {
-  variant?: 'default' | 'destructive';
-}) {
+}: React.ComponentProps<typeof DropdownMenuPrimitive.Item> & { variant?: 'default' | 'destructive' }) {
   return (
     <DropdownMenuPrimitive.Item
       data-slot="dropdown-menu-item"
       data-variant={variant}
-      className={cn(
-        itemClass,
-        'data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10',
-        className,
-      )}
+      className={cn(itemClass, 'data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10', className)}
       {...props}
     />
   );
@@ -69,11 +63,7 @@ function DropdownMenuCheckboxItem({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.CheckboxItem>) {
   return (
-    <DropdownMenuPrimitive.CheckboxItem
-      data-slot="dropdown-menu-checkbox-item"
-      className={cn(itemClass, 'pl-8', className)}
-      {...props}
-    >
+    <DropdownMenuPrimitive.CheckboxItem data-slot="dropdown-menu-checkbox-item" className={cn(itemClass, 'pl-8', className)} {...props}>
       <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
         <DropdownMenuPrimitive.ItemIndicator>
           <CheckIcon className="size-4" aria-hidden />
@@ -84,23 +74,13 @@ function DropdownMenuCheckboxItem({
   );
 }
 
-function DropdownMenuRadioGroup(
-  props: React.ComponentProps<typeof DropdownMenuPrimitive.RadioGroup>,
-) {
+function DropdownMenuRadioGroup(props: React.ComponentProps<typeof DropdownMenuPrimitive.RadioGroup>) {
   return <DropdownMenuPrimitive.RadioGroup data-slot="dropdown-menu-radio-group" {...props} />;
 }
 
-function DropdownMenuRadioItem({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.RadioItem>) {
+function DropdownMenuRadioItem({ className, children, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.RadioItem>) {
   return (
-    <DropdownMenuPrimitive.RadioItem
-      data-slot="dropdown-menu-radio-item"
-      className={cn(itemClass, 'pl-8', className)}
-      {...props}
-    >
+    <DropdownMenuPrimitive.RadioItem data-slot="dropdown-menu-radio-item" className={cn(itemClass, 'pl-8', className)} {...props}>
       <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
         <DropdownMenuPrimitive.ItemIndicator>
           <CircleIcon className="size-2 fill-current" aria-hidden />
@@ -111,10 +91,7 @@ function DropdownMenuRadioItem({
   );
 }
 
-function DropdownMenuLabel({
-  className,
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Label>) {
+function DropdownMenuLabel({ className, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Label>) {
   return (
     <DropdownMenuPrimitive.Label
       data-slot="dropdown-menu-label"
@@ -124,17 +101,8 @@ function DropdownMenuLabel({
   );
 }
 
-function DropdownMenuSeparator({
-  className,
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Separator>) {
-  return (
-    <DropdownMenuPrimitive.Separator
-      data-slot="dropdown-menu-separator"
-      className={cn('-mx-1 my-1 h-px bg-border', className)}
-      {...props}
-    />
-  );
+function DropdownMenuSeparator({ className, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Separator>) {
+  return <DropdownMenuPrimitive.Separator data-slot="dropdown-menu-separator" className={cn('-mx-1 my-1 h-px bg-border', className)} {...props} />;
 }
 
 export {

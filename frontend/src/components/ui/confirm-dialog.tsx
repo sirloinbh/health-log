@@ -2,16 +2,7 @@
 import * as React from 'react';
 
 import { Button } from './button';
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from './dialog';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './dialog';
 import { Spinner } from './spinner';
 
 // Asks before a destructive action such as delete (#311), instead of the browser's confirm().
@@ -94,12 +85,7 @@ function ConfirmDialog({
               {cancelLabel}
             </Button>
           </DialogClose>
-          <Button
-            variant={destructive ? 'destructive' : 'default'}
-            disabled={pending}
-            aria-busy={pending || undefined}
-            onClick={confirm}
-          >
+          <Button variant={destructive ? 'destructive' : 'default'} disabled={pending} aria-busy={pending || undefined} onClick={confirm}>
             {pending ? <Spinner size="sm" label="Working" /> : null}
             {confirmLabel}
           </Button>

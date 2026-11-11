@@ -29,24 +29,16 @@ afterEach(() => {
 
 test('the frame has a skip link, the app name, a main region and a footer', () => {
   renderAt('/');
-  expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveAttribute(
-    'href',
-    '#main',
-  );
+  expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveAttribute('href', '#main');
   expect(screen.getByRole('link', { name: 'Sample App' })).toHaveAttribute('href', '/');
-  expect(screen.getByRole('main')).toContainElement(
-    screen.getByRole('heading', { level: 1, name: 'Page' }),
-  );
+  expect(screen.getByRole('main')).toContainElement(screen.getByRole('heading', { level: 1, name: 'Page' }));
   expect(screen.getByRole('contentinfo')).toHaveTextContent('Sample App');
 });
 
 test('the sidebar menu marks the current page', () => {
   renderAt('/journal');
   const menu = screen.getByRole('navigation', { name: 'Main menu' });
-  expect(within(menu).getByRole('link', { name: 'Journal' })).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  expect(within(menu).getByRole('link', { name: 'Journal' })).toHaveAttribute('aria-current', 'page');
   expect(within(menu).getByRole('link', { name: 'Overview' })).not.toHaveAttribute('aria-current');
 });
 
@@ -56,11 +48,10 @@ test('the menu button opens the menu as a sheet, and choosing a page closes it',
   const sheet = screen.getByRole('dialog', { name: 'Sample App' });
   fireEvent.click(within(sheet).getByRole('link', { name: 'Journal' }));
   expect(screen.queryByRole('dialog')).toBeNull();
-  expect(
-    within(screen.getByRole('navigation', { name: 'Main menu' })).getByRole('link', {
-      name: 'Journal',
-    }),
-  ).toHaveAttribute('aria-current', 'page');
+  expect(within(screen.getByRole('navigation', { name: 'Main menu' })).getByRole('link', { name: 'Journal' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
 });
 
 test.skipIf(DARK_ONLY)('the mode menu switches to dark and remembers it', () => {

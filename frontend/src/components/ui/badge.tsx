@@ -11,10 +11,8 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: 'border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary/90',
-        secondary:
-          'border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90',
-        destructive:
-          'border-transparent bg-destructive text-white dark:bg-destructive/60 [a&]:hover:bg-destructive/90',
+        secondary: 'border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90',
+        destructive: 'border-transparent bg-destructive text-white dark:bg-destructive/60 [a&]:hover:bg-destructive/90',
         success: 'border-transparent bg-success text-success-foreground',
         warning: 'border-transparent bg-warning text-warning-foreground',
         outline: 'text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
@@ -31,9 +29,7 @@ function Badge({
   ...props
 }: React.ComponentProps<'span'> & VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot.Root : 'span';
-  return (
-    <Comp data-slot="badge" className={cn(badgeVariants({ variant }), className)} {...props} />
-  );
+  return <Comp data-slot="badge" className={cn(badgeVariants({ variant }), className)} {...props} />;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components -- shadcn/ui exports the variants next to the component.

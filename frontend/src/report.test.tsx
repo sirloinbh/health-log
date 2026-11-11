@@ -649,7 +649,7 @@ test('one failed check of the server keeps the report already on screen', async 
           ? json(noReminders)
           : healthy
             ? json({ today })
-            : json({ error: '서버에 연결할 수 없습니다' }, 503),
+            : json({ error: 'Cannot reach the server' }, 503),
     ),
   );
   vi.stubGlobal('fetch', fetchMock);
@@ -658,7 +658,7 @@ test('one failed check of the server keeps the report already on screen', async 
   healthy = false;
   // Returning to the tab checks the server again.
   document.dispatchEvent(new Event('visibilitychange'));
-  expect(await screen.findByRole('alert')).toHaveTextContent('서버에 연결할 수 없습니다');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Cannot reach the server');
   expect(screen.getByText('11월 2일 ~ 11월 8일')).toBeInTheDocument();
   expect(stat('평균 수면')).toHaveTextContent('7시간 30분');
   expect(screen.queryByText(/서버의 오늘 날짜를 알 수 없어/)).not.toBeInTheDocument();

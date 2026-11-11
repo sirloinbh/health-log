@@ -64,7 +64,7 @@ test('the main menu opens the clinic page, which lists visits with their procedu
   serve(() => json({ visits: [visit], more: false }));
   window.history.replaceState(null, '', '/');
   render(<App />);
-  const menu = screen.getByRole('navigation', { name: '주 메뉴' });
+  const menu = screen.getByRole('navigation', { name: 'Main menu' });
   fireEvent.click(within(menu).getByRole('link', { name: '병원' }));
   expect(await screen.findByRole('heading', { level: 1, name: '병원' })).toBeInTheDocument();
 
@@ -235,7 +235,7 @@ test('deleting asks first, removes the visit and keeps keyboard focus on the pag
   fireEvent.click(await screen.findByRole('button', { name: '2026-03-10 가상피부과 삭제' }));
   const confirm = screen.getByRole('dialog', { name: '병원 방문 기록을 삭제할까요?' });
   expect(writes(fetchMock)).toHaveLength(0);
-  fireEvent.click(within(confirm).getByRole('button', { name: '삭제' }));
+  fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
 
   expect(await screen.findByText('병원 기록이 없습니다')).toBeInTheDocument();
   expect(writes(fetchMock)[0][0]).toBe('/api/visits/7');

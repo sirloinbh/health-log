@@ -65,7 +65,7 @@ test('the same kind and unit may appear once, and a day holds at most 20 drinks'
 test('a record has to say something about drinking or smoking', async () => {
   await rejects({}, '하나 이상');
   await rejects({ cigarettes: null, drinks: null }, '하나 이상');
-  await rejects(null, '요청 본문');
+  await rejects(null, 'Request body is not valid JSON');
 });
 
 test('a date that does not exist is rejected everywhere', async () => {

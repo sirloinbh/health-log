@@ -209,20 +209,20 @@ test('the done button says what it hides, and that it is busy', async () => {
 test('any other failure keeps the reminder for another try', async () => {
   serve((url) =>
     url === '/api/reminders/done'
-      ? json({ error: '서버에 연결할 수 없습니다' }, 503)
+      ? json({ error: 'Cannot reach the server' }, 503)
       : json(listOf([appointment])),
   );
   show();
   const button = await screen.findByRole('button', { name: '가상피부과 · 피부과 예약 알림 완료' });
   fireEvent.click(button);
-  expect(await screen.findByRole('alert')).toHaveTextContent('서버에 연결할 수 없습니다');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Cannot reach the server');
   expect(button).toBeInTheDocument();
   expect(button).not.toHaveAttribute('aria-disabled');
 });
 
 test('a failed load can be tried again, and focus stays in the card', async () => {
   let fail = true;
-  serve(() => (fail ? json({ error: '서버에 연결할 수 없습니다' }, 503) : json(listOf([later]))));
+  serve(() => (fail ? json({ error: 'Cannot reach the server' }, 503) : json(listOf([later]))));
   show();
   const retry = await screen.findByRole('button', { name: '다시 시도' });
   fail = false;
@@ -275,7 +275,7 @@ test('reminders failing to load leave the rest of the dashboard alone', async ()
     vi.fn((url: string) =>
       Promise.resolve(
         url === '/api/reminders'
-          ? json({ error: '서버에 연결할 수 없습니다' }, 503)
+          ? json({ error: 'Cannot reach the server' }, 503)
           : url.startsWith('/api/report')
             ? json({ error: '리포트 없음' }, 500)
             : json({ today: '2026-03-15' }),
@@ -285,7 +285,7 @@ test('reminders failing to load leave the rest of the dashboard alone', async ()
   window.history.replaceState(null, '', '/');
   render(<App />);
   // Each keeps its own word and its own retry.
-  expect(await screen.findByText('서버에 연결할 수 없습니다')).toBeInTheDocument();
+  expect(await screen.findByText('Cannot reach the server')).toBeInTheDocument();
   expect(await screen.findByText('리포트 없음')).toBeInTheDocument();
   expect(screen.getAllByRole('button', { name: '다시 시도' })).toHaveLength(2);
   expect(screen.getByRole('heading', { level: 1, name: '대시보드' })).toBeInTheDocument();

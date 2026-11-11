@@ -161,7 +161,7 @@ test('an invalid id and a missing food answer in Korean', async () => {
   await withApi(pool, async (call) => {
     const badId = await call('/api/foods/abc', { method: 'PUT', body: valid });
     assert.equal(badId.status, 400);
-    assert.equal(badId.data.error, '음식 ID가 올바르지 않습니다');
+    assert.equal(badId.data.error, 'Invalid 음식 ID');
 
     const missing = await call('/api/foods/9', { method: 'PUT', body: valid });
     assert.equal(missing.status, 404);

@@ -115,7 +115,7 @@ test('deleting asks first, then the form returns with focus on the card', async 
   fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
   expect(fetchMock).toHaveBeenCalledTimes(1);
   const dialog = screen.getByRole('dialog', { name: '수면 기록을 삭제할까요?' });
-  fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
   expect(await screen.findByLabelText('취침 시각')).toHaveValue('');
   expect(fetchMock.mock.calls[1]).toEqual([
@@ -129,7 +129,7 @@ test('a record already gone counts as deleted', async () => {
   server({ body: { record } }, { status: 404, body: { error: '수면 기록을 찾을 수 없습니다' } });
   render(<SleepCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
   expect(await screen.findByLabelText('취침 시각')).toBeInTheDocument();
 });
 
@@ -138,7 +138,7 @@ test('a failed delete says why and keeps the record and the dialog', async () =>
   server({ body: { record } }, { status: 500, body: { error: '서버 오류가 발생했습니다' } });
   render(<SleepCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
-  const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' });
+  const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' });
   fireEvent.click(confirm);
   await waitFor(() => expect(confirm).toBeEnabled());
   expect(shown).toHaveBeenCalledWith('서버 오류가 발생했습니다');

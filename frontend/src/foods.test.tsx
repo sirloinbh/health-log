@@ -48,7 +48,7 @@ const foodCalls = (fetchMock: ReturnType<typeof serve>) =>
 test('the main menu opens the foods page', async () => {
   serve(() => json({ foods: [] }));
   render(<App />);
-  const menu = screen.getByRole('navigation', { name: '주 메뉴' });
+  const menu = screen.getByRole('navigation', { name: 'Main menu' });
   fireEvent.click(within(menu).getByRole('link', { name: '음식' }));
   expect(await screen.findByRole('heading', { level: 1, name: '음식' })).toBeInTheDocument();
   expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
@@ -247,7 +247,7 @@ test('a save in progress cannot be cancelled or closed', async () => {
   const cancel = within(dialog).getByRole('button', { name: '취소' });
   expect(cancel).toHaveAttribute('aria-disabled', 'true');
   fireEvent.click(cancel);
-  fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
   fireEvent.keyDown(dialog, { key: 'Escape' });
   expect(screen.getByRole('dialog')).toBeInTheDocument();
 

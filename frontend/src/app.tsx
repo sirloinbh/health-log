@@ -69,7 +69,7 @@ function useHealth() {
               : { state: 'error', message: data.error ?? '서버 상태를 확인할 수 없습니다' },
           );
         })
-        .catch(() => report({ state: 'error', message: '서버에 연결할 수 없습니다' }));
+        .catch(() => report({ state: 'error', message: 'Cannot reach the server' }));
     };
     const checkWhenVisible = () => {
       if (document.visibilityState === 'visible') check();

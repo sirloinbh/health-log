@@ -163,7 +163,7 @@ test('deleting asks first, then reloads the rates without the day', async () => 
   fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
   const dialog = await screen.findByRole('dialog', { name: '하루 체크를 삭제할까요?' });
   expect(fetchMock).toHaveBeenCalledTimes(1);
-  fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
   expect(await screen.findByRole('button', { name: '저장' })).toBeInTheDocument();
   expect(request(fetchMock, 1)).toEqual({
@@ -334,7 +334,7 @@ test('a failed delete says why and keeps the check and the dialog', async () => 
   );
   render(<ChecksCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
-  const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' });
+  const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' });
   fireEvent.click(confirm);
   await waitFor(() => expect(confirm).toBeEnabled());
   expect(shown).toHaveBeenCalledWith('서버 오류가 발생했습니다');

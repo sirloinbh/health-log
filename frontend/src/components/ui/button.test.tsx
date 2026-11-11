@@ -29,8 +29,14 @@ test('variants and sizes change the classes, and touch screens get 44px', () => 
       <Button variant="outline" size="icon" aria-label="Close" />
     </>,
   );
-  expect(screen.getByRole('button', { name: 'Delete' })).toHaveClass('bg-destructive', 'pointer-coarse:min-h-11');
-  expect(screen.getByRole('button', { name: 'Close' })).toHaveClass('border', 'pointer-coarse:size-11');
+  expect(screen.getByRole('button', { name: 'Delete' })).toHaveClass(
+    'bg-destructive',
+    'pointer-coarse:min-h-11',
+  );
+  expect(screen.getByRole('button', { name: 'Close' })).toHaveClass(
+    'border',
+    'pointer-coarse:size-11',
+  );
 });
 
 test('asChild renders the child element, e.g. a link', () => {

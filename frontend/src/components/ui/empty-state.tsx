@@ -29,12 +29,17 @@ function EmptyState({
       {...props}
     >
       {icon ? (
-        <div className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground [&_svg]:size-6" aria-hidden>
+        <div
+          className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground [&_svg]:size-6"
+          aria-hidden
+        >
           {icon}
         </div>
       ) : null}
       <Heading className="text-body font-semibold">{title}</Heading>
-      {description ? <p className="max-w-sm text-body-sm text-muted-foreground">{description}</p> : null}
+      {description ? (
+        <p className="max-w-sm text-body-sm text-muted-foreground">{description}</p>
+      ) : null}
       {action ? <div className="mt-2">{action}</div> : null}
     </section>
   );

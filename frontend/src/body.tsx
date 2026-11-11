@@ -26,17 +26,17 @@ import { trackWrite, writesSettled } from './pending-writes';
 const pathOf = (date: string) => `/api/body/${date}`;
 
 const numberFields = [
-  { key: 'weightKg', id: 'body-weight', label: '체중 (kg)' },
-  { key: 'bodyFatPercent', id: 'body-fat', label: '체지방률 (%)' },
-  { key: 'waistCm', id: 'body-waist', label: '허리둘레 (cm)' },
-  { key: 'systolicMmhg', id: 'body-systolic', label: '수축기 혈압 (mmHg)' },
-  { key: 'diastolicMmhg', id: 'body-diastolic', label: '이완기 혈압 (mmHg)' },
+  { key: 'weightKg', id: 'body-weight', label: 'Weight (kg)' },
+  { key: 'bodyFatPercent', id: 'body-fat', label: 'Body fat (%)' },
+  { key: 'waistCm', id: 'body-waist', label: 'Waist (cm)' },
+  { key: 'systolicMmhg', id: 'body-systolic', label: 'Systolic blood pressure (mmHg)' },
+  { key: 'diastolicMmhg', id: 'body-diastolic', label: 'Diastolic blood pressure (mmHg)' },
 ] as const;
 
 const changeRows = [
-  { key: 'weightKg', label: '체중', unit: 'kg' },
-  { key: 'bodyFatPercent', label: '체지방률', unit: '%' },
-  { key: 'waistCm', label: '허리둘레', unit: 'cm' },
+  { key: 'weightKg', label: 'Weight', unit: 'kg' },
+  { key: 'bodyFatPercent', label: 'Body fat', unit: '%' },
+  { key: 'waistCm', label: 'Waist', unit: 'cm' },
 ] as const;
 
 type NumberKey = (typeof numberFields)[number]['key'];
@@ -105,7 +105,7 @@ function BodyForm({
     } catch (cause) {
       // Moving to another day removes this form, and the record still was not saved.
       if (!mounted.current) {
-        toast.error(`${date} 신체 기록을 저장하지 못했습니다: ${errorText(cause)}`);
+        toast.error(`Could not save the body record for ${date}: ${errorText(cause)}`);
         return;
       }
       error(cause);
@@ -132,7 +132,7 @@ function BodyForm({
         ))}
       </div>
       <div className="flex flex-col gap-2">
-        <Label htmlFor="body-memo">메모</Label>
+        <Label htmlFor="body-memo">Note</Label>
         <Input
           id="body-memo"
           value={form.memo}
@@ -142,12 +142,12 @@ function BodyForm({
       <Notice notice={notice} />
       <div className="flex flex-wrap gap-2">
         <BusyButton type="submit" busy={saving} aria-busy={saving || undefined}>
-          {saving ? <Spinner size="sm" label="저장하는 중" /> : null}
-          저장
+          {saving ? <Spinner size="sm" label="Saving" /> : null}
+          Save
         </BusyButton>
         {onCancel ? (
           <BusyButton type="button" variant="outline" busy={saving} onClick={onCancel}>
-            취소
+            Cancel
           </BusyButton>
         ) : null}
       </div>
@@ -165,9 +165,9 @@ function BodySummary({
   onDelete: () => Promise<unknown>;
 }) {
   const shown = [
-    { label: '체중', value: record.weightKg, unit: 'kg' },
-    { label: '체지방률', value: record.bodyFatPercent, unit: '%' },
-    { label: '허리둘레', value: record.waistCm, unit: 'cm' },
+    { label: 'Weight', value: record.weightKg, unit: 'kg' },
+    { label: 'Body fat', value: record.bodyFatPercent, unit: '%' },
+    { label: 'Waist', value: record.waistCm, unit: 'cm' },
   ].filter((item) => item.value !== null);
   return (
     <div className="flex flex-col gap-4">
@@ -183,7 +183,7 @@ function BodySummary({
         ))}
         {record.systolicMmhg !== null ? (
           <div>
-            <dt className="text-muted-foreground">혈압</dt>
+            <dt className="text-muted-foreground">Blood pressure</dt>
             <dd>
               {record.systolicMmhg}/{record.diastolicMmhg}mmHg
             </dd>
@@ -191,22 +191,22 @@ function BodySummary({
         ) : null}
         {record.memo ? (
           <div className="col-span-2">
-            <dt className="text-muted-foreground">메모</dt>
+            <dt className="text-muted-foreground">Note</dt>
             <dd className="break-words">{record.memo}</dd>
           </div>
         ) : null}
       </dl>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={onEdit}>
-          수정
+          Edit
         </Button>
         <ConfirmDialog
-          title="신체 기록을 삭제할까요?"
-          description="삭제하면 되돌릴 수 없습니다."
+          title="Delete this body record?"
+          description="This cannot be undone."
           onConfirm={onDelete}
           trigger={
             <Button variant="outline" size="sm">
-              삭제
+              Delete
             </Button>
           }
         />
@@ -221,15 +221,15 @@ function BodyChanges({ date, records }: { date: string; records: BodyRecord[] })
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-body-sm">
-        <caption className="pb-2 text-left font-medium">기간별 변화</caption>
+        <caption className="pb-2 text-left font-medium">Change over time</caption>
         <thead className="text-muted-foreground">
           <tr>
             <th scope="col" className="py-1 pr-2 font-normal">
-              항목
+              Measurement
             </th>
             {changeWindows.map((days) => (
               <th key={days} scope="col" className="px-2 py-1 font-normal">
-                {days}일
+                {days} days
               </th>
             ))}
           </tr>
@@ -253,7 +253,7 @@ function BodyChanges({ date, records }: { date: string; records: BodyRecord[] })
                         </span>
                       </>
                     ) : (
-                      '기록 부족'
+                      'Not enough records'
                     )}
                   </td>
                 );
@@ -312,7 +312,7 @@ export function BodyCard({ date }: { date: string }) {
     } catch {
       // Says which part failed: the record above has its own message for the same outage.
       if (live.current && request === latestHistory.current) {
-        changesError('기간별 변화를 불러오지 못했습니다');
+        changesError('Could not load the changes over time');
       }
     }
   }, [changesClear, changesError, date]);
@@ -359,7 +359,7 @@ export function BodyCard({ date }: { date: string }) {
         throw cause;
       }
     }
-    toast.success('삭제했습니다');
+    toast.success('Deleted');
     finish(null);
     void loadHistory();
   };
@@ -368,7 +368,7 @@ export function BodyCard({ date }: { date: string }) {
     <Card>
       <CardHeader>
         <div ref={heading} tabIndex={-1} className="outline-none">
-          <CardTitle asHeading="h2">신체</CardTitle>
+          <CardTitle asHeading="h2">Body</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -384,11 +384,11 @@ export function BodyCard({ date }: { date: string }) {
               setMoveFocus((count) => count + 1);
             }}
           >
-            다시 시도
+            Try again
           </Button>
         ) : null}
         {!notice && record === undefined ? (
-          <div role="status" aria-busy="true" aria-label="신체 기록 불러오는 중">
+          <div role="status" aria-busy="true" aria-label="Loading body records">
             <SkeletonText lines={2} />
           </div>
         ) : null}
@@ -397,7 +397,7 @@ export function BodyCard({ date }: { date: string }) {
             date={date}
             record={record}
             onSaved={(saved) => {
-              toast.success('저장했습니다');
+              toast.success('Saved');
               finish(saved);
               void loadHistory();
             }}
@@ -424,8 +424,8 @@ export function BodyCard({ date }: { date: string }) {
             aria-busy={retryingChanges || undefined}
             onClick={() => void retryChanges()}
           >
-            {retryingChanges ? <Spinner size="sm" label="불러오는 중" /> : null}
-            변화 다시 불러오기
+            {retryingChanges ? <Spinner size="sm" label="Loading" /> : null}
+            Reload changes
           </Button>
         ) : null}
         {/* Numbers from before a failed reload may be wrong, so they do not stay on screen. */}

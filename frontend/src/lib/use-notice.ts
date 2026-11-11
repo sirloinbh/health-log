@@ -14,7 +14,14 @@ export function errorText(error: unknown, fallback = 'Could not process the requ
 export function useNotice() {
   const [notice, setNotice] = useState<NoticeValue | undefined>(undefined);
   const status = useCallback((text: string) => setNotice({ kind: 'status', text }), []);
-  const error = useCallback((cause: unknown, fallback?: string) => setNotice({ kind: 'error', text: typeof cause === 'string' ? cause : errorText(cause, fallback) }), []);
+  const error = useCallback(
+    (cause: unknown, fallback?: string) =>
+      setNotice({
+        kind: 'error',
+        text: typeof cause === 'string' ? cause : errorText(cause, fallback),
+      }),
+    [],
+  );
   const clear = useCallback(() => setNotice(undefined), []);
   return useMemo(() => ({ notice, status, error, clear }), [notice, status, error, clear]);
 }

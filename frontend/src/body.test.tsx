@@ -12,7 +12,7 @@ const record = {
   waistCm: null,
   systolicMmhg: 120,
   diastolicMmhg: 80,
-  memo: '공복',
+  memo: 'Fasting',
 };
 
 type Reply = { status?: number; body?: unknown };
@@ -51,12 +51,12 @@ test('weight alone is saved, and blanks go as no value', async () => {
   const fetchMock = server({ recordReplies: [{ body: { record: null } }, { body: saved }] });
   render(<BodyCard date={date} />);
 
-  fireEvent.change(await screen.findByLabelText('체중 (kg)'), { target: { value: '70.5' } });
-  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  fireEvent.change(await screen.findByLabelText('Weight (kg)'), { target: { value: '70.5' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
   expect(await screen.findByText('70.5kg')).toBeInTheDocument();
-  expect(screen.queryByText('혈압')).not.toBeInTheDocument();
-  expect(screen.queryByText('메모')).not.toBeInTheDocument();
+  expect(screen.queryByText('Blood pressure')).not.toBeInTheDocument();
+  expect(screen.queryByText('Note')).not.toBeInTheDocument();
   expect(sent(fetchMock, 'PUT')).toEqual({
     url: `/api/body/${date}`,
     body: {
@@ -77,10 +77,10 @@ test('saving reloads the trend so the new value counts at once', async () => {
     history: [{ body: { records: [earlier] } }, { body: { records: [earlier, record] } }],
   });
   render(<BodyCard date={date} />);
-  fireEvent.change(await screen.findByLabelText('체중 (kg)'), { target: { value: '70.5' } });
-  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  fireEvent.change(await screen.findByLabelText('Weight (kg)'), { target: { value: '70.5' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-  const row = await screen.findByRole('row', { name: /체중.*−1\.5kg/ });
+  const row = await screen.findByRole('row', { name: /Weight.*−1\.5kg/ });
   expect(
     within(row)
       .getAllByRole('cell')
@@ -91,7 +91,7 @@ test('saving reloads the trend so the new value counts at once', async () => {
 test('the trend asks for the 90 days ending on the day shown', async () => {
   const fetchMock = server({ recordReplies: [{ body: { record: null } }] });
   render(<BodyCard date={date} />);
-  await screen.findByLabelText('체중 (kg)');
+  await screen.findByLabelText('Weight (kg)');
   expect(fetchMock.mock.calls.map(([url]) => url)).toContain(
     '/api/body?from=2025-12-16&to=2026-03-15',
   );
@@ -113,13 +113,13 @@ test('each window shows its own change with the days it compares', async () => {
     ],
   });
   render(<BodyCard date={date} />);
-  const row = await screen.findByRole('row', { name: /체중/ });
+  const row = await screen.findByRole('row', { name: /Weight/ });
   expect(
     within(row)
       .getAllByRole('cell')
       .map((cell) => cell.textContent),
   ).toEqual(['−0.5kg3/14~3/15', '−0.5kg3/14~3/15', '−4.5kg1/10~3/15']);
-  expect(screen.queryByRole('row', { name: /허리둘레/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('row', { name: /Waist/ })).not.toBeInTheDocument();
 });
 
 test('a window with one measurement says there is not enough', async () => {
@@ -128,12 +128,12 @@ test('a window with one measurement says there is not enough', async () => {
     history: [{ body: { records: [{ ...record, date: '2026-01-10', weightKg: 75 }, record] } }],
   });
   render(<BodyCard date={date} />);
-  const row = await screen.findByRole('row', { name: /체중/ });
+  const row = await screen.findByRole('row', { name: /Weight/ });
   expect(
     within(row)
       .getAllByRole('cell')
       .map((cell) => cell.textContent),
-  ).toEqual(['기록 부족', '기록 부족', '−4.5kg1/10~3/15']);
+  ).toEqual(['Not enough records', 'Not enough records', '−4.5kg1/10~3/15']);
 });
 
 test('a trend that fails to load leaves today usable and can be retried', async () => {
@@ -141,18 +141,20 @@ test('a trend that fails to load leaves today usable and can be retried', async 
   server({
     recordReplies: [{ body: { record: null } }],
     history: [
-      { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+      { status: 500, body: { error: 'Server error occurred' } },
       { body: { records: [earlier, record] } },
     ],
   });
   render(<BodyCard date={date} />);
-  expect(await screen.findByLabelText('체중 (kg)')).toBeEnabled();
-  expect(await screen.findByRole('alert')).toHaveTextContent('기간별 변화를 불러오지 못했습니다');
+  expect(await screen.findByLabelText('Weight (kg)')).toBeEnabled();
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Could not load the changes over time',
+  );
 
-  fireEvent.click(screen.getByRole('button', { name: '변화 다시 불러오기' }));
-  expect(await screen.findByRole('row', { name: /체중/ })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Reload changes' }));
+  expect(await screen.findByRole('row', { name: /Weight/ })).toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: '변화 다시 불러오기' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Reload changes' })).not.toBeInTheDocument();
 });
 
 test('numbers from before a failed reload do not stay on screen', async () => {
@@ -162,17 +164,19 @@ test('numbers from before a failed reload do not stay on screen', async () => {
     recordReplies: [{ body: { record } }, { body: saved }],
     history: [
       { body: { records: [earlier, record] } },
-      { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+      { status: 500, body: { error: 'Server error occurred' } },
     ],
   });
   render(<BodyCard date={date} />);
-  await screen.findByRole('row', { name: /체중.*−4\.5kg/ });
+  await screen.findByRole('row', { name: /Weight.*−4\.5kg/ });
 
-  fireEvent.click(screen.getByRole('button', { name: '수정' }));
-  fireEvent.change(screen.getByLabelText('체중 (kg)'), { target: { value: '60' } });
-  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+  fireEvent.change(screen.getByLabelText('Weight (kg)'), { target: { value: '60' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('기간별 변화를 불러오지 못했습니다');
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Could not load the changes over time',
+  );
   expect(screen.getByText('60kg')).toBeInTheDocument();
   expect(screen.queryByRole('table')).not.toBeInTheDocument();
 });
@@ -192,9 +196,9 @@ test('a trend retry shows it is running, allows one at a time, and announces fai
   });
   vi.stubGlobal('fetch', fetchMock);
   render(<BodyCard date={date} />);
-  fireEvent.click(await screen.findByRole('button', { name: '변화 다시 불러오기' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Reload changes' }));
 
-  const retry = await screen.findByRole('button', { name: /변화 다시 불러오기/ });
+  const retry = await screen.findByRole('button', { name: /Reload changes/ });
   expect(retry).toBeDisabled();
   expect(retry).toHaveAttribute('aria-busy', 'true');
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -202,11 +206,13 @@ test('a trend retry shows it is running, allows one at a time, and announces fai
   expect(historyCalls).toBe(2);
 
   finishRetry(new Response(JSON.stringify({ error: 'x' }), { status: 500 }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('기간별 변화를 불러오지 못했습니다');
-  expect(screen.getByRole('button', { name: '변화 다시 불러오기' })).toBeEnabled();
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Could not load the changes over time',
+  );
+  expect(screen.getByRole('button', { name: 'Reload changes' })).toBeEnabled();
   await waitFor(() =>
     expect(document.activeElement).toBe(
-      screen.getByRole('heading', { name: '신체' }).parentElement,
+      screen.getByRole('heading', { name: 'Body' }).parentElement,
     ),
   );
 });
@@ -214,11 +220,11 @@ test('a trend retry shows it is running, allows one at a time, and announces fai
 test('a value too long to read is refused and the stored value stays', async () => {
   const fetchMock = server({ recordReplies: [{ body: { record } }] });
   render(<BodyCard date={date} />);
-  fireEvent.click(await screen.findByRole('button', { name: '수정' }));
-  fireEvent.change(screen.getByLabelText('체중 (kg)'), { target: { value: '9'.repeat(400) } });
-  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+  fireEvent.change(screen.getByLabelText('Weight (kg)'), { target: { value: '9'.repeat(400) } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('숫자만 입력해 주세요');
+  expect(await screen.findByRole('alert')).toHaveTextContent('enter digits only');
   expect(
     fetchMock.mock.calls.some(
       (args) => (args as unknown as [string, RequestInit])[1]?.method === 'PUT',
@@ -230,22 +236,22 @@ test('when both fail, one retry brings back the record and the trend', async () 
   const earlier = { ...record, date: '2026-03-10', weightKg: 72 };
   server({
     recordReplies: [
-      { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+      { status: 500, body: { error: 'Server error occurred' } },
       { body: { record } },
     ],
     history: [
-      { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+      { status: 500, body: { error: 'Server error occurred' } },
       { body: { records: [earlier, record] } },
     ],
   });
   render(<BodyCard date={date} />);
-  await screen.findByText('기간별 변화를 불러오지 못했습니다');
-  await screen.findByText('서버 오류가 발생했습니다');
-  expect(screen.queryByRole('button', { name: '변화 다시 불러오기' })).not.toBeInTheDocument();
+  await screen.findByText('Could not load the changes over time');
+  await screen.findByText('Server error occurred');
+  expect(screen.queryByRole('button', { name: 'Reload changes' })).not.toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
   expect(await screen.findByText('70.5kg')).toBeInTheDocument();
-  expect(await screen.findByRole('row', { name: /체중/ })).toBeInTheDocument();
+  expect(await screen.findByRole('row', { name: /Weight/ })).toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
@@ -267,13 +273,13 @@ test('a slow older trend does not overwrite the one that includes a save', async
     }),
   );
   render(<BodyCard date={date} />);
-  fireEvent.change(await screen.findByLabelText('체중 (kg)'), { target: { value: '70.5' } });
-  fireEvent.click(screen.getByRole('button', { name: '저장' }));
-  await screen.findByRole('row', { name: /체중.*−1\.5kg/ });
+  fireEvent.change(await screen.findByLabelText('Weight (kg)'), { target: { value: '70.5' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await screen.findByRole('row', { name: /Weight.*−1\.5kg/ });
 
   finishFirst(new Response(JSON.stringify({ records: [earlier] })));
   await new Promise((resolve) => setTimeout(resolve));
-  expect(screen.getByRole('row', { name: /체중.*−1\.5kg/ })).toBeInTheDocument();
+  expect(screen.getByRole('row', { name: /Weight.*−1\.5kg/ })).toBeInTheDocument();
 });
 
 test('a save that fails after leaving the day still says so', async () => {
@@ -291,14 +297,14 @@ test('a save that fails after leaving the day still says so', async () => {
     }),
   );
   const { unmount } = render(<BodyCard date={date} />);
-  fireEvent.change(await screen.findByLabelText('체중 (kg)'), { target: { value: '70.5' } });
-  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  fireEvent.change(await screen.findByLabelText('Weight (kg)'), { target: { value: '70.5' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   unmount();
 
-  failSave(new Response(JSON.stringify({ error: '서버 오류가 발생했습니다' }), { status: 500 }));
+  failSave(new Response(JSON.stringify({ error: 'Server error occurred' }), { status: 500 }));
   await waitFor(() =>
     expect(shown).toHaveBeenCalledWith(
-      `${date} 신체 기록을 저장하지 못했습니다: 서버 오류가 발생했습니다`,
+      `Could not save the body record for ${date}: Server error occurred`,
     ),
   );
 });
@@ -306,15 +312,15 @@ test('a save that fails after leaving the day still says so', async () => {
 test('a failed load hides the form so an unseen record cannot be overwritten', async () => {
   server({
     recordReplies: [
-      { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+      { status: 500, body: { error: 'Server error occurred' } },
       { body: { record } },
     ],
   });
   render(<BodyCard date={date} />);
-  await screen.findByText('서버 오류가 발생했습니다');
-  expect(screen.queryByLabelText('체중 (kg)')).not.toBeInTheDocument();
+  await screen.findByText('Server error occurred');
+  expect(screen.queryByLabelText('Weight (kg)')).not.toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
   expect(await screen.findByText('70.5kg')).toBeInTheDocument();
 });
 
@@ -322,30 +328,30 @@ test('a server rejection keeps the form and the typed values', async () => {
   server({
     recordReplies: [
       { body: { record: null } },
-      { status: 400, body: { error: '혈압은 수축기와 이완기를 함께 입력해 주세요' } },
+      { status: 400, body: { error: 'Enter both systolic and diastolic blood pressure' } },
     ],
   });
   render(<BodyCard date={date} />);
-  fireEvent.change(await screen.findByLabelText('수축기 혈압 (mmHg)'), {
+  fireEvent.change(await screen.findByLabelText('Systolic blood pressure (mmHg)'), {
     target: { value: '120' },
   });
-  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('함께 입력해 주세요');
-  expect(screen.getByLabelText('수축기 혈압 (mmHg)')).toHaveValue('120');
-  expect(screen.getByRole('button', { name: '저장' })).not.toHaveAttribute('aria-disabled');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Enter both');
+  expect(screen.getByLabelText('Systolic blood pressure (mmHg)')).toHaveValue('120');
+  expect(screen.getByRole('button', { name: 'Save' })).not.toHaveAttribute('aria-disabled');
 });
 
 test('a comma decimal is refused, never read as ten times the value', async () => {
   const fetchMock = server({ recordReplies: [{ body: { record: null } }] });
   render(<BodyCard date={date} />);
-  const weight = await screen.findByLabelText('체중 (kg)');
+  const weight = await screen.findByLabelText('Weight (kg)');
   fireEvent.change(weight, { target: { value: '49,5' } });
   expect(weight).toHaveValue('49,5');
-  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent(
-    '체중 (kg): 숫자만 입력해 주세요. 소수점은 마침표로 씁니다',
+    'Weight (kg): enter digits only. Use a period for the decimal point',
   );
   expect(weight).toHaveValue('49,5');
   expect(
@@ -359,15 +365,15 @@ test('editing starts from the record and cancel changes nothing', async () => {
   const fetchMock = server({ recordReplies: [{ body: { record } }] });
   render(<BodyCard date={date} />);
   expect(await screen.findByText('120/80mmHg')).toBeInTheDocument();
-  expect(screen.getByText('공복')).toBeInTheDocument();
+  expect(screen.getByText('Fasting')).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: '수정' }));
-  const weight = screen.getByLabelText('체중 (kg)');
+  fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+  const weight = screen.getByLabelText('Weight (kg)');
   expect(weight).toHaveValue('70.5');
-  expect(screen.getByLabelText('체지방률 (%)')).toHaveValue('');
-  expect(screen.getByLabelText('메모')).toHaveValue('공복');
+  expect(screen.getByLabelText('Body fat (%)')).toHaveValue('');
+  expect(screen.getByLabelText('Note')).toHaveValue('Fasting');
   fireEvent.change(weight, { target: { value: '60' } });
-  fireEvent.click(screen.getByRole('button', { name: '취소' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
   expect(await screen.findByText('70.5kg')).toBeInTheDocument();
   expect(
@@ -384,8 +390,8 @@ test('deleting asks first, then offers the form again and reloads the trend', as
   });
   const success = vi.spyOn(toast, 'success');
   render(<BodyCard date={date} />);
-  fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
-  const dialog = screen.getByRole('dialog', { name: '신체 기록을 삭제할까요?' });
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+  const dialog = screen.getByRole('dialog', { name: 'Delete this body record?' });
   expect(
     fetchMock.mock.calls.some(
       (args) => (args as unknown as [string, RequestInit])[1]?.method === 'DELETE',
@@ -393,8 +399,8 @@ test('deleting asks first, then offers the form again and reloads the trend', as
   ).toBe(false);
   fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
-  expect(await screen.findByLabelText('체중 (kg)')).toHaveValue('');
-  expect(success).toHaveBeenCalledWith('삭제했습니다');
+  expect(await screen.findByLabelText('Weight (kg)')).toHaveValue('');
+  expect(success).toHaveBeenCalledWith('Deleted');
   await waitFor(() =>
     expect(
       fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/body?')).length,
@@ -407,14 +413,14 @@ test('a record another tab already deleted counts as deleted', async () => {
   server({
     recordReplies: [
       { body: { record } },
-      { status: 404, body: { error: '신체 기록을 찾을 수 없습니다' } },
+      { status: 404, body: { error: 'Body record not found' } },
     ],
   });
   render(<BodyCard date={date} />);
-  fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
-  const dialog = screen.getByRole('dialog', { name: '신체 기록을 삭제할까요?' });
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+  const dialog = screen.getByRole('dialog', { name: 'Delete this body record?' });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
-  expect(await screen.findByLabelText('체중 (kg)')).toBeInTheDocument();
+  expect(await screen.findByLabelText('Weight (kg)')).toBeInTheDocument();
 });
 
 test('coming back while a save is on its way shows the saved record, not a blank form', async () => {
@@ -441,22 +447,22 @@ test('coming back while a save is on its way shows the saved record, not a blank
     ).length;
 
   const first = render(<BodyCard date={date} />);
-  fireEvent.change(await screen.findByLabelText('체중 (kg)'), { target: { value: '70.5' } });
-  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  fireEvent.change(await screen.findByLabelText('Weight (kg)'), { target: { value: '70.5' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   first.unmount();
   render(<BodyCard date={date} />);
 
   // No form while the save is out: the server would still answer with the empty day.
-  expect(screen.getByRole('status', { name: '신체 기록 불러오는 중' })).toBeInTheDocument();
+  expect(screen.getByRole('status', { name: 'Loading body records' })).toBeInTheDocument();
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(reads()).toBe(1);
-  expect(screen.queryByLabelText('체중 (kg)')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Weight (kg)')).not.toBeInTheDocument();
 
   finishSave();
   expect(await screen.findByText('70.5kg')).toBeInTheDocument();
   expect(reads()).toBe(2);
-  expect(screen.queryByLabelText('체중 (kg)')).not.toBeInTheDocument();
-  expect(await screen.findByRole('row', { name: /체중/ })).toBeInTheDocument();
+  expect(screen.queryByLabelText('Weight (kg)')).not.toBeInTheDocument();
+  expect(await screen.findByRole('row', { name: /Weight/ })).toBeInTheDocument();
 });
 
 test('a failed delete says why and keeps the record and the dialog', async () => {
@@ -464,15 +470,15 @@ test('a failed delete says why and keeps the record and the dialog', async () =>
   server({
     recordReplies: [
       { body: { record } },
-      { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+      { status: 500, body: { error: 'Server error occurred' } },
     ],
   });
   render(<BodyCard date={date} />);
-  fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' });
   fireEvent.click(confirm);
   await waitFor(() => expect(confirm).toBeEnabled());
-  expect(shown).toHaveBeenCalledWith('서버 오류가 발생했습니다');
+  expect(shown).toHaveBeenCalledWith('Server error occurred');
   expect(screen.getByRole('dialog')).toBeInTheDocument();
   expect(screen.getByText('70.5kg')).toBeInTheDocument();
   shown.mockRestore();
@@ -481,11 +487,11 @@ test('a failed delete says why and keeps the record and the dialog', async () =>
 test('pressing edit moves focus to the card instead of losing it', async () => {
   server({ recordReplies: [{ body: { record } }] });
   render(<BodyCard date={date} />);
-  const edit = await screen.findByRole('button', { name: '수정' });
+  const edit = await screen.findByRole('button', { name: 'Edit' });
   edit.focus();
   fireEvent.click(edit);
   await waitFor(() =>
-    expect(screen.getByRole('heading', { name: '신체' }).parentElement).toHaveFocus(),
+    expect(screen.getByRole('heading', { name: 'Body' }).parentElement).toHaveFocus(),
   );
 });
 
@@ -507,40 +513,40 @@ test('a slow older trend failure does not replace the one that includes a save',
     }),
   );
   render(<BodyCard date={date} />);
-  fireEvent.change(await screen.findByLabelText('체중 (kg)'), { target: { value: '70.5' } });
-  fireEvent.click(screen.getByRole('button', { name: '저장' }));
-  await screen.findByRole('row', { name: /체중.*−1\.5kg/ });
+  fireEvent.change(await screen.findByLabelText('Weight (kg)'), { target: { value: '70.5' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await screen.findByRole('row', { name: /Weight.*−1\.5kg/ });
 
-  failFirst(new Response(JSON.stringify({ error: '서버 오류가 발생했습니다' }), { status: 500 }));
+  failFirst(new Response(JSON.stringify({ error: 'Server error occurred' }), { status: 500 }));
   await new Promise((resolve) => setTimeout(resolve));
-  expect(screen.queryByText('기간별 변화를 불러오지 못했습니다')).not.toBeInTheDocument();
-  expect(screen.getByRole('row', { name: /체중.*−1\.5kg/ })).toBeInTheDocument();
+  expect(screen.queryByText('Could not load the changes over time')).not.toBeInTheDocument();
+  expect(screen.getByRole('row', { name: /Weight.*−1\.5kg/ })).toBeInTheDocument();
 });
 
 test('trying again moves focus to the card, as the button it was on goes away', async () => {
   server({
     recordReplies: [
-      { status: 500, body: { error: '서버 오류가 발생했습니다' } },
+      { status: 500, body: { error: 'Server error occurred' } },
       { body: { record } },
     ],
   });
   render(<BodyCard date={date} />);
-  const again = await screen.findByRole('button', { name: '다시 시도' });
+  const again = await screen.findByRole('button', { name: 'Try again' });
   again.focus();
   fireEvent.click(again);
   expect(await screen.findByText('70.5kg')).toBeInTheDocument();
   await waitFor(() =>
-    expect(screen.getByRole('heading', { name: '신체' }).parentElement).toHaveFocus(),
+    expect(screen.getByRole('heading', { name: 'Body' }).parentElement).toHaveFocus(),
   );
 });
 
 test('a retry cannot be started twice, so no older answer can land after a newer one', async () => {
   const finishers: ((response: Response) => void)[] = [];
   const fetchMock = server({
-    recordReplies: [{ status: 500, body: { error: '서버 오류가 발생했습니다' } }],
+    recordReplies: [{ status: 500, body: { error: 'Server error occurred' } }],
   });
   render(<BodyCard date={date} />);
-  const again = await screen.findByRole('button', { name: '다시 시도' });
+  const again = await screen.findByRole('button', { name: 'Try again' });
   fetchMock.mockImplementation(() => new Promise<Response>((resolve) => finishers.push(resolve)));
   const before = fetchMock.mock.calls.length;
   fireEvent.click(again);
@@ -548,11 +554,11 @@ test('a retry cannot be started twice, so no older answer can land after a newer
   await new Promise((resolve) => setTimeout(resolve, 0));
   // The button goes with the first press; the second reaches nothing. (The body card also
   // reloads its trend, hence two requests there.)
-  expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
   expect(fetchMock.mock.calls.length - before).toBe(2);
   for (const finish of finishers) {
     finish(new Response(JSON.stringify({ error: 'x' }), { status: 500 }));
   }
   // Settles before the test ends, so nothing updates the card afterwards.
-  expect(await screen.findByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
 });

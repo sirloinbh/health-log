@@ -65,7 +65,7 @@ function DayLink({
 function DailyHeader({ description }: { description?: string }) {
   return (
     <header className="flex flex-col gap-2">
-      <h1 id="page-title">하루 기록</h1>
+      <h1 id="page-title">Daily record</h1>
       {description ? (
         <p aria-live="polite" className="text-body text-muted-foreground">
           {description}
@@ -126,11 +126,11 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
         <Notice
           notice={{
             kind: 'error',
-            text: isValidDate(date) ? `${dailyRangeText}: ${date}` : `없는 날짜입니다: ${date}`,
+            text: isValidDate(date) ? `${dailyRangeText}: ${date}` : `Not a real date: ${date}`,
           }}
         />
         <Button asChild variant="outline" className="self-start">
-          <Link to={basePath}>오늘 기록으로 이동</Link>
+          <Link to={basePath}>Go to today's record</Link>
         </Button>
       </section>
     );
@@ -148,16 +148,16 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
       {health.state === 'error' ? (
         <Notice notice={{ kind: 'error', text: health.message }} />
       ) : null}
-      <nav aria-label="날짜 이동" className="flex flex-wrap items-center gap-2">
+      <nav aria-label="Date navigation" className="flex flex-wrap items-center gap-2">
         <DayLink
-          label="이전 날"
+          label="Previous day"
           to={date > earliestDate ? pathOf(shiftDate(date, -1)) : null}
           here={pathOf(date)}
           icon={<ChevronLeft aria-hidden />}
         />
         <Input
           type="date"
-          aria-label="날짜 선택"
+          aria-label="Choose date"
           className="w-auto"
           min={earliestDate}
           max={latestDate}
@@ -181,14 +181,14 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
           }}
         />
         <DayLink
-          label="다음 날"
+          label="Next day"
           to={date < latestDate ? pathOf(shiftDate(date, 1)) : null}
           here={pathOf(date)}
           icon={<ChevronRight aria-hidden />}
         />
         {today && today !== date ? (
           <Button asChild variant="outline">
-            <Link to={pathOf(today)}>오늘</Link>
+            <Link to={pathOf(today)}>Today</Link>
           </Button>
         ) : null}
       </nav>

@@ -7,7 +7,14 @@ import { Link, NavLink } from 'react-router';
 import { DARK_ONLY } from '../../lib/theme-config';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '../ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '../ui/sheet';
 import { ThemeToggle } from './theme-toggle';
 
 // The common app frame (docs/layout.md): top bar, main menu (LNB), content and footer.
@@ -27,7 +34,7 @@ function NavList({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => v
             onClick={onNavigate}
             className={({ isActive }) =>
               cn(
-                'flex min-h-9 items-center gap-3 rounded-md px-3 text-body-sm outline-none pointer-coarse:min-h-11 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-[3px] focus-visible:ring-sidebar-ring/50',
+                'flex min-h-9 items-center gap-3 rounded-md px-3 text-body-sm outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-[3px] focus-visible:ring-sidebar-ring/50 pointer-coarse:min-h-11',
                 isActive && 'bg-sidebar-accent font-medium text-sidebar-accent-foreground',
               )
             }

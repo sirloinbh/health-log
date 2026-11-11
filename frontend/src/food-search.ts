@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { requestJson } from './lib/api';
+import { count } from './plural';
 
 /** The status line for a result list; it says when more results are waiting behind the button. */
-export const resultText = (count: number, more: boolean) =>
-  more ? `검색 결과 ${count}건 표시 중, 결과가 더 있습니다` : `검색 결과 ${count}건`;
+export const resultText = (n: number, more: boolean) =>
+  more ? `Showing ${count(n, 'result')}, more are available` : count(n, 'result');
 
 /** One page of `GET /api/foods`. `nextOffset` is null on the last page. */
 type FoodPage<T> = { foods: T[]; nextOffset: number | null };

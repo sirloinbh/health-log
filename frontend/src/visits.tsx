@@ -42,7 +42,6 @@ import {
   procedureText,
   type Visit,
   visitsPath,
-  withTopic,
   wonText,
 } from './visit-text';
 
@@ -89,52 +88,52 @@ const maxCost = 100_000_000;
 /** The first field longer than the server takes, counted in characters as it counts them (#92). */
 const tooLong = (fields: [string, string, number][]) => {
   const found = fields.find(([, value, max]) => charCount(value.trim()) > max);
-  return found ? `${withTopic(found[0])} ${found[2]}자 이하로 입력해 주세요` : null;
+  return found ? `${found[0]} must be ${found[2]} characters or fewer` : null;
 };
 
 /** A cost in won, or the reason it cannot be read. */
 const readCost = (label: string, text: string) => {
   const value = parseWon(text);
   if (value === undefined) {
-    return `${withTopic(label)} 원 단위 숫자로 입력해 주세요. 예: 12000 또는 12,000`;
+    return `${label}: enter whole won, for example 12000 or 12,000`;
   }
-  if (value !== null && value > maxCost) return `${withTopic(label)} 1억 원 이하로 입력해 주세요`;
+  if (value !== null && value > maxCost) return `${label} must be 100 million won or less`;
   return value;
 };
 
 /** The request body, or the first reason it cannot be sent. */
 function readDraft(draft: Draft) {
-  if (!isValidDate(draft.date)) return '방문 날짜를 골라 주세요';
+  if (!isValidDate(draft.date)) return 'Choose a visit date';
   // The daily page opens only these days (#50); a visit outside them could never be seen there.
-  if (!inDailyRange(draft.date)) return `방문 날짜: ${dailyRangeText}`;
-  if (!draft.clinic.trim()) return '병원 이름을 입력해 주세요';
+  if (!inDailyRange(draft.date)) return `Visit date: ${dailyRangeText}`;
+  if (!draft.clinic.trim()) return 'Enter the clinic name';
   const long = tooLong([
-    ['병원 이름', draft.clinic, 100],
-    ['진료과', draft.department, 50],
-    ['증상·진단 메모', draft.note, 1000],
+    ['Clinic name', draft.clinic, 100],
+    ['Department', draft.department, 50],
+    ['Symptoms and diagnosis note', draft.note, 1000],
   ]);
   if (long) return long;
-  const cost = readCost('진료비', draft.cost);
+  const cost = readCost('Visit cost', draft.cost);
   if (typeof cost === 'string') return cost;
   if (draft.nextVisitOn && !isValidDate(draft.nextVisitOn))
-    return '다음 예약일이 올바르지 않습니다';
+    return 'The next appointment date is not valid';
   if (draft.nextVisitOn && !inDailyRange(draft.nextVisitOn))
-    return `다음 예약일: ${dailyRangeText}`;
+    return `Next appointment: ${dailyRangeText}`;
   if (draft.nextVisitOn && draft.nextVisitOn < draft.date) {
-    return '다음 예약일은 방문 날짜보다 빠를 수 없습니다';
+    return 'The next appointment date cannot be before the visit date';
   }
   const procedures = [];
   for (const [index, item] of draft.procedures.entries()) {
-    const label = `${index + 1}번째 시술`;
-    if (!item.name.trim()) return `${label}의 이름을 입력해 주세요`;
+    const label = `Procedure ${index + 1}`;
+    if (!item.name.trim()) return `${label}: enter a name`;
     const itemLong = tooLong([
-      [`${label} 이름`, item.name, 100],
-      [`${label} 부위`, item.area, 50],
-      [`${label} 용량·횟수`, item.amount, 50],
-      [`${label} 메모`, item.note, 500],
+      [`${label} name`, item.name, 100],
+      [`${label} area`, item.area, 50],
+      [`${label} dose or count`, item.amount, 50],
+      [`${label} note`, item.note, 500],
     ]);
     if (itemLong) return itemLong;
-    const itemCost = readCost(`${label} 비용`, item.cost);
+    const itemCost = readCost(`${label} cost`, item.cost);
     if (typeof itemCost === 'string') return itemCost;
     procedures.push({
       name: item.name,
@@ -233,12 +232,12 @@ function VisitDialog({
     <Dialog open onOpenChange={(open) => (open || saving ? undefined : onClose())}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{visit ? '병원 방문 수정' : '병원 방문 기록'}</DialogTitle>
-          <DialogDescription>비용은 원 단위로 씁니다. 모르는 값은 비워 두세요.</DialogDescription>
+          <DialogTitle>{visit ? 'Edit clinic visit' : 'Record clinic visit'}</DialogTitle>
+          <DialogDescription>Costs are in won. Leave unknown values blank.</DialogDescription>
         </DialogHeader>
         <form onSubmit={(event) => void submit(event)} noValidate className="flex flex-col gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field id="visit-date" label="방문 날짜">
+            <Field id="visit-date" label="Visit date">
               <Input
                 id="visit-date"
                 type="date"
@@ -248,7 +247,7 @@ function VisitDialog({
                 onChange={set('date')}
               />
             </Field>
-            <Field id="visit-next" label="다음 예약일">
+            <Field id="visit-next" label="Next appointment">
               <Input
                 id="visit-next"
                 type="date"
@@ -258,7 +257,7 @@ function VisitDialog({
                 onChange={set('nextVisitOn')}
               />
             </Field>
-            <Field id="visit-clinic" label="병원 이름">
+            <Field id="visit-clinic" label="Clinic name">
               <Input
                 id="visit-clinic"
                 autoComplete="off"
@@ -266,7 +265,7 @@ function VisitDialog({
                 onChange={set('clinic')}
               />
             </Field>
-            <Field id="visit-department" label="진료과">
+            <Field id="visit-department" label="Department">
               <Input
                 id="visit-department"
                 autoComplete="off"
@@ -274,7 +273,7 @@ function VisitDialog({
                 onChange={set('department')}
               />
             </Field>
-            <Field id="visit-cost" label="진료비 (원)">
+            <Field id="visit-cost" label="Visit cost (₩)">
               <Input
                 id="visit-cost"
                 inputMode="numeric"
@@ -284,7 +283,7 @@ function VisitDialog({
               />
             </Field>
           </div>
-          <Field id="visit-note" label="증상·진단 메모">
+          <Field id="visit-note" label="Symptoms and diagnosis note">
             <textarea
               id="visit-note"
               className={textareaClass}
@@ -293,14 +292,14 @@ function VisitDialog({
             />
           </Field>
           <fieldset className="flex min-w-0 flex-col gap-3">
-            <legend className="mb-2 text-body-sm font-medium">시술</legend>
+            <legend className="mb-2 text-body-sm font-medium">Procedures</legend>
             {draft.procedures.length === 0 ? (
-              <p className="text-body-sm text-muted-foreground">기록한 시술이 없습니다.</p>
+              <p className="text-body-sm text-muted-foreground">No procedures recorded.</p>
             ) : null}
-            <ol aria-label="시술 목록" className="flex flex-col gap-3">
+            <ol aria-label="Procedure list" className="flex flex-col gap-3">
               {draft.procedures.map((item, index) => {
                 const id = (field: string) => `procedure-${item.key}-${field}`;
-                const label = `${index + 1}번째 시술`;
+                const label = `Procedure ${index + 1}`;
                 return (
                   <li key={item.key} className="flex flex-col gap-3 rounded-md border p-3">
                     <div className="flex items-center justify-between gap-2">
@@ -309,7 +308,7 @@ function VisitDialog({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        aria-label={`${label} 빼기`}
+                        aria-label={`Remove ${label}`}
                         onClick={() => {
                           focusNext.current = 'procedure-add';
                           setDraft((current) => ({
@@ -324,7 +323,7 @@ function VisitDialog({
                       </Button>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <Field id={id('name')} label={`${label} 이름`}>
+                      <Field id={id('name')} label={`${label} name`}>
                         <Input
                           id={id('name')}
                           autoComplete="off"
@@ -332,7 +331,7 @@ function VisitDialog({
                           onChange={setProcedure(item.key, 'name')}
                         />
                       </Field>
-                      <Field id={id('area')} label={`${label} 부위`}>
+                      <Field id={id('area')} label={`${label} area`}>
                         <Input
                           id={id('area')}
                           autoComplete="off"
@@ -340,7 +339,7 @@ function VisitDialog({
                           onChange={setProcedure(item.key, 'area')}
                         />
                       </Field>
-                      <Field id={id('amount')} label={`${label} 용량·횟수`}>
+                      <Field id={id('amount')} label={`${label} dose or count`}>
                         <Input
                           id={id('amount')}
                           autoComplete="off"
@@ -348,7 +347,7 @@ function VisitDialog({
                           onChange={setProcedure(item.key, 'amount')}
                         />
                       </Field>
-                      <Field id={id('cost')} label={`${label} 비용 (원)`}>
+                      <Field id={id('cost')} label={`${label} cost (₩)`}>
                         <Input
                           id={id('cost')}
                           inputMode="numeric"
@@ -358,7 +357,7 @@ function VisitDialog({
                         />
                       </Field>
                     </div>
-                    <Field id={id('note')} label={`${label} 메모`}>
+                    <Field id={id('note')} label={`${label} note`}>
                       <Input
                         id={id('note')}
                         autoComplete="off"
@@ -386,11 +385,11 @@ function VisitDialog({
               }}
             >
               <Plus aria-hidden />
-              시술 추가
+              Add procedure
             </Button>
             {full ? (
               <p className="text-body-sm text-muted-foreground">
-                시술은 한 번에 {maxProcedures}개까지 기록할 수 있습니다.
+                You can record up to {maxProcedures} procedures per visit.
               </p>
             ) : null}
           </fieldset>
@@ -406,7 +405,7 @@ function VisitDialog({
                 if (!saving) onClose();
               }}
             >
-              취소
+              Cancel
             </Button>
             <Button
               type="submit"
@@ -415,7 +414,7 @@ function VisitDialog({
               aria-busy={saving || undefined}
               className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
             >
-              {saving ? '저장 중…' : '저장'}
+              {saving ? 'Saving…' : 'Save'}
             </Button>
           </DialogFooter>
         </form>
@@ -445,25 +444,25 @@ function VisitCard({
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
           {visit.cost !== null ? (
             <>
-              <dt className="text-muted-foreground">진료비</dt>
+              <dt className="text-muted-foreground">Visit cost</dt>
               <dd>{wonText(visit.cost)}</dd>
             </>
           ) : null}
           {visit.nextVisitOn ? (
             <>
-              <dt className="text-muted-foreground">다음 예약</dt>
+              <dt className="text-muted-foreground">Next appointment</dt>
               <dd>{formatDate(visit.nextVisitOn)}</dd>
             </>
           ) : null}
           {visit.note ? (
             <>
-              <dt className="text-muted-foreground">메모</dt>
+              <dt className="text-muted-foreground">Note</dt>
               <dd className="wrap-anywhere whitespace-pre-line">{visit.note}</dd>
             </>
           ) : null}
         </dl>
         {visit.procedures.length ? (
-          <ul aria-label="시술" className="flex flex-col gap-1">
+          <ul aria-label="Procedures" className="flex flex-col gap-1">
             {visit.procedures.map((item, index) => (
               <li key={index} className="wrap-anywhere">
                 {procedureText(item)}
@@ -476,13 +475,17 @@ function VisitCard({
         ) : null}
         <div className="flex flex-wrap justify-end gap-2">
           <ConfirmDialog
-            title="병원 방문 기록을 삭제할까요?"
-            description="이 방문의 시술 기록도 함께 지워집니다. 삭제하면 되돌릴 수 없습니다."
+            title="Delete this clinic visit?"
+            description="The procedures of this visit are deleted with it. This cannot be undone."
             onConfirm={onDelete}
             trigger={
-              <Button variant="outline" size="sm" aria-label={`${visit.date} ${visit.clinic} 삭제`}>
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label={`Delete ${visit.date} ${visit.clinic}`}
+              >
                 <Trash2 aria-hidden />
-                삭제
+                Delete
               </Button>
             }
           />
@@ -490,20 +493,20 @@ function VisitCard({
             {/* Records what was prescribed here, linked to this visit (#40). */}
             <Link
               to={`${medicationsPagePath}?visit=${visit.id}&date=${visit.date}`}
-              aria-label={`${visit.date} ${visit.clinic} 처방 약 기록`}
+              aria-label={`${visit.date} ${visit.clinic} prescribed medication records`}
             >
               <Pill aria-hidden />
-              처방 약
+              Prescribed medication
             </Link>
           </Button>
           <Button
             variant="outline"
             size="sm"
-            aria-label={`${visit.date} ${visit.clinic} 수정`}
+            aria-label={`Edit ${visit.date} ${visit.clinic}`}
             onClick={(event) => onEdit(event.currentTarget)}
           >
             <Pencil aria-hidden />
-            수정
+            Edit
           </Button>
         </div>
       </CardContent>
@@ -620,7 +623,7 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
         throw cause;
       }
     }
-    toast.success('삭제했습니다');
+    toast.success('Deleted');
     // Dropped now, so its delete button is not what the closing dialog hands focus back to.
     setVisits((list) => list?.filter((item) => item.id !== visit.id) ?? list);
     setMoveFocus((count) => count + 1);
@@ -636,10 +639,10 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
           tabIndex={-1}
           className="rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         >
-          병원
+          Clinic
         </h1>
         <p className="text-body text-muted-foreground">
-          병원 방문과 그때 받은 시술을 기록하고 다시 찾아봅니다.
+          Record clinic visits and the procedures you had, and look them up again.
         </p>
       </header>
       <div className="flex flex-wrap items-center gap-2">
@@ -654,31 +657,31 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
         >
           <Input
             type="search"
-            aria-label="병원 기록 검색"
-            placeholder="병원 이름 또는 시술 이름"
+            aria-label="Search clinic records"
+            placeholder="Clinic or procedure name"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
           <Button type="submit" variant="outline">
-            검색
+            Search
           </Button>
         </form>
         <Button onClick={(event) => openDialog(event.currentTarget, null)}>
           <Plus aria-hidden />
-          방문 기록
+          Visit records
         </Button>
       </div>
       <Notice notice={notice} />
       {visits === null && !notice ? (
         <p role="status" className="text-body-sm text-muted-foreground">
-          불러오는 중…
+          Loading…
         </p>
       ) : null}
       {visits?.length === 0 ? (
         <EmptyState
-          title={applied.current ? '찾는 기록이 없습니다' : '병원 기록이 없습니다'}
+          title={applied.current ? 'No matching records' : 'No clinic records'}
           description={
-            applied.current ? '다른 검색어로 찾아 보세요.' : '첫 병원 방문을 기록해 보세요.'
+            applied.current ? 'Try a different search term.' : 'Record your first clinic visit.'
           }
         />
       ) : null}
@@ -706,8 +709,8 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
       >
         {visits?.length
           ? more
-            ? `방문 ${visits.length}건 표시 중. 더 있습니다.`
-            : `방문 ${visits.length}건`
+            ? `Showing ${visits.length} visits. There are more.`
+            : `${visits.length} ${visits.length === 1 ? 'visit' : 'visits'}`
           : null}
       </p>
       {visits?.length && more ? (
@@ -721,7 +724,7 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
           onClose={closeDialog}
           onSaved={() => {
             closeDialog();
-            toast.success('저장했습니다');
+            toast.success('Saved');
             void load(applied.current);
           }}
         />

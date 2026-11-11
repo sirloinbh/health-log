@@ -3,7 +3,13 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { Button } from './button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './dropdown-menu';
 
 function RowMenu({ onEdit }: { onEdit: () => void }) {
   return (
@@ -26,7 +32,10 @@ test('the keyboard opens the menu and Enter picks an item', () => {
   const trigger = screen.getByRole('button', { name: 'More' });
   fireEvent.keyDown(trigger, { key: 'Enter' });
   expect(screen.getByRole('menu')).toBeInTheDocument();
-  expect(screen.getByRole('menuitem', { name: 'Delete' })).toHaveAttribute('data-variant', 'destructive');
+  expect(screen.getByRole('menuitem', { name: 'Delete' })).toHaveAttribute(
+    'data-variant',
+    'destructive',
+  );
   fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
   expect(onEdit).toHaveBeenCalledOnce();
   expect(screen.queryByRole('menu')).toBeNull();

@@ -14,11 +14,11 @@ import {
 } from './goal-text';
 
 test('each goal says which way it points', () => {
-  expect(targetText('calories', 2000)).toBe('하루 2,000kcal 이하');
-  expect(targetText('protein', 100)).toBe('하루 100g 이상');
-  expect(targetText('sleep', 450)).toBe('7시간 30분 이상');
-  expect(targetText('sober_days', 5)).toBe('주 5일 이상 금주');
-  expect(changeText('sleep', null)).toBe('목표 끔');
+  expect(targetText('calories', 2000)).toBe('Up to 2,000kcal a day');
+  expect(targetText('protein', 100)).toBe('At least 100g a day');
+  expect(targetText('sleep', 450)).toBe('At least 7 h 30 min');
+  expect(targetText('sober_days', 5)).toBe('At least 5 alcohol-free days a week');
+  expect(changeText('sleep', null)).toBe('Goal off');
 });
 
 test('sleep is typed in hours and minutes, so any whole minute can be a goal', () => {
@@ -27,10 +27,10 @@ test('sleep is typed in hours and minutes, so any whole minute can be a goal', (
   expect(toSleepTarget(7, 10)).toBe(430);
   expect(toSleepTarget(24, 0)).toBe(1440);
   expect(toSleepTarget(1, 0)).toBe(60);
-  expect(toSleepTarget(0, 59)).toMatch('1시간~24시간');
-  expect(toSleepTarget(24, 1)).toMatch('1시간~24시간');
-  expect(toSleepTarget(7, 60)).toMatch('0~59');
-  expect(toSleepTarget(7.5, 0)).toMatch('정수로');
+  expect(toSleepTarget(0, 59)).toMatch('between 1 and 24 hours');
+  expect(toSleepTarget(24, 1)).toMatch('between 1 and 24 hours');
+  expect(toSleepTarget(7, 60)).toMatch('from 0 to 59');
+  expect(toSleepTarget(7.5, 0)).toMatch('whole number');
   expect(sleepParts(430)).toEqual({ hours: '7', minutes: '10' });
   expect(sleepParts(445)).toEqual({ hours: '7', minutes: '25' });
 });
@@ -69,16 +69,16 @@ test('deleting a change brings back the goal before it, as of today', () => {
 
 test('other goals take whole numbers in their own ranges', () => {
   expect(toTarget('calories', 1800)).toBe(1800);
-  expect(toTarget('calories', 1800.5)).toMatch('정수로');
-  expect(toTarget('calories', 99)).toMatch('100~10000kcal');
-  expect(toTarget('protein', 1001)).toMatch('1~1000g');
-  expect(toTarget('sober_days', 8)).toMatch('1~7일');
+  expect(toTarget('calories', 1800.5)).toMatch('whole number');
+  expect(toTarget('calories', 99)).toMatch('100 to 10000 kcal');
+  expect(toTarget('protein', 1001)).toMatch('1 to 1000 g');
+  expect(toTarget('sober_days', 8)).toMatch('1 to 7 days');
 });
 
 test('the actual side says when nothing was recorded, and what was left out', () => {
   const empty = { entries: 0, total: null, missing: 0 };
   expect(actualText({ item: 'calories', goal: null, status: null, actual: empty })).toBe(
-    '식사 기록 없음',
+    'No meal records',
   );
   expect(
     actualText({
@@ -87,7 +87,7 @@ test('the actual side says when nothing was recorded, and what was left out', ()
       status: null,
       actual: { entries: 3, total: 82.5, missing: 1 },
     }),
-  ).toBe('82.5g (값을 모르는 음식 1개 제외)');
+  ).toBe('82.5g (excludes 1 food with unknown values)');
   // Every entry unknown: no sum to show, not 0g.
   expect(
     actualText({
@@ -96,9 +96,9 @@ test('the actual side says when nothing was recorded, and what was left out', ()
       status: null,
       actual: { entries: 2, total: null, missing: 2 },
     }),
-  ).toBe('값을 모르는 음식 2개');
+  ).toBe('2 foods with unknown values');
   expect(actualText({ item: 'sleep', goal: null, status: null, actual: { minutes: null } })).toBe(
-    '수면 기록 없음',
+    'No sleep record',
   );
   const week = { from: '2026-11-02', to: '2026-11-08' };
   expect(
@@ -108,7 +108,7 @@ test('the actual side says when nothing was recorded, and what was left out', ()
       status: null,
       actual: { ...week, recordedDays: 0, soberDays: 0 },
     }),
-  ).toBe('이 주(11.02~11.08) 술 기록 없음');
+  ).toBe('This week (Nov 2 – Nov 8): no drink records');
   expect(
     actualText({
       item: 'sober_days',
@@ -116,7 +116,7 @@ test('the actual side says when nothing was recorded, and what was left out', ()
       status: null,
       actual: { ...week, recordedDays: 4, soberDays: 3 },
     }),
-  ).toBe('이 주(11.02~11.08) 금주 3일 / 기록 4일');
+  ).toBe('This week (Nov 2 – Nov 8): 3 alcohol-free days / 4 days recorded');
 });
 
 test('sober days count a change up to this Sunday as current, daily goals only up to today', () => {
@@ -138,10 +138,12 @@ test('sober days count a change up to this Sunday as current, daily goals only u
     ],
   };
   expect(currentText(goals, 'sober_days')).toBe(
-    '이번 주(11.02~11.08) 목표: 주 6일 이상 금주 (2026-11-07부터)',
+    "This week's goal (Nov 2 – Nov 8): At least 6 alcohol-free days a week (from 2026-11-07)",
   );
-  expect(currentText(goals, 'calories')).toBe('지금 목표: 하루 2,000kcal 이하 (2026-11-01부터)');
-  expect(currentText(goals, 'protein')).toBe('지금 목표 없음');
+  expect(currentText(goals, 'calories')).toBe(
+    'Current goal: Up to 2,000kcal a day (from 2026-11-01)',
+  );
+  expect(currentText(goals, 'protein')).toBe('Current goal: not set');
   // Deleting next week's sober change leaves Saturday's as this week's.
   expect(withoutChange(goals, 'sober_days', '2026-11-09').current.sober_days).toEqual({
     from: '2026-11-07',
@@ -191,5 +193,5 @@ test('a sober change on this Sunday already counts, and one turning it off leave
   };
   const afterDelete = withoutChange(off, 'sober_days', '2026-11-09');
   expect(afterDelete.current.sober_days).toBeNull();
-  expect(currentText(afterDelete, 'sober_days')).toBe('이번 주(11.02~11.08) 목표 없음');
+  expect(currentText(afterDelete, 'sober_days')).toBe("This week's goal (Nov 2 – Nov 8): not set");
 });

@@ -38,8 +38,8 @@ export function MoreFoodsButton({
         });
       }}
     >
-      {loading ? <Spinner size="sm" label="불러오는 중" /> : null}
-      결과 더 보기
+      {loading ? <Spinner size="sm" label="Loading" /> : null}
+      Show more results
     </Button>
   );
 }

@@ -21,9 +21,9 @@ test('the same time twice is no sleep at all, which the server refuses', () => {
 });
 
 test('a length reads in hours and minutes', () => {
-  expect(formatMinutes(450)).toBe('7시간 30분');
-  expect(formatMinutes(420)).toBe('7시간');
-  expect(formatMinutes(30)).toBe('30분');
+  expect(formatMinutes(450)).toBe('7 h 30 min');
+  expect(formatMinutes(420)).toBe('7 h');
+  expect(formatMinutes(30)).toBe('30 min');
 });
 
 test('a date from before 1989 reads back at the time that was typed', () => {

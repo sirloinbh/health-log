@@ -42,5 +42,8 @@ test('the toaster follows the html light/dark class', async () => {
     toast('Confirm');
   });
   await screen.findByText('Confirm');
-  expect(document.querySelector('[data-sonner-toaster]')).toHaveAttribute('data-sonner-theme', 'dark');
+  expect(document.querySelector('[data-sonner-toaster]')).toHaveAttribute(
+    'data-sonner-theme',
+    'dark',
+  );
 });

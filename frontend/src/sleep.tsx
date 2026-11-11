@@ -31,7 +31,7 @@ type SleepRecord = {
   source: 'manual' | 'garmin';
 };
 
-const sourceLabels = { manual: '직접 입력', garmin: '가민' } as const;
+const sourceLabels = { manual: 'Manual', garmin: 'Garmin' } as const;
 
 const pathOf = (date: string) => `/api/sleep/${date}`;
 
@@ -65,7 +65,7 @@ function SleepForm({
     // The save button stays pressable while saving (#126), and Enter in a field submits too.
     if (saving) return;
     if (!bed || !wake) {
-      error('취침 시각과 기상 시각을 입력해 주세요');
+      error('Enter a bedtime and a wake-up time');
       return;
     }
     // Nothing to save: a PUT would still turn an imported record into a manual one.
@@ -89,7 +89,7 @@ function SleepForm({
     } catch (cause) {
       // Moving to another day removes this form, and the night still was not saved.
       if (!mounted.current) {
-        toast.error(`${date} 수면 기록을 저장하지 못했습니다: ${errorText(cause)}`);
+        toast.error(`Could not save the sleep record for ${date}: ${errorText(cause)}`);
         return;
       }
       error(cause);
@@ -101,7 +101,7 @@ function SleepForm({
     <form onSubmit={(event) => void submit(event)} noValidate className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="sleep-bed">취침 시각</Label>
+          <Label htmlFor="sleep-bed">Bedtime</Label>
           <Input
             id="sleep-bed"
             type="time"
@@ -110,7 +110,7 @@ function SleepForm({
           />
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="sleep-wake">기상 시각</Label>
+          <Label htmlFor="sleep-wake">Wake-up time</Label>
           <Input
             id="sleep-wake"
             type="time"
@@ -122,23 +122,23 @@ function SleepForm({
       {/* Stays mounted: a live region announces changes only if it was already there. */}
       <p aria-live="polite" className="min-h-5 text-body-sm text-muted-foreground">
         {length > 0
-          ? `${isOvernight(bed, wake) ? '전날' : '이날'} ${bed}에 잠들어 ${formatMinutes(length)}`
+          ? `Asleep at ${bed} ${isOvernight(bed, wake) ? 'the day before' : 'this day'} for ${formatMinutes(length)}`
           : null}
       </p>
       {record?.source === 'garmin' ? (
         <p className="text-body-sm text-muted-foreground">
-          시각을 바꿔 저장하면 가민에서 가져온 수면 단계와 점수가 지워집니다.
+          Saving with changed times erases the sleep stages and score imported from Garmin.
         </p>
       ) : null}
       <Notice notice={notice} />
       <div className="flex flex-wrap gap-2">
         <BusyButton type="submit" busy={saving} aria-busy={saving || undefined}>
-          {saving ? <Spinner size="sm" label="저장하는 중" /> : null}
-          저장
+          {saving ? <Spinner size="sm" label="Saving" /> : null}
+          Save
         </BusyButton>
         {onCancel ? (
           <BusyButton type="button" variant="outline" busy={saving} onClick={onCancel}>
-            취소
+            Cancel
           </BusyButton>
         ) : null}
       </div>
@@ -155,20 +155,20 @@ function SleepSummary({
   onEdit: () => void;
   onDelete: () => Promise<unknown>;
 }) {
-  const before = dayOf(record.bedAt) === record.date ? '' : '전날 ';
+  const before = dayOf(record.bedAt) === record.date ? '' : 'Day before ';
   return (
     <div className="flex flex-col gap-4">
       <p className="text-xl font-semibold">{formatMinutes(record.durationMinutes)}</p>
       <dl className="grid grid-cols-2 gap-4 text-body-sm">
         <div>
-          <dt className="text-muted-foreground">취침</dt>
+          <dt className="text-muted-foreground">Bedtime</dt>
           <dd>
             {before}
             {clockOf(record.bedAt)}
           </dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">기상</dt>
+          <dt className="text-muted-foreground">Wake-up</dt>
           <dd>{clockOf(record.wakeAt)}</dd>
         </div>
       </dl>
@@ -176,15 +176,15 @@ function SleepSummary({
         <Badge variant="secondary">{sourceLabels[record.source]}</Badge>
         <div className="ml-auto flex gap-2">
           <Button variant="outline" size="sm" onClick={onEdit}>
-            수정
+            Edit
           </Button>
           <ConfirmDialog
-            title="수면 기록을 삭제할까요?"
-            description="삭제하면 되돌릴 수 없습니다."
+            title="Delete this sleep record?"
+            description="This cannot be undone."
             onConfirm={onDelete}
             trigger={
               <Button variant="outline" size="sm">
-                삭제
+                Delete
               </Button>
             }
           />
@@ -248,7 +248,7 @@ export function SleepCard({ date }: { date: string }) {
         throw cause;
       }
     }
-    toast.success('삭제했습니다');
+    toast.success('Deleted');
     finish(null);
   };
 
@@ -256,7 +256,7 @@ export function SleepCard({ date }: { date: string }) {
     <Card>
       <CardHeader>
         <div ref={heading} tabIndex={-1} className="outline-none">
-          <CardTitle asHeading="h2">수면</CardTitle>
+          <CardTitle asHeading="h2">Sleep</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -271,11 +271,11 @@ export function SleepCard({ date }: { date: string }) {
               setMoveFocus((count) => count + 1);
             }}
           >
-            다시 시도
+            Try again
           </Button>
         ) : null}
         {!notice && record === undefined ? (
-          <div role="status" aria-busy="true" aria-label="수면 기록 불러오는 중">
+          <div role="status" aria-busy="true" aria-label="Loading sleep record">
             <SkeletonText lines={2} />
           </div>
         ) : null}
@@ -284,7 +284,7 @@ export function SleepCard({ date }: { date: string }) {
             date={date}
             record={record}
             onSaved={(saved) => {
-              toast.success('저장했습니다');
+              toast.success('Saved');
               finish(saved);
             }}
             onCancel={record ? () => finish(record) : undefined}

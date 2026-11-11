@@ -16,7 +16,8 @@ function Spinner({
   size,
   label = 'Loading',
   ...props
-}: Omit<React.ComponentProps<'svg'>, 'children'> & VariantProps<typeof spinnerVariants> & { label?: string }) {
+}: Omit<React.ComponentProps<'svg'>, 'children'> &
+  VariantProps<typeof spinnerVariants> & { label?: string }) {
   return (
     <Loader2Icon
       data-slot="spinner"

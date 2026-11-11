@@ -1,4 +1,5 @@
 import { spanText } from './habit-text';
+import { count } from './plural';
 import { minutesText } from './report-text';
 
 /** Where goals are set: the same as pages.settings in app.tsx. */
@@ -40,63 +41,77 @@ export const goalFields: Record<
   { title: string; label: string; unit: string; min: number; max: number; example: string }
 > = {
   calories: {
-    title: '칼로리',
-    label: '하루 칼로리 상한',
+    title: 'Calories',
+    label: 'Daily calorie limit',
     unit: 'kcal',
     min: 100,
     max: 10_000,
     example: '2000',
   },
   protein: {
-    title: '단백질',
-    label: '하루 단백질 하한',
+    title: 'Protein',
+    label: 'Daily protein minimum',
     unit: 'g',
     min: 1,
     max: 1000,
     example: '100',
   },
-  sleep: { title: '수면', label: '하루 수면 시간', unit: '시간', min: 1, max: 24, example: '7' },
-  sober_days: { title: '금주', label: '주 금주 일수', unit: '일', min: 1, max: 7, example: '5' },
+  sleep: {
+    title: 'Sleep',
+    label: 'Daily sleep time',
+    unit: 'hours',
+    min: 1,
+    max: 24,
+    example: '7',
+  },
+  sober_days: {
+    title: 'Alcohol-free',
+    label: 'Alcohol-free days per week',
+    unit: 'days',
+    min: 1,
+    max: 7,
+    example: '5',
+  },
 };
 
-const number = (value: number) => value.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+const number = (value: number) => value.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
-/** "하루 2,000kcal 이하" */
+/** "Up to 2,000 kcal a day" */
 export function targetText(item: GoalItem, target: number) {
   switch (item) {
     case 'calories':
-      return `하루 ${number(target)}kcal 이하`;
+      return `Up to ${number(target)}kcal a day`;
     case 'protein':
-      return `하루 ${number(target)}g 이상`;
+      return `At least ${number(target)}g a day`;
     case 'sleep':
-      return `${minutesText(target)} 이상`;
+      return `At least ${minutesText(target)}`;
     case 'sober_days':
-      return `주 ${target}일 이상 금주`;
+      return `At least ${count(target, 'alcohol-free day')} a week`;
   }
 }
 
 /** The goal as it stands from a date: its target, or that it was turned off. */
 export const changeText = (item: GoalItem, target: number | null) =>
-  target === null ? '목표 끔' : targetText(item, target);
+  target === null ? 'Goal off' : targetText(item, target);
 
 /** A number typed in the form, as the API takes it; a string says why it cannot be. Not for sleep. */
 export function toTarget(item: Exclude<GoalItem, 'sleep'>, value: number): number | string {
   const { label, unit, min, max } = goalFields[item];
-  if (value < min || value > max) return `${label}: ${min}~${max}${unit} 사이로 입력해 주세요`;
-  return Number.isInteger(value) ? value : `${label}: 정수로 입력해 주세요`;
+  if (value < min || value > max) return `${label}: enter ${min} to ${max} ${unit}`;
+  return Number.isInteger(value) ? value : `${label}: enter a whole number`;
 }
 
 /**
  * Sleep is typed as hours and minutes, like the sleep card, and kept in minutes. Hours alone as a
- * decimal could not say 7시간 10분.
+ * decimal could not say 7 h 10 min.
  */
 export function toSleepTarget(hours: number, minutes: number): number | string {
   if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
-    return '수면 시간: 시간과 분은 정수로 입력해 주세요';
+    return 'Sleep time: enter hours and minutes as whole numbers';
   }
-  if (minutes > 59) return '수면 시간: 분은 0~59로 입력해 주세요';
+  if (minutes > 59) return 'Sleep time: enter minutes from 0 to 59';
   const total = hours * 60 + minutes;
-  return total < 60 || total > 1440 ? '수면 시간: 1시간~24시간 사이로 입력해 주세요' : total;
+  return total < 60 || total > 1440 ? 'Sleep time: enter between 1 and 24 hours' : total;
 }
 
 /** A stored sleep target as its two fields. */
@@ -112,11 +127,14 @@ export const sleepParts = (target: number) => ({
 export const countsUntil = (goals: Goals, item: GoalItem) =>
   item === 'sober_days' ? goals.week.to : goals.today;
 
-/** "지금 목표: …", or for sober days the goal this week is judged by, with the week. */
+/** "Current goal: …", or for sober days the goal this week is judged by, with the week. */
 export function currentText(goals: Goals, item: GoalItem) {
   const goal = goals.current[item];
-  const label = item === 'sober_days' ? `이번 주(${spanText(goals.week)}) 목표` : '지금 목표';
-  return goal ? `${label}: ${targetText(item, goal.target)} (${goal.from}부터)` : `${label} 없음`;
+  const label =
+    item === 'sober_days' ? `This week's goal (${spanText(goals.week)})` : 'Current goal';
+  return goal
+    ? `${label}: ${targetText(item, goal.target)} (from ${goal.from})`
+    : `${label}: not set`;
 }
 
 /**
@@ -134,10 +152,10 @@ export function withoutChange(goals: Goals, item: GoalItem, from: string): Goals
 }
 
 export const statusText: Record<Status, string> = {
-  met: '달성',
-  missed: '미달',
-  unknown: '판정 보류',
-  none: '기록 없음',
+  met: 'Met',
+  missed: 'Missed',
+  unknown: 'Undetermined',
+  none: 'No records',
 };
 
 /** What the day's records add up to, said the same way whether or not a goal is set. */
@@ -146,27 +164,27 @@ export function actualText(day: GoalDayItem) {
     case 'calories':
     case 'protein': {
       const { entries, total, missing } = day.actual;
-      if (entries === 0) return '식사 기록 없음';
+      if (entries === 0) return 'No meal records';
       // Nothing known to add up is not zero.
-      if (total === null) return `값을 모르는 음식 ${missing}개`;
+      if (total === null) return `${count(missing, 'food')} with unknown values`;
       const unit = day.item === 'calories' ? 'kcal' : 'g';
       const sum = `${number(total ?? 0)}${unit}`;
-      return missing ? `${sum} (값을 모르는 음식 ${missing}개 제외)` : sum;
+      return missing ? `${sum} (excludes ${count(missing, 'food')} with unknown values)` : sum;
     }
     case 'sleep':
-      return day.actual.minutes === null ? '수면 기록 없음' : minutesText(day.actual.minutes);
+      return day.actual.minutes === null ? 'No sleep record' : minutesText(day.actual.minutes);
     case 'sober_days': {
       const { recordedDays, soberDays } = day.actual;
       const span = spanText(day.actual);
       return recordedDays === 0
-        ? `이 주(${span}) 술 기록 없음`
-        : `이 주(${span}) 금주 ${soberDays}일 / 기록 ${recordedDays}일`;
+        ? `This week (${span}): no drink records`
+        : `This week (${span}): ${count(soberDays, 'alcohol-free day')} / ${count(recordedDays, 'day')} recorded`;
     }
   }
 }
 
-/** Why a verdict is held, so "판정 보류" is never left unexplained. */
+/** Why a verdict is held, so "Undetermined" is never left unexplained. */
 export const unknownReason = (item: GoalItem) =>
   item === 'sober_days'
-    ? '아직 기록하지 않은 날에 따라 달라집니다'
-    : '값을 모르는 음식이 있어 판정할 수 없습니다';
+    ? 'It depends on days not recorded yet'
+    : 'Some foods have unknown values, so it cannot be judged';

@@ -27,8 +27,8 @@ test('the first page leaves the offset out, and later pages ask for theirs', () 
 });
 
 test('the status says when more results are waiting', () => {
-  expect(resultText(3, false)).toBe('검색 결과 3건');
-  expect(resultText(100, true)).toBe('검색 결과 100건 표시 중, 결과가 더 있습니다');
+  expect(resultText(3, false)).toBe('3 results');
+  expect(resultText(100, true)).toBe('Showing 100 results, more are available');
 });
 
 test('the next page is added under the first, for the query that found it', async () => {
@@ -77,7 +77,7 @@ test('a failed next page keeps the pages shown and lets the user try again', asy
   serve((url) => {
     if (!url.endsWith('offset=100')) return json({ foods: foodsFrom(1, 100), nextOffset: 100 });
     return fail
-      ? json({ error: '서버 오류가 발생했습니다' }, 500)
+      ? json({ error: 'Server error occurred' }, 500)
       : json({ foods: foodsFrom(101, 1), nextOffset: null });
   });
   const { view, onError } = setup();
@@ -98,7 +98,7 @@ test('a new search drops a next page still on its way', async () => {
   serve((url) => {
     if (url.endsWith('offset=100')) return new Promise((resolve) => (finishPage = resolve));
     if (url.includes('q=new'))
-      return json({ foods: [{ id: 900, name: '새 음식' }], nextOffset: null });
+      return json({ foods: [{ id: 900, name: 'New food' }], nextOffset: null });
     return json({ foods: foodsFrom(1, 100), nextOffset: 100 });
   });
   const { view } = setup();
@@ -112,7 +112,7 @@ test('a new search drops a next page still on its way', async () => {
 
   finishPage(json({ foods: foodsFrom(101, 5), nextOffset: null }));
   await act(() => page);
-  expect(view.result.current.foods).toEqual([{ id: 900, name: '새 음식' }]);
+  expect(view.result.current.foods).toEqual([{ id: 900, name: 'New food' }]);
 });
 
 test('asking for the next page during a search does nothing', async () => {
@@ -140,7 +140,9 @@ test('asking for the next page during a search does nothing', async () => {
 test('a failed search empties the list, unless asked to keep it', async () => {
   let fail = false;
   serve(() =>
-    fail ? json({ error: '서버 오류' }, 500) : json({ foods: foodsFrom(1, 2), nextOffset: null }),
+    fail
+      ? json({ error: 'Server error' }, 500)
+      : json({ foods: foodsFrom(1, 2), nextOffset: null }),
   );
   const cleared = setup();
   await act(() => cleared.view.result.current.search('a'));

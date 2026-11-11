@@ -8,14 +8,22 @@ import { cn } from '../../lib/utils';
 // "status" politely (role="status"), "error" at once (role="alert"). For a passing message that is not
 // tied to one place, use the toast from sonner instead.
 
-function Notice({ notice, className, ...props }: Omit<React.ComponentProps<'p'>, 'children' | 'role'> & { notice: NoticeValue | undefined }) {
+function Notice({
+  notice,
+  className,
+  ...props
+}: Omit<React.ComponentProps<'p'>, 'children' | 'role'> & { notice: NoticeValue | undefined }) {
   if (!notice) return null;
   return (
     <p
       data-slot="notice"
       data-kind={notice.kind}
       role={notice.kind === 'error' ? 'alert' : 'status'}
-      className={cn('text-body-sm', notice.kind === 'error' ? 'text-destructive' : 'text-muted-foreground', className)}
+      className={cn(
+        'text-body-sm',
+        notice.kind === 'error' ? 'text-destructive' : 'text-muted-foreground',
+        className,
+      )}
       {...props}
     >
       {notice.text}

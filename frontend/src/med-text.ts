@@ -27,10 +27,10 @@ export const medicationsPath = '/api/medications';
 /** The medicine page, in the app's page list and linked from the daily card and visits. */
 export const medicationsPagePath = '/medications';
 
-/** "500mg · 하루 2번 식후", or null when neither is known. */
+/** "500 mg · twice a day after meals", or null when neither is known. */
 export const howText = (item: Pick<Medication, 'dose' | 'directions'>) =>
   [item.dose, item.directions].filter(Boolean).join(' · ') || null;
 
-/** "2026-03-10 ~ 2026-03-17", or "2026-03-10부터" while it has no end. */
+/** "2026-03-10 ~ 2026-03-17", or "From 2026-03-10" while it has no end. */
 export const periodText = (item: Pick<Medication, 'startOn' | 'endOn'>) =>
-  item.endOn ? `${item.startOn} ~ ${item.endOn}` : `${item.startOn}부터`;
+  item.endOn ? `${item.startOn} ~ ${item.endOn}` : `From ${item.startOn}`;

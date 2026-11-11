@@ -44,17 +44,17 @@ type DraftItem = Omit<ComboItem, 'servings' | 'calories'> & { servings: string }
 
 /** The request body, or the message to show instead of sending. */
 function readDraft(name: string, items: DraftItem[]) {
-  if (!name.trim()) return '조합 이름을 입력해 주세요';
-  if (items.length === 0) return '조합에 음식을 하나 이상 넣어 주세요';
+  if (!name.trim()) return 'Enter a combo name';
+  if (items.length === 0) return 'Add at least one food to the combo';
   const read = [];
   for (const item of items) {
-    const label = `${fullName(item)} 수량`;
+    const label = `${fullName(item)} quantity`;
     const servings = parseAmount(item.servings);
     if (servings === undefined) return unreadableAmount(label);
-    if (servings === null || !(servings > 0)) return `${label}을 0보다 큰 숫자로 입력해 주세요`;
-    // The server says only "수량이 너무 큽니다"; here the message can name the food.
-    if (servings > maxServings) return `${label}은 ${maxServings} 이하로 입력해 주세요`;
-    if (!hasTwoDecimalsAtMost(servings)) return `${label}은 소수 둘째 자리까지 입력해 주세요`;
+    if (servings === null || !(servings > 0)) return `${label} must be a number greater than 0`;
+    // The server says only "The quantity is too large"; here the message can name the food.
+    if (servings > maxServings) return `${label} must be ${maxServings} or less`;
+    if (!hasTwoDecimalsAtMost(servings)) return `${label} can have at most 2 decimal places`;
     read.push({ foodId: item.foodId, servings });
   }
   return { name, items: read };
@@ -148,14 +148,15 @@ function ComboDialog({
     <Dialog open onOpenChange={(open) => (open || saving ? undefined : onClose())}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{combo ? '조합 수정' : '조합 추가'}</DialogTitle>
+          <DialogTitle>{combo ? 'Edit combo' : 'Add combo'}</DialogTitle>
           <DialogDescription>
-            함께 먹는 음식과 수량을 정해 두면 식단 카드에서 한 번에 기록합니다.
+            Set the foods and quantities you eat together, and the diet card records them in one
+            step.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="combo-name">조합 이름</Label>
+            <Label htmlFor="combo-name">Combo name</Label>
             <Input
               id="combo-name"
               value={name}
@@ -163,13 +164,13 @@ function ComboDialog({
               onChange={(event) => setName(event.target.value)}
             />
           </div>
-          <section aria-label="조합에 넣은 음식" className="flex flex-col gap-2">
+          <section aria-label="Foods in the combo" className="flex flex-col gap-2">
             <p className="text-body-sm font-medium">
-              넣은 음식 {items.length}/{maxItems}
+              Foods added {items.length}/{maxItems}
             </p>
             {items.length === 0 ? (
               <p className="text-body-sm text-muted-foreground">
-                아래에서 음식을 검색해 넣어 주세요.
+                Search for foods below and add them.
               </p>
             ) : (
               <ul className="flex flex-col divide-y">
@@ -179,7 +180,7 @@ function ComboDialog({
                       {fullName(item)}
                     </span>
                     <Input
-                      aria-label={`${fullName(item)} 수량`}
+                      aria-label={`${fullName(item)} quantity`}
                       className="w-20"
                       inputMode="decimal"
                       autoComplete="off"
@@ -194,12 +195,12 @@ function ComboDialog({
                         )
                       }
                     />
-                    <span className="text-body-sm text-muted-foreground">회분</span>
+                    <span className="text-body-sm text-muted-foreground">servings</span>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      aria-label={`${fullName(item)} 빼기`}
+                      aria-label={`Remove ${fullName(item)}`}
                       onClick={() =>
                         setItems((current) =>
                           current.filter((other) => other.foodId !== item.foodId),
@@ -216,8 +217,8 @@ function ComboDialog({
           <form role="search" onSubmit={search} className="flex gap-2">
             <Input
               type="search"
-              aria-label="넣을 음식 검색"
-              placeholder="이름 또는 브랜드"
+              aria-label="Search foods to add"
+              placeholder="Name or brand"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -227,8 +228,8 @@ function ComboDialog({
               disabled={searching}
               aria-busy={searching || undefined}
             >
-              {searching ? <Spinner size="sm" label="검색하는 중" /> : null}
-              검색
+              {searching ? <Spinner size="sm" label="Searching" /> : null}
+              Search
             </Button>
           </form>
           <Notice notice={searchNotice} />
@@ -241,13 +242,16 @@ function ComboDialog({
             {foods === null
               ? null
               : foods.length === 0
-                ? '찾는 음식이 없습니다. 음식 화면에서 먼저 추가해 주세요.'
+                ? 'No matching foods. Add them on the Foods page first.'
                 : full
-                  ? `${resultText(foods.length, more)}. 음식은 ${maxItems}개까지 넣을 수 있습니다.`
+                  ? `${resultText(foods.length, more)}. A combo can have up to ${maxItems} foods.`
                   : resultText(foods.length, more)}
           </p>
           {foods?.length ? (
-            <ul aria-label="검색 결과" className="flex max-h-60 flex-col divide-y overflow-y-auto">
+            <ul
+              aria-label="Search results"
+              className="flex max-h-60 flex-col divide-y overflow-y-auto"
+            >
               {foods.map((food) => {
                 const added = items.some((item) => item.foodId === food.id);
                 return (
@@ -255,9 +259,9 @@ function ComboDialog({
                     <div className="flex min-w-0 flex-col">
                       <span className="wrap-anywhere">{fullName(food)}</span>
                       <span className="text-caption text-muted-foreground">
-                        1회 {food.servingSize}
+                        Serving {food.servingSize}
                         {food.servingUnit} ·{' '}
-                        {food.calories === null ? '칼로리 값 없음' : `${food.calories}kcal`}
+                        {food.calories === null ? 'No calorie value' : `${food.calories}kcal`}
                       </span>
                     </div>
                     <Button
@@ -265,10 +269,10 @@ function ComboDialog({
                       variant="outline"
                       size="sm"
                       disabled={added || full}
-                      aria-label={`${fullName(food)} ${added ? '넣음' : '넣기'}`}
+                      aria-label={`${fullName(food)} ${added ? 'added' : 'add'}`}
                       onClick={() => addFood(food)}
                     >
-                      {added ? '넣음' : '넣기'}
+                      {added ? 'Added' : 'Add'}
                     </Button>
                   </li>
                 );
@@ -297,7 +301,7 @@ function ComboDialog({
               if (!saving) onClose();
             }}
           >
-            취소
+            Cancel
           </Button>
           <Button
             type="button"
@@ -308,7 +312,7 @@ function ComboDialog({
             className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
             onClick={() => void save()}
           >
-            {saving ? '저장 중…' : '저장'}
+            {saving ? 'Saving…' : 'Save'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -336,40 +340,40 @@ function ComboCard({
       <CardContent className="flex flex-col gap-4">
         {combo.items.length === 0 ? (
           <p className="text-body-sm text-muted-foreground">
-            음식이 모두 지워졌습니다. 수정해서 음식을 넣어 주세요.
+            All foods were removed. Edit the combo to add foods.
           </p>
         ) : (
           <ul className="flex flex-col gap-1 text-body-sm">
             {combo.items.map((item) => (
               <li key={item.foodId} className="wrap-anywhere">
-                {fullName(item)} · {item.servings}회분 ·{' '}
-                {item.calories === null ? '칼로리 값 없음' : `${item.calories}kcal`}
+                {fullName(item)} · {item.servings} servings ·{' '}
+                {item.calories === null ? 'No calorie value' : `${item.calories}kcal`}
               </li>
             ))}
           </ul>
         )}
         <div className="flex flex-wrap justify-end gap-2">
           <ConfirmDialog
-            title="조합을 삭제할까요?"
+            title="Delete this combo?"
             description={
-              <span className="wrap-anywhere">{`'${combo.name}' 조합을 지웁니다. 이미 기록한 식사는 그대로 남습니다.`}</span>
+              <span className="wrap-anywhere">{`'${combo.name}' will be deleted. Meals already recorded stay as they are.`}</span>
             }
             onConfirm={onDelete}
             trigger={
-              <Button variant="outline" size="sm" aria-label={`${combo.name} 삭제`}>
+              <Button variant="outline" size="sm" aria-label={`Delete ${combo.name}`}>
                 <Trash2 aria-hidden />
-                삭제
+                Delete
               </Button>
             }
           />
           <Button
             variant="outline"
             size="sm"
-            aria-label={`${combo.name} 수정`}
+            aria-label={`Edit ${combo.name}`}
             onClick={(event) => onEdit(event.currentTarget)}
           >
             <Pencil aria-hidden />
-            수정
+            Edit
           </Button>
         </div>
       </CardContent>
@@ -436,7 +440,7 @@ export function CombosPage() {
         throw cause;
       }
     }
-    toast.success('삭제했습니다');
+    toast.success('Deleted');
     // Drop the card now: if it stayed until the reload, the closing dialog would hand focus back
     // to its delete button, and focus would fall to the body when the reload removes it.
     setCombos((list) => list?.filter((item) => item.id !== combo.id) ?? list);
@@ -453,16 +457,17 @@ export function CombosPage() {
           tabIndex={-1}
           className="rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         >
-          조합
+          Combos
         </h1>
         <p className="text-body text-muted-foreground">
-          자주 함께 먹는 음식을 묶어 두고, 하루 기록의 식단 카드에서 한 번에 기록합니다.
+          Group foods you often eat together and record them in one step from the diet card in the
+          daily record.
         </p>
       </header>
       <div>
         <Button onClick={(event) => openDialog(event.currentTarget, 'new')}>
           <Plus aria-hidden />
-          조합 추가
+          Add combo
         </Button>
       </div>
       <Notice notice={notice} />
@@ -473,24 +478,24 @@ export function CombosPage() {
           onClick={() => {
             // A word in its place: the same failure twice is announced again, and a list already
             // on screen does not look fixed while the new one is on its way.
-            status('목록을 다시 불러오는 중…');
-            void load('목록을 다시 불러왔습니다.');
+            status('Reloading the list…');
+            void load('The list was reloaded.');
             // Trying again removes this button, which would drop keyboard focus to the page (#65, #127).
             setMoveFocus((count) => count + 1);
           }}
         >
-          다시 시도
+          Try again
         </Button>
       ) : null}
       {combos === null && !notice ? (
         <p role="status" className="text-body-sm text-muted-foreground">
-          불러오는 중…
+          Loading…
         </p>
       ) : null}
       {combos?.length === 0 ? (
         <EmptyState
-          title="조합이 없습니다"
-          description="함께 먹는 음식을 묶어 첫 조합을 만들어 보세요."
+          title="No combos"
+          description="Group foods you eat together to make your first combo."
         />
       ) : null}
       {combos?.length ? (
@@ -511,7 +516,7 @@ export function CombosPage() {
           onClose={closeDialog}
           onSaved={() => {
             closeDialog();
-            toast.success('저장했습니다');
+            toast.success('Saved');
             void load();
           }}
         />

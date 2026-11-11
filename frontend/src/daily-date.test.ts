@@ -20,7 +20,7 @@ test('shifting crosses month, year and leap day boundaries', () => {
 });
 
 test('formats the date with its weekday in Korean', () => {
-  expect(formatDate('2026-10-31')).toBe('2026년 10월 31일 토요일');
+  expect(formatDate('2026-10-31')).toBe('Saturday, October 31, 2026');
 });
 
 test('the daily page opens 2000-01-01 to 2099-12-31', () => {

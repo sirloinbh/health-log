@@ -15,7 +15,10 @@ test('the spinner is a named status in three sizes', () => {
   );
   expect(screen.getByRole('status', { name: 'Loading' })).toHaveClass('size-4');
   expect(screen.getByRole('status', { name: 'Saving' })).toHaveClass('size-6');
-  expect(screen.getByRole('status', { name: 'Large spinner' })).toHaveClass('size-8', 'motion-reduce:animate-none');
+  expect(screen.getByRole('status', { name: 'Large spinner' })).toHaveClass(
+    'size-8',
+    'motion-reduce:animate-none',
+  );
 });
 
 test('a saving button shows the spinner and stays named', () => {

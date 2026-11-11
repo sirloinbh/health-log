@@ -11,6 +11,7 @@ import { dailyRangeText, earliestDate, inDailyRange, isValidDate, latestDate } f
 import { type Health, healthText } from './health';
 import { requestJson } from './lib/api';
 import { useNotice } from './lib/use-notice';
+import { count } from './plural';
 import { RemindersCard } from './reminders';
 import {
   changeText,
@@ -68,10 +69,10 @@ function Stats({
   return (
     <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <Stat
-        label="평균 수면"
+        label="Average sleep"
         value={
           current.sleep.averageMinutes === null
-            ? '기록 없음'
+            ? 'No records'
             : minutesText(current.sleep.averageMinutes)
         }
         sample={daysText(current.sleep.days)}
@@ -84,16 +85,16 @@ function Stats({
         )}
       />
       <Stat
-        label="하루 평균 칼로리"
+        label="Average daily calories"
         value={
           current.calories.average === null
-            ? '기록 없음'
-            : `${current.calories.average.toLocaleString('ko-KR')}kcal`
+            ? 'No records'
+            : `${current.calories.average.toLocaleString('en-US')}kcal`
         }
         sample={
           daysText(current.calories.days) +
           (current.calories.incompleteDays
-            ? ` (칼로리를 모르는 날 ${current.calories.incompleteDays}일 제외)`
+            ? ` (excludes ${count(current.calories.incompleteDays, 'day')} with unknown calories)`
             : '')
         }
         change={changeText(
@@ -101,13 +102,15 @@ function Stats({
           previous.calories.average,
           previous.calories.days,
           words,
-          (value) => `${value.toLocaleString('ko-KR')}kcal`,
+          (value) => `${value.toLocaleString('en-US')}kcal`,
         )}
       />
       <Stat
-        label="술 마신 날"
+        label="Days with drinking"
         value={
-          drinking === null ? '기록 없음' : `${current.drinking.drinkingDays}일 (${drinking}%)`
+          drinking === null
+            ? 'No records'
+            : `${count(current.drinking.drinkingDays, 'day')} (${drinking}%)`
         }
         sample={daysText(current.drinking.days)}
         // Periods with different numbers of recorded days compare by share, not by count.
@@ -120,34 +123,36 @@ function Stats({
         )}
       />
       <Stat
-        label="하루 평균 흡연"
+        label="Average daily smoking"
         value={
           current.smoking.averagePerDay === null
-            ? '기록 없음'
-            : `${current.smoking.averagePerDay}개비`
+            ? 'No records'
+            : count(current.smoking.averagePerDay, 'cigarette')
         }
         sample={
           daysText(current.smoking.days) +
-          (current.smoking.cigarettes === null ? '' : ` · 합계 ${current.smoking.cigarettes}개비`)
+          (current.smoking.cigarettes === null
+            ? ''
+            : ` · total ${count(current.smoking.cigarettes, 'cigarette')}`)
         }
         change={changeText(
           current.smoking.averagePerDay,
           previous.smoking.averagePerDay,
           previous.smoking.days,
           words,
-          (value) => `${Number(value.toFixed(1))}개비`,
+          (value) => count(Number(value.toFixed(1)), 'cigarette'),
         )}
       />
       <Stat
-        label="식단 지킴"
-        value={diet === null ? '기록 없음' : `${diet}%`}
-        sample={`체크한 날 ${current.diet.days}일`}
+        label="Diet kept"
+        value={diet === null ? 'No records' : `${diet}%`}
+        sample={`${count(current.diet.days, 'day')} checked`}
         change={changeText(diet, shareOf(previous.diet), previous.diet.days, words, points)}
       />
       <Stat
-        label="수면 만족"
-        value={sleepGood === null ? '기록 없음' : `${sleepGood}%`}
-        sample={`체크한 날 ${current.sleepGood.days}일`}
+        label="Sleep good"
+        value={sleepGood === null ? 'No records' : `${sleepGood}%`}
+        sample={`${count(current.sleepGood.days, 'day')} checked`}
         change={changeText(
           sleepGood,
           shareOf(previous.sleepGood),
@@ -163,17 +168,21 @@ function Stats({
 function SleepAfterDrinking({ report }: { report: Report }) {
   const { afterDrinking, afterNoDrinking } = report.sleepAfterDrinking;
   const groups = [
-    { label: '술 마신 날 밤', group: afterDrinking, bar: 'bg-[#eb6834] dark:bg-[#d95926]' },
-    { label: '안 마신 날 밤', group: afterNoDrinking, bar: 'bg-[#2a78d6] dark:bg-[#3987e5]' },
+    { label: 'Nights after drinking', group: afterDrinking, bar: 'bg-[#eb6834] dark:bg-[#d95926]' },
+    {
+      label: 'Nights without drinking',
+      group: afterNoDrinking,
+      bar: 'bg-[#2a78d6] dark:bg-[#3987e5]',
+    },
   ];
   const longest = Math.max(...groups.map(({ group }) => group.averageMinutes ?? 0), 1);
   const thin = groups.some(({ group }) => group.nights < fewNights);
   return (
     <Card>
       <CardHeader>
-        <CardTitle asHeading="h2">술과 그날 밤 수면</CardTitle>
+        <CardTitle asHeading="h2">Drinking and sleep that night</CardTitle>
         <CardDescription className="break-keep">
-          관련성을 보여 줄 뿐, 원인을 판정하지 않습니다.
+          This shows a relationship only; it does not establish a cause.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
@@ -182,7 +191,9 @@ function SleepAfterDrinking({ report }: { report: Report }) {
             <div key={label} className="flex flex-col gap-1">
               <dt className="flex flex-wrap justify-between gap-2 text-body-sm">
                 <span>{label}</span>
-                <span className="text-muted-foreground">표본 {group.nights}일</span>
+                <span className="text-muted-foreground">
+                  Sample: {count(group.nights, 'night')}
+                </span>
               </dt>
               <dd className="flex items-center gap-2 text-body-sm">
                 <span className="h-2 min-w-0 flex-1 rounded-full bg-muted">
@@ -194,7 +205,7 @@ function SleepAfterDrinking({ report }: { report: Report }) {
                   )}
                 </span>
                 <span className="w-24 shrink-0 text-right">
-                  {group.averageMinutes === null ? '기록 없음' : minutesText(group.averageMinutes)}
+                  {group.averageMinutes === null ? 'No records' : minutesText(group.averageMinutes)}
                 </span>
               </dd>
             </div>
@@ -202,12 +213,14 @@ function SleepAfterDrinking({ report }: { report: Report }) {
         </dl>
         {thin ? (
           <p className="text-caption break-keep text-muted-foreground">
-            한쪽 표본이 {fewNights}일보다 적어 차이를 믿기 어렵습니다. 기록이 더 쌓이면 다시 보세요.
+            One sample has fewer than {fewNights} nights, so the difference is hard to trust. Check
+            again once more records build up.
           </p>
         ) : null}
         <p className="text-caption break-keep text-muted-foreground">
-          술을 기록한 날 밤에 자고 다음 날 아침에 깬 수면을 비교합니다. 수면은 깬 날짜로 기록하므로
-          다음 날짜의 수면입니다. 술을 기록하지 않은 날 밤은 빼고 셉니다.
+          Compares sleep from nights after a recorded drinking day to the next morning. Sleep is
+          recorded by the day you wake up, so it is the next date's sleep. Nights after days without
+          a drinking record are left out.
         </p>
       </CardContent>
     </Card>
@@ -215,8 +228,8 @@ function SleepAfterDrinking({ report }: { report: Report }) {
 }
 
 const periods: { value: Period; label: string }[] = [
-  { value: 'week', label: '주간' },
-  { value: 'month', label: '월간' },
+  { value: 'week', label: 'Weekly' },
+  { value: 'month', label: 'Monthly' },
 ];
 
 export function ReportPage({ health }: { health: Health }) {
@@ -241,10 +254,10 @@ export function ReportPage({ health }: { health: Health }) {
   // once the report is back, focus moves to the period it shows (#128).
   const [retrying, setRetrying] = useState(false);
   const focusSpan = useRef(false);
-  // "이번 주로 이동" goes with the word about a date out of range; its report takes the focus too.
+  // "Go to this week" goes with the word about a date out of range; its report takes the focus too.
   const focusOnArrival = useRef(false);
   const span = useRef<HTMLParagraphElement>(null);
-  // A move whose report fails takes its row away; focus goes to "다시 시도" instead (#138).
+  // A move whose report fails takes its row away; focus goes to "Try again" instead (#138).
   const moved = useRef(false);
   const [focusRetry, setFocusRetry] = useState(0);
   const retryButton = useRef<HTMLButtonElement>(null);
@@ -344,9 +357,9 @@ export function ReportPage({ health }: { health: Health }) {
   return (
     <section aria-labelledby="page-title" className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
-        <h1 id="page-title">대시보드</h1>
+        <h1 id="page-title">Dashboard</h1>
         <p className="text-body text-muted-foreground">
-          수면, 식단, 술·담배, 하루 체크의 주간·월간 변화를 봅니다.
+          View weekly and monthly changes in sleep, diet, alcohol and tobacco, and daily checks.
         </p>
         {health.state === 'error' ? (
           <p role="alert" className="text-body-sm text-destructive">
@@ -360,8 +373,8 @@ export function ReportPage({ health }: { health: Health }) {
       </header>
       {/* Keyed by the service day, so an open dashboard moves on at midnight (#48). */}
       {today ? <RemindersCard key={today} /> : null}
-      <nav aria-label="기간 선택" className="flex flex-wrap items-center gap-2">
-        <div role="group" aria-label="기간 단위" className="flex gap-2">
+      <nav aria-label="Choose period" className="flex flex-wrap items-center gap-2">
+        <div role="group" aria-label="Period unit" className="flex gap-2">
           {periods.map(({ value, label }) => (
             <Button
               key={value}
@@ -381,7 +394,7 @@ export function ReportPage({ health }: { health: Health }) {
             <Button
               variant="outline"
               size="icon"
-              aria-label={`이전 ${words.name}`}
+              aria-label={`Previous ${words.name}`}
               aria-disabled={atStart || undefined}
               aria-description={atStart ? dailyRangeText : undefined}
               title={atStart ? dailyRangeText : undefined}
@@ -403,14 +416,14 @@ export function ReportPage({ health }: { health: Health }) {
               aria-live="polite"
               className="text-body-sm break-keep outline-none"
             >
-              {/* A date with its year no longer fits a phone's row: the line breaks only at "~",
-                  never inside "2000년 1월 2일". */}
-              {spanLabel(shown.current, today).replace(/(?<!~) (?!~)/g, ' ')}
+              {/* A date with its year no longer fits a phone's row: the line breaks only at "–",
+                  never inside "Jan 2, 2000". */}
+              {spanLabel(shown.current, today).replace(/(?<!–) (?!–)/g, '\u00a0')}
             </p>
             <Button
               variant="outline"
               size="icon"
-              aria-label={`다음 ${words.name}`}
+              aria-label={`Next ${words.name}`}
               aria-disabled={atEnd || undefined}
               aria-description={atEnd ? dailyRangeText : undefined}
               title={atEnd ? dailyRangeText : undefined}
@@ -432,7 +445,7 @@ export function ReportPage({ health }: { health: Health }) {
                   go({ date: today }, true);
                 }}
               >
-                이번 {words.name}
+                This {words.name}
               </Button>
             ) : null}
           </div>
@@ -450,7 +463,7 @@ export function ReportPage({ health }: { health: Health }) {
                 go({ date: today }, true);
               }}
             >
-              이번 {words.name}로 이동
+              Go to this {words.name}
             </Button>
           ) : null}
         </>
@@ -466,17 +479,17 @@ export function ReportPage({ health }: { health: Health }) {
             if (!retrying) void retry();
           }}
         >
-          다시 시도
+          Try again
         </Button>
       ) : null}
       {!date && !outOfRange && health.state === 'error' ? (
         <p className="text-body-sm break-keep text-muted-foreground">
-          서버의 오늘 날짜를 알 수 없어 리포트를 불러오지 못했습니다. 서버 연결이 돌아오면 다시
-          불러옵니다.
+          The server's today date is unknown, so the report could not be loaded. It loads again once
+          the server connection is back.
         </p>
       ) : null}
       {!shown && !notice && !outOfRange && (date || health.state === 'loading') ? (
-        <div role="status" aria-busy="true" aria-label="리포트 불러오는 중">
+        <div role="status" aria-busy="true" aria-label="Loading report">
           <SkeletonText lines={3} />
         </div>
       ) : null}
@@ -489,22 +502,21 @@ export function ReportPage({ health }: { health: Health }) {
           <Stats current={shown.current} previous={shown.previous} period={shown.period} />
           <Card>
             <CardHeader>
-              <CardTitle asHeading="h2">날짜별 기록</CardTitle>
+              <CardTitle asHeading="h2">Records by day</CardTitle>
               <CardDescription className="break-keep">
-                기록이 없는 날은 막대 없이 비워 둡니다. 막대에 마우스를 올리거나 누르면 값이
-                보입니다.
+                Days without a record are left blank. Hover or tap a bar to see its value.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <DailyBars
-                title="수면 시간"
+                title="Sleep time"
                 bars={shown.days.map((day) => ({ date: day.date, value: day.sleepMinutes }))}
                 format={minutesText}
               />
               <DailyBars
-                title="칼로리"
+                title="Calories"
                 bars={shown.days.map((day) => ({ date: day.date, value: day.calories }))}
-                format={(value) => `${value.toLocaleString('ko-KR')}kcal`}
+                format={(value) => `${value.toLocaleString('en-US')}kcal`}
               />
             </CardContent>
           </Card>

@@ -22,7 +22,10 @@ function SkeletonText({ lines = 3, className }: { lines?: number; className?: st
   return (
     <div data-slot="skeleton-text" className={cn('flex flex-col gap-2', className)}>
       {Array.from({ length: lines }, (_, i) => (
-        <Skeleton key={i} className={cn('h-4', i === lines - 1 && lines > 1 ? 'w-3/5' : 'w-full')} />
+        <Skeleton
+          key={i}
+          className={cn('h-4', i === lines - 1 && lines > 1 ? 'w-3/5' : 'w-full')}
+        />
       ))}
     </div>
   );
@@ -31,7 +34,10 @@ function SkeletonText({ lines = 3, className }: { lines?: number; className?: st
 /** A card with a title line and a short paragraph. */
 function SkeletonCard({ className }: { className?: string }) {
   return (
-    <div data-slot="skeleton-card" className={cn('flex flex-col gap-4 rounded-xl border p-6', className)}>
+    <div
+      data-slot="skeleton-card"
+      className={cn('flex flex-col gap-4 rounded-xl border p-6', className)}
+    >
       <Skeleton className="h-5 w-2/5" />
       <SkeletonText lines={2} />
     </div>

@@ -1,3 +1,4 @@
+import { count } from './plural';
 // What the API answers for a combo (#46), and how the combo and meal screens describe it.
 
 export type ComboItem = {
@@ -22,11 +23,14 @@ export type Combo = {
 export const fullName = ({ brand, name }: { brand: string | null; name: string }) =>
   brand ? `${brand} ${name}` : name;
 
-/** "음식 3개 · 650kcal", saying when some calories are unknown. */
+/** "3 foods · 650kcal", saying when some calories are unknown. */
 export function comboSummary(combo: Combo) {
-  if (combo.items.length === 0) return '음식이 없습니다';
+  if (combo.items.length === 0) return 'No foods';
   const { value, missing } = combo.calories;
-  const calories = value === null ? '칼로리 값 없음' : `${value}kcal`;
-  const unknown = missing > 0 && value !== null ? ` (칼로리를 모르는 음식 ${missing}개 제외)` : '';
-  return `음식 ${combo.items.length}개 · ${calories}${unknown}`;
+  const calories = value === null ? 'No calorie value' : `${value}kcal`;
+  const unknown =
+    missing > 0 && value !== null
+      ? ` (excludes ${count(missing, 'food')} with unknown calories)`
+      : '';
+  return `${count(combo.items.length, 'food')} · ${calories}${unknown}`;
 }

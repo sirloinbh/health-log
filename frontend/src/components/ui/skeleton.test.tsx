@@ -25,9 +25,13 @@ test('text, card and list shapes draw the expected number of blocks', () => {
       </div>
     </section>,
   );
-  const blocks = (id: string) => screen.getByTestId(id).querySelectorAll('[data-slot="skeleton"]').length;
+  const blocks = (id: string) =>
+    screen.getByTestId(id).querySelectorAll('[data-slot="skeleton"]').length;
   expect(blocks('text')).toBe(4);
   expect(blocks('card')).toBe(1 + 2);
   expect(blocks('list')).toBe(2 * 3);
-  expect(screen.getByRole('region', { name: 'Loading entries' })).toHaveAttribute('aria-busy', 'true');
+  expect(screen.getByRole('region', { name: 'Loading entries' })).toHaveAttribute(
+    'aria-busy',
+    'true',
+  );
 });

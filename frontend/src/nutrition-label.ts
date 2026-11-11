@@ -507,7 +507,7 @@ export function readNutritionLabel(pasted: string): LabelReading {
 }
 
 /**
- * "총 내용량 500g은(는) 1회 제공량(100g)의 5배, 약 1,250kcal입니다." — how much a whole package is,
+ * "The total amount of 500g is 5 times the serving size (100g), about 1,250kcal." — how much a whole package is,
  * so a meal can be recorded in servings. Null when the label does not say enough.
  */
 export function packageText({ basis, total, values }: LabelReading) {
@@ -516,8 +516,8 @@ export function packageText({ basis, total, values }: LabelReading) {
   const kcal =
     values.calories === undefined
       ? ''
-      : `, 약 ${Math.round(values.calories * times).toLocaleString('ko-KR')}kcal`;
-  return `총 내용량 ${total.size}${total.unit}은(는) 1회 제공량(${basis.size}${basis.unit})의 ${times}배${kcal}입니다. 포장 하나를 다 먹었으면 식사에 ${times}회분으로 기록하세요.`;
+      : `, about ${Math.round(values.calories * times).toLocaleString('en-US')}kcal`;
+  return `The total amount of ${total.size}${total.unit} is ${times} times the serving size (${basis.size}${basis.unit})${kcal}. If you ate the whole package, record it as ${times} servings.`;
 }
 
 /** A Coupang product link, recognised only to explain that the app never opens it. */

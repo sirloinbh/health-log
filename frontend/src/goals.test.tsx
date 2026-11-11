@@ -74,24 +74,24 @@ test('each goal shows its verdict beside the day check of the same kind', async 
   });
   renderCard();
 
-  const diet = await screen.findByRole('region', { name: '식단' });
+  const diet = await screen.findByRole('region', { name: 'Diet' });
   expect(request(fetchMock, 0).url).toBe(`/api/goals/days/${date}`);
-  expect(within(diet).getByText('달성')).toBeInTheDocument();
-  expect(within(diet).getByText('1,850kcal · 목표 하루 2,000kcal 이하')).toBeInTheDocument();
-  expect(within(diet).getByText('미달')).toBeInTheDocument();
-  expect(within(diet).getByText('80g · 목표 하루 100g 이상')).toBeInTheDocument();
+  expect(within(diet).getByText('Met')).toBeInTheDocument();
+  expect(within(diet).getByText('1,850kcal · Goal: Up to 2,000kcal a day')).toBeInTheDocument();
+  expect(within(diet).getByText('Missed')).toBeInTheDocument();
+  expect(within(diet).getByText('80g · Goal: At least 100g a day')).toBeInTheDocument();
   // The person's own answer sits next to the automatic one, and can disagree with it.
-  expect(within(diet).getByText('못 지킴')).toBeInTheDocument();
+  expect(within(diet).getByText('Not kept')).toBeInTheDocument();
 
-  // No sleep recorded is "기록 없음", not a miss.
-  const sleep = screen.getByRole('region', { name: '수면' });
-  expect(within(sleep).getByText('기록 없음')).toBeInTheDocument();
-  expect(within(sleep).queryByText('미달')).not.toBeInTheDocument();
-  expect(within(sleep).getByText('체크 안 함')).toBeInTheDocument();
+  // No sleep recorded is "No records", not a miss.
+  const sleep = screen.getByRole('region', { name: 'Sleep' });
+  expect(within(sleep).getByText('No records')).toBeInTheDocument();
+  expect(within(sleep).queryByText('Missed')).not.toBeInTheDocument();
+  expect(within(sleep).getByText('Not checked')).toBeInTheDocument();
 
-  const sober = screen.getByRole('region', { name: '금주' });
-  expect(within(sober).getByText('목표 없음')).toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: '설정에서 목표 정하기' })).not.toBeInTheDocument();
+  const sober = screen.getByRole('region', { name: 'Alcohol-free' });
+  expect(within(sober).getByText('No goal')).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Set goals in Settings' })).not.toBeInTheDocument();
 });
 
 test('a held verdict says why', async () => {
@@ -106,20 +106,24 @@ test('a held verdict says why', async () => {
     }),
   });
   renderCard();
-  const diet = await screen.findByRole('region', { name: '식단' });
-  expect(within(diet).getByText('판정 보류')).toBeInTheDocument();
-  expect(within(diet).getByText('값을 모르는 음식이 있어 판정할 수 없습니다')).toBeInTheDocument();
-  const sober = screen.getByRole('region', { name: '금주' });
+  const diet = await screen.findByRole('region', { name: 'Diet' });
+  expect(within(diet).getByText('Undetermined')).toBeInTheDocument();
   expect(
-    within(sober).getByText('이 주(11.02~11.08) 금주 1일 / 기록 2일 · 목표 주 5일 이상 금주'),
+    within(diet).getByText('Some foods have unknown values, so it cannot be judged'),
   ).toBeInTheDocument();
-  expect(within(sober).getByText('아직 기록하지 않은 날에 따라 달라집니다')).toBeInTheDocument();
+  const sober = screen.getByRole('region', { name: 'Alcohol-free' });
+  expect(
+    within(sober).getByText(
+      'This week (Nov 2 – Nov 8): 1 alcohol-free day / 2 days recorded · Goal: At least 5 alcohol-free days a week',
+    ),
+  ).toBeInTheDocument();
+  expect(within(sober).getByText('It depends on days not recorded yet')).toBeInTheDocument();
 });
 
 test('with no goal at all the card points to the settings', async () => {
   server({ body: dayOf() });
   renderCard();
-  expect(await screen.findByRole('link', { name: '설정에서 목표 정하기' })).toHaveAttribute(
+  expect(await screen.findByRole('link', { name: 'Set goals in Settings' })).toHaveAttribute(
     'href',
     '/settings',
   );
@@ -135,17 +139,17 @@ test('the verdicts can be asked again after records change elsewhere', async () 
     },
   );
   renderCard();
-  fireEvent.click(await screen.findByRole('button', { name: '다시 판정' }));
-  expect(await screen.findByText('미달')).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('button', { name: 'Re-judge' }));
+  expect(await screen.findByText('Missed')).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
 
 test('a failed load can be tried again', async () => {
-  server({ status: 500, body: { error: '서버 오류' } }, { body: dayOf() });
+  server({ status: 500, body: { error: 'Server error' } }, { body: dayOf() });
   renderCard();
-  expect(await screen.findByText('서버 오류')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
-  expect(await screen.findByRole('region', { name: '식단' })).toBeInTheDocument();
+  expect(await screen.findByText('Server error')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(await screen.findByRole('region', { name: 'Diet' })).toBeInTheDocument();
 });
 
 // Today and its week as the server would answer them: 2026-11-06 is a Friday.
@@ -170,20 +174,22 @@ test('the sober card shows the goal this week is judged by, and a change later t
   );
   server({ body: goals });
   render(<GoalsSettings />);
-  await screen.findByRole('heading', { name: '금주' });
+  await screen.findByRole('heading', { name: 'Alcohol-free' });
   expect(
-    within(cardOf('금주')).getByText(
-      '이번 주(11.02~11.08) 목표: 주 6일 이상 금주 (2026-11-07부터)',
+    within(cardOf('Alcohol-free')).getByText(
+      "This week's goal (Nov 2 – Nov 8): At least 6 alcohol-free days a week (from 2026-11-07)",
     ),
   ).toBeInTheDocument();
-  const sober = screen.getByRole('region', { name: '금주 목표 변경 기록' });
-  expect(within(sober.querySelector('li') as HTMLElement).getByText('(예정)')).toBeInTheDocument();
-  expect(within(sober).getAllByText('(예정)')).toHaveLength(1);
-  // The daily goal from Saturday is still to come.
-  const protein = screen.getByRole('region', { name: '단백질 목표 변경 기록' });
-  expect(within(protein).getAllByText('(예정)')).toHaveLength(1);
+  const sober = screen.getByRole('region', { name: 'Alcohol-free goal changes' });
   expect(
-    within(cardOf('단백질')).getByText('지금 목표: 하루 100g 이상 (2026-11-01부터)'),
+    within(sober.querySelector('li') as HTMLElement).getByText('(upcoming)'),
+  ).toBeInTheDocument();
+  expect(within(sober).getAllByText('(upcoming)')).toHaveLength(1);
+  // The daily goal from Saturday is still to come.
+  const protein = screen.getByRole('region', { name: 'Protein goal changes' });
+  expect(within(protein).getAllByText('(upcoming)')).toHaveLength(1);
+  expect(
+    within(cardOf('Protein')).getByText('Current goal: At least 100g a day (from 2026-11-01)'),
   ).toBeInTheDocument();
 });
 
@@ -196,25 +202,25 @@ test('a sleep goal is typed in hours and minutes and sent in minutes from the ch
   ]);
   const fetchMock = server({ body: goalsOf() }, { body: saved });
   render(<GoalsSettings />);
-  await screen.findByRole('heading', { name: '수면' });
-  const sleep = cardOf('수면');
-  expect(within(sleep).getByText('지금 목표 없음')).toBeInTheDocument();
+  await screen.findByRole('heading', { name: 'Sleep' });
+  const sleep = cardOf('Sleep');
+  expect(within(sleep).getByText('Current goal: not set')).toBeInTheDocument();
   // The start date begins at the server's today.
-  expect(within(sleep).getByLabelText('적용 시작일')).toHaveValue('2026-11-06');
-  fireEvent.change(within(sleep).getByLabelText('하루 수면 시간 (시간)'), {
+  expect(within(sleep).getByLabelText('Start date')).toHaveValue('2026-11-06');
+  fireEvent.change(within(sleep).getByLabelText('Daily sleep time (hours)'), {
     target: { value: '7' },
   });
-  fireEvent.change(within(sleep).getByLabelText('하루 수면 시간 (분)'), {
+  fireEvent.change(within(sleep).getByLabelText('Daily sleep time (minutes)'), {
     target: { value: '10' },
   });
-  fireEvent.change(within(sleep).getByLabelText('적용 시작일'), {
+  fireEvent.change(within(sleep).getByLabelText('Start date'), {
     target: { value: '2026-11-03' },
   });
-  fireEvent.click(within(sleep).getByRole('button', { name: '저장' }));
+  fireEvent.click(within(sleep).getByRole('button', { name: 'Save' }));
 
   await waitFor(() =>
     expect(
-      within(cardOf('수면')).getByText('지금 목표: 7시간 10분 이상 (2026-11-03부터)'),
+      within(cardOf('Sleep')).getByText('Current goal: At least 7 h 10 min (from 2026-11-03)'),
     ).toBeInTheDocument(),
   );
   expect(request(fetchMock, 1)).toEqual({
@@ -223,12 +229,12 @@ test('a sleep goal is typed in hours and minutes and sent in minutes from the ch
     body: { from: '2026-11-03', target: 430 },
   });
   // The form is refilled from what was saved.
-  expect(within(cardOf('수면')).getByLabelText('하루 수면 시간 (시간)')).toHaveValue('7');
-  expect(within(cardOf('수면')).getByLabelText('하루 수면 시간 (분)')).toHaveValue('10');
+  expect(within(cardOf('Sleep')).getByLabelText('Daily sleep time (hours)')).toHaveValue('7');
+  expect(within(cardOf('Sleep')).getByLabelText('Daily sleep time (minutes)')).toHaveValue('10');
   // The refilled form has a new Save button, so focus goes to the card's title instead of the page.
   await waitFor(() =>
     expect(document.activeElement).toBe(
-      within(cardOf('수면')).getByRole('heading', { name: '수면' }).parentElement,
+      within(cardOf('Sleep')).getByRole('heading', { name: 'Sleep' }).parentElement,
     ),
   );
 });
@@ -247,7 +253,7 @@ test('the card reads only after a save of the same day has landed', async () => 
   expect(fetchMock).not.toHaveBeenCalled();
   land(undefined);
   await save;
-  expect(await screen.findByRole('region', { name: '식단' })).toBeInTheDocument();
+  expect(await screen.findByRole('region', { name: 'Diet' })).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
@@ -265,11 +271,11 @@ test('a save in another card of the same day judges again without a button', asy
     { body: over },
   );
   renderCard();
-  expect(await screen.findByText('달성')).toBeInTheDocument();
+  expect(await screen.findByText('Met')).toBeInTheDocument();
   // The meal card's save of this day.
   await trackWrite(`/api/meals/${date}`, Promise.resolve({}));
-  expect(await screen.findByText('미달')).toBeInTheDocument();
-  expect(screen.getByText('2,300kcal · 목표 하루 2,000kcal 이하')).toBeInTheDocument();
+  expect(await screen.findByText('Missed')).toBeInTheDocument();
+  expect(screen.getByText('2,300kcal · Goal: Up to 2,000kcal a day')).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(request(fetchMock, 1).url).toBe(`/api/goals/days/${date}`);
 });
@@ -278,7 +284,7 @@ test('only saves that can change this day read again', async () => {
   // The first read, then one for each of the three saves below that count.
   const fetchMock = server(...Array.from({ length: 4 }, () => ({ body: dayOf() })));
   renderCard();
-  await screen.findByRole('region', { name: '식단' });
+  await screen.findByRole('region', { name: 'Diet' });
   const settle = async (path: string) => {
     await trackWrite(path, Promise.resolve({}));
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -314,23 +320,23 @@ test('a read started by a save is quiet; one asked for with the button says so',
   renderCard();
   await waitFor(() => expect(replies).toHaveLength(1));
   replies[0](dayOf());
-  await screen.findByRole('region', { name: '식단' });
+  await screen.findByRole('region', { name: 'Diet' });
 
   await trackWrite(`/api/meals/${date}`, Promise.resolve({}));
   await waitFor(() => expect(replies).toHaveLength(2));
   // Reading, but nothing announced while the person works in the meal card.
-  expect(screen.queryByRole('status', { name: '다시 판정하는 중' })).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '다시 판정' })).not.toHaveAttribute('aria-busy');
+  expect(screen.queryByRole('status', { name: 'Re-judging' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Re-judge' })).not.toHaveAttribute('aria-busy');
   // Waits for the answer on screen, so the quiet read is over before the button is pressed.
   replies[1](over);
-  expect(await screen.findByText('미달')).toBeInTheDocument();
+  expect(await screen.findByText('Missed')).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: '다시 판정' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Re-judge' }));
   await waitFor(() => expect(replies).toHaveLength(3));
-  expect(screen.getByRole('status', { name: '다시 판정하는 중' })).toBeInTheDocument();
+  expect(screen.getByRole('status', { name: 'Re-judging' })).toBeInTheDocument();
   replies[2](dayOf());
   await waitFor(() =>
-    expect(screen.queryByRole('status', { name: '다시 판정하는 중' })).not.toBeInTheDocument(),
+    expect(screen.queryByRole('status', { name: 'Re-judging' })).not.toBeInTheDocument(),
   );
 });
 
@@ -348,21 +354,21 @@ test('pressing the button during a quiet read asks again and says so', async () 
   renderCard();
   await waitFor(() => expect(replies).toHaveLength(1));
   replies[0](dayOf());
-  await screen.findByRole('region', { name: '식단' });
+  await screen.findByRole('region', { name: 'Diet' });
   await trackWrite(`/api/meals/${date}`, Promise.resolve({}));
   await waitFor(() => expect(replies).toHaveLength(2));
 
   // The quiet read is still out; the press starts its own.
-  fireEvent.click(screen.getByRole('button', { name: '다시 판정' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Re-judge' }));
   await waitFor(() => expect(replies).toHaveLength(3));
-  expect(screen.getByRole('status', { name: '다시 판정하는 중' })).toBeInTheDocument();
+  expect(screen.getByRole('status', { name: 'Re-judging' })).toBeInTheDocument();
   replies[2](over);
-  expect(await screen.findByText('미달')).toBeInTheDocument();
+  expect(await screen.findByText('Missed')).toBeInTheDocument();
   // The quiet read's late answer is dropped.
   replies[1](dayOf());
   await new Promise((resolve) => setTimeout(resolve, 20));
-  expect(screen.getByText('미달')).toBeInTheDocument();
-  expect(screen.queryByRole('status', { name: '다시 판정하는 중' })).not.toBeInTheDocument();
+  expect(screen.getByText('Missed')).toBeInTheDocument();
+  expect(screen.queryByRole('status', { name: 'Re-judging' })).not.toBeInTheDocument();
 });
 
 test('when reads overlap, a late answer to the older one is not shown', async () => {
@@ -379,14 +385,14 @@ test('when reads overlap, a late answer to the older one is not shown', async ()
   renderCard();
   await waitFor(() => expect(replies).toHaveLength(1));
   replies[0](dayOf());
-  await screen.findByRole('region', { name: '식단' });
+  await screen.findByRole('region', { name: 'Diet' });
   // Two saves in a row start two reads.
   await trackWrite(`/api/meals/${date}`, Promise.resolve({}));
   await waitFor(() => expect(replies).toHaveLength(2));
   await trackWrite(`/api/sleep/${date}`, Promise.resolve({}));
   await waitFor(() => expect(replies).toHaveLength(3));
   replies[2](over);
-  expect(await screen.findByText('미달')).toBeInTheDocument();
+  expect(await screen.findByText('Missed')).toBeInTheDocument();
   // The first save's read answers last, with what was true before the second save.
   replies[1](
     dayOf({
@@ -394,14 +400,14 @@ test('when reads overlap, a late answer to the older one is not shown', async ()
     }),
   );
   await new Promise((resolve) => setTimeout(resolve, 20));
-  expect(screen.getByText('미달')).toBeInTheDocument();
-  expect(screen.queryByText('달성')).not.toBeInTheDocument();
+  expect(screen.getByText('Missed')).toBeInTheDocument();
+  expect(screen.queryByText('Met')).not.toBeInTheDocument();
 });
 
 test('a card that is gone stops listening', async () => {
   const fetchMock = server({ body: dayOf() });
   const { unmount } = renderCard();
-  await screen.findByRole('region', { name: '식단' });
+  await screen.findByRole('region', { name: 'Diet' });
   unmount();
   await trackWrite(`/api/meals/${date}`, Promise.resolve({}));
   await new Promise((resolve) => setTimeout(resolve, 20));
@@ -411,42 +417,38 @@ test('a card that is gone stops listening', async () => {
 test('a value the goal cannot take is refused before sending', async () => {
   const fetchMock = server({ body: goalsOf() });
   render(<GoalsSettings />);
-  await screen.findByRole('heading', { name: '칼로리' });
-  const calories = cardOf('칼로리');
-  const field = within(calories).getByLabelText('하루 칼로리 상한 (kcal)');
-  const save = within(calories).getByRole('button', { name: '저장' });
+  await screen.findByRole('heading', { name: 'Calories' });
+  const calories = cardOf('Calories');
+  const field = within(calories).getByLabelText('Daily calorie limit (kcal)');
+  const save = within(calories).getByRole('button', { name: 'Save' });
 
   fireEvent.click(save);
-  expect(
-    await within(calories).findByText('하루 칼로리 상한을(를) 입력해 주세요'),
-  ).toBeInTheDocument();
+  expect(await within(calories).findByText('Enter daily calorie limit')).toBeInTheDocument();
   fireEvent.change(field, { target: { value: '1800.5' } });
   fireEvent.click(save);
   expect(
-    await within(calories).findByText('하루 칼로리 상한: 정수로 입력해 주세요'),
+    await within(calories).findByText('Daily calorie limit: enter a whole number'),
   ).toBeInTheDocument();
   fireEvent.change(field, { target: { value: '2천' } });
   fireEvent.click(save);
-  expect(await within(calories).findByText(/숫자만 입력해 주세요/)).toBeInTheDocument();
+  expect(await within(calories).findByText(/enter digits only/)).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
 test('a start date outside the days the daily page shows is refused', async () => {
   const fetchMock = server({ body: goalsOf() });
   render(<GoalsSettings />);
-  await screen.findByRole('heading', { name: '단백질' });
-  const protein = cardOf('단백질');
-  fireEvent.change(within(protein).getByLabelText('하루 단백질 하한 (g)'), {
+  await screen.findByRole('heading', { name: 'Protein' });
+  const protein = cardOf('Protein');
+  fireEvent.change(within(protein).getByLabelText('Daily protein minimum (g)'), {
     target: { value: '100' },
   });
-  fireEvent.change(within(protein).getByLabelText('적용 시작일'), {
+  fireEvent.change(within(protein).getByLabelText('Start date'), {
     target: { value: '2100-01-01' },
   });
-  fireEvent.click(within(protein).getByRole('button', { name: '저장' }));
+  fireEvent.click(within(protein).getByRole('button', { name: 'Save' }));
   expect(
-    await within(protein).findByText(
-      '적용 시작일은 2000-01-01부터 2099-12-31까지 고를 수 있습니다',
-    ),
+    await within(protein).findByText('The start date must be between 2000-01-01 and 2099-12-31'),
   ).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
@@ -454,24 +456,26 @@ test('a start date outside the days the daily page shows is refused', async () =
 test('unreadable sleep minutes are refused, not saved as no minutes', async () => {
   const fetchMock = server({ body: goalsOf() });
   render(<GoalsSettings />);
-  await screen.findByRole('heading', { name: '수면' });
-  const sleep = cardOf('수면');
-  fireEvent.change(within(sleep).getByLabelText('하루 수면 시간 (시간)'), {
+  await screen.findByRole('heading', { name: 'Sleep' });
+  const sleep = cardOf('Sleep');
+  fireEvent.change(within(sleep).getByLabelText('Daily sleep time (hours)'), {
     target: { value: '7' },
   });
-  for (const value of ['3O', '-10', '30분']) {
-    fireEvent.change(within(sleep).getByLabelText('하루 수면 시간 (분)'), { target: { value } });
-    fireEvent.click(within(sleep).getByRole('button', { name: '저장' }));
+  for (const value of ['3O', '-10', '30 min']) {
+    fireEvent.change(within(sleep).getByLabelText('Daily sleep time (minutes)'), {
+      target: { value },
+    });
+    fireEvent.click(within(sleep).getByRole('button', { name: 'Save' }));
     expect(
-      await within(sleep).findByText(/하루 수면 시간\(분\): 숫자만 입력해 주세요/),
+      await within(sleep).findByText(/Daily sleep time \(minutes\): enter digits only/),
     ).toBeInTheDocument();
   }
-  fireEvent.change(within(sleep).getByLabelText('하루 수면 시간 (분)'), {
+  fireEvent.change(within(sleep).getByLabelText('Daily sleep time (minutes)'), {
     target: { value: '75' },
   });
-  fireEvent.click(within(sleep).getByRole('button', { name: '저장' }));
+  fireEvent.click(within(sleep).getByRole('button', { name: 'Save' }));
   expect(
-    await within(sleep).findByText('수면 시간: 분은 0~59로 입력해 주세요'),
+    await within(sleep).findByText('Sleep time: enter minutes from 0 to 59'),
   ).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
@@ -486,15 +490,21 @@ test('a goal can be turned off from a date, and the change shows in its history'
   ]);
   const fetchMock = server({ body: on }, { body: off });
   render(<GoalsSettings />);
-  await screen.findByRole('heading', { name: '칼로리' });
-  expect(within(cardOf('칼로리')).getByLabelText('하루 칼로리 상한 (kcal)')).toHaveValue('2000');
-  fireEvent.click(within(cardOf('칼로리')).getByRole('button', { name: '시작일부터 목표 끄기' }));
-
-  const history = await screen.findByRole('region', { name: '칼로리 목표 변경 기록' });
-  await waitFor(() =>
-    expect(within(history).getByText('2026-11-06부터 목표 끔')).toBeInTheDocument(),
+  await screen.findByRole('heading', { name: 'Calories' });
+  expect(within(cardOf('Calories')).getByLabelText('Daily calorie limit (kcal)')).toHaveValue(
+    '2000',
   );
-  expect(within(history).getByText('2026-11-01부터 하루 2,000kcal 이하')).toBeInTheDocument();
+  fireEvent.click(
+    within(cardOf('Calories')).getByRole('button', {
+      name: 'Turn the goal off from the start date',
+    }),
+  );
+
+  const history = await screen.findByRole('region', { name: 'Calories goal changes' });
+  await waitFor(() =>
+    expect(within(history).getByText('From 2026-11-06 Goal off')).toBeInTheDocument(),
+  );
+  expect(within(history).getByText('From 2026-11-01 Up to 2,000kcal a day')).toBeInTheDocument();
   expect(request(fetchMock, 1).body).toEqual({ from: '2026-11-06', target: null });
 });
 
@@ -509,15 +519,15 @@ test('a change after today is marked as coming, and one change can be deleted', 
     { body: goalsOf({ protein: { from, target: 100 } }, [{ item: 'protein', from, target: 100 }]) },
   );
   render(<GoalsSettings />);
-  const history = await screen.findByRole('region', { name: '단백질 목표 변경 기록' });
-  expect(within(history).getByText('(예정)')).toBeInTheDocument();
+  const history = await screen.findByRole('region', { name: 'Protein goal changes' });
+  expect(within(history).getByText('(upcoming)')).toBeInTheDocument();
   fireEvent.click(
-    within(history).getByRole('button', { name: '2026-12-01 단백질 목표 변경 삭제' }),
+    within(history).getByRole('button', { name: 'Delete 2026-12-01 Protein goal change' }),
   );
   const dialog = await screen.findByRole('dialog');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
-  await waitFor(() => expect(screen.queryByText('(예정)')).not.toBeInTheDocument());
+  await waitFor(() => expect(screen.queryByText('(upcoming)')).not.toBeInTheDocument());
   expect(request(fetchMock, 1)).toEqual({
     url: '/api/goals/protein/2026-12-01',
     method: 'DELETE',
@@ -527,7 +537,7 @@ test('a change after today is marked as coming, and one change can be deleted', 
   // The pressed button is gone with its row, so focus goes to the card's title.
   await waitFor(() =>
     expect(document.activeElement).toBe(
-      within(cardOf('단백질')).getByRole('heading', { name: '단백질' }).parentElement,
+      within(cardOf('Protein')).getByRole('heading', { name: 'Protein' }).parentElement,
     ),
   );
 });
@@ -537,19 +547,21 @@ test('a deleted change stays gone even if reading the goals again fails', async 
     { item: 'sleep', from: '2026-11-05', target: 480 },
     { item: 'sleep', from, target: 420 },
   ]);
-  server({ body: goals }, { status: 204 }, { status: 500, body: { error: '서버 오류' } });
+  server({ body: goals }, { status: 204 }, { status: 500, body: { error: 'Server error' } });
   render(<GoalsSettings />);
-  const history = await screen.findByRole('region', { name: '수면 목표 변경 기록' });
-  fireEvent.click(within(history).getByRole('button', { name: '2026-11-05 수면 목표 변경 삭제' }));
+  const history = await screen.findByRole('region', { name: 'Sleep goal changes' });
+  fireEvent.click(
+    within(history).getByRole('button', { name: 'Delete 2026-11-05 Sleep goal change' }),
+  );
   fireEvent.click(
     within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }),
   );
 
-  expect(await screen.findByText('서버 오류')).toBeInTheDocument();
-  expect(within(history).queryByText(/2026-11-05부터/)).not.toBeInTheDocument();
+  expect(await screen.findByText('Server error')).toBeInTheDocument();
+  expect(within(history).queryByText(/From 2026-11-05/)).not.toBeInTheDocument();
   // The goal before it holds again.
   expect(
-    within(cardOf('수면')).getByText('지금 목표: 7시간 이상 (2026-11-01부터)'),
+    within(cardOf('Sleep')).getByText('Current goal: At least 7 h (from 2026-11-01)'),
   ).toBeInTheDocument();
 });
 
@@ -561,17 +573,21 @@ test('deleting a sober change says it stops counting from the week of its date',
     ]),
   });
   render(<GoalsSettings />);
-  const sober = await screen.findByRole('region', { name: '금주 목표 변경 기록' });
-  fireEvent.click(within(sober).getByRole('button', { name: `${from} 금주 목표 변경 삭제` }));
+  const sober = await screen.findByRole('region', { name: 'Alcohol-free goal changes' });
+  fireEvent.click(
+    within(sober).getByRole('button', { name: `Delete ${from} Alcohol-free goal change` }),
+  );
   expect(
-    await screen.findByText('삭제하면 그 날짜가 든 주부터 바로 앞의 목표로 판정합니다.'),
+    await screen.findByText(
+      'Deleting it judges weeks from the week containing that date by the previous goal.',
+    ),
   ).toBeInTheDocument();
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
-  const sleep = screen.getByRole('region', { name: '수면 목표 변경 기록' });
-  fireEvent.click(within(sleep).getByRole('button', { name: `${from} 수면 목표 변경 삭제` }));
+  const sleep = screen.getByRole('region', { name: 'Sleep goal changes' });
+  fireEvent.click(within(sleep).getByRole('button', { name: `Delete ${from} Sleep goal change` }));
   expect(
-    await screen.findByText('삭제하면 그 날짜부터 바로 앞의 목표로 판정합니다.'),
+    await screen.findByText('Deleting it judges days from that date by the previous goal.'),
   ).toBeInTheDocument();
 });

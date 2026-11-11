@@ -54,7 +54,7 @@ function StatusBadge({ status }: { status: Status }) {
   return <Badge variant={badgeVariant[status]}>{statusText[status]}</Badge>;
 }
 
-const sinceText = (from: string) => `${from}부터`;
+const sinceText = (from: string) => `From ${from}`;
 
 function GoalForm({
   item,
@@ -85,12 +85,12 @@ function GoalForm({
     // Both buttons stay pressable while saving (#126), and Enter in a field submits too.
     if (saving) return;
     if (!isValidDate(from)) {
-      error('적용 시작일을 골라 주세요');
+      error('Choose the date the goal takes effect');
       return;
     }
     // The same days the daily page can show (#50), so every goal can be seen judged.
     if (!inDailyRange(from)) {
-      error(`적용 시작일은 ${earliestDate}부터 ${latestDate}까지 고를 수 있습니다`);
+      error(`The start date must be between ${earliestDate} and ${latestDate}`);
       return;
     }
     // A repeated failure then appears anew and is announced again (as in #98).
@@ -101,7 +101,7 @@ function GoalForm({
         goalsPath,
         requestJson<Goals>(`${goalsPath}/${item}`, { method: 'PUT', body: { from, target } }),
       );
-      toast.success(target === null ? '목표를 껐습니다' : '목표를 저장했습니다');
+      toast.success(target === null ? 'Goal turned off' : 'Goal saved');
       onSaved(goals);
     } catch (cause) {
       error(cause);
@@ -115,7 +115,7 @@ function GoalForm({
     if (saving) return;
     const typed = parseAmount(value);
     if (typed === null) {
-      error(`${field.label}을(를) 입력해 주세요`);
+      error(`Enter ${field.label.toLowerCase()}`);
       return;
     }
     if (typed === undefined) {
@@ -127,7 +127,7 @@ function GoalForm({
       const typedMinutes = parseAmount(minutes);
       // Unreadable is refused; only a blank field means no minutes.
       if (typedMinutes === undefined) {
-        error(unreadableAmount('하루 수면 시간(분)'));
+        error(unreadableAmount('Daily sleep time (minutes)'));
         return;
       }
       target = toSleepTarget(typed, typedMinutes ?? 0);
@@ -157,7 +157,7 @@ function GoalForm({
               aria-label={isSleep ? `${field.label} (${field.unit})` : undefined}
               inputMode={isSleep ? 'numeric' : 'decimal'}
               autoComplete="off"
-              placeholder={`예: ${field.example}`}
+              placeholder={`e.g. ${field.example}`}
               readOnly={saving}
               value={value}
               onChange={(event) => setValue(event.target.value)}
@@ -165,14 +165,14 @@ function GoalForm({
           </div>
           {isSleep ? (
             <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <Label htmlFor={`${id}-minutes`}>분</Label>
+              <Label htmlFor={`${id}-minutes`}>Minutes</Label>
               <Input
                 id={`${id}-minutes`}
                 // The full name, so a list of fields says whose minutes these are.
-                aria-label={`${field.label} (분)`}
+                aria-label={`${field.label} (minutes)`}
                 inputMode="numeric"
                 autoComplete="off"
-                placeholder="예: 30"
+                placeholder="e.g. 30"
                 readOnly={saving}
                 value={minutes}
                 onChange={(event) => setMinutes(event.target.value)}
@@ -181,7 +181,7 @@ function GoalForm({
           ) : null}
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor={`${id}-from`}>적용 시작일</Label>
+          <Label htmlFor={`${id}-from`}>Start date</Label>
           <Input
             id={`${id}-from`}
             type="date"
@@ -195,18 +195,18 @@ function GoalForm({
       </div>
       <p className="text-caption text-muted-foreground">
         {item === 'sober_days'
-          ? '주(월~일) 단위로 판정합니다. 주 중간에 바꾸면 그 주 전체를 새 목표로 판정하고, 그 전 주는 그때의 목표로 판정합니다.'
-          : '시작일 전 날짜는 그때의 목표로 판정합니다.'}
+          ? 'Judged by week (Monday to Sunday). Changing it mid-week judges that whole week by the new goal; earlier weeks keep the goal they had.'
+          : 'Days before the start date are judged by the goal they had.'}
       </p>
       <Notice notice={notice} />
       <div className="flex flex-wrap gap-2">
         <BusyButton type="submit" busy={saving} aria-busy={saving || undefined}>
-          {saving ? <Spinner size="sm" label="저장하는 중" /> : null}
-          저장
+          {saving ? <Spinner size="sm" label="Saving" /> : null}
+          Save
         </BusyButton>
         {goal ? (
           <BusyButton type="button" variant="outline" busy={saving} onClick={() => void save(null)}>
-            시작일부터 목표 끄기
+            Turn the goal off from the start date
           </BusyButton>
         ) : null}
       </div>
@@ -239,16 +239,13 @@ function GoalHistory({
         throw cause;
       }
     }
-    toast.success('변경 기록을 삭제했습니다');
+    toast.success('Change deleted');
     onRemoved(from);
   };
 
   return (
-    <section
-      aria-label={`${goalFields[item].title} 목표 변경 기록`}
-      className="flex flex-col gap-2"
-    >
-      <p className="text-body-sm font-medium">변경 기록</p>
+    <section aria-label={`${goalFields[item].title} goal changes`} className="flex flex-col gap-2">
+      <p className="text-body-sm font-medium">Changes</p>
       <ul className="flex flex-col gap-2 text-body-sm">
         {changes.map((change) => (
           <li key={change.from} className="flex flex-wrap items-center justify-between gap-2">
@@ -256,26 +253,26 @@ function GoalHistory({
               {sinceText(change.from)} {changeText(item, change.target)}
               {/* A sober change later this week already judges this week, so it is not to come. */}
               {change.from > countsUntil(goals, item) ? (
-                <span className="text-muted-foreground"> (예정)</span>
+                <span className="text-muted-foreground"> (upcoming)</span>
               ) : null}
             </span>
             <ConfirmDialog
-              title="이 변경을 삭제할까요?"
+              title="Delete this change?"
               description={
                 // A sober goal judges whole weeks, so a deleted change stops counting from the
                 // Monday of its week.
                 item === 'sober_days'
-                  ? '삭제하면 그 날짜가 든 주부터 바로 앞의 목표로 판정합니다.'
-                  : '삭제하면 그 날짜부터 바로 앞의 목표로 판정합니다.'
+                  ? 'Deleting it judges weeks from the week containing that date by the previous goal.'
+                  : 'Deleting it judges days from that date by the previous goal.'
               }
               onConfirm={() => remove(change.from)}
               trigger={
                 <Button
                   variant="outline"
                   size="sm"
-                  aria-label={`${change.from} ${goalFields[item].title} 목표 변경 삭제`}
+                  aria-label={`Delete ${change.from} ${goalFields[item].title} goal change`}
                 >
-                  삭제
+                  Delete
                 </Button>
               }
             />
@@ -338,11 +335,11 @@ export function GoalsSettings() {
           tabIndex={-1}
           className="outline-none"
         >
-          목표
+          Goals
         </h2>
         <p className="text-body-sm text-muted-foreground">
-          하루 기록에서 목표를 지켰는지 자동으로 판정합니다. 목표를 바꿔도 지난 날짜는 그때의 목표로
-          판정합니다.
+          Whether you kept your goals is judged automatically from the daily record. Changing a goal
+          keeps earlier dates judged by the goal they had.
         </p>
       </div>
       <Notice notice={notice} />
@@ -356,11 +353,11 @@ export function GoalsSettings() {
             moveFocus('section');
           }}
         >
-          다시 시도
+          Try again
         </Button>
       ) : null}
       {!notice && goals === undefined ? (
-        <div role="status" aria-busy="true" aria-label="목표 불러오는 중">
+        <div role="status" aria-busy="true" aria-label="Loading goals">
           <SkeletonText lines={3} />
         </div>
       ) : null}
@@ -415,9 +412,9 @@ export function GoalsSettings() {
 }
 
 const groups: { title: string; items: GoalItem[]; check?: (typeof questions)[number] }[] = [
-  { title: '식단', items: ['calories', 'protein'], check: questions[0] },
-  { title: '수면', items: ['sleep'], check: questions[1] },
-  { title: '금주', items: ['sober_days'] },
+  { title: 'Diet', items: ['calories', 'protein'], check: questions[0] },
+  { title: 'Sleep', items: ['sleep'], check: questions[1] },
+  { title: 'Alcohol-free', items: ['sober_days'] },
 ];
 
 function Verdict({ day }: { day: GoalDayItem }) {
@@ -429,12 +426,12 @@ function Verdict({ day }: { day: GoalDayItem }) {
         {day.goal && day.status ? (
           <StatusBadge status={day.status} />
         ) : (
-          <span className="text-muted-foreground">목표 없음</span>
+          <span className="text-muted-foreground">No goal</span>
         )}
       </div>
       <p className="break-keep text-muted-foreground">
         {actualText(day)}
-        {day.goal ? ` · 목표 ${targetText(day.item, day.goal.target)}` : null}
+        {day.goal ? ` · Goal: ${targetText(day.item, day.goal.target)}` : null}
       </p>
       {day.status === 'unknown' ? (
         <p className="text-caption text-muted-foreground">{unknownReason(day.item)}</p>
@@ -463,7 +460,7 @@ export function GoalsCard({ date }: { date: string }) {
   const [day, setDay] = useState<GoalDay | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   // Only a read the person asked for says so. Saving each meal would otherwise have a screen reader
-  // announce "다시 판정하는 중" from this card while they work in another one.
+  // announce "Re-judging" from this card while they work in another one.
   const [asked, setAsked] = useState(false);
   const { notice, error, clear } = useNotice();
   const live = useRef(true);
@@ -510,15 +507,16 @@ export function GoalsCard({ date }: { date: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle asHeading="h2">목표 달성</CardTitle>
+        <CardTitle asHeading="h2">Goal results</CardTitle>
         <CardDescription>
-          자동 판정은 정한 목표로, 직접 체크는 하루 체크에서 고른 답입니다.
+          Automatic judgments use the goals you set; manual checks are your answers in the daily
+          check.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <Notice notice={notice} />
         {day === undefined && !notice ? (
-          <div role="status" aria-busy="true" aria-label="목표 달성 불러오는 중">
+          <div role="status" aria-busy="true" aria-label="Loading goal results">
             <SkeletonText lines={3} />
           </div>
         ) : null}
@@ -526,9 +524,9 @@ export function GoalsCard({ date }: { date: string }) {
           <>
             {noGoal ? (
               <p className="text-body-sm text-muted-foreground">
-                아직 정한 목표가 없습니다.{' '}
+                No goals set yet.{' '}
                 <Link to={goalSettingsPath} className="underline underline-offset-4">
-                  설정에서 목표 정하기
+                  Set goals in Settings
                 </Link>
               </p>
             ) : null}
@@ -546,7 +544,7 @@ export function GoalsCard({ date }: { date: string }) {
                 </ul>
                 {group.check ? (
                   <p className="break-keep">
-                    <span className="text-muted-foreground">직접 체크: </span>
+                    <span className="text-muted-foreground">Manual check: </span>
                     {answerText(
                       day.checks?.[group.check.key] ?? null,
                       group.check.yes,
@@ -573,8 +571,8 @@ export function GoalsCard({ date }: { date: string }) {
             void load();
           }}
         >
-          {loading && asked && day ? <Spinner size="sm" label="다시 판정하는 중" /> : null}
-          {day === undefined && notice ? '다시 시도' : '다시 판정'}
+          {loading && asked && day ? <Spinner size="sm" label="Re-judging" /> : null}
+          {day === undefined && notice ? 'Try again' : 'Re-judge'}
         </Button>
       </CardContent>
     </Card>

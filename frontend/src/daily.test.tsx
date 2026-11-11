@@ -109,10 +109,10 @@ test('the main menu opens the day the server counts as today', async () => {
   health({ today: '2026-03-15' });
   render(<App />);
   const menu = screen.getByRole('navigation', { name: 'Main menu' });
-  fireEvent.click(within(menu).getByRole('link', { name: '하루 기록' }));
-  expect(await screen.findByText('2026년 3월 15일 일요일')).toBeInTheDocument();
+  fireEvent.click(within(menu).getByRole('link', { name: 'Daily record' }));
+  expect(await screen.findByText('Sunday, March 15, 2026')).toBeInTheDocument();
   expect(window.location.pathname).toBe('/daily/2026-03-15');
-  expect(within(menu).getByRole('link', { name: '하루 기록' })).toHaveAttribute(
+  expect(within(menu).getByRole('link', { name: 'Daily record' })).toHaveAttribute(
     'aria-current',
     'page',
   );
@@ -121,33 +121,33 @@ test('the main menu opens the day the server counts as today', async () => {
 test('the previous and next day links move across a month boundary', async () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-02-28');
-  fireEvent.click(screen.getByRole('link', { name: '다음 날' }));
-  expect(await screen.findByText('2026년 3월 1일 일요일')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('link', { name: '이전 날' }));
-  expect(await screen.findByText('2026년 2월 28일 토요일')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('link', { name: 'Next day' }));
+  expect(await screen.findByText('Sunday, March 1, 2026')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('link', { name: 'Previous day' }));
+  expect(await screen.findByText('Saturday, February 28, 2026')).toBeInTheDocument();
   expect(window.location.pathname).toBe('/daily/2026-02-28');
 });
 
 test('the today link returns to the server date and hides once there', async () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-01-01');
-  fireEvent.click(await screen.findByRole('link', { name: '오늘' }));
-  expect(await screen.findByText('2026년 3월 15일 일요일')).toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: '오늘' })).not.toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('link', { name: 'Today' }));
+  expect(await screen.findByText('Sunday, March 15, 2026')).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Today' })).not.toBeInTheDocument();
 });
 
 test('picking a date opens that day', async () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  fireEvent.change(screen.getByLabelText('날짜 선택'), { target: { value: '2026-03-02' } });
-  expect(await screen.findByText('2026년 3월 2일 월요일')).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Choose date'), { target: { value: '2026-03-02' } });
+  expect(await screen.findByText('Monday, March 2, 2026')).toBeInTheDocument();
   expect(window.location.pathname).toBe('/daily/2026-03-02');
 });
 
 test('a year still being typed does not change the page', () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  const input = screen.getByLabelText('날짜 선택');
+  const input = screen.getByLabelText('Choose date');
   fireEvent.change(input, { target: { value: '0002-03-15' } });
   expect(window.location.pathname).toBe('/daily/2026-03-15');
   expect(input).toHaveValue('0002-03-15');
@@ -158,17 +158,17 @@ test('a year still being typed does not change the page', () => {
 test('a date that does not exist shows an error with a way back', async () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-02-30');
-  expect(screen.getByRole('alert')).toHaveTextContent('없는 날짜입니다: 2026-02-30');
-  expect(screen.queryByRole('heading', { level: 2, name: '수면' })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('link', { name: '오늘 기록으로 이동' }));
-  expect(await screen.findByText('2026년 3월 15일 일요일')).toBeInTheDocument();
+  expect(screen.getByRole('alert')).toHaveTextContent('Not a real date: 2026-02-30');
+  expect(screen.queryByRole('heading', { level: 2, name: 'Sleep' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('link', { name: "Go to today's record" }));
+  expect(await screen.findByText('Sunday, March 15, 2026')).toBeInTheDocument();
   expect(window.location.pathname).toBe('/daily/2026-03-15');
 });
 
 test('a server error is reported instead of guessing today', async () => {
-  health({ error: '서버 오류가 발생했습니다' }, 500);
+  health({ error: 'Server error occurred' }, 500);
   open('/daily');
-  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
   expect(window.location.pathname).toBe('/daily');
 });
 
@@ -186,17 +186,17 @@ test('an app left open past midnight picks up the new today', async () => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  await screen.findByText('2026년 3월 15일 일요일');
+  await screen.findByText('Sunday, March 15, 2026');
   await act(() => Promise.resolve());
-  expect(screen.queryByRole('link', { name: '오늘' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Today' })).not.toBeInTheDocument();
 
   health({ today: '2026-03-16' });
   await act(async () => {
     vi.advanceTimersByTime(60_000);
     await Promise.resolve();
   });
-  fireEvent.click(await screen.findByRole('link', { name: '오늘' }));
-  expect(await screen.findByText('2026년 3월 16일 월요일')).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('link', { name: 'Today' }));
+  expect(await screen.findByText('Monday, March 16, 2026')).toBeInTheDocument();
 });
 
 test('returning to the tab checks today again', async () => {
@@ -206,7 +206,7 @@ test('returning to the tab checks today again', async () => {
 
   health({ today: '2026-03-16' });
   fireEvent(document, new Event('visibilitychange'));
-  expect(await screen.findByRole('link', { name: '오늘' })).toHaveAttribute(
+  expect(await screen.findByRole('link', { name: 'Today' })).toHaveAttribute(
     'href',
     '/daily/2026-03-16',
   );
@@ -236,45 +236,45 @@ test('a slow older response does not overwrite a newer today', async () => {
     await Promise.resolve();
   });
   await act(() => Promise.resolve());
-  expect(screen.queryByRole('link', { name: '오늘' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Today' })).not.toBeInTheDocument();
 });
 
 test('moving to another day is announced to screen readers', async () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
   // A live region announces changes only if the same element stays and its text changes.
-  const region = screen.getByText('2026년 3월 15일 일요일');
+  const region = screen.getByText('Sunday, March 15, 2026');
   expect(region).toHaveAttribute('aria-live', 'polite');
-  fireEvent.click(screen.getByRole('link', { name: '다음 날' }));
-  await screen.findByText('2026년 3월 16일 월요일');
+  fireEvent.click(screen.getByRole('link', { name: 'Next day' }));
+  await screen.findByText('Monday, March 16, 2026');
   expect(region).toBeInTheDocument();
-  expect(region).toHaveTextContent('2026년 3월 16일 월요일');
+  expect(region).toHaveTextContent('Monday, March 16, 2026');
 });
 
 test('going back ends a typed edit, so the field matches the page and history stays intact', async () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  const input = screen.getByLabelText('날짜 선택');
+  const input = screen.getByLabelText('Choose date');
   fireEvent.change(input, { target: { value: '2026-12-25' } });
-  await screen.findByText('2026년 12월 25일 금요일');
+  await screen.findByText('Friday, December 25, 2026');
 
   window.history.back();
-  await screen.findByText('2026년 3월 15일 일요일');
+  await screen.findByText('Sunday, March 15, 2026');
   expect(input).toHaveValue('2026-03-15');
 
   // A new edit must add an entry, not replace the day we came back to.
   fireEvent.change(input, { target: { value: '2026-03-20' } });
-  await screen.findByText('2026년 3월 20일 금요일');
+  await screen.findByText('Friday, March 20, 2026');
   window.history.back();
-  await screen.findByText('2026년 3월 15일 일요일');
+  await screen.findByText('Sunday, March 15, 2026');
   window.history.forward();
-  await screen.findByText('2026년 3월 20일 금요일');
+  await screen.findByText('Friday, March 20, 2026');
 });
 
 test('the date input offers the range the page opens', () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  const input = screen.getByLabelText('날짜 선택');
+  const input = screen.getByLabelText('Choose date');
   expect(input).toHaveAttribute('min', '2000-01-01');
   // A max also keeps Chrome from taking a sixth digit into the year.
   expect(input).toHaveAttribute('max', '2099-12-31');
@@ -283,7 +283,7 @@ test('the date input offers the range the page opens', () => {
 test('typing the date already shown leaves no history entry', () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  const input = screen.getByLabelText('날짜 선택');
+  const input = screen.getByLabelText('Choose date');
   const before = window.history.length;
   fireEvent.change(input, { target: { value: '0202-03-15' } });
   fireEvent.change(input, { target: { value: '2026-03-15' } });
@@ -294,7 +294,7 @@ test('typing the date already shown leaves no history entry', () => {
 test('typing a date leaves one history entry and blur starts a new one', () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  const input = screen.getByLabelText('날짜 선택');
+  const input = screen.getByLabelText('Choose date');
   const before = window.history.length;
   fireEvent.change(input, { target: { value: '2026-01-15' } });
   fireEvent.change(input, { target: { value: '2026-12-15' } });
@@ -313,10 +313,10 @@ test('each day loads its own sleep record', async () => {
   );
   vi.stubGlobal('fetch', fetchMock);
   open('/daily/2026-03-15');
-  await screen.findByLabelText('취침 시각');
-  fireEvent.click(screen.getByRole('link', { name: '다음 날' }));
-  await screen.findByText('2026년 3월 16일 월요일');
-  await screen.findByLabelText('취침 시각');
+  await screen.findByLabelText('Bedtime');
+  fireEvent.click(screen.getByRole('link', { name: 'Next day' }));
+  await screen.findByText('Monday, March 16, 2026');
+  await screen.findByLabelText('Bedtime');
   const sleepCalls = fetchMock.mock.calls
     .map(([url]) => url)
     .filter((url) => url.startsWith('/api/sleep'));
@@ -335,12 +335,12 @@ test('a slow reply for the day just left does not fill in the new day', async ()
   );
   open('/daily/2026-03-15');
   await waitFor(() => expect(replies.has('/api/sleep/2026-03-15')).toBe(true));
-  fireEvent.click(screen.getByRole('link', { name: '다음 날' }));
-  await screen.findByText('2026년 3월 16일 월요일');
+  fireEvent.click(screen.getByRole('link', { name: 'Next day' }));
+  await screen.findByText('Monday, March 16, 2026');
   await waitFor(() => expect(replies.has('/api/sleep/2026-03-16')).toBe(true));
 
   replies.get('/api/sleep/2026-03-16')?.(noSleep());
-  await screen.findByLabelText('취침 시각');
+  await screen.findByLabelText('Bedtime');
   replies.get('/api/sleep/2026-03-15')?.(
     new Response(
       JSON.stringify({
@@ -355,8 +355,8 @@ test('a slow reply for the day just left does not fill in the new day', async ()
     ),
   );
   await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
-  expect(screen.queryByText('7시간 30분')).not.toBeInTheDocument();
-  expect(screen.getByLabelText('취침 시각')).toHaveValue('');
+  expect(screen.queryByText('7 h 30 min')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Bedtime')).toHaveValue('');
 });
 
 test('a slow meal reply for the day just left does not fill in the new day', async () => {
@@ -371,12 +371,12 @@ test('a slow meal reply for the day just left does not fill in the new day', asy
   );
   open('/daily/2026-03-15');
   await waitFor(() => expect(replies.has('/api/meals/2026-03-15')).toBe(true));
-  fireEvent.click(screen.getByRole('link', { name: '다음 날' }));
-  await screen.findByText('2026년 3월 16일 월요일');
+  fireEvent.click(screen.getByRole('link', { name: 'Next day' }));
+  await screen.findByText('Monday, March 16, 2026');
   await waitFor(() => expect(replies.has('/api/meals/2026-03-16')).toBe(true));
 
   replies.get('/api/meals/2026-03-16')?.(noMeals());
-  await screen.findByText('아직 기록한 식사가 없습니다.');
+  await screen.findByText('No meals recorded yet.');
   const eaten = {
     id: 1,
     meal: 'lunch',
@@ -398,7 +398,14 @@ test('a slow meal reply for the day just left does not fill in the new day', asy
 test('a day shows a place for each record kind', () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  for (const name of ['수면', '식단', '신체', '술·담배', '하루 체크', '병원·약']) {
+  for (const name of [
+    'Sleep',
+    'Diet',
+    'Body',
+    'Alcohol and tobacco',
+    'Daily check',
+    'Clinic and medication',
+  ]) {
     expect(screen.getByRole('heading', { level: 2, name })).toBeInTheDocument();
   }
 });
@@ -408,10 +415,10 @@ test('an address outside the range says which days can be recorded, with a way b
   for (const date of ['1999-12-31', '2100-01-01', '0002-03-15', '9999-12-31']) {
     open(`/daily/${date}`);
     expect(screen.getByRole('alert')).toHaveTextContent(
-      `2000-01-01부터 2099-12-31까지 기록할 수 있습니다: ${date}`,
+      `Records can be kept from 2000-01-01 to 2099-12-31: ${date}`,
     );
-    expect(screen.getByRole('link', { name: '오늘 기록으로 이동' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '수면' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: "Go to today's record" })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Sleep' })).not.toBeInTheDocument();
     cleanup();
   }
 });
@@ -419,21 +426,21 @@ test('an address outside the range says which days can be recorded, with a way b
 test('at either end of the range the previous or next day stays in place but goes nowhere', () => {
   health({ today: '2026-03-15' });
   open('/daily/2000-01-01');
-  const previous = screen.getByRole('link', { name: '이전 날' });
+  const previous = screen.getByRole('link', { name: 'Previous day' });
   expect(previous).toHaveAttribute('aria-disabled', 'true');
-  expect(previous).toHaveAccessibleDescription('2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
+  expect(previous).toHaveAccessibleDescription('Records can be kept from 2000-01-01 to 2099-12-31');
   fireEvent.click(previous);
   expect(window.location.pathname).toBe('/daily/2000-01-01');
-  expect(screen.getByRole('link', { name: '다음 날' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: 'Next day' })).toHaveAttribute(
     'href',
     '/daily/2000-01-02',
   );
-  expect(screen.getByRole('link', { name: '다음 날' })).not.toHaveAttribute('aria-disabled');
+  expect(screen.getByRole('link', { name: 'Next day' })).not.toHaveAttribute('aria-disabled');
   cleanup();
 
   open('/daily/2099-12-31');
-  expect(screen.getByRole('link', { name: '다음 날' })).toHaveAttribute('aria-disabled', 'true');
-  expect(screen.getByRole('link', { name: '이전 날' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: 'Next day' })).toHaveAttribute('aria-disabled', 'true');
+  expect(screen.getByRole('link', { name: 'Previous day' })).toHaveAttribute(
     'href',
     '/daily/2099-12-30',
   );
@@ -442,19 +449,22 @@ test('at either end of the range the previous or next day stays in place but goe
 test('stepping onto the first day keeps keyboard focus on the previous day link', async () => {
   health({ today: '2026-03-15' });
   open('/daily/2000-01-02');
-  const previous = screen.getByRole('link', { name: '이전 날' });
+  const previous = screen.getByRole('link', { name: 'Previous day' });
   previous.focus();
   fireEvent.click(previous);
-  expect(await screen.findByText('2000년 1월 1일 토요일')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: '이전 날' })).toHaveAttribute('aria-disabled', 'true');
-  expect(screen.getByRole('link', { name: '이전 날' })).toHaveFocus();
+  expect(await screen.findByText('Saturday, January 1, 2000')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Previous day' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  expect(screen.getByRole('link', { name: 'Previous day' })).toHaveFocus();
 });
 
 test('leaving the field on a date out of range says why, even for a year cut short', () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  const input = screen.getByLabelText('날짜 선택');
-  const message = () => screen.queryByText('2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
+  const input = screen.getByLabelText('Choose date');
+  const message = () => screen.queryByText('Records can be kept from 2000-01-01 to 2099-12-31');
   // Chrome stops the year at the field's max, so typing 2100 can leave 0210.
   fireEvent.change(input, { target: { value: '0210-01-01' } });
   expect(message()).not.toBeInTheDocument();
@@ -469,8 +479,8 @@ test('leaving the field on a date out of range says why, even for a year cut sho
 test('a typed date outside the range is explained and does not change the page', () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  const input = screen.getByLabelText('날짜 선택');
-  const message = () => screen.queryByText('2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
+  const input = screen.getByLabelText('Choose date');
+  const message = () => screen.queryByText('Records can be kept from 2000-01-01 to 2099-12-31');
 
   // A year still being typed is not worth a word yet.
   fireEvent.change(input, { target: { value: '0199-12-31' } });
@@ -490,17 +500,17 @@ test('a typed date outside the range is explained and does not change the page',
 test('a word about the range left on one day does not come back after going there and back', async () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  const input = screen.getByLabelText('날짜 선택');
-  const message = () => screen.queryByText('2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
+  const input = screen.getByLabelText('Choose date');
+  const message = () => screen.queryByText('Records can be kept from 2000-01-01 to 2099-12-31');
   fireEvent.change(input, { target: { value: '0210-01-01' } });
   fireEvent.blur(input);
   expect(message()).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('link', { name: '다음 날' }));
-  expect(await screen.findByText('2026년 3월 16일 월요일')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('link', { name: 'Next day' }));
+  expect(await screen.findByText('Monday, March 16, 2026')).toBeInTheDocument();
   expect(message()).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('link', { name: '이전 날' }));
-  expect(await screen.findByText('2026년 3월 15일 일요일')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('link', { name: 'Previous day' }));
+  expect(await screen.findByText('Sunday, March 15, 2026')).toBeInTheDocument();
   expect(message()).not.toBeInTheDocument();
 });
 
@@ -511,12 +521,12 @@ test("today's page shows what is coming up, and another day does not ask for it 
   vi.stubGlobal('fetch', fetchMock);
   open('/daily/2026-03-15');
   expect(
-    await screen.findByText('7일 안에 다가오는 병원 예약이나 약 복용 종료가 없습니다.'),
+    await screen.findByText('No clinic appointments or medication end dates in the next 7 days.'),
   ).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('link', { name: '이전 날' }));
-  await screen.findByText('2026년 3월 14일 토요일');
-  await screen.findByLabelText('취침 시각');
-  expect(screen.queryByRole('heading', { name: '다가오는 일정' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('link', { name: 'Previous day' }));
+  await screen.findByText('Saturday, March 14, 2026');
+  await screen.findByLabelText('Bedtime');
+  expect(screen.queryByRole('heading', { name: 'Upcoming' })).not.toBeInTheDocument();
   expect(fetchMock.mock.calls.filter(([url]) => url === '/api/reminders')).toHaveLength(1);
 });
 
@@ -532,10 +542,10 @@ test("one failed check of the server keeps today's coming-up card (#48)", async 
   );
   vi.stubGlobal('fetch', fetchMock);
   open('/daily/2026-03-15');
-  await screen.findByText('7일 안에 다가오는 병원 예약이나 약 복용 종료가 없습니다.');
+  await screen.findByText('No clinic appointments or medication end dates in the next 7 days.');
   healthy = false;
   fireEvent(document, new Event('visibilitychange'));
   expect(await screen.findByText('Cannot reach the server')).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: '다가오는 일정' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Upcoming' })).toBeInTheDocument();
   expect(fetchMock.mock.calls.filter(([url]) => url === '/api/reminders')).toHaveLength(1);
 });

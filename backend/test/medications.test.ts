@@ -28,24 +28,33 @@ const rejects = async (body: unknown, message: string) => {
 };
 
 test('the end cannot come before the start, and both are real dates', async () => {
-  await rejects({ ...medicine, endOn: '2026-03-09' }, '종료일은 시작일보다 빠를 수 없습니다');
-  await rejects({ name: '가상정' }, '시작일을 골라 주세요');
-  await rejects({ ...medicine, startOn: '2026-02-30' }, '시작일이 올바르지 않습니다');
-  await rejects({ ...medicine, endOn: '3000-01-01' }, '종료일이 올바르지 않습니다');
+  await rejects(
+    { ...medicine, endOn: '2026-03-09' },
+    'The end date cannot be before the start date',
+  );
+  await rejects({ name: '가상정' }, 'Choose a start date');
+  await rejects({ ...medicine, startOn: '2026-02-30' }, 'The start date is not valid');
+  await rejects({ ...medicine, endOn: '3000-01-01' }, 'The end date is not valid');
 });
 
 test('a medicine needs a name, and lengths are counted in characters', async () => {
-  await rejects({ startOn: medicine.startOn }, '약 이름을 입력해 주세요');
-  await rejects({ ...medicine, name: '  ' }, '약 이름을 입력해 주세요');
-  await rejects({ ...medicine, name: '💊'.repeat(101) }, '약 이름은 100자 이하');
-  await rejects({ ...medicine, dose: '가'.repeat(51) }, '용량은\\(는\\) 50자 이하');
-  await rejects({ ...medicine, directions: '가'.repeat(101) }, '복용법은\\(는\\) 100자 이하');
-  await rejects({ ...medicine, note: '가'.repeat(501) }, '메모은\\(는\\) 500자 이하');
+  await rejects({ startOn: medicine.startOn }, 'Enter a medication name');
+  await rejects({ ...medicine, name: '  ' }, 'Enter a medication name');
+  await rejects(
+    { ...medicine, name: '💊'.repeat(101) },
+    'medication name must be 100 characters or fewer',
+  );
+  await rejects({ ...medicine, dose: '가'.repeat(51) }, 'Dose must be 50 characters or fewer');
+  await rejects(
+    { ...medicine, directions: '가'.repeat(101) },
+    'Directions must be 100 characters or fewer',
+  );
+  await rejects({ ...medicine, note: '가'.repeat(501) }, 'Note must be 500 characters or fewer');
 });
 
 test('a linked visit is an id or nothing', async () => {
   for (const visitId of ['7', 1.5, 0, -1]) {
-    await rejects({ ...medicine, visitId }, '연결할 병원 방문이 올바르지 않습니다');
+    await rejects({ ...medicine, visitId }, 'The linked clinic visit is not valid');
   }
 });
 
@@ -67,9 +76,9 @@ test('refusals never repeat what was entered', async () => {
 test('ids and dates are checked before the database', async () => {
   await withApi(untouched(), async (call) => {
     for (const [method, path, message] of [
-      ['PUT', '/api/medications/abc', '약 기록 ID'],
-      ['DELETE', '/api/medications/0', '약 기록 ID'],
-      ['GET', '/api/medications?date=2026-02-30', '날짜가 올바르지 않습니다'],
+      ['PUT', '/api/medications/abc', 'medication record ID'],
+      ['DELETE', '/api/medications/0', 'medication record ID'],
+      ['GET', '/api/medications?date=2026-02-30', 'The date is not valid'],
     ] as const) {
       const { status, data } = await call(path, {
         method,

@@ -15,50 +15,53 @@ const hasTwoDecimalsAtMost = (value: number) => Number(value.toFixed(2)) === val
 
 const measure = (label: string, max: number) =>
   z
-    .number({ error: `${label}은(는) 숫자로 입력해 주세요` })
-    .gt(0, `${label}은(는) 0보다 커야 합니다`)
-    .max(max, `${label}은(는) ${max} 이하로 입력해 주세요`)
-    .refine(hasTwoDecimalsAtMost, `${label}은(는) 소수 둘째 자리까지 입력해 주세요`)
+    .number({ error: `${label} must be a number` })
+    .gt(0, `${label} must be greater than 0`)
+    .max(max, `${label} must be ${max} or less`)
+    .refine(hasTwoDecimalsAtMost, `${label} can have at most 2 decimal places`)
     .nullable()
     .default(null);
 
 const pressure = (label: string, min: number, max: number) =>
   z
-    .number({ error: `${label}은(는) 숫자로 입력해 주세요` })
-    .int(`${label}은(는) 정수로 입력해 주세요`)
-    .min(min, `${label}은(는) ${min} 이상으로 입력해 주세요`)
-    .max(max, `${label}은(는) ${max} 이하로 입력해 주세요`)
+    .number({ error: `${label} must be a number` })
+    .int(`${label} must be a whole number`)
+    .min(min, `${label} must be ${min} or more`)
+    .max(max, `${label} must be ${max} or less`)
     .nullable()
     .default(null);
 
 const bodyInput = z
   .object(
     {
-      weightKg: measure('체중', 500),
-      bodyFatPercent: measure('체지방률', 100),
-      waistCm: measure('허리둘레', 300),
-      systolicMmhg: pressure('수축기 혈압', 50, 300),
-      diastolicMmhg: pressure('이완기 혈압', 20, 200),
+      weightKg: measure('Weight', 500),
+      bodyFatPercent: measure('Body fat', 100),
+      waistCm: measure('Waist', 300),
+      systolicMmhg: pressure('Systolic blood pressure', 50, 300),
+      diastolicMmhg: pressure('Diastolic blood pressure', 20, 200),
       memo: z
-        .string({ error: '메모가 올바르지 않습니다' })
+        .string({ error: 'The note is not valid' })
         .trim()
-        .refine((value) => charCount(value) <= 500, '메모는 500자 이하로 입력해 주세요')
+        .refine((value) => charCount(value) <= 500, 'The note must be 500 characters or fewer')
         .nullable()
         .default(null)
         .transform((value) => value || null),
     },
-    { error: '요청 본문이 올바르지 않습니다' },
+    { error: 'The request body is not valid' },
   )
   .superRefine((input, ctx) => {
     const { systolicMmhg: systolic, diastolicMmhg: diastolic } = input;
     if ((systolic === null) !== (diastolic === null)) {
-      ctx.addIssue({ code: 'custom', message: '혈압은 수축기와 이완기를 함께 입력해 주세요' });
+      ctx.addIssue({ code: 'custom', message: 'Enter both systolic and diastolic blood pressure' });
     }
     if (systolic !== null && diastolic !== null && systolic <= diastolic) {
-      ctx.addIssue({ code: 'custom', message: '수축기 혈압은 이완기 혈압보다 높아야 합니다' });
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Systolic blood pressure must be higher than diastolic',
+      });
     }
     if (Object.values(input).every((value) => value === null)) {
-      ctx.addIssue({ code: 'custom', message: '저장할 값을 하나 이상 입력해 주세요' });
+      ctx.addIssue({ code: 'custom', message: 'Enter at least one value to save' });
     }
   });
 
@@ -98,9 +101,9 @@ export function bodyRouter(pool: Pool, limits: RateLimitSettings) {
   router.get('/', async (req, res) => {
     const from = parseDate(req.query.from);
     const to = parseDate(req.query.to);
-    if (from > to) throw new HttpError(400, '시작 날짜는 끝 날짜보다 늦을 수 없습니다');
+    if (from > to) throw new HttpError(400, 'The start date cannot be after the end date');
     if (daysBetween(from, to) >= maxRangeDays) {
-      throw new HttpError(400, `조회 기간은 ${maxRangeDays}일 이하로 지정해 주세요`);
+      throw new HttpError(400, `The date range must be ${maxRangeDays} days or fewer`);
     }
     const { rows } = await pool.query<BodyRow>(
       `SELECT ${columns} FROM body_records WHERE record_date BETWEEN $1 AND $2 ORDER BY record_date`,
@@ -151,7 +154,7 @@ export function bodyRouter(pool: Pool, limits: RateLimitSettings) {
     const { rowCount } = await pool.query('DELETE FROM body_records WHERE record_date = $1', [
       date,
     ]);
-    if (!rowCount) throw new HttpError(404, '신체 기록을 찾을 수 없습니다');
+    if (!rowCount) throw new HttpError(404, 'Body record not found');
     res.status(204).end();
   });
 

@@ -13,32 +13,32 @@ const maxItems = 20;
 const comboInput = z.object(
   {
     name: z
-      .string({ error: '조합 이름을 입력해 주세요' })
+      .string({ error: 'Enter a combo name' })
       .trim()
-      .refine((value) => value.length >= 1, '조합 이름을 입력해 주세요')
-      .refine((value) => charCount(value) <= 50, '조합 이름은 50자 이하로 입력해 주세요'),
+      .refine((value) => value.length >= 1, 'Enter a combo name')
+      .refine((value) => charCount(value) <= 50, 'The combo name must be 50 characters or fewer'),
     items: z
       .array(
         z.object(
           {
             foodId: z
-              .number({ error: '음식이 올바르지 않습니다' })
-              .int('음식이 올바르지 않습니다')
-              .positive('음식이 올바르지 않습니다'),
+              .number({ error: 'The food is not valid' })
+              .int('The food is not valid')
+              .positive('The food is not valid'),
             servings: servingsInput,
           },
-          { error: '조합의 음식이 올바르지 않습니다' },
+          { error: 'A food in the combo is not valid' },
         ),
-        { error: '조합에 넣을 음식을 골라 주세요' },
+        { error: 'Choose the foods for the combo' },
       )
-      .min(1, '조합에 음식을 하나 이상 넣어 주세요')
-      .max(maxItems, `조합에는 음식을 ${maxItems}개까지 넣을 수 있습니다`)
+      .min(1, 'Add at least one food to the combo')
+      .max(maxItems, `A combo can have up to ${maxItems} foods`)
       .refine(
         (items) => new Set(items.map((item) => item.foodId)).size === items.length,
-        '같은 음식은 한 번만 넣고 수량으로 조절해 주세요',
+        'Add each food only once and adjust the quantity instead',
       ),
   },
-  { error: '요청 본문이 올바르지 않습니다' },
+  { error: 'The request body is not valid' },
 );
 
 type ComboInput = z.infer<typeof comboInput>;
@@ -144,7 +144,7 @@ export function combosRouter(pool: Pool, limits: RateLimitSettings) {
       return result;
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
-      if (nameTaken(error)) throw new HttpError(409, '같은 이름의 조합이 이미 있습니다');
+      if (nameTaken(error)) throw new HttpError(409, 'A combo with that name already exists');
       throw error;
     } finally {
       client.release();
@@ -160,7 +160,7 @@ export function combosRouter(pool: Pool, limits: RateLimitSettings) {
        JOIN foods f ON f.id = item.food_id`,
       [comboId, items.map((item) => item.foodId), items.map((item) => item.servings)],
     );
-    if (rowCount !== items.length) throw new HttpError(400, '찾을 수 없는 음식이 있습니다');
+    if (rowCount !== items.length) throw new HttpError(400, 'Some foods could not be found');
   };
 
   router.get('/', async (_req, res) => {
@@ -184,14 +184,14 @@ export function combosRouter(pool: Pool, limits: RateLimitSettings) {
 
   // Replaces the name and the whole list of foods.
   router.put('/:id', async (req, res) => {
-    const id = parseId(req.params.id, '조합');
+    const id = parseId(req.params.id, 'combo');
     const combo = comboInput.parse(req.body);
     const updated = await inTransaction(async (client) => {
       const { rowCount } = await client.query(
         'UPDATE meal_combos SET name = $1, updated_at = now() WHERE id = $2',
         [combo.name, id],
       );
-      if (!rowCount) throw new HttpError(404, '조합을 찾을 수 없습니다');
+      if (!rowCount) throw new HttpError(404, 'Combo not found');
       await client.query('DELETE FROM meal_combo_items WHERE combo_id = $1', [id]);
       await putItems(client, id, combo.items);
       return read(client, id);
@@ -200,9 +200,9 @@ export function combosRouter(pool: Pool, limits: RateLimitSettings) {
   });
 
   router.delete('/:id', async (req, res) => {
-    const id = parseId(req.params.id, '조합');
+    const id = parseId(req.params.id, 'combo');
     const { rowCount } = await pool.query('DELETE FROM meal_combos WHERE id = $1', [id]);
-    if (!rowCount) throw new HttpError(404, '조합을 찾을 수 없습니다');
+    if (!rowCount) throw new HttpError(404, 'Combo not found');
     res.status(204).end();
   });
 

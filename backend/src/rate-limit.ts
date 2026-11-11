@@ -16,5 +16,5 @@ export const rateLimitOptions = ({ max, windowMs }: RateLimitSettings): Partial<
   // nginx adds this header and the app does not trust it, so behind nginx every request counts
   // toward one address. With a single user that is intended, not a misconfiguration to warn about.
   validate: { xForwardedForHeader: false },
-  handler: (_req, res) => sendError(res, 429, '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요'),
+  handler: (_req, res) => sendError(res, 429, 'Too many requests. Try again in a moment'),
 });

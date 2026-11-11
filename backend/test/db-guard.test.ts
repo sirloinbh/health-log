@@ -14,17 +14,17 @@ test('DB tests run only against health_test', () => {
 test('another database or none is skipped with its name as the reason', () => {
   assert.equal(
     testDatabaseSkip('postgres://postgres@127.0.0.1:5432/study_test'),
-    'health_test 전용 DB가 아닙니다: study_test',
+    'Not the dedicated health_test database: study_test',
   );
   assert.equal(
     testDatabaseSkip('postgres://postgres@127.0.0.1:5432/health'),
-    'health_test 전용 DB가 아닙니다: health',
+    'Not the dedicated health_test database: health',
   );
-  assert.equal(testDatabaseSkip(undefined), 'health_test 전용 DB가 아닙니다: 없음');
-  assert.equal(testDatabaseSkip(''), 'health_test 전용 DB가 아닙니다: 없음');
+  assert.equal(testDatabaseSkip(undefined), 'Not the dedicated health_test database: none');
+  assert.equal(testDatabaseSkip(''), 'Not the dedicated health_test database: none');
   assert.equal(
     testDatabaseSkip('postgres://postgres@127.0.0.1:5432/'),
-    'health_test 전용 DB가 아닙니다: 없음',
+    'Not the dedicated health_test database: none',
   );
 });
 
@@ -32,7 +32,7 @@ test('an address that cannot be read fails without printing its password', () =>
   assert.throws(
     () => testDatabaseSkip('postgres://user:secret-pass@bad host/health_test'),
     (error: Error) => {
-      assert.match(error.message, /TEST_DATABASE_URL을 주소로 읽을 수 없습니다/);
+      assert.match(error.message, /TEST_DATABASE_URL cannot be read as an address/);
       // Printed errors show their properties and cause too, not only the message.
       assert.doesNotMatch(inspect(error), /secret-pass/);
       return true;

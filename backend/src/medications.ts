@@ -14,10 +14,10 @@ import { charCount } from './text.js';
 // Blank means no value; the database refuses empty text, so it is stored as null.
 const optionalText = (label: string, max: number) =>
   z
-    .string({ error: `${label}이(가) 올바르지 않습니다` })
+    .string({ error: `${label} is not valid` })
     .trim()
     .refine((value) => charCount(value) <= max, {
-      message: `${label}은(는) ${max}자 이하로 입력해 주세요`,
+      message: `${label} must be ${max} characters or fewer`,
       abort: true,
     })
     .nullable()
@@ -28,40 +28,43 @@ const medicationInput = z
   .object(
     {
       name: z
-        .string({ error: '약 이름을 입력해 주세요' })
+        .string({ error: 'Enter a medication name' })
         .trim()
-        .refine((value) => value.length >= 1, '약 이름을 입력해 주세요')
-        .refine((value) => charCount(value) <= 100, '약 이름은 100자 이하로 입력해 주세요'),
-      dose: optionalText('용량', 50),
-      directions: optionalText('복용법', 100),
+        .refine((value) => value.length >= 1, 'Enter a medication name')
+        .refine(
+          (value) => charCount(value) <= 100,
+          'The medication name must be 100 characters or fewer',
+        ),
+      dose: optionalText('Dose', 50),
+      directions: optionalText('Directions', 100),
       startOn: z
-        .string({ error: '시작일을 골라 주세요' })
-        .refine(isRealDate, '시작일이 올바르지 않습니다'),
+        .string({ error: 'Choose a start date' })
+        .refine(isRealDate, 'The start date is not valid'),
       endOn: z
-        .string({ error: '종료일이 올바르지 않습니다' })
-        .refine(isRealDate, '종료일이 올바르지 않습니다')
+        .string({ error: 'The end date is not valid' })
+        .refine(isRealDate, 'The end date is not valid')
         .nullable()
         .default(null),
-      note: optionalText('메모', 500),
+      note: optionalText('Note', 500),
       visitId: z
-        .number({ error: '연결할 병원 방문이 올바르지 않습니다' })
-        .int('연결할 병원 방문이 올바르지 않습니다')
-        .positive('연결할 병원 방문이 올바르지 않습니다')
+        .number({ error: 'The linked clinic visit is not valid' })
+        .int('The linked clinic visit is not valid')
+        .positive('The linked clinic visit is not valid')
         .nullable()
         .default(null),
     },
-    { error: '요청 본문이 올바르지 않습니다' },
+    { error: 'The request body is not valid' },
   )
   .refine((item) => !item.endOn || item.endOn >= item.startOn, {
-    message: '종료일은 시작일보다 빠를 수 없습니다',
+    message: 'The end date cannot be before the start date',
   });
 
 type MedicationInput = z.infer<typeof medicationInput>;
 
 const dayQuery = z.object({
   date: z
-    .string({ error: '날짜가 올바르지 않습니다' })
-    .refine(isRealDate, '날짜가 올바르지 않습니다')
+    .string({ error: 'The date is not valid' })
+    .refine(isRealDate, 'The date is not valid')
     .optional(),
 });
 
@@ -142,7 +145,8 @@ export function medicationsRouter(pool: Pool, today: () => string, limits: RateL
     try {
       return await run();
     } catch (error) {
-      if (unknownVisit(error)) throw new HttpError(400, '연결할 병원 방문을 찾을 수 없습니다');
+      if (unknownVisit(error))
+        throw new HttpError(400, 'The linked clinic visit could not be found');
       throw error;
     }
   };
@@ -190,7 +194,7 @@ export function medicationsRouter(pool: Pool, today: () => string, limits: RateL
   });
 
   router.put('/:id', async (req, res) => {
-    const id = parseId(req.params.id, '약 기록');
+    const id = parseId(req.params.id, 'medication record');
     const item = medicationInput.parse(req.body);
     const { rowCount } = await write(() =>
       pool.query(
@@ -200,14 +204,14 @@ export function medicationsRouter(pool: Pool, today: () => string, limits: RateL
         [...values(item), id],
       ),
     );
-    if (!rowCount) throw new HttpError(404, '약 기록을 찾을 수 없습니다');
+    if (!rowCount) throw new HttpError(404, 'Medication record not found');
     res.json(await read(id));
   });
 
   router.delete('/:id', async (req, res) => {
-    const id = parseId(req.params.id, '약 기록');
+    const id = parseId(req.params.id, 'medication record');
     const { rowCount } = await pool.query('DELETE FROM medications WHERE id = $1', [id]);
-    if (!rowCount) throw new HttpError(404, '약 기록을 찾을 수 없습니다');
+    if (!rowCount) throw new HttpError(404, 'Medication record not found');
     res.status(204).end();
   });
 

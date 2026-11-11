@@ -36,7 +36,7 @@ const hasNul = (root: unknown): boolean => {
  */
 export function rejectNul(req: Request, res: Response, next: NextFunction) {
   if (hasNul(req.body) || hasNul(req.query)) {
-    sendError(res, 400, '쓸 수 없는 문자(NUL)가 들어 있습니다');
+    sendError(res, 400, 'The text contains a character that is not allowed (NUL)');
     return;
   }
   next();

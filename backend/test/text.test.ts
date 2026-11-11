@@ -47,7 +47,7 @@ test('a NUL character anywhere in a body or query is refused before the database
     ] as const) {
       const { status, data } = await call(path, { method, body });
       assert.equal(status, 400, `${method} ${path}`);
-      assert.equal(data.error, '쓸 수 없는 문자(NUL)가 들어 있습니다');
+      assert.equal(data.error, 'The text contains a character that is not allowed (NUL)');
     }
   });
   assert.equal(queries.length, 0);
@@ -57,13 +57,23 @@ test('one emoji past a limit is refused, counted the same way', async () => {
   const { pool, queries } = recording();
   await withApi(pool, async (call) => {
     for (const [method, path, body, message] of [
-      ['PUT', '/api/checks/2026-03-15', { memo: '🍙'.repeat(201) }, '메모는 200자 이하'],
-      ['PUT', '/api/body/2026-03-15', { memo: '🍙'.repeat(501) }, '메모는 500자 이하'],
+      [
+        'PUT',
+        '/api/checks/2026-03-15',
+        { memo: '🍙'.repeat(201) },
+        'note must be 200 characters or fewer',
+      ],
+      [
+        'PUT',
+        '/api/body/2026-03-15',
+        { memo: '🍙'.repeat(501) },
+        'note must be 500 characters or fewer',
+      ],
       [
         'POST',
         '/api/combos',
         { name: '🍙'.repeat(51), items: [{ foodId: 1, servings: 1 }] },
-        '조합 이름은 50자 이하',
+        'combo name must be 50 characters or fewer',
       ],
     ] as const) {
       const { status, data } = await call(path, { method, body });
@@ -90,7 +100,9 @@ test('a deeply nested or very long body is checked without failing, and a NUL in
         body: `{"memo":"a","extra":${extra}}`,
       });
       assert.equal(response.status, 400);
-      assert.deepEqual(await response.json(), { error: '쓸 수 없는 문자(NUL)가 들어 있습니다' });
+      assert.deepEqual(await response.json(), {
+        error: 'The text contains a character that is not allowed (NUL)',
+      });
     }
     // Without a NUL the same depth passes on to the route, whose own rule answers.
     const clean = '['.repeat(10_000) + '"a"' + ']'.repeat(10_000);
@@ -100,7 +112,10 @@ test('a deeply nested or very long body is checked without failing, and a NUL in
       body: `{"memo":3,"extra":${clean}}`,
     });
     assert.equal(response.status, 400);
-    assert.match(String(((await response.json()) as { error: unknown }).error), /메모가 올바르지/);
+    assert.match(
+      String(((await response.json()) as { error: unknown }).error),
+      /The note is not valid/,
+    );
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -112,21 +127,31 @@ test('food and meal text past its limit by one emoji is refused, counted in char
   const food = { name: '김밥', servingSize: 1, servingUnit: 'g' };
   await withApi(pool, async (call) => {
     for (const [method, path, body, message] of [
-      ['POST', '/api/foods', { ...food, name: '🍙'.repeat(101) }, '음식 이름은 100자 이하'],
-      ['POST', '/api/foods', { ...food, brand: '🍙'.repeat(51) }, '50자 이하'],
-      ['POST', '/api/foods', { ...food, category: '🍙'.repeat(31) }, '30자 이하'],
-      ['POST', '/api/foods', { ...food, servingUnit: '🍙'.repeat(11) }, '단위는 10자 이하'],
+      [
+        'POST',
+        '/api/foods',
+        { ...food, name: '🍙'.repeat(101) },
+        'food name must be 100 characters or fewer',
+      ],
+      ['POST', '/api/foods', { ...food, brand: '🍙'.repeat(51) }, '50 characters or fewer'],
+      ['POST', '/api/foods', { ...food, category: '🍙'.repeat(31) }, '30 characters or fewer'],
+      [
+        'POST',
+        '/api/foods',
+        { ...food, servingUnit: '🍙'.repeat(11) },
+        'unit must be 10 characters or fewer',
+      ],
       [
         'POST',
         '/api/meals/2026-03-15',
         { meal: 'lunch', name: '🍙'.repeat(101), calories: 1, servings: 1 },
-        '음식 이름은 100자 이하',
+        'food name must be 100 characters or fewer',
       ],
       [
         'GET',
         `/api/foods?q=${encodeURIComponent('🍙'.repeat(101))}`,
         undefined,
-        '검색어는 100자 이하',
+        'search term must be 100 characters or fewer',
       ],
     ] as const) {
       const { status, data } = await call(path, { method, body });

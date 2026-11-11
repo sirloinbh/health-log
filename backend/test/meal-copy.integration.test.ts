@@ -188,7 +188,7 @@ test('a meal with nothing recorded has nothing to copy', { skip }, async () => {
       body: { from, meal: 'breakfast' },
     });
     assert.equal(status, 404);
-    assert.equal(data.error, '복사할 기록이 없습니다');
+    assert.equal(data.error, 'There are no records to copy');
     assert.deepEqual(((await call(`/api/meals/${to}`)).data as unknown as Day).entries, []);
   });
 });

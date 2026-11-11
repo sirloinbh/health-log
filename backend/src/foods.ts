@@ -15,10 +15,10 @@ export const hasTwoDecimalsAtMost = (value: number) => Number(value.toFixed(2)) 
 
 const amount = (label: string) =>
   z
-    .number({ error: `${label}은(는) 숫자로 입력해 주세요` })
-    .min(0, `${label}은(는) 0 이상이어야 합니다`)
-    .max(maxAmount, `${label}이(가) 너무 큽니다`)
-    .refine(hasTwoDecimalsAtMost, `${label}은(는) 소수 둘째 자리까지 입력해 주세요`)
+    .number({ error: `${label} must be a number` })
+    .min(0, `${label} must be 0 or more`)
+    .max(maxAmount, `${label} is too large`)
+    .refine(hasTwoDecimalsAtMost, `${label} can have at most 2 decimal places`)
     .nullable()
     .default(null);
 
@@ -26,11 +26,11 @@ const amount = (label: string) =>
 // Lengths count characters, as the rest of the API does, so an emoji is one, not two (#101).
 const optionalText = (label: string, max: number) =>
   z
-    .string({ error: `${label}이(가) 올바르지 않습니다` })
+    .string({ error: `${label} is not valid` })
     .trim()
     // abort: the source rules below would otherwise add their messages to this one.
     .refine((value) => charCount(value) <= max, {
-      message: `${label}은(는) ${max}자 이하로 입력해 주세요`,
+      message: `${label} must be ${max} characters or fewer`,
       abort: true,
     })
     .nullable()
@@ -52,73 +52,79 @@ const foodInput = z
   .object(
     {
       name: z
-        .string({ error: '음식 이름을 입력해 주세요' })
+        .string({ error: 'Enter a food name' })
         .trim()
-        .refine((value) => value.length >= 1, '음식 이름을 입력해 주세요')
-        .refine((value) => charCount(value) <= 100, '음식 이름은 100자 이하로 입력해 주세요'),
-      brand: optionalText('브랜드', 50),
-      category: optionalText('분류', 30),
+        .refine((value) => value.length >= 1, 'Enter a food name')
+        .refine(
+          (value) => charCount(value) <= 100,
+          'The food name must be 100 characters or fewer',
+        ),
+      brand: optionalText('Brand', 50),
+      category: optionalText('Category', 30),
       servingSize: z
-        .number({ error: '1회 제공량을 입력해 주세요' })
-        .positive('1회 제공량은 0보다 커야 합니다')
-        .max(maxAmount, '1회 제공량이 너무 큽니다')
-        .refine(hasTwoDecimalsAtMost, '1회 제공량은 소수 둘째 자리까지 입력해 주세요'),
+        .number({ error: 'Enter a serving size' })
+        .positive('The serving size must be greater than 0')
+        .max(maxAmount, 'The serving size is too large')
+        .refine(hasTwoDecimalsAtMost, 'The serving size can have at most 2 decimal places'),
       servingUnit: z
-        .string({ error: '1회 제공량 단위를 입력해 주세요' })
+        .string({ error: 'Enter a serving size unit' })
         .trim()
-        .refine((value) => value.length >= 1, '1회 제공량 단위를 입력해 주세요')
-        .refine((value) => charCount(value) <= 10, '1회 제공량 단위는 10자 이하로 입력해 주세요'),
-      calories: amount('칼로리'),
-      carbs: amount('탄수화물'),
-      protein: amount('단백질'),
-      fat: amount('지방'),
-      sugars: amount('당류'),
-      sodium: amount('나트륨'),
+        .refine((value) => value.length >= 1, 'Enter a serving size unit')
+        .refine(
+          (value) => charCount(value) <= 10,
+          'The serving size unit must be 10 characters or fewer',
+        ),
+      calories: amount('Calories'),
+      carbs: amount('Carbs'),
+      protein: amount('Protein'),
+      fat: amount('Fat'),
+      sugars: amount('Sugars'),
+      sodium: amount('Sodium'),
       sourceType: z
         .enum(['official', 'label', 'public', 'estimate', 'manual'], {
-          error: '출처 종류가 올바르지 않습니다',
+          error: 'The source type is not valid',
         })
         .default('manual'),
       sourceUrl: z
-        .string({ error: '출처 주소가 올바르지 않습니다' })
+        .string({ error: 'The source URL is not valid' })
         .trim()
-        .refine((value) => charCount(value) <= 2000, '출처 주소가 너무 깁니다')
-        .refine(isHttpUrl, '출처 주소는 http 또는 https로 시작해야 합니다')
+        .refine((value) => charCount(value) <= 2000, 'The source URL is too long')
+        .refine(isHttpUrl, 'The source URL must start with http or https')
         .nullable()
         .default(null),
       checkedOn: z
-        .string({ error: '확인 날짜가 올바르지 않습니다' })
-        .refine(isRealDate, '확인 날짜가 올바르지 않습니다')
+        .string({ error: 'The verified date is not valid' })
+        .refine(isRealDate, 'The verified date is not valid')
         .nullable()
         .default(null),
       // Left out, a new food is not junk food and an edited one keeps its mark, so a screen that
       // predates the mark cannot clear it.
-      isJunk: z.boolean({ error: '정크푸드 표시가 올바르지 않습니다' }).optional(),
+      isJunk: z.boolean({ error: 'The junk food flag is not valid' }).optional(),
     },
-    { error: '요청 본문이 올바르지 않습니다' },
+    { error: 'The request body is not valid' },
   )
   .superRefine((food, ctx) => {
     // A number that claims a source has to say where and when it was checked.
     if (['official', 'public'].includes(food.sourceType) && !food.sourceUrl) {
-      ctx.addIssue({ code: 'custom', message: '공식·공공 자료는 출처 주소가 필요합니다' });
+      ctx.addIssue({ code: 'custom', message: 'Official and public data need a source URL' });
     }
     if (['official', 'public', 'label'].includes(food.sourceType) && !food.checkedOn) {
       ctx.addIssue({
         code: 'custom',
-        message: '공식·공공 자료와 제품 표기는 확인 날짜가 필요합니다',
+        message: 'Official and public data and product labels need a verified date',
       });
     }
   });
 
 const searchQuery = z.object({
   q: z
-    .string({ error: '검색어가 올바르지 않습니다' })
+    .string({ error: 'The search term is not valid' })
     .trim()
-    .refine((value) => charCount(value) <= 100, '검색어는 100자 이하로 입력해 주세요')
+    .refine((value) => charCount(value) <= 100, 'The search term must be 100 characters or fewer')
     .default(''),
   offset: z
-    .string({ error: '목록 위치가 올바르지 않습니다' })
-    .regex(/^\d{1,7}$/, '목록 위치가 올바르지 않습니다')
+    .string({ error: 'The list offset is not valid' })
+    .regex(/^\d{1,7}$/, 'The list offset is not valid')
     .transform(Number)
     .default(0),
 });
@@ -201,7 +207,7 @@ export function foodsRouter(pool: Pool, today: () => string, limits: RateLimitSe
     const food = foodInput.parse(body);
     // A future date would also make every later research look older and be ignored.
     if (food.checkedOn && food.checkedOn > today()) {
-      throw new HttpError(400, '확인 날짜는 오늘 이후일 수 없습니다');
+      throw new HttpError(400, 'The verified date cannot be in the future');
     }
     return food;
   };
@@ -255,7 +261,7 @@ export function foodsRouter(pool: Pool, today: () => string, limits: RateLimitSe
   });
 
   router.put('/:id', async (req, res) => {
-    const id = parseId(req.params.id, '음식');
+    const id = parseId(req.params.id, 'food');
     const food = parseFood(req.body);
     const { rows } = await pool.query<FoodRow>(
       `UPDATE foods SET name = $1, brand = $2, category = $3, serving_size = $4, serving_unit = $5,
@@ -266,7 +272,7 @@ export function foodsRouter(pool: Pool, today: () => string, limits: RateLimitSe
        RETURNING ${columns}`,
       [...inputValues(food), food.isJunk ?? null, id],
     );
-    if (!rows[0]) throw new HttpError(404, '음식을 찾을 수 없습니다');
+    if (!rows[0]) throw new HttpError(404, 'Food not found');
     res.json(toFood(rows[0]));
   });
 

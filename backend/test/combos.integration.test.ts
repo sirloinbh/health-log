@@ -117,7 +117,7 @@ test('two combos cannot share a name, whatever the case', { skip }, async () => 
       body: comboBody('same', [[food, 1]]),
     });
     assert.equal(second.status, 409);
-    assert.equal(second.data.error, '같은 이름의 조합이 이미 있습니다');
+    assert.equal(second.data.error, 'A combo with that name already exists');
   });
 });
 
@@ -132,7 +132,7 @@ test('a food that does not exist saves no part of the combo', { skip }, async ()
       ]),
     });
     assert.equal(status, 400);
-    assert.equal(data.error, '찾을 수 없는 음식이 있습니다');
+    assert.equal(data.error, 'Some foods could not be found');
     const { rowCount } = await pool.query('SELECT 1 FROM meal_combos WHERE name = $1', [
       `${prefix}with-missing`,
     ]);
@@ -268,7 +268,7 @@ test(
         body: { meal: 'snack' },
       });
       assert.equal(missing.status, 404);
-      assert.equal(missing.data.error, '조합을 찾을 수 없습니다');
+      assert.equal(missing.data.error, 'Combo not found');
 
       const combo = (
         await call('/api/combos', {
@@ -288,7 +288,7 @@ test(
         body: { meal: 'snack' },
       });
       assert.equal(empty.status, 400);
-      assert.equal(empty.data.error, '조합에 음식이 없습니다');
+      assert.equal(empty.data.error, 'The combo has no foods');
       assert.deepEqual(((await call(path)).data as unknown as Day).entries, []);
     });
   },
@@ -302,10 +302,10 @@ test('editing or deleting a combo that is not there is a 404', { skip }, async (
       body: comboBody('nowhere', [[food, 1]]),
     });
     assert.equal(edited.status, 404);
-    assert.equal(edited.data.error, '조합을 찾을 수 없습니다');
+    assert.equal(edited.data.error, 'Combo not found');
     const deleted = await call('/api/combos/999999999', { method: 'DELETE' });
     assert.equal(deleted.status, 404);
-    assert.equal(deleted.data.error, '조합을 찾을 수 없습니다');
+    assert.equal(deleted.data.error, 'Combo not found');
   });
 });
 

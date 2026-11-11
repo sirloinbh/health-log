@@ -18,10 +18,10 @@ const visitPageSize = 20;
 // Blank means no value; the database refuses empty text, so it is stored as null.
 const optionalText = (label: string, max: number) =>
   z
-    .string({ error: `${label}이(가) 올바르지 않습니다` })
+    .string({ error: `${label} is not valid` })
     .trim()
     .refine((value) => charCount(value) <= max, {
-      message: `${label}은(는) ${max}자 이하로 입력해 주세요`,
+      message: `${label} must be ${max} characters or fewer`,
       abort: true,
     })
     .nullable()
@@ -30,17 +30,17 @@ const optionalText = (label: string, max: number) =>
 
 const requiredText = (label: string, max: number) =>
   z
-    .string({ error: `${label}을(를) 입력해 주세요` })
+    .string({ error: `Enter ${label.toLowerCase()}` })
     .trim()
-    .refine((value) => value.length >= 1, `${label}을(를) 입력해 주세요`)
-    .refine((value) => charCount(value) <= max, `${label}은(는) ${max}자 이하로 입력해 주세요`);
+    .refine((value) => value.length >= 1, `Enter ${label.toLowerCase()}`)
+    .refine((value) => charCount(value) <= max, `${label} must be ${max} characters or fewer`);
 
 const cost = (label: string) =>
   z
-    .number({ error: `${label}은(는) 숫자로 입력해 주세요` })
-    .int(`${label}은(는) 원 단위 정수로 입력해 주세요`)
-    .min(0, `${label}은(는) 0원 이상이어야 합니다`)
-    .max(maxCost, `${label}은(는) 1억 원 이하로 입력해 주세요`)
+    .number({ error: `${label} must be a number` })
+    .int(`${label} must be a whole number of won`)
+    .min(0, `${label} must be 0 won or more`)
+    .max(maxCost, `${label} must be 100 million won or less`)
     .nullable()
     .default(null);
 
@@ -48,55 +48,55 @@ const visitInput = z
   .object(
     {
       date: z
-        .string({ error: '방문 날짜를 골라 주세요' })
-        .refine(isRealDate, '방문 날짜가 올바르지 않습니다'),
-      clinic: requiredText('병원 이름', 100),
-      department: optionalText('진료과', 50),
-      note: optionalText('증상·진단 메모', 1000),
-      cost: cost('진료비'),
+        .string({ error: 'Choose a visit date' })
+        .refine(isRealDate, 'The visit date is not valid'),
+      clinic: requiredText('Clinic name', 100),
+      department: optionalText('Department', 50),
+      note: optionalText('Symptoms and diagnosis note', 1000),
+      cost: cost('Visit cost'),
       nextVisitOn: z
-        .string({ error: '다음 예약일이 올바르지 않습니다' })
-        .refine(isRealDate, '다음 예약일이 올바르지 않습니다')
+        .string({ error: 'The next appointment date is not valid' })
+        .refine(isRealDate, 'The next appointment date is not valid')
         .nullable()
         .default(null),
       procedures: z
         .array(
           z.object(
             {
-              name: requiredText('시술 이름', 100),
-              area: optionalText('시술 부위', 50),
-              amount: optionalText('용량·횟수', 50),
-              cost: cost('시술 비용'),
-              note: optionalText('시술 메모', 500),
+              name: requiredText('Procedure name', 100),
+              area: optionalText('Procedure area', 50),
+              amount: optionalText('Dose or count', 50),
+              cost: cost('Procedure cost'),
+              note: optionalText('Procedure note', 500),
             },
-            { error: '시술 항목이 올바르지 않습니다' },
+            { error: 'The procedure is not valid' },
           ),
-          { error: '시술 목록이 올바르지 않습니다' },
+          { error: 'The procedure list is not valid' },
         )
-        .max(maxProcedures, `시술은 한 번에 ${maxProcedures}개까지 기록할 수 있습니다`)
+        .max(maxProcedures, `You can record up to ${maxProcedures} procedures per visit`)
         .default([]),
     },
-    { error: '요청 본문이 올바르지 않습니다' },
+    { error: 'The request body is not valid' },
   )
   .refine((visit) => !visit.nextVisitOn || visit.nextVisitOn >= visit.date, {
-    message: '다음 예약일은 방문 날짜보다 빠를 수 없습니다',
+    message: 'The next appointment date cannot be before the visit date',
   });
 
 type VisitInput = z.infer<typeof visitInput>;
 
 const listQuery = z.object({
   q: z
-    .string({ error: '검색어가 올바르지 않습니다' })
+    .string({ error: 'The search term is not valid' })
     .trim()
-    .refine((value) => charCount(value) <= 100, '검색어는 100자 이하로 입력해 주세요')
+    .refine((value) => charCount(value) <= 100, 'The search term must be 100 characters or fewer')
     .default(''),
   date: z
-    .string({ error: '날짜가 올바르지 않습니다' })
-    .refine(isRealDate, '날짜가 올바르지 않습니다')
+    .string({ error: 'The date is not valid' })
+    .refine(isRealDate, 'The date is not valid')
     .optional(),
   offset: z
-    .string({ error: '목록 위치가 올바르지 않습니다' })
-    .regex(/^\d{1,7}$/, '목록 위치가 올바르지 않습니다')
+    .string({ error: 'The list offset is not valid' })
+    .regex(/^\d{1,7}$/, 'The list offset is not valid')
     .transform(Number)
     .default(0),
 });
@@ -238,7 +238,7 @@ export function visitsRouter(pool: Pool, limits: RateLimitSettings) {
 
   // Replaces the visit and its whole list of procedures.
   router.put('/:id', async (req, res) => {
-    const id = parseId(req.params.id, '병원 방문');
+    const id = parseId(req.params.id, 'clinic visit');
     const visit = visitInput.parse(req.body);
     const updated = await inTransaction(async (client) => {
       const { rowCount } = await client.query(
@@ -247,7 +247,7 @@ export function visitsRouter(pool: Pool, limits: RateLimitSettings) {
          WHERE id = $7`,
         [...values(visit), id],
       );
-      if (!rowCount) throw new HttpError(404, '병원 방문 기록을 찾을 수 없습니다');
+      if (!rowCount) throw new HttpError(404, 'Clinic visit record not found');
       await client.query('DELETE FROM clinic_procedures WHERE visit_id = $1', [id]);
       await putProcedures(client, id, visit.procedures);
       return read(client, id);
@@ -257,9 +257,9 @@ export function visitsRouter(pool: Pool, limits: RateLimitSettings) {
 
   // The procedures go with it (ON DELETE CASCADE).
   router.delete('/:id', async (req, res) => {
-    const id = parseId(req.params.id, '병원 방문');
+    const id = parseId(req.params.id, 'clinic visit');
     const { rowCount } = await pool.query('DELETE FROM clinic_visits WHERE id = $1', [id]);
-    if (!rowCount) throw new HttpError(404, '병원 방문 기록을 찾을 수 없습니다');
+    if (!rowCount) throw new HttpError(404, 'Clinic visit record not found');
     res.status(204).end();
   });
 

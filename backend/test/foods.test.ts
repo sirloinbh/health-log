@@ -25,43 +25,43 @@ const rejects = async (body: object, message: string) => {
 };
 
 test('a negative nutrient is rejected', async () => {
-  await rejects({ ...valid, calories: -1 }, '칼로리은\\(는\\) 0 이상');
-  await rejects({ ...valid, sodium: -0.5 }, '나트륨은\\(는\\) 0 이상');
+  await rejects({ ...valid, calories: -1 }, 'Calories must be 0 or more');
+  await rejects({ ...valid, sodium: -0.5 }, 'Sodium must be 0 or more');
 });
 
 test('a food without a serving size or unit is rejected', async () => {
-  await rejects({ name: '치즈버거', servingUnit: 'g' }, '1회 제공량을 입력');
-  await rejects({ ...valid, servingSize: null }, '1회 제공량을 입력');
-  await rejects({ ...valid, servingSize: 0 }, '0보다 커야');
-  await rejects({ name: '치즈버거', servingSize: 120 }, '단위를 입력');
+  await rejects({ name: '치즈버거', servingUnit: 'g' }, 'Enter a serving size');
+  await rejects({ ...valid, servingSize: null }, 'Enter a serving size');
+  await rejects({ ...valid, servingSize: 0 }, 'must be greater than 0');
+  await rejects({ name: '치즈버거', servingSize: 120 }, 'Enter a serving size unit');
 });
 
 test('a blank name is rejected', async () => {
-  await rejects({ ...valid, name: '   ' }, '음식 이름을 입력');
+  await rejects({ ...valid, name: '   ' }, 'Enter a food name');
 });
 
 test('a claimed source has to say where and when it was checked', async () => {
-  await rejects({ ...valid, sourceType: 'official', checkedOn: '2026-10-31' }, '출처 주소가 필요');
+  await rejects({ ...valid, sourceType: 'official', checkedOn: '2026-10-31' }, 'need a source URL');
   await rejects(
     { ...valid, sourceType: 'public', sourceUrl: 'https://example.com' },
-    '확인 날짜가 필요',
+    'need a verified date',
   );
-  await rejects({ ...valid, sourceType: 'label' }, '확인 날짜가 필요');
+  await rejects({ ...valid, sourceType: 'label' }, 'need a verified date');
 });
 
 test('only http and https source addresses are stored', async () => {
-  await rejects({ ...valid, sourceUrl: 'javascript:alert(1)' }, 'http 또는 https');
-  await rejects({ ...valid, sourceUrl: 'not a url' }, 'http 또는 https');
+  await rejects({ ...valid, sourceUrl: 'javascript:alert(1)' }, 'http or https');
+  await rejects({ ...valid, sourceUrl: 'not a url' }, 'http or https');
 });
 
 test('an address with no host part is rejected even though URL can parse it', async () => {
-  await rejects({ ...valid, sourceUrl: 'http:foo' }, 'http 또는 https');
-  await rejects({ ...valid, sourceUrl: 'http:/foo' }, 'http 또는 https');
+  await rejects({ ...valid, sourceUrl: 'http:foo' }, 'http or https');
+  await rejects({ ...valid, sourceUrl: 'http:/foo' }, 'http or https');
 });
 
 test('a date that does not exist is rejected as the checked date', async () => {
-  await rejects({ ...valid, checkedOn: '2026-02-30' }, '확인 날짜가 올바르지');
-  await rejects({ ...valid, checkedOn: '0000-01-01' }, '확인 날짜가 올바르지');
+  await rejects({ ...valid, checkedOn: '2026-02-30' }, 'verified date is not valid');
+  await rejects({ ...valid, checkedOn: '0000-01-01' }, 'verified date is not valid');
 });
 
 test('the checked date cannot be after the service date', async () => {
@@ -80,7 +80,7 @@ test('the checked date cannot be after the service date', async () => {
         body: { ...valid, checkedOn: '2026-11-01' },
       });
       assert.equal(status, 400);
-      assert.equal(data.error, '확인 날짜는 오늘 이후일 수 없습니다');
+      assert.equal(data.error, 'The verified date cannot be in the future');
       assert.equal(queries.length, 0);
     },
     { today: () => '2026-10-31' },
@@ -88,13 +88,13 @@ test('the checked date cannot be after the service date', async () => {
 });
 
 test('numbers finer than two decimals are rejected instead of rounded', async () => {
-  await rejects({ ...valid, servingSize: 0.001 }, '1회 제공량은 소수 둘째 자리');
-  await rejects({ ...valid, sodium: 0.004 }, '나트륨은\\(는\\) 소수 둘째 자리');
-  await rejects({ ...valid, protein: 12.345 }, '단백질은\\(는\\) 소수 둘째 자리');
+  await rejects({ ...valid, servingSize: 0.001 }, 'serving size can have at most 2 decimal places');
+  await rejects({ ...valid, sodium: 0.004 }, 'Sodium can have at most 2 decimal places');
+  await rejects({ ...valid, protein: 12.345 }, 'Protein can have at most 2 decimal places');
   // Tiny values must not slip through as "almost two decimals" and become zero in the column.
-  await rejects({ ...valid, servingSize: 5e-9 }, '1회 제공량은 소수 둘째 자리');
-  await rejects({ ...valid, calories: 1e-9 }, '칼로리은\\(는\\) 소수 둘째 자리');
-  await rejects({ ...valid, fat: 12.340000009 }, '지방은\\(는\\) 소수 둘째 자리');
+  await rejects({ ...valid, servingSize: 5e-9 }, 'serving size can have at most 2 decimal places');
+  await rejects({ ...valid, calories: 1e-9 }, 'Calories can have at most 2 decimal places');
+  await rejects({ ...valid, fat: 12.340000009 }, 'Fat can have at most 2 decimal places');
 });
 
 test('two-decimal amounts that binary floating point handles badly are accepted', async () => {
@@ -149,11 +149,11 @@ test('two decimals pass despite floating point, like 12.35 and 1.1', async () =>
 });
 
 test('a body that is not an object answers in Korean', async () => {
-  await rejects([], '요청 본문이 올바르지 않습니다');
+  await rejects([], 'The request body is not valid');
 });
 
 test('an unknown source kind is rejected', async () => {
-  await rejects({ ...valid, sourceType: 'guess' }, '출처 종류');
+  await rejects({ ...valid, sourceType: 'guess' }, 'source type');
 });
 
 test('an invalid id and a missing food answer in Korean', async () => {
@@ -161,11 +161,11 @@ test('an invalid id and a missing food answer in Korean', async () => {
   await withApi(pool, async (call) => {
     const badId = await call('/api/foods/abc', { method: 'PUT', body: valid });
     assert.equal(badId.status, 400);
-    assert.equal(badId.data.error, 'Invalid 음식 ID');
+    assert.equal(badId.data.error, 'Invalid food ID');
 
     const missing = await call('/api/foods/9', { method: 'PUT', body: valid });
     assert.equal(missing.status, 404);
-    assert.equal(missing.data.error, '음식을 찾을 수 없습니다');
+    assert.equal(missing.data.error, 'Food not found');
   });
 });
 
@@ -174,7 +174,7 @@ test('a repeated search parameter is rejected instead of failing on the server',
   await withApi(pool, async (call) => {
     const { status, data } = await call('/api/foods?q=a&q=b');
     assert.equal(status, 400);
-    assert.equal(data.error, '검색어가 올바르지 않습니다');
+    assert.equal(data.error, 'The search term is not valid');
   });
 });
 
@@ -186,7 +186,7 @@ test('a too-long brand answers only with its own message, not the source rules',
       body: { ...valid, brand: 'a'.repeat(51), sourceType: 'official' },
     });
     assert.equal(status, 400);
-    assert.equal(data.error, '브랜드은(는) 50자 이하로 입력해 주세요');
+    assert.equal(data.error, 'Brand must be 50 characters or fewer');
   });
 });
 
@@ -231,11 +231,11 @@ test('a value that is not text answers with one message, even if it has a length
   const pool = { query: async () => ({ rows: [] }) } as unknown as Pool;
   const longList = Array.from({ length: 101 }, () => 'a');
   const cases: [Record<string, unknown>, string][] = [
-    [{ name: [] }, '음식 이름을 입력해 주세요'],
-    [{ name: longList }, '음식 이름을 입력해 주세요'],
-    [{ servingUnit: [] }, '1회 제공량 단위를 입력해 주세요'],
-    [{ brand: longList }, '브랜드이(가) 올바르지 않습니다'],
-    [{ sourceUrl: { length: 2001 } }, '출처 주소가 올바르지 않습니다'],
+    [{ name: [] }, 'Enter a food name'],
+    [{ name: longList }, 'Enter a food name'],
+    [{ servingUnit: [] }, 'Enter a serving size unit'],
+    [{ brand: longList }, 'Brand is not valid'],
+    [{ sourceUrl: { length: 2001 } }, 'The source URL is not valid'],
   ];
   await withApi(pool, async (call) => {
     for (const [change, message] of cases) {
@@ -255,7 +255,7 @@ test('a list position that is not a plain whole number is rejected', async () =>
     for (const offset of ['-1', '1.5', 'abc', '', '1e3', '12345678']) {
       const { status, data } = await call(`/api/foods?offset=${offset}`);
       assert.equal(status, 400, offset);
-      assert.equal(data.error, '목록 위치가 올바르지 않습니다');
+      assert.equal(data.error, 'The list offset is not valid');
     }
     assert.equal((await call('/api/foods?offset=1&offset=2')).status, 400);
   });
@@ -287,8 +287,8 @@ test('a list asks for one food past the page to know whether another page exists
 
 // #38. An edit that leaves the mark out keeps it, so a screen that predates the mark cannot clear it.
 test('the junk food mark is a yes or no, kept on an edit that leaves it out', async () => {
-  await rejects({ ...valid, isJunk: 'yes' }, '정크푸드 표시가 올바르지 않습니다');
-  await rejects({ ...valid, isJunk: null }, '정크푸드 표시가 올바르지 않습니다');
+  await rejects({ ...valid, isJunk: 'yes' }, 'The junk food flag is not valid');
+  await rejects({ ...valid, isJunk: null }, 'The junk food flag is not valid');
   const params: unknown[][] = [];
   const pool = {
     query: async (_sql: string, values: unknown[]) => {

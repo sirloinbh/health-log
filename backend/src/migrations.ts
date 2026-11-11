@@ -29,9 +29,9 @@ export async function readMigrations(dir: string): Promise<Migration[]> {
   const migrations: Migration[] = [];
   for (const name of names) {
     const match = filePattern.exec(name);
-    if (!match) throw new Error(`마이그레이션 파일 이름은 NNN_name.sql 형식이어야 합니다: ${name}`);
+    if (!match) throw new Error(`Migration file names must look like NNN_name.sql: ${name}`);
     const previous = prefixes.get(match[1]);
-    if (previous) throw new Error(`마이그레이션 번호가 중복됩니다: ${previous}, ${name}`);
+    if (previous) throw new Error(`Duplicate migration number: ${previous}, ${name}`);
     prefixes.set(match[1], name);
     const sql = await readFile(join(dir, name), 'utf8');
     migrations.push({ name, checksum: checksum(sql), sql });
@@ -46,9 +46,9 @@ export function planMigrations(files: Migration[], applied: AppliedMigration[]) 
   const byName = new Map(files.map((file) => [file.name, file]));
   for (const row of applied) {
     const file = byName.get(row.name);
-    if (!file) errors.push(`적용된 마이그레이션 파일이 없습니다: ${row.name}`);
+    if (!file) errors.push(`The applied migration file is missing: ${row.name}`);
     else if (file.checksum !== row.checksum)
-      errors.push(`적용된 마이그레이션 파일의 내용이 바뀌었습니다: ${row.name}`);
+      errors.push(`The applied migration file has changed: ${row.name}`);
   }
   const done = new Set(applied.map((row) => row.name));
   const last = applied
@@ -58,7 +58,7 @@ export function planMigrations(files: Migration[], applied: AppliedMigration[]) 
   const pending = files.filter((file) => !done.has(file.name));
   for (const file of pending)
     if (last && file.name < last)
-      errors.push(`이미 적용된 ${last}보다 앞선 번호의 새 파일입니다: ${file.name}`);
+      errors.push(`New file numbered before the already applied ${last}: ${file.name}`);
   return { pending, errors };
 }
 
@@ -92,7 +92,7 @@ export async function migrate(db: Db, files: Migration[]) {
         await db.query('COMMIT');
       } catch (e) {
         await db.query('ROLLBACK').catch(() => undefined);
-        throw new Error(`${file.name} 적용 실패: ${(e as Error).message}`, { cause: e });
+        throw new Error(`${file.name} failed to apply: ${(e as Error).message}`, { cause: e });
       }
     }
     return pending.map((file) => file.name);

@@ -150,7 +150,7 @@ test('a visit that does not exist cannot be linked', { skip }, async (t) => {
       body: { name: `${tag}정`, startOn: '1985-09-21', visitId: 999999999 },
     });
     assert.equal(status, 400);
-    assert.equal(data.error, '연결할 병원 방문을 찾을 수 없습니다');
+    assert.equal(data.error, 'The linked clinic visit could not be found');
   });
 });
 
@@ -217,7 +217,7 @@ test(
       assert.equal(await linkOf(null), null);
       const unknown = await put(999999999);
       assert.equal(unknown.status, 400);
-      assert.equal(unknown.data.error, '연결할 병원 방문을 찾을 수 없습니다');
+      assert.equal(unknown.data.error, 'The linked clinic visit could not be found');
       // The refused change left the record as it was.
       const day = (await call('/api/medications?date=1985-10-03')).data as {
         medications: Medication[];

@@ -185,7 +185,7 @@ test('a food that does not exist is a 404 and records nothing', { skip }, async 
       body: { meal: 'lunch', servings: 1, foodId: 999_999_999 },
     });
     assert.equal(status, 404);
-    assert.equal(data.error, '음식을 찾을 수 없습니다');
+    assert.equal(data.error, 'Food not found');
     assert.deepEqual(((await call(`/api/meals/${days[4]}`)).data as unknown as Day).entries, []);
   });
 });
@@ -210,7 +210,7 @@ test('deleting removes an entry from the totals; only on its own day', { skip },
 
     const again = await call(`${path}/entries/${id}`, { method: 'DELETE' });
     assert.equal(again.status, 404);
-    assert.equal(again.data.error, '식사 기록을 찾을 수 없습니다');
+    assert.equal(again.data.error, 'Meal record not found');
   });
 });
 

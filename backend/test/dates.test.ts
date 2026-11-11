@@ -40,7 +40,7 @@ test('a date past either end is a 400 on every day route and the report, before 
       ]) {
         const { status, data } = await call(path);
         assert.equal(status, 400, path);
-        assert.match(String(data.error), /날짜가 올바르지 않습니다/, path);
+        assert.match(String(data.error), /The date is not valid/, path);
       }
     }
   });
@@ -49,8 +49,8 @@ test('a date past either end is a 400 on every day route and the report, before 
 test('the other places that take a date use the same ends', async () => {
   await withApi(untouched(), async (call) => {
     for (const [method, path, body, message] of [
-      ['GET', '/api/body?from=1899-12-31&to=1900-01-02', undefined, '날짜가 올바르지 않습니다'],
-      ['GET', '/api/body?from=2999-12-30&to=3000-01-01', undefined, '날짜가 올바르지 않습니다'],
+      ['GET', '/api/body?from=1899-12-31&to=1900-01-02', undefined, 'The date is not valid'],
+      ['GET', '/api/body?from=2999-12-30&to=3000-01-01', undefined, 'The date is not valid'],
       [
         'POST',
         '/api/foods',
@@ -61,13 +61,13 @@ test('the other places that take a date use the same ends', async () => {
           sourceType: 'label',
           checkedOn: '9999-12-31',
         },
-        '확인 날짜가 올바르지 않습니다',
+        'The verified date is not valid',
       ],
       [
         'POST',
         '/api/meals/2026-03-15/copy',
         { from: '0001-01-01', meal: 'lunch' },
-        '복사할 날짜가 올바르지 않습니다',
+        'The date to copy from is not valid',
       ],
     ] as const) {
       const { status, data } = await call(path, { method, body });

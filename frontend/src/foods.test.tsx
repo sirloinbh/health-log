@@ -497,7 +497,7 @@ test('once focus has moved on from the edit button, a later redraw leaves it alo
   fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
   await vi.waitFor(() => expect(opener).toHaveFocus());
 
-  // Typing in the search field moves focus on. A mouse click on 검색 that does not focus the
+  // Typing in the search field moves focus on. A mouse click on the 검색 (search) button that does not focus the
   // button (as in Safari) then leaves focus on <body> while the search removes the card.
   const field = screen.getByRole('searchbox', { name: 'Search foods' });
   field.focus();
@@ -701,7 +701,7 @@ test('reading a table into a published food clears stale values and marks it as 
   });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Read the table and fill in' }));
 
-  // "미만" really empties the field, and so does a nutrient the new table leaves out.
+  // "미만" (less than) really empties the field, and so does a nutrient the new table leaves out.
   expect(within(dialog).getByLabelText('Sugars (g)')).toHaveValue('');
   expect(within(dialog).getByLabelText('Fat (g)')).toHaveValue('');
   expect(within(dialog).getByLabelText('Calories (kcal)')).toHaveValue('280');

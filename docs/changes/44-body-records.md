@@ -1,74 +1,74 @@
-# #44 체중과 신체 기록
+# #44 Weight and body records
 
-- 이슈: [#44](https://github.com/sirloinbh/health-log/issues/44)
-- 브랜치: `feat/44-body-records`
+- Issue: [#44](https://github.com/sirloinbh/health-log/issues/44)
+- Branch: `feat/44-body-records`
 
-## 목적
+## Purpose
 
-칼로리와 수면 기록이 실제 몸 변화로 이어지는지 보려면 체중 기록이 필요하다. 날짜별 신체 수치를 기록하고 기간별 변화를 본다.
+To see whether the calorie and sleep records lead to a real change in the body, we need weight records. Record body values by date and see the change by period.
 
-## 변경 — 2026-11-02
+## Changes: 2026-11-02
 
-- **DB:** `database/migrations/006_body_records.sql`. 날짜당 한 건이며 기본 키는 `record_date`다. 재지 않은 값은 `NULL`이고 0이 아니다. 범위와 혈압 규칙은 DB도 강제한다.
-- **API:** `backend/src/body.ts`. `GET /api/body/:date`, `PUT`(같은 날을 덮어씀), `DELETE`(없으면 404), `GET /api/body?from&to`(366일 이하). 요청 횟수 제한은 다른 API와 같은 방식이다.
-- **화면:** `frontend/src/body.tsx`. 하루 기록에 신체 카드를 추가했다. 입력, 요약, 수정, 삭제와 기간별 변화 표를 보여 준다. 불러오기에 실패하면 입력 폼을 숨겨 보지 못한 기록을 덮어쓰지 않는다. 변화 표를 불러오지 못해도 입력은 할 수 있다.
-- **변화 계산:** `frontend/src/body-change.ts`. 보고 있는 날짜에서 끝나는 7·30·90일 안의 첫 측정과 마지막 측정의 차이다. 측정이 2개 미만이면 `기록 부족`이다.
+- **DB:** `database/migrations/006_body_records.sql`. One row per date, and the primary key is `record_date`. A value that was not measured is `NULL`, not 0. The DB also enforces the ranges and the blood pressure rule.
+- **API:** `backend/src/body.ts`. `GET /api/body/:date`, `PUT` (overwrites the same day), `DELETE` (404 if there is none), `GET /api/body?from&to` (366 days or less). The request rate limit works like the other APIs.
+- **Screen:** `frontend/src/body.tsx`. Added a body card to the daily record. It shows the entry, the summary, edit, delete, and a table of changes by period. If loading fails, the entry form is hidden, so we do not overwrite a record we could not see. Even if the change table cannot be loaded, you can still enter values.
+- **Change calculation:** `frontend/src/body-change.ts`. The difference between the first and the last measurement within 7, 30, and 90 days ending on the date you are viewing. If there are fewer than 2 measurements, it shows `not enough records` (`기록 부족` on the screen).
 
-## 정한 것
+## What we decided
 
-이슈에 없던 규칙이다. 사용자 확인 없이 #44 댓글에 기록하고 진행했다. 바꾸라고 하면 후속 이슈로 고친다.
+These are rules that were not in the issue. We recorded them in a #44 comment and went on without user confirmation. If the user says to change them, we fix them in a follow-up issue.
 
-- **하루 한 건:** 같은 날짜에 다시 저장하면 전체를 덮어쓴다.
-- **범위:** 체중 0 초과 500kg 이하, 체지방률 0 초과 100% 이하, 허리둘레 0 초과 300cm 이하, 수축기 50~300, 이완기 20~200mmHg. 비정상 값을 걸러 내는 기준이며 건강 판단 기준이 아니다.
-- **숫자:** 체중, 체지방률, 허리둘레는 소수 둘째 자리까지, 혈압은 정수다.
-- **혈압:** 수축기와 이완기를 함께 입력하고, 수축기가 이완기보다 높아야 한다.
-- **메모만 있는 날:** 저장할 수 있다. 값이 하나도 없으면 거부한다.
-- **미래 날짜:** 막지 않는다. 범위는 #50에서 정한다.
-- **변화 표:** 기준일은 오늘이 아니라 보고 있는 날짜다. 혈압은 변화 표에 넣지 않았다.
+- **One per day:** saving again for the same date overwrites everything.
+- **Ranges:** weight above 0 and up to 500 kg, body fat above 0 and up to 100%, waist above 0 and up to 300 cm, systolic 50 to 300, and diastolic 20 to 200 mmHg. These are standards to filter out abnormal values, not standards for a health judgement.
+- **Numbers:** weight, body fat, and waist go to two decimal places, and blood pressure is an integer.
+- **Blood pressure:** enter systolic and diastolic together, and systolic must be higher than diastolic.
+- **A day with only a memo:** can be saved. It is rejected if there is no value at all.
+- **Future dates:** not blocked. The range is decided in #50.
+- **Change table:** the base day is the date you are viewing, not today. Blood pressure is not in the change table.
 
-## 검증
+## Verification
 
-- 추가한 테스트: `backend/test/body.test.ts`(입력 거부), `backend/test/body.integration.test.ts`(실제 DB), `frontend/src/body.test.tsx`(화면), `frontend/src/body-change.test.ts`(변화 계산), `frontend/src/number-input.test.ts`(숫자 해석)
-- 마이그레이션: 임시 PostgreSQL(포트 55902, `health_test`)에 전체를 2회 적용해 오류가 없었다. 기존 로컬 DB는 건드리지 않았다.
-- `npm run check`(임시 `health_test`): 결과는 PR에 적는다.
+- Tests added: `backend/test/body.test.ts` (input rejection), `backend/test/body.integration.test.ts` (real DB), `frontend/src/body.test.tsx` (screen), `frontend/src/body-change.test.ts` (change calculation), `frontend/src/number-input.test.ts` (number parsing)
+- Migrations: applied everything twice to a temporary PostgreSQL (port 55902, `health_test`) with no errors. We did not touch the existing local DB.
+- `npm run check` (temporary `health_test`): the result is written in the PR.
 
-### 브라우저 확인
+### Browser check
 
-헤드리스 Chrome, 뷰포트 390×844와 1440×900. API는 실제 서버 코드를 임시 DB에 연결해 포트 3993으로 띄웠다.
+Headless Chrome, viewports 390×844 and 1440×900. The API ran the real server code connected to a temporary DB on port 3993.
 
-| 항목                                                | 390×844 | 1440×900 |
-| --------------------------------------------------- | ------- | -------- |
-| 체중만 입력해 저장                                  | 통과    | 통과     |
-| 다른 날 저장 후 변화 표 (−1.5kg)                    | 통과    | 통과     |
-| 음수, 혈압 한쪽만 입력 시 한국어 오류와 입력값 유지 | 통과    | 통과     |
-| 수정 시 기존 값 표시, 취소                          | 통과    | 통과     |
-| 삭제 확인 후 폼 복귀, 변화 표 갱신                  | 통과    | 통과     |
-| 가로 넘침, 콘솔 오류                                | 없음    | 없음     |
+| Item                                                                               | 390×844 | 1440×900 |
+| ---------------------------------------------------------------------------------- | ------- | -------- |
+| Enter only weight and save                                                         | pass    | pass     |
+| The change table after saving on another day (−1.5 kg)                             | pass    | pass     |
+| A Korean error and the input kept for a negative value or one blood pressure value | pass    | pass     |
+| The existing values on edit, cancel                                                | pass    | pass     |
+| The form comes back after delete confirmation, the change table refreshes          | pass    | pass     |
+| Horizontal overflow, console errors                                                | none    | none     |
 
-## 1차 리뷰 보완 — 2026-11-02
+## First review fixes: 2026-11-02
 
-독립 리뷰 지적 8건 중 7건을 이 PR에서 고쳤고, 같은 문제가 있는 다른 화면은 [#70](https://github.com/sirloinbh/health-log/issues/70)으로 분리했다. `body_records`를 복원 확인 목록에 더하는 일은 이 PR 병합 뒤 PR #68에서 한다.
+Of the 8 findings of the independent review, we fixed 7 in this PR, and split the other screens with the same problem into [#70](https://github.com/sirloinbh/health-log/issues/70). Adding `body_records` to the restore check list is done in PR #68 after this PR is merged.
 
-- **쉼표 입력:** Chrome의 `type="number"` 칸은 쉼표를 입력 단계에서 지운다. `49,5`가 `495`가 되고 `badInput`도 켜지지 않아 495kg가 경고 없이 저장됐다. 처음 넣은 `badInput` 방어는 이 경우에 동작하지 않았고, 테스트도 값을 강제로 넣어 잘못된 가정을 증명하지 못했다. 텍스트 입력과 엄격한 해석(`frontend/src/number-input.ts`)으로 바꿨다. 쉼표, `70.5.1`, `1e5`, 음수는 저장하지 않고 안내한다. 실제 Chrome에서 키 입력으로 `49,5`가 칸에 그대로 보이고 저장되지 않음을 확인했다.
-- **변화 표 재시도:** 변화 표만 실패하면 전용 재시도 버튼이 나오고, 기록까지 실패하면 `다시 시도` 하나로 둘 다 다시 읽는다. 문구도 어느 쪽이 실패했는지 말한다.
-- **측정 구간:** 하루 사이의 변화가 "90일 −2kg"으로 읽히지 않도록 칸마다 비교한 날짜(`3/9~3/10`)를 글자로 보여 준다. 이전에는 마우스를 올려야만 보였다.
-- **테스트:** `기록 부족` 표시, 느린 응답 순서, 날짜를 옮긴 뒤 저장 실패, 재시도, 혈압 범위의 DB 제약을 검사한다.
-- **문서:** 다음 작업 문서의 틀린 항목을 고치고, 미래 날짜 규칙을 #44 댓글에 더했다.
+- **Comma input:** a `type="number"` field in Chrome removes the comma at the input stage. `49,5` became `495`, and `badInput` was not turned on either, so 495 kg was saved with no warning. The `badInput` guard we first added did not work in this case, and the test forced a value in, so it did not prove the wrong assumption. We changed to a text input and strict parsing (`frontend/src/number-input.ts`). A comma, `70.5.1`, `1e5`, and a negative number are not saved and are explained. In real Chrome with key input, we confirmed that `49,5` stays visible in the field and is not saved.
+- **Change table retry:** if only the change table fails, a dedicated retry button appears, and if the record also fails, a single `다시 시도` ("Try again") button reads both again. The wording also says which side failed.
+- **Measurement span:** so that a change within a day is not read as "−2 kg over 90 days", each cell shows the compared dates (`3/9~3/10`) as text. Before, they showed only on mouse hover.
+- **Tests:** checks the `not enough records` display, a slow response order, a save failure after moving the date, the retry, and the DB constraint of the blood pressure range.
+- **Docs:** fixed a wrong item in the next work document, and added the future date rule to the #44 comment.
 
-## 2차 리뷰 보완 — 2026-11-02
+## Second review fixes: 2026-11-02
 
-지적 7건 중 5건을 고쳤고, 2건은 [#71](https://github.com/sirloinbh/health-log/issues/71)로 분리했다. 리뷰는 2회까지이므로 3차 리뷰는 하지 않는다.
+We fixed 5 of the 7 findings and split 2 into [#71](https://github.com/sirloinbh/health-log/issues/71). The review is at most 2 rounds, so there is no third review.
 
-- **좁은 화면:** 측정 구간 글자 때문에 그리드 열이 내용 폭까지 늘어 360px, 375px에서 페이지가 가로로 넘치고 표 스크롤이 동작하지 않았다. 앞의 "가로 넘침 없음"은 390px에서만 맞았다. 열을 명시해 고쳤다.
-- **아주 긴 숫자:** 400자리 숫자가 `Infinity`를 거쳐 `null`이 되어 저장된 체중을 지웠다. 자릿수를 제한해 안내로 바꿨다.
-- **옛 수치:** 변화 표를 다시 읽지 못하면 옛 값을 숨긴다.
-- **재시도:** 진행 표시와 비활성화를 넣고, 다시 실패하면 안내를 새로 띄우며, 끝나면 포커스를 카드 제목으로 옮긴다.
-- **문서:** 빠진 테스트 파일과 #68의 할 일을 적고, 다음 작업 표의 순번을 고쳤다.
+- **Narrow screens:** because of the measurement span text, the grid column stretched to the width of its content, so the page overflowed horizontally at 360px and 375px and the table scroll did not work. The earlier "no horizontal overflow" was true only at 390px. We fixed it by specifying the columns.
+- **A very long number:** a 400-digit number went through `Infinity` to `null` and erased the saved weight. We limited the digits and changed it to a notice.
+- **Old numbers:** if the change table cannot be read again, the old values are hidden.
+- **Retry:** added a progress display and disabling, a new notice if it fails again, and the focus moves to the card title when it ends.
+- **Docs:** wrote the missing test files and the to-do of #68, and fixed the order numbers in the next work table.
 
-## 제한·후속
+## Limits and follow-up
 
-- 그래프는 없다. 변화 그래프는 #43 변화 리포트에서 다룬다.
-- 느린 저장 중에 날짜를 옮겼다 돌아오면 저장된 기록이 빈 폼으로 보일 수 있다(#71).
-- 다크 모드와 실제 휴대폰, Firefox, Safari는 확인하지 않았다.
-- 음수를 입력하면 범위 오류가 아니라 숫자 형식 안내가 나온다.
-- 가민·체중계 자동 연동은 이 이슈 범위 밖이다.
+- There is no graph. The change graph is handled in the #43 change report.
+- If you move the date and come back during a slow save, the saved record can look like an empty form (#71).
+- We did not check dark mode, a real phone, Firefox, or Safari.
+- If you enter a negative number, you get the number format notice, not a range error.
+- Automatic Garmin and scale integration is outside this issue.

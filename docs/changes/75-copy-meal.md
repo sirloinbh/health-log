@@ -1,79 +1,79 @@
-# #75 다른 날의 끼니를 그대로 복사하기
+# #75 Copy a meal from another day as it is
 
-- 이슈: [#75](https://github.com/sirloinbh/health-log/issues/75)
-- 브랜치: `feat/75-copy-meal`
+- Issue: [#75](https://github.com/sirloinbh/health-log/issues/75)
+- Branch: `feat/75-copy-meal`
 
-## 목적
+## Purpose
 
-같은 아침을 자주 먹을 때 음식을 하나씩 다시 고르지 않도록, 다른 날의 끼니를 한 번에 복사한다("어제와 똑같이").
+When you often eat the same breakfast, copy a meal of another day in one step ("same as yesterday") so that you do not pick the foods one by one again.
 
-## 정한 규칙
+## Rules we set
 
-요구사항에 없던 규칙이다. 사용자 확인 없이 [#75 댓글](https://github.com/sirloinbh/health-log/issues/75#issuecomment-6621218252)에 기록하고 진행했다. 다르게 원하면 후속 이슈로 고친다.
+These are rules that were not in the requirements. We recorded them in the [#75 comment](https://github.com/sirloinbh/health-log/issues/75#issuecomment-6621218252) and went on without user confirmation. If you want them different, we fix them in a follow-up issue.
 
-- **무엇을:** 고른 날짜의 같은 끼니를 지금 보는 날의 같은 끼니로 복사한다. 끼니는 식단 카드에서 고른 끼니다.
-- **기본 날짜:** 하루 전날이다. 다른 날짜도 고를 수 있다.
-- **값:** 원본에 기록된 값을 그대로 복사한다. 음식 저장소의 현재 값을 다시 읽지 않는다. 음식 연결(`food_id`)도 그대로 둔다.
-- **기존 기록:** 덮어쓰지 않고 뒤에 더한다.
-- **원자성:** 한 문장으로 넣어, 전부 복사되거나 하나도 복사되지 않는다.
-- **거부:** 같은 날짜는 400, 고른 날의 그 끼니에 기록이 없으면 404 "복사할 기록이 없습니다"다.
+- **What:** copy the same meal of the chosen date to the same meal of the day you are viewing. The meal is the one chosen on the meal card.
+- **Default date:** the day before. You can also pick another date.
+- **Values:** copy the values recorded in the source as they are. We do not read the current values of the food store again. The food link (`food_id`) is also kept as it is.
+- **Existing records:** not overwritten; the copy is added after them.
+- **Atomicity:** inserted in one statement, so either everything is copied or nothing is.
+- **Rejections:** the same date is 400, and if there is no record for that meal on the chosen day, 404 "복사할 기록이 없습니다" ("There is no record to copy").
 
-## 변경 — 2026-11-04
+## Changes: 2026-11-04
 
-- **API** `backend/src/meals.ts`: `POST /api/meals/:date/copy`를 추가했다.
-  - 본문은 `{ "from": "YYYY-MM-DD", "meal": "lunch" }`다. 응답은 다른 기록 API처럼 그날 전체(`entries`, `totals`)다.
-  - `meal_entries`에서 `meal_entries`로 `INSERT … SELECT … ORDER BY id` 한 문장이다.
-  - `from`은 경로 날짜와 같은 규칙(`isRealDate`)으로 검사한다.
-  - DB 변경은 없다.
-- **화면** `frontend/src/meals.tsx`: 식단 카드의 조합 아래에 "다른 날에서 복사"를 더했다.
-  - 날짜 입력(기본 전날)과 "<끼니> 복사" 버튼이 있다. 버튼 이름은 고른 끼니를 따른다.
-  - 날짜가 비었거나 같은 날이면 보내지 않고 안내한다.
-  - 404는 "2026년 11월 3일 화요일 아침에 복사할 기록이 없습니다"처럼 어느 날 어느 끼니인지 말한다.
-  - 다른 오류는 서버 문구를 복사 버튼 옆에 보인다.
-  - 기록 중에는 다른 기록 버튼처럼 막는다. 날을 떠나는 경우는 기존 `add()`의 처리를 그대로 쓴다.
+- **API** `backend/src/meals.ts`: added `POST /api/meals/:date/copy`.
+  - The body is `{ "from": "YYYY-MM-DD", "meal": "lunch" }`. The response is the whole day (`entries`, `totals`), like the other record APIs.
+  - It is one `INSERT … SELECT … ORDER BY id` statement from `meal_entries` to `meal_entries`.
+  - `from` is checked with the same rule as the date in the path (`isRealDate`).
+  - There is no DB change.
+- **Screen** `frontend/src/meals.tsx`: added "Copy from another day" (in Korean on the screen) under the combos of the meal card.
+  - It has a date input (default the day before) and a "Copy <meal>" button. The button name follows the chosen meal.
+  - If the date is empty or the same day, nothing is sent and a notice is shown.
+  - A 404 says which day and which meal, as in "There is no record to copy to breakfast on Tuesday, 3 November 2026" (in Korean on the screen).
+  - For other errors, the server text is shown next to the copy button.
+  - While recording, it is blocked like the other record buttons. When you leave the day, the existing handling of `add()` is used as it is.
 
-## 검증
+## Verification
 
-### 테스트
+### Tests
 
-- `backend/test/meal-copy.integration.test.ts`: 실제 DB 4개. 이슈 완료 기준 세 가지가 여기 있다.
-  - "원본의 영양성분 값을 그대로": 원본을 기록한 뒤 음식 값을 바꾸고 복사한다. 복사본이 원본과 같은 값(185.18kcal, 단백질 3.75)을 가지고, 순서와 합계가 맞고, 다른 끼니는 복사되지 않고, 이미 있던 기록 뒤에 더해지는지 본다.
-  - "일부가 실패하면 전부 취소": 두 번째 기록의 복사만 실패하게 하는 트리거를 잠시 걸고, 그날에 아무것도 남지 않는지 본다.
-  - "원본을 지워도 복사본이 남음": 원본 기록과 음식을 모두 지운 뒤에도 복사본이 같은 값으로 남는지 본다. 음식 연결만 비워진다.
-  - 그 밖에 그 끼니에 기록이 없으면 404이고 아무것도 생기지 않는지 본다.
-- `backend/test/meals.test.ts`: 2개 추가.
-  - 끼니, 빠진 날짜, 없는 날짜, 형식이 다른 날짜, 같은 날짜, 경로의 잘못된 날짜를 DB에 닿기 전에 거부한다.
-  - 응답을 읽지 못하면 복사를 되돌려, 다시 시도해도 두 번 들어가지 않는다.
-- `frontend/src/meals.test.tsx`: 7개 추가. 기본 전날과 요청 본문, 다른 날짜 고르기, 빈 날짜와 같은 날 거부(2가지), 404 안내, 다른 실패 안내, 복사 중 버튼 잠금과 설명 연결을 검사한다.
+- `backend/test/meal-copy.integration.test.ts`: 4 real-DB tests. The three done criteria of the issue are here.
+  - "The nutrition values of the source as they are": after recording the source, we change the food values and copy. We check that the copy has the same values as the source (185.18 kcal, protein 3.75), that the order and the totals are right, that another meal is not copied, and that it is added after the records that were already there.
+  - "If part fails, everything is cancelled": we briefly set a trigger that makes only the copy of the second record fail, and check that nothing is left on that day.
+  - "The copy stays even if the source is deleted": after deleting both the source record and the food, we check that the copy stays with the same values. Only the food link is emptied.
+  - Besides, if there is no record for that meal, it is 404 and nothing is created.
+- `backend/test/meals.test.ts`: 2 added.
+  - It rejects a meal, a missing date, a date that does not exist, a date in another format, the same date, and a wrong date in the path before it reaches the DB.
+  - If the response cannot be read, the copy is rolled back, so retrying does not insert it twice.
+- `frontend/src/meals.test.tsx`: 7 added. It checks the default day before and the request body, picking another date, the rejection of an empty date and of the same day (2 cases), the 404 notice, the notice for another failure, and the button lock and the description link while copying.
 
-### 실행 결과
+### Run results
 
-- `npm test -w backend`: 117개 중 67개 통과, 50개 건너뜀. 이 PC에는 PostgreSQL이 없어 DB 통합 테스트(새 4개 포함)를 건너뛰었다. 성공으로 세지 않는다. CI 결과는 PR에 적는다.
-- `npm test -w frontend`: 32개 파일, 240개 통과, 2개 건너뜀(다크 전용 앱 조건, 무관).
-- `npm run check`: 통과. 포맷, 린트, 타입 검사, 빌드, 스킬 검사 4개 통과.
+- `npm test -w backend`: 67 of 117 passed, 50 skipped. There is no PostgreSQL on this PC, so we skipped the DB integration tests (including the 4 new ones). They are not counted as a success. The CI result is written in the PR.
+- `npm test -w frontend`: 32 files, 240 passed, 2 skipped (the dark-only app condition, unrelated).
+- `npm run check`: passed. Format, lint, type check, build, and 4 skill checks passed.
 
-### 브라우저 확인
+### Browser check
 
-헤드리스 Chrome을 CDP로 움직였다. PostgreSQL이 없어 API는 메모리 스텁을 썼다. 서버의 복사·트랜잭션 동작은 위 DB 통합 테스트가 맡는다.
+We drove headless Chrome with CDP. There is no PostgreSQL, so the API used a memory stub. The copy and transaction behavior of the server is covered by the DB integration tests above.
 
-| 항목                                                       | 390×844 | 1440×900 |
-| ---------------------------------------------------------- | ------- | -------- |
-| 전날 점심에 음식을 기록한 뒤, 기본 날짜가 전날             | 통과    | 통과     |
-| 비어 있는 아침 복사 시 날짜·끼니를 말하는 안내             | 통과    | 통과     |
-| 점심 복사 요청 `{"from":전날,"meal":"lunch"}`, 점심에 표시 | 통과    | 통과     |
-| 복사 뒤 이전 안내가 지워짐                                 | 통과    | 통과     |
-| 가로 넘침, 콘솔 오류                                       | 없음    | 없음     |
+| Item                                                                                 | 390×844 | 1440×900 |
+| ------------------------------------------------------------------------------------ | ------- | -------- |
+| After recording foods at lunch of the day before, the default date is the day before | pass    | pass     |
+| Copying an empty breakfast shows a notice that names the date and the meal           | pass    | pass     |
+| The lunch copy request `{"from":day before,"meal":"lunch"}`, shown at lunch          | pass    | pass     |
+| The earlier notice is cleared after a copy                                           | pass    | pass     |
+| Horizontal overflow, console errors                                                  | none    | none     |
 
-## 1차 리뷰 반영 — 2026-11-04
+## First review applied: 2026-11-04
 
-필수 수정은 없었고, 선택 항목 두 개를 반영했다.
+There was no required fix, and we applied two optional items.
 
-- **설명 연결:** 화면 읽기 프로그램이 버튼 이름("점심 복사")만 읽고 "이미 있는 기록 뒤에 더한다"는 설명을 놓치지 않도록, 설명 문단을 버튼의 `aria-describedby`로 이었다.
-- **복사 중 잠금 테스트:** 복사 요청이 끝나기 전에는 버튼이 막히고 `aria-busy`가 붙어, 두 번 눌러도 한 번만 보내는지 확인하는 테스트를 더했다.
+- **Description link:** so that a screen reader does not read only the button name ("Copy lunch") and miss the description "it is added after the existing records", we linked the description paragraph to the button with `aria-describedby`.
+- **Lock-while-copying test:** added a test that checks that until the copy request finishes the button is blocked and gets `aria-busy`, so pressing twice sends only once.
 
-## 제한·후속
+## Limits and follow-up
 
-- 끼니를 바꿔서 복사(예: 어제 점심을 오늘 저녁으로)하지 않는다. 같은 끼니만 복사한다.
-- 복사 전에 무엇이 복사될지 미리 보여 주지 않는다. 복사한 뒤 잘못 들어간 기록은 하나씩 지운다.
-- 하루 전체 복사는 없다. 끼니마다 복사한다.
-- 다크 모드, 실제 휴대폰, Firefox, Safari, 실제 DB와 연결한 화면은 확인하지 않았다.
+- We do not copy to a different meal (for example yesterday lunch to today dinner). Only the same meal is copied.
+- Before copying, it does not preview what will be copied. A record that went in wrongly after the copy is deleted one by one.
+- There is no copy of a whole day. You copy each meal.
+- We did not check dark mode, a real phone, Firefox, Safari, or the screen connected to a real DB.

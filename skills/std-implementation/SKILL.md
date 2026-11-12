@@ -15,6 +15,15 @@ Skills used together:
 - [std-git-writing](../std-git-writing/SKILL.md): how to write issues, branches, commits, and PRs, plus templates
 - [std-testing](../std-testing/SKILL.md): writing and running tests (app repos)
 
+## Decisions: proceed with the default
+
+Do not stop to ask the user to choose when a sensible default exists. Pick the default, continue, and record the choice so the user can reverse it later. Several worktrees often run at once, and every question stalls one of them.
+
+- Proceed without asking when there is a conventional default, the code or existing docs settle the choice, or the choice is easy to reverse (naming, file placement, wording, ordering, which of two equivalent approaches).
+- Ask first only for decisions that are truly the user's: irreversible actions, costly actions, actions that become public, actions that conflict with the requirements, merges into production (app repo `main`), steps the issue marks as user-only (`[Manual]`, `needs-user`), package installs outside pre-approved scope, and anything the issue marks as "user confirmation". Keep working on the other parts of the task while waiting.
+- Write each choice made without asking in the PR "Check before merging" section as a line such as "Chose X over Y because Z. Say so if you want Y." Add the same line to the `docs/changes/` record.
+- If an item in "Check before merging" needs the user's answer before merging, say so in the PR and do not merge.
+
 ## 1. Register the issue
 
 - Check the GitHub remote URL and `gh api user --jq .login`. The expected account is `sirloinbh`. If it is a different account, make no remote changes until authentication is fixed.

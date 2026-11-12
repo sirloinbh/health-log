@@ -46,6 +46,6 @@ export function formatSpan(change: Change) {
 }
 
 export function formatChange(change: Change, unit: string) {
-  if (change.amount === 0) return `변화 없음`;
+  if (change.amount === 0) return 'No change';
   return `${change.amount > 0 ? '+' : '−'}${Math.abs(change.amount)}${unit}`;
 }

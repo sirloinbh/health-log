@@ -128,7 +128,7 @@ test('deleting removes the record, and deleting again is a 404', { skip }, async
     assert.equal((await call(path)).data.record, null);
     const again = await call(path, { method: 'DELETE' });
     assert.equal(again.status, 404);
-    assert.equal(again.data.error, '수면 기록을 찾을 수 없습니다');
+    assert.equal(again.data.error, 'Sleep record not found');
   });
 });
 

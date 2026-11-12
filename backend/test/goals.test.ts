@@ -76,22 +76,27 @@ test('a sober week stays open until the unrecorded days cannot change it', () =>
 });
 
 test('each goal takes a whole number in its own range, or null to turn it off', async () => {
-  await rejects('/api/goals/calories', { from, target: 99 }, 400, '100kcal 이상');
-  await rejects('/api/goals/calories', { from, target: 10_001 }, 400, '10000kcal 이하');
-  await rejects('/api/goals/calories', { from, target: 1800.5 }, 400, '정수');
-  await rejects('/api/goals/protein', { from, target: 0 }, 400, '1g 이상');
-  await rejects('/api/goals/sleep', { from, target: 59 }, 400, '60분 이상');
-  await rejects('/api/goals/sleep', { from, target: 1441 }, 400, '1440분 이하');
-  await rejects('/api/goals/sober_days', { from, target: 8 }, 400, '7일 이하');
-  await rejects('/api/goals/sober_days', { from, target: '5' }, 400, '숫자로');
-  await rejects('/api/goals/sober_days', { from }, 400, '숫자로');
+  await rejects('/api/goals/calories', { from, target: 99 }, 400, 'at least 100 kcal');
+  await rejects('/api/goals/calories', { from, target: 10_001 }, 400, 'at most 10000 kcal');
+  await rejects('/api/goals/calories', { from, target: 1800.5 }, 400, 'whole number');
+  await rejects('/api/goals/protein', { from, target: 0 }, 400, 'at least 1 g');
+  await rejects('/api/goals/sleep', { from, target: 59 }, 400, 'at least 60 min');
+  await rejects('/api/goals/sleep', { from, target: 1441 }, 400, 'at most 1440 min');
+  await rejects('/api/goals/sober_days', { from, target: 8 }, 400, 'at most 7 days');
+  await rejects('/api/goals/sober_days', { from, target: '5' }, 400, 'must be a number');
+  await rejects('/api/goals/sober_days', { from }, 400, 'must be a number');
 });
 
 test('a goal needs a real start date and a known item', async () => {
-  await rejects('/api/goals/calories', { target: 2000 }, 400, '적용 시작일을');
-  await rejects('/api/goals/calories', { from: '2026-02-30', target: 2000 }, 400, '시작일이');
-  await rejects('/api/goals/calories', [], 400, '요청 본문');
-  await rejects('/api/goals/water', { from, target: 2000 }, 404, '없는 목표 항목');
+  await rejects('/api/goals/calories', { target: 2000 }, 400, 'Choose a start date');
+  await rejects(
+    '/api/goals/calories',
+    { from: '2026-02-30', target: 2000 },
+    400,
+    'start date is not valid',
+  );
+  await rejects('/api/goals/calories', [], 400, 'request body');
+  await rejects('/api/goals/water', { from, target: 2000 }, 404, 'Unknown goal item');
 });
 
 test('a bad date or item in the path is refused before the database', async () => {

@@ -16,16 +16,16 @@ const leadDays = 7;
 
 const doneInput = z.object(
   {
-    kind: z.enum(['visit', 'medication'], { error: '알림 종류가 올바르지 않습니다' }),
+    kind: z.enum(['visit', 'medication'], { error: 'The reminder type is not valid' }),
     id: z
-      .number({ error: '알림 대상이 올바르지 않습니다' })
-      .int('알림 대상이 올바르지 않습니다')
-      .positive('알림 대상이 올바르지 않습니다'),
-    dueOn: z.string({ error: '알림 날짜가 올바르지 않습니다' }).refine(isRealDate, {
-      message: '알림 날짜가 올바르지 않습니다',
+      .number({ error: 'The reminder target is not valid' })
+      .int('The reminder target is not valid')
+      .positive('The reminder target is not valid'),
+    dueOn: z.string({ error: 'The reminder date is not valid' }).refine(isRealDate, {
+      message: 'The reminder date is not valid',
     }),
   },
-  { error: '요청 본문이 올바르지 않습니다' },
+  { error: 'The request body is not valid' },
 );
 
 type VisitRow = {
@@ -129,11 +129,11 @@ export function remindersRouter(pool: Pool, today: () => string, limits: RateLim
            WHERE d.${mark} = $1 AND d.due_on = $2 AND t.${due} = $2`,
           [id, dueOn],
         );
-        if (!already) throw new HttpError(404, '알림을 찾을 수 없습니다');
+        if (!already) throw new HttpError(404, 'Reminder not found');
       }
     } catch (error) {
       // Deleted between the read and the write.
-      if (isForeignKeyError(error)) throw new HttpError(404, '알림을 찾을 수 없습니다');
+      if (isForeignKeyError(error)) throw new HttpError(404, 'Reminder not found');
       throw error;
     }
     res.status(204).end();

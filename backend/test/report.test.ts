@@ -20,11 +20,11 @@ const untouched = () => {
 test('a report needs a known period and a real date', async () => {
   await withApi(untouched(), async (call) => {
     for (const [query, message] of [
-      ['?date=2026-11-05', '기간은 week 또는 month'],
-      ['?period=year&date=2026-11-05', '기간은 week 또는 month'],
-      ['?period=week', '날짜가 올바르지 않습니다'],
-      ['?period=week&date=2026-02-30', '날짜가 올바르지 않습니다'],
-      ['?period=week&date=2026-11-05&date=2026-11-06', '날짜가 올바르지 않습니다'],
+      ['?date=2026-11-05', 'The period must be week or month'],
+      ['?period=year&date=2026-11-05', 'The period must be week or month'],
+      ['?period=week', 'The date is not valid'],
+      ['?period=week&date=2026-02-30', 'The date is not valid'],
+      ['?period=week&date=2026-11-05&date=2026-11-06', 'The date is not valid'],
     ]) {
       const { status, data } = await call(`/api/report${query}`);
       assert.equal(status, 400, query);

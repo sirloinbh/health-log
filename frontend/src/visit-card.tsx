@@ -68,7 +68,7 @@ export function VisitsCard({ date }: { date: string }) {
     <Card>
       <CardHeader>
         <div ref={heading} tabIndex={-1} className="outline-none">
-          <CardTitle asHeading="h2">병원·약</CardTitle>
+          <CardTitle asHeading="h2">Clinic and medication</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -83,19 +83,19 @@ export function VisitsCard({ date }: { date: string }) {
               setMoveFocus((count) => count + 1);
             }}
           >
-            다시 시도
+            Try again
           </Button>
         ) : null}
         {!notice && visits === undefined ? (
-          <div role="status" aria-busy="true" aria-label="병원·약 기록 불러오는 중">
+          <div role="status" aria-busy="true" aria-label="Loading clinic and medication records">
             <SkeletonText lines={2} />
           </div>
         ) : null}
         {visits?.length === 0 ? (
-          <p className="text-body-sm text-muted-foreground">이 날 병원 방문 기록이 없습니다.</p>
+          <p className="text-body-sm text-muted-foreground">No clinic visits on this day.</p>
         ) : null}
         {visits?.length ? (
-          <ul aria-label="이 날 병원 방문" className="flex flex-col gap-3 text-body-sm">
+          <ul aria-label="Clinic visits on this day" className="flex flex-col gap-3 text-body-sm">
             {visits.map((visit) => (
               <li key={visit.id} className="flex flex-col gap-1">
                 <span className="font-medium wrap-anywhere">{clinicText(visit)}</span>
@@ -105,11 +105,11 @@ export function VisitsCard({ date }: { date: string }) {
                   </span>
                 ))}
                 {visit.cost !== null ? (
-                  <span className="text-muted-foreground">진료비 {wonText(visit.cost)}</span>
+                  <span className="text-muted-foreground">Visit cost {wonText(visit.cost)}</span>
                 ) : null}
                 {visit.nextVisitOn ? (
                   <span className="text-muted-foreground">
-                    다음 예약 {formatDate(visit.nextVisitOn)}
+                    Next appointment {formatDate(visit.nextVisitOn)}
                   </span>
                 ) : null}
               </li>
@@ -120,12 +120,13 @@ export function VisitsCard({ date }: { date: string }) {
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline" size="sm">
               <Link to={`${visitsPagePath}?new=${date}`}>
-                <Plus aria-hidden />이 날 병원 방문 기록
+                <Plus aria-hidden />
+                Record a clinic visit for this day
               </Link>
             </Button>
             {visits.length ? (
               <Button asChild variant="ghost" size="sm">
-                <Link to={visitsPagePath}>병원 기록 보기</Link>
+                <Link to={visitsPagePath}>View clinic records</Link>
               </Button>
             ) : null}
           </div>
@@ -133,7 +134,7 @@ export function VisitsCard({ date }: { date: string }) {
         {medications !== undefined ? (
           <section aria-labelledby={`meds-${date}`} className="flex flex-col gap-2 text-body-sm">
             <h3 id={`meds-${date}`} className="font-medium">
-              이 날 먹은 약
+              Medication taken this day
             </h3>
             {medications.length ? (
               <ul className="flex flex-col gap-1">
@@ -148,10 +149,10 @@ export function VisitsCard({ date }: { date: string }) {
                 })}
               </ul>
             ) : (
-              <p className="text-muted-foreground">이 날 먹은 약 기록이 없습니다.</p>
+              <p className="text-muted-foreground">No medication records for this day.</p>
             )}
             <Button asChild variant="ghost" size="sm" className="self-start">
-              <Link to={medicationsPagePath}>약 기록 보기</Link>
+              <Link to={medicationsPagePath}>View medication records</Link>
             </Button>
           </section>
         ) : null}

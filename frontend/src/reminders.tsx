@@ -11,6 +11,7 @@ import { RequestError, requestJson } from './lib/api';
 import { useNotice } from './lib/use-notice';
 import { medicationsPath } from './med-text';
 import { trackWrite, writesSettled } from './pending-writes';
+import { count as countText } from './plural';
 import {
   type Reminder,
   reminderDetail,
@@ -92,7 +93,7 @@ export function RemindersCard() {
             reminders: current.reminders.filter((other) => reminderKey(other) !== key),
           },
       );
-      status(`${reminderTitle(item)} 알림을 완료로 표시했습니다.`);
+      status(`${reminderTitle(item)} reminder marked as done.`);
       setMoveFocus((count) => count + 1);
     } catch (cause) {
       if (!live.current) return;
@@ -106,7 +107,7 @@ export function RemindersCard() {
       // could land before the read and be brought back by it.
       if (await load()) {
         if (!live.current) return;
-        status('다른 화면에서 날짜가 바뀌었거나 지워진 일정이라 목록을 새로 불러왔습니다.');
+        status('The date was changed or the item was removed elsewhere, so the list was reloaded.');
         setMoveFocus((count) => count + 1);
       }
     } finally {
@@ -118,12 +119,12 @@ export function RemindersCard() {
     <Card>
       <CardHeader>
         <div ref={heading} tabIndex={-1} className="outline-none">
-          <CardTitle asHeading="h2">다가오는 일정</CardTitle>
+          <CardTitle asHeading="h2">Upcoming</CardTitle>
         </div>
         {data ? (
           <CardDescription>
-            병원 예약과 약 복용 종료를 {data.leadDays}일 전부터 알려 줍니다(
-            {formatDate(data.until)}까지).
+            Clinic appointments and the end of medication courses are shown{' '}
+            {countText(data.leadDays, 'day')} ahead (until {formatDate(data.until)}).
           </CardDescription>
         ) : null}
       </CardHeader>
@@ -140,21 +141,22 @@ export function RemindersCard() {
               setMoveFocus((count) => count + 1);
             }}
           >
-            다시 시도
+            Try again
           </Button>
         ) : null}
         {!notice && data === undefined ? (
-          <div role="status" aria-busy="true" aria-label="다가오는 일정 불러오는 중">
+          <div role="status" aria-busy="true" aria-label="Loading upcoming items">
             <SkeletonText lines={2} />
           </div>
         ) : null}
         {data?.reminders.length === 0 ? (
           <p className="text-body-sm text-muted-foreground">
-            {data.leadDays}일 안에 다가오는 병원 예약이나 약 복용 종료가 없습니다.
+            No clinic appointments or medication end dates in the next{' '}
+            {countText(data.leadDays, 'day')}.
           </p>
         ) : null}
         {data?.reminders.length ? (
-          <ul aria-label="다가오는 일정" className="flex flex-col gap-3">
+          <ul aria-label="Upcoming" className="flex flex-col gap-3">
             {data.reminders.map((item) => {
               const key = reminderKey(item);
               const title = reminderTitle(item);
@@ -193,7 +195,7 @@ export function RemindersCard() {
                       size="sm"
                       // It hides the reminder only, so the name says so; while busy, it says that
                       // too, as aria-busy alone is not read out.
-                      aria-label={`${title} 알림 ${busy ? '완료 처리 중' : '완료'}`}
+                      aria-label={`${title} reminder ${busy ? 'marking as done' : 'done'}`}
                       // aria-disabled, not disabled: a disabled button drops keyboard focus (#98).
                       aria-disabled={marking !== null || undefined}
                       aria-busy={busy || undefined}
@@ -201,7 +203,7 @@ export function RemindersCard() {
                       onClick={() => void markDone(item)}
                     >
                       <Check aria-hidden />
-                      {busy ? '처리 중…' : '완료'}
+                      {busy ? 'Working…' : 'Done'}
                     </Button>
                   </div>
                 </li>

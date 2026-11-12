@@ -30,39 +30,45 @@ const rejects = async (body: unknown, message: string) => {
 };
 
 test('values outside their range are rejected', async () => {
-  await rejects({ weightKg: 0 }, '체중은\\(는\\) 0보다');
-  await rejects({ weightKg: -1 }, '체중은\\(는\\) 0보다');
-  await rejects({ weightKg: 500.01 }, '체중은\\(는\\) 500 이하');
-  await rejects({ bodyFatPercent: 0 }, '체지방률은\\(는\\) 0보다');
-  await rejects({ bodyFatPercent: 101 }, '체지방률은\\(는\\) 100 이하');
-  await rejects({ waistCm: 301 }, '허리둘레은\\(는\\) 300 이하');
-  await rejects({ systolicMmhg: 49, diastolicMmhg: 30 }, '수축기 혈압은\\(는\\) 50 이상');
-  await rejects({ systolicMmhg: 120, diastolicMmhg: 19 }, '이완기 혈압은\\(는\\) 20 이상');
+  await rejects({ weightKg: 0 }, 'Weight must be greater than 0');
+  await rejects({ weightKg: -1 }, 'Weight must be greater than 0');
+  await rejects({ weightKg: 500.01 }, 'Weight must be 500 or less');
+  await rejects({ bodyFatPercent: 0 }, 'Body fat must be greater than 0');
+  await rejects({ bodyFatPercent: 101 }, 'Body fat must be 100 or less');
+  await rejects({ waistCm: 301 }, 'Waist must be 300 or less');
+  await rejects(
+    { systolicMmhg: 49, diastolicMmhg: 30 },
+    'Systolic blood pressure must be 50 or more',
+  );
+  await rejects(
+    { systolicMmhg: 120, diastolicMmhg: 19 },
+    'Diastolic blood pressure must be 20 or more',
+  );
 });
 
 test('numbers the columns would round or refuse are rejected', async () => {
-  await rejects({ weightKg: 70.123 }, '소수 둘째 자리');
-  await rejects({ weightKg: 1e-9 }, '소수 둘째 자리');
-  await rejects({ systolicMmhg: 120.5, diastolicMmhg: 80 }, '정수');
-  await rejects({ weightKg: '70' }, '숫자로 입력');
+  await rejects({ weightKg: 70.123 }, 'at most 2 decimal places');
+  await rejects({ weightKg: 1e-9 }, 'at most 2 decimal places');
+  await rejects({ systolicMmhg: 120.5, diastolicMmhg: 80 }, 'whole number');
+  await rejects({ weightKg: '70' }, 'must be a number');
 });
 
 test('blood pressure needs both numbers in the right order', async () => {
-  await rejects({ systolicMmhg: 120 }, '함께 입력');
-  await rejects({ diastolicMmhg: 80 }, '함께 입력');
-  await rejects({ systolicMmhg: 80, diastolicMmhg: 80 }, '이완기 혈압보다 높아야');
-  await rejects({ systolicMmhg: 70, diastolicMmhg: 80 }, '이완기 혈압보다 높아야');
+  await rejects({ systolicMmhg: 120 }, 'Enter both');
+  await rejects({ diastolicMmhg: 80 }, 'Enter both');
+  await rejects({ systolicMmhg: 80, diastolicMmhg: 80 }, 'must be higher than diastolic');
+  await rejects({ systolicMmhg: 70, diastolicMmhg: 80 }, 'must be higher than diastolic');
 });
 
 test('a record needs something in it', async () => {
-  await rejects({}, '하나 이상');
-  await rejects({ memo: '   ' }, '하나 이상');
-  await rejects({ weightKg: null, memo: null }, '하나 이상');
+  await rejects({}, 'at least one value');
+  await rejects({ memo: '   ' }, 'at least one value');
+  await rejects({ weightKg: null, memo: null }, 'at least one value');
 });
 
 test('a long memo and a body that is not an object answer in Korean', async () => {
-  await rejects({ memo: 'x'.repeat(501) }, '500자 이하');
-  await rejects([], '요청 본문이 올바르지 않습니다');
+  await rejects({ memo: 'x'.repeat(501) }, '500 characters or fewer');
+  await rejects([], 'The request body is not valid');
 });
 
 test('a date that does not exist is rejected for every method', async () => {
@@ -83,7 +89,7 @@ test('deleting a day without a record answers 404 in Korean', async () => {
   await withApi(pool, async (call) => {
     const { status, data } = await call(path, { method: 'DELETE' });
     assert.equal(status, 404);
-    assert.equal(data.error, '신체 기록을 찾을 수 없습니다');
+    assert.equal(data.error, 'Body record not found');
   });
 });
 
@@ -91,16 +97,16 @@ test('a range must be real, in order, and at most 366 days', async () => {
   const { pool, queries } = recording();
   await withApi(pool, async (call) => {
     const answer = async (query: string) => (await call(`/api/body?${query}`)).data.error;
-    assert.equal(await answer('to=2026-03-15'), '날짜가 올바르지 않습니다');
-    assert.equal(await answer('from=2026-02-30&to=2026-03-15'), '날짜가 올바르지 않습니다');
-    assert.equal(await answer('from=a&from=b&to=2026-03-15'), '날짜가 올바르지 않습니다');
+    assert.equal(await answer('to=2026-03-15'), 'The date is not valid');
+    assert.equal(await answer('from=2026-02-30&to=2026-03-15'), 'The date is not valid');
+    assert.equal(await answer('from=a&from=b&to=2026-03-15'), 'The date is not valid');
     assert.equal(
       await answer('from=2026-03-16&to=2026-03-15'),
-      '시작 날짜는 끝 날짜보다 늦을 수 없습니다',
+      'The start date cannot be after the end date',
     );
     assert.equal(
       await answer('from=2025-03-14&to=2026-03-15'),
-      '조회 기간은 366일 이하로 지정해 주세요',
+      'The date range must be 366 days or fewer',
     );
     assert.equal(queries.length, 0);
 

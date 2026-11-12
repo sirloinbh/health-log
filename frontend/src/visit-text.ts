@@ -25,9 +25,9 @@ export const maxProcedures = 10;
 /** Path every visit write goes under, so the daily card can wait for them (#71). */
 export const visitsPath = '/api/visits';
 
-const won = new Intl.NumberFormat('ko-KR');
+const won = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'KRW' });
 
-export const wonText = (value: number) => `${won.format(value)}원`;
+export const wonText = (value: number) => won.format(value);
 
 /**
  * Whole won as typed: digits, with or without thousands commas. Blank is no value (null) and
@@ -40,25 +40,15 @@ export function parseWon(text: string): number | null | undefined {
   return Number(value.replaceAll(',', ''));
 }
 
-/** What a procedure was, in one line: "레이저 · 이마 · 1회차 · 50,000원". */
+/** What a procedure was, in one line: "Laser · Forehead · Session 1 · ₩50,000". */
 export const procedureText = (item: Procedure) =>
   [item.name, item.area, item.amount, item.cost === null ? null : wonText(item.cost)]
     .filter(Boolean)
     .join(' · ');
 
-/** The clinic with its department: "가상피부과 · 피부과". */
+/** The clinic with its department: "Sample Clinic · Dermatology". */
 export const clinicText = (visit: Pick<Visit, 'clinic' | 'department'>) =>
   visit.department ? `${visit.clinic} · ${visit.department}` : visit.clinic;
 
 /** The clinic page, in the app's page list and linked from the daily card. */
 export const visitsPagePath = '/visits';
-
-/**
- * The label with 은 or 는, as its last syllable takes: "진료비는", "병원 이름은". A label that does
- * not end in Hangul gets 은(는).
- */
-export function withTopic(label: string) {
-  const last = label.charCodeAt(label.length - 1) - 0xac00;
-  if (last < 0 || last > 11171) return `${label}은(는)`;
-  return `${label}${last % 28 === 0 ? '는' : '은'}`;
-}

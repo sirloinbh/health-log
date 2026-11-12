@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { count } from './plural';
+
 type Bar = { date: string; value: number | null };
 
 const height = 120;
@@ -29,8 +31,8 @@ export function DailyBars({
   const recorded = values.length;
   const summary =
     recorded === 0
-      ? `${title}: 기록한 날이 없습니다`
-      : `${title}: ${bars.length}일 중 ${recorded}일 기록, 가장 높은 날 ${format(max)}`;
+      ? `${title}: no days recorded`
+      : `${title}: ${recorded} of ${count(bars.length, 'day')} recorded, highest day ${format(max)}`;
   const shown = active === null ? null : bars[active];
   // The same share of bars counts as an edge on either side.
   const edgeSpan = bars.length / 4;
@@ -48,7 +50,7 @@ export function DailyBars({
       <figcaption className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-body-sm font-medium">{title}</span>
         {recorded ? (
-          <span className="text-caption text-muted-foreground">최고 {format(max)}</span>
+          <span className="text-caption text-muted-foreground">Max {format(max)}</span>
         ) : null}
       </figcaption>
       <div className="relative">
@@ -125,7 +127,7 @@ export function DailyBars({
               left: `${(((active ?? 0) + (edge === 'start' ? 0 : edge === 'end' ? 1 : 0.5)) / bars.length) * 100}%`,
             }}
           >
-            {dayLabel(shown.date)} · {shown.value === null ? '기록 없음' : format(shown.value)}
+            {dayLabel(shown.date)} · {shown.value === null ? 'No record' : format(shown.value)}
           </div>
         ) : null}
       </div>
@@ -134,12 +136,12 @@ export function DailyBars({
         <span>{bars.at(-1) ? dayLabel(bars.at(-1)!.date) : null}</span>
       </div>
       <details className="text-body-sm">
-        <summary className="cursor-pointer text-muted-foreground">{title} 표로 보기</summary>
+        <summary className="cursor-pointer text-muted-foreground">View {title} as a table</summary>
         <table className="mt-2 w-full text-left">
           <thead className="text-muted-foreground">
             <tr>
               <th scope="col" className="py-1 pr-4 font-normal">
-                날짜
+                Date
               </th>
               <th scope="col" className="py-1 font-normal">
                 {title}
@@ -152,7 +154,7 @@ export function DailyBars({
                 <th scope="row" className="py-0.5 pr-4 font-normal">
                   {dayLabel(bar.date)}
                 </th>
-                <td className="py-0.5">{bar.value === null ? '기록 없음' : format(bar.value)}</td>
+                <td className="py-0.5">{bar.value === null ? 'No record' : format(bar.value)}</td>
               </tr>
             ))}
           </tbody>

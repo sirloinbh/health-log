@@ -23,21 +23,22 @@ import { errorText, useNotice } from './lib/use-notice';
 import { MoreFoodsButton } from './more-foods-button';
 import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
 import { trackWrite, writesSettled } from './pending-writes';
+import { count } from './plural';
 
 const meals = [
-  { key: 'breakfast', label: '아침' },
-  { key: 'lunch', label: '점심' },
-  { key: 'dinner', label: '저녁' },
-  { key: 'snack', label: '간식' },
+  { key: 'breakfast', label: 'Breakfast' },
+  { key: 'lunch', label: 'Lunch' },
+  { key: 'dinner', label: 'Dinner' },
+  { key: 'snack', label: 'Snack' },
 ] as const;
 
 const nutrients = [
-  { key: 'calories', label: '칼로리', unit: 'kcal' },
-  { key: 'carbs', label: '탄수화물', unit: 'g' },
-  { key: 'protein', label: '단백질', unit: 'g' },
-  { key: 'fat', label: '지방', unit: 'g' },
-  { key: 'sugars', label: '당류', unit: 'g' },
-  { key: 'sodium', label: '나트륨', unit: 'mg' },
+  { key: 'calories', label: 'Calories', unit: 'kcal' },
+  { key: 'carbs', label: 'Carbs', unit: 'g' },
+  { key: 'protein', label: 'Protein', unit: 'g' },
+  { key: 'fat', label: 'Fat', unit: 'g' },
+  { key: 'sugars', label: 'Sugars', unit: 'g' },
+  { key: 'sodium', label: 'Sodium', unit: 'mg' },
 ] as const;
 
 type MealKey = (typeof meals)[number]['key'];
@@ -81,14 +82,16 @@ function Totals({ totals }: { totals: MealDay['totals'] }) {
         {nutrients.map(({ key, label, unit }) => (
           <div key={key}>
             <dt className="text-muted-foreground">{label}</dt>
-            <dd>{totals[key].value === null ? '값 없음' : `${totals[key].value}${unit}`}</dd>
+            <dd>{totals[key].value === null ? 'No value' : `${totals[key].value}${unit}`}</dd>
           </div>
         ))}
       </dl>
       {incomplete.length > 0 ? (
         <p className="text-body-sm break-keep text-muted-foreground">
-          값을 모르는 음식이 있어 일부가 빠진 합계입니다:{' '}
-          {incomplete.map(({ key, label }) => `${label} ${totals[key].missing}개`).join(', ')}
+          Some foods have unknown values, so these totals leave them out:{' '}
+          {incomplete
+            .map(({ key, label }) => `${label} ${count(totals[key].missing, 'food')}`)
+            .join(', ')}
         </p>
       ) : null}
     </div>
@@ -99,12 +102,12 @@ function JunkSummary({ junk }: { junk: MealDay['junk'] }) {
   return (
     <section aria-labelledby="meal-junk-heading" className="flex flex-col gap-1 text-body-sm">
       <h3 id="meal-junk-heading" className="font-semibold">
-        정크푸드
+        Junk food
       </h3>
       {(
         [
-          ['이 주', junk.week],
-          ['이 달', junk.month],
+          ['This week', junk.week],
+          ['This month', junk.month],
         ] as const
       ).map(([title, period]) => (
         <p key={title} className="break-keep">
@@ -116,7 +119,7 @@ function JunkSummary({ junk }: { junk: MealDay['junk'] }) {
   );
 }
 
-const JunkBadge = () => <Badge variant="warning">정크푸드</Badge>;
+const JunkBadge = () => <Badge variant="warning">Junk food</Badge>;
 
 function EntryRow({
   entry,
@@ -128,7 +131,7 @@ function EntryRow({
   onDelete: () => Promise<unknown>;
 }) {
   const serving =
-    entry.servingSize === null ? null : ` · 1회 ${entry.servingSize}${entry.servingUnit ?? ''}`;
+    entry.servingSize === null ? null : ` · Serving ${entry.servingSize}${entry.servingUnit ?? ''}`;
   return (
     <li className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
       <div className="flex min-w-0 flex-col">
@@ -137,14 +140,14 @@ function EntryRow({
           {entry.isJunk ? <JunkBadge /> : null}
         </span>
         <span className="text-caption text-muted-foreground">
-          {entry.servings}회분{serving} ·{' '}
-          {entry.calories === null ? '칼로리 값 없음' : `${entry.calories}kcal`}
+          {entry.servings} servings{serving} ·{' '}
+          {entry.calories === null ? 'No calorie value' : `${entry.calories}kcal`}
         </span>
       </div>
       <ConfirmDialog
-        title="식사 기록을 삭제할까요?"
+        title="Delete this meal record?"
         description={
-          <span className="wrap-anywhere">{`'${fullName(entry)}' 기록을 지웁니다.`}</span>
+          <span className="wrap-anywhere">{`'${fullName(entry)}' will be deleted.`}</span>
         }
         onConfirm={onDelete}
         trigger={
@@ -152,7 +155,7 @@ function EntryRow({
             variant="ghost"
             size="icon"
             disabled={disabled}
-            aria-label={`${fullName(entry)} 삭제`}
+            aria-label={`Delete ${fullName(entry)}`}
           >
             <Trash2 aria-hidden />
           </Button>
@@ -187,9 +190,9 @@ function FoodChoices({
               {food.isJunk ? <JunkBadge /> : null}
             </span>
             <span className="text-caption text-muted-foreground">
-              1회 {food.servingSize}
+              Serving {food.servingSize}
               {food.servingUnit} ·{' '}
-              {food.calories === null ? '칼로리 값 없음' : `${food.calories}kcal`}
+              {food.calories === null ? 'No calorie value' : `${food.calories}kcal`}
             </span>
           </div>
           <BusyButton
@@ -197,11 +200,11 @@ function FoodChoices({
             size="sm"
             busy={adding}
             aria-busy={waiting === food.id || undefined}
-            aria-label={`${fullName(food)} 추가`}
+            aria-label={`Add ${fullName(food)}`}
             onClick={() => onAdd(food)}
           >
-            {waiting === food.id ? <Spinner size="sm" label="기록하는 중" /> : null}
-            추가
+            {waiting === food.id ? <Spinner size="sm" label="Recording" /> : null}
+            Add
           </BusyButton>
         </li>
       ))}
@@ -321,11 +324,11 @@ function AddEntry({
     if (adding) return;
     clear();
     if (!isValidDate(copyFrom)) {
-      copyError('복사할 날짜를 골라 주세요');
+      copyError('Choose a date to copy from');
       return;
     }
     if (copyFrom === date) {
-      copyError('다른 날짜를 골라 주세요');
+      copyError('Choose a different date');
       return;
     }
     setPending('copy');
@@ -335,7 +338,7 @@ function AddEntry({
       // Say which meal of which day was empty, not just that nothing was found.
       copyError(
         cause instanceof RequestError && cause.status === 404
-          ? `${formatDate(copyFrom)} ${mealLabel}에 복사할 기록이 없습니다`
+          ? `No ${mealLabel.toLowerCase()} records to copy from ${formatDate(copyFrom)}`
           : cause,
       );
     } finally {
@@ -372,15 +375,15 @@ function AddEntry({
     clear();
     const value = parseAmount(servings);
     if (value === undefined) {
-      showError(unreadableAmount('수량'));
+      showError(unreadableAmount('Quantity'));
       return null;
     }
     if (value === null || !(value > 0)) {
-      showError('수량을 0보다 큰 숫자로 입력해 주세요');
+      showError('The quantity must be a number greater than 0');
       return null;
     }
     if (!hasTwoDecimalsAtMost(value)) {
-      showError('수량은 소수 둘째 자리까지 입력해 주세요');
+      showError('The quantity can have at most 2 decimal places');
       return null;
     }
     return value;
@@ -417,16 +420,16 @@ function AddEntry({
     const value = readServings(typedError);
     if (value === null) return;
     if (!name.trim()) {
-      typedError('음식 이름을 입력해 주세요');
+      typedError('Enter a food name');
       return;
     }
     const kcal = parseAmount(calories);
     if (kcal === undefined) {
-      typedError(unreadableAmount('1회 칼로리'));
+      typedError(unreadableAmount('Calories per serving'));
       return;
     }
     if (kcal === null) {
-      typedError('칼로리를 숫자로 입력해 주세요');
+      typedError('Calories must be a number');
       return;
     }
     setPending('typed');
@@ -447,7 +450,7 @@ function AddEntry({
 
   return (
     <div className="flex flex-col gap-4 border-t pt-4">
-      <div role="group" aria-label="끼니" className="flex flex-wrap gap-2">
+      <div role="group" aria-label="Meal" className="flex flex-wrap gap-2">
         {meals.map(({ key, label }) => (
           <Button
             key={key}
@@ -462,7 +465,7 @@ function AddEntry({
         ))}
       </div>
       <div className="flex flex-col gap-2">
-        <Label htmlFor="meal-servings">수량 (1회 제공량 기준)</Label>
+        <Label htmlFor="meal-servings">Quantity (in servings)</Label>
         <Input
           id="meal-servings"
           inputMode="decimal"
@@ -473,27 +476,27 @@ function AddEntry({
       </div>
       {/* Shown only once there is something to offer, or a reason it could not be read. */}
       {recent?.length || recentFailure ? (
-        <section aria-label="최근 먹은 음식" className="flex flex-col gap-3">
+        <section aria-label="Recently eaten foods" className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <p ref={recentHeading} tabIndex={-1} className="text-body-sm font-medium outline-none">
-              최근 먹은 음식
+              Recently eaten foods
             </p>
             {recentFailure ? (
               <Button type="button" variant="outline" size="sm" onClick={retryRecent}>
-                다시 불러오기
+                Reload
               </Button>
             ) : null}
           </div>
           <Notice
             notice={
               recentFailure
-                ? { kind: 'error', text: `최근 먹은 음식을 불러오지 못했습니다: ${recentFailure}` }
+                ? { kind: 'error', text: `Could not load recently eaten foods: ${recentFailure}` }
                 : undefined
             }
           />
           {recent?.length ? (
             <FoodChoices
-              label="최근 먹은 음식 목록"
+              label="Recently eaten foods list"
               foods={recent}
               adding={adding}
               waiting={waitingIn('recent')}
@@ -507,8 +510,8 @@ function AddEntry({
         <Input
           ref={searchInput}
           type="search"
-          aria-label="음식 검색"
-          placeholder="이름 또는 브랜드"
+          aria-label="Search foods"
+          placeholder="Name or brand"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -518,8 +521,8 @@ function AddEntry({
           disabled={searching}
           aria-busy={searching || undefined}
         >
-          {searching ? <Spinner size="sm" label="검색하는 중" /> : null}
-          검색
+          {searching ? <Spinner size="sm" label="Searching" /> : null}
+          Search
         </Button>
       </form>
       <Notice notice={listNotice} />
@@ -533,12 +536,12 @@ function AddEntry({
         {foods === null
           ? null
           : foods.length === 0
-            ? '찾는 음식이 없습니다. 아래에 이름과 칼로리를 바로 적을 수 있습니다.'
+            ? 'No matching foods. You can type a name and calories below.'
             : resultText(foods.length, more)}
       </p>
       {foods?.length ? (
         <FoodChoices
-          label="검색 결과"
+          label="Search results"
           foods={foods}
           adding={adding}
           waiting={waitingIn('search')}
@@ -549,9 +552,9 @@ function AddEntry({
         <MoreFoodsButton loading={loadingMore || searching} onLoad={loadMore} afterLast={shown} />
       ) : null}
       <Notice notice={pageNotice} />
-      <section aria-label="조합" className="flex flex-col gap-3">
+      <section aria-label="Combos" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-body-sm font-medium">조합</p>
+          <p className="text-body-sm font-medium">Combos</p>
           <Button
             type="button"
             variant="outline"
@@ -560,20 +563,20 @@ function AddEntry({
             aria-busy={loadingCombos || undefined}
             onClick={() => void loadCombos()}
           >
-            {loadingCombos ? <Spinner size="sm" label="불러오는 중" /> : null}
-            {combos === null ? '조합에서 고르기' : '조합 다시 불러오기'}
+            {loadingCombos ? <Spinner size="sm" label="Loading" /> : null}
+            {combos === null ? 'Choose from combos' : 'Reload combos'}
           </Button>
         </div>
         {combos === null ? null : combos.length === 0 ? (
           <p className="text-body-sm break-keep text-muted-foreground">
-            저장한 조합이 없습니다. 메뉴의 조합 화면에서 만들 수 있습니다.
+            No saved combos. You can create them on the Combos page in the menu.
           </p>
         ) : (
           <>
             <p className="text-caption break-keep text-muted-foreground">
-              고른 끼니에, 조합에 저장한 수량대로 기록합니다.
+              Records the chosen meal with the quantities saved in the combo.
             </p>
-            <ul aria-label="조합 목록" className="flex max-h-80 flex-col divide-y overflow-y-auto">
+            <ul aria-label="Combo list" className="flex max-h-80 flex-col divide-y overflow-y-auto">
               {combos.map((combo) => (
                 <li key={combo.id} className="flex items-center justify-between gap-3 py-2">
                   <div className="flex min-w-0 flex-col">
@@ -588,13 +591,13 @@ function AddEntry({
                     disabled={combo.items.length === 0}
                     busy={adding}
                     aria-busy={pending === `combo-${combo.id}` || undefined}
-                    aria-label={`${combo.name} 기록`}
+                    aria-label={`Record ${combo.name}`}
                     onClick={() => void addCombo(combo)}
                   >
                     {pending === `combo-${combo.id}` ? (
-                      <Spinner size="sm" label="기록하는 중" />
+                      <Spinner size="sm" label="Recording" />
                     ) : null}
-                    기록
+                    Record
                   </BusyButton>
                 </li>
               ))}
@@ -604,19 +607,19 @@ function AddEntry({
         <Notice notice={comboNotice} />
       </section>
       <form
-        aria-label="다른 날에서 복사"
+        aria-label="Copy from another day"
         onSubmit={(event) => void copyMeal(event)}
         noValidate
         className="flex flex-col gap-3"
       >
-        <p className="text-body-sm font-medium">다른 날에서 복사</p>
+        <p className="text-body-sm font-medium">Copy from another day</p>
         <p id="meal-copy-help" className="text-caption break-keep text-muted-foreground">
-          고른 날의 {mealLabel} 기록을 이 날 {mealLabel}에 그대로 더합니다. 영양성분은 그날 기록한
-          값 그대로입니다.
+          Adds the chosen day's {mealLabel.toLowerCase()} records to this day's{' '}
+          {mealLabel.toLowerCase()} as they are. Nutrition values stay as recorded that day.
         </p>
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="meal-copy-from">복사할 날짜</Label>
+            <Label htmlFor="meal-copy-from">Date to copy from</Label>
             <Input
               id="meal-copy-from"
               type="date"
@@ -632,21 +635,21 @@ function AddEntry({
             aria-busy={pending === 'copy' || undefined}
             aria-describedby="meal-copy-help"
           >
-            {pending === 'copy' ? <Spinner size="sm" label="복사하는 중" /> : null}
-            {mealLabel} 복사
+            {pending === 'copy' ? <Spinner size="sm" label="Copying" /> : null}
+            Copy {mealLabel.toLowerCase()}
           </BusyButton>
         </div>
         <Notice notice={copyNotice} />
       </form>
       <form onSubmit={(event) => void addTyped(event)} noValidate className="flex flex-col gap-3">
-        <p className="text-body-sm font-medium">저장소에 없는 음식</p>
+        <p className="text-body-sm font-medium">Foods not in the library</p>
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="meal-name">음식 이름</Label>
+            <Label htmlFor="meal-name">Food name</Label>
             <Input id="meal-name" value={name} onChange={(event) => setName(event.target.value)} />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="meal-calories">1회 칼로리 (kcal)</Label>
+            <Label htmlFor="meal-calories">Calories per serving (kcal)</Label>
             <Input
               id="meal-calories"
               inputMode="decimal"
@@ -663,13 +666,13 @@ function AddEntry({
             aria-describedby="meal-typed-junk-help"
             onCheckedChange={(checked) => setTypedJunk(checked === true)}
           />
-          <Label htmlFor="meal-typed-junk">정크푸드</Label>
+          <Label htmlFor="meal-typed-junk">Junk food</Label>
         </div>
         <p
           id="meal-typed-junk-help"
           className="-mt-2 text-caption break-keep text-muted-foreground"
         >
-          위의 이 주·이 달 정크푸드 횟수로 셉니다.
+          Counts toward the junk food times for this week and this month above.
         </p>
         <Notice notice={typedNotice} />
         <BusyButton
@@ -679,8 +682,8 @@ function AddEntry({
           busy={adding}
           aria-busy={pending === 'typed' || undefined}
         >
-          {pending === 'typed' ? <Spinner size="sm" label="기록하는 중" /> : null}
-          바로 기록
+          {pending === 'typed' ? <Spinner size="sm" label="Recording" /> : null}
+          Record now
         </BusyButton>
       </form>
     </div>
@@ -742,20 +745,20 @@ export function MealCard({ date }: { date: string }) {
       );
       changes.current += 1;
       if (!live.current) {
-        toast.success(`${date} 식사를 기록했습니다`);
+        toast.success(`Meal recorded for ${date}`);
         return false;
       }
       setDay(data);
       // What this answers replaces whatever an earlier failed read left on screen.
       clear();
-      toast.success('기록했습니다');
+      toast.success('Recorded');
       return true;
     } catch (cause) {
       if (live.current) throw cause;
       // Moving to another day removes the form. With no answer, the server may still have saved it.
       const unanswered = cause instanceof RequestError && cause.status === undefined;
       toast.error(
-        `${date} 식사를 ${unanswered ? '기록했는지 확인하지 못했습니다' : '기록하지 못했습니다'}: ${errorText(cause)}`,
+        `Could not ${unanswered ? 'confirm that the meal was recorded' : 'record the meal'} for ${date}: ${errorText(cause)}`,
       );
       return false;
     } finally {
@@ -780,7 +783,7 @@ export function MealCard({ date }: { date: string }) {
       // Already gone counts as deleted, but the list and totals are out of date.
       if (live.current && !(await load())) return;
     }
-    toast.success('삭제했습니다');
+    toast.success('Deleted');
     setMoveFocus((count) => count + 1);
   };
 
@@ -788,7 +791,7 @@ export function MealCard({ date }: { date: string }) {
     <Card>
       <CardHeader>
         <div ref={heading} tabIndex={-1} className="outline-none">
-          <CardTitle asHeading="h2">식단</CardTitle>
+          <CardTitle asHeading="h2">Diet</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -803,11 +806,11 @@ export function MealCard({ date }: { date: string }) {
               setMoveFocus((count) => count + 1);
             }}
           >
-            다시 시도
+            Try again
           </Button>
         ) : null}
         {!notice && !day ? (
-          <div role="status" aria-busy="true" aria-label="식사 기록 불러오는 중">
+          <div role="status" aria-busy="true" aria-label="Loading meal records">
             <SkeletonText lines={2} />
           </div>
         ) : null}
@@ -816,7 +819,7 @@ export function MealCard({ date }: { date: string }) {
             <Totals totals={day.totals} />
             <JunkSummary junk={day.junk} />
             {day.entries.length === 0 ? (
-              <p className="text-body-sm text-muted-foreground">아직 기록한 식사가 없습니다.</p>
+              <p className="text-body-sm text-muted-foreground">No meals recorded yet.</p>
             ) : (
               meals
                 .filter(({ key }) => day.entries.some((entry) => entry.meal === key))

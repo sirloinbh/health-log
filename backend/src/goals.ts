@@ -13,15 +13,15 @@ type GoalItem = (typeof goalItems)[number];
 
 // The same ranges as the database's goals_target_range.
 const ranges: Record<GoalItem, { label: string; min: number; max: number; unit: string }> = {
-  calories: { label: '칼로리 목표', min: 100, max: 10_000, unit: 'kcal' },
-  protein: { label: '단백질 목표', min: 1, max: 1000, unit: 'g' },
-  sleep: { label: '수면 목표', min: 60, max: 1440, unit: '분' },
-  sober_days: { label: '금주 목표', min: 1, max: 7, unit: '일' },
+  calories: { label: 'Calorie goal', min: 100, max: 10_000, unit: 'kcal' },
+  protein: { label: 'Protein goal', min: 1, max: 1000, unit: 'g' },
+  sleep: { label: 'Sleep goal', min: 60, max: 1440, unit: 'min' },
+  sober_days: { label: 'Alcohol-free goal', min: 1, max: 7, unit: 'days' },
 };
 
 const parseItem = (value: unknown) => {
   const parsed = z.enum(goalItems).safeParse(value);
-  if (!parsed.success) throw new HttpError(404, '없는 목표 항목입니다');
+  if (!parsed.success) throw new HttpError(404, 'Unknown goal item');
   return parsed.data;
 };
 
@@ -30,17 +30,17 @@ const goalInput = (item: GoalItem) => {
   return z.object(
     {
       from: z
-        .string({ error: '적용 시작일을 골라 주세요' })
-        .refine(isRealDate, '적용 시작일이 올바르지 않습니다'),
+        .string({ error: 'Choose a start date' })
+        .refine(isRealDate, 'The start date is not valid'),
       // null: the goal is off from this date.
       target: z
-        .number({ error: `${label}는 숫자로 입력해 주세요` })
-        .int(`${label}는 정수로 입력해 주세요`)
-        .min(min, `${label}는 ${min}${unit} 이상으로 입력해 주세요`)
-        .max(max, `${label}는 ${max}${unit} 이하로 입력해 주세요`)
+        .number({ error: `${label} must be a number` })
+        .int(`${label} must be a whole number`)
+        .min(min, `${label} must be at least ${min} ${unit}`)
+        .max(max, `${label} must be at most ${max} ${unit}`)
         .nullable(),
     },
-    { error: '요청 본문이 올바르지 않습니다' },
+    { error: 'The request body is not valid' },
   );
 };
 
@@ -260,7 +260,7 @@ export function goalsRouter(pool: Pool, today: () => string, limits: RateLimitSe
       'DELETE FROM goals WHERE item = $1 AND effective_from = $2',
       [item, from],
     );
-    if (!rowCount) throw new HttpError(404, '목표 변경 기록을 찾을 수 없습니다');
+    if (!rowCount) throw new HttpError(404, 'Goal change record not found');
     res.status(204).end();
   });
 

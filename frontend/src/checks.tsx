@@ -63,11 +63,11 @@ function CheckForm({
     if (saving) return;
     const memo = form.memo.trim() || null;
     if (form.dietKept === null && form.sleepGood === null && memo === null) {
-      error('체크나 메모 중 하나 이상 입력해 주세요');
+      error('Enter at least one check or a note');
       return;
     }
     if (memo && charCount(memo) > maxMemo) {
-      error(`메모는 ${maxMemo}자 이하로 입력해 주세요`);
+      error(`The note must be ${maxMemo} characters or fewer`);
       return;
     }
     // A repeated failure then appears anew and is announced again (as in #98).
@@ -86,7 +86,7 @@ function CheckForm({
     } catch (cause) {
       // Moving to another day removes this form, and the check still was not saved.
       if (!mounted.current) {
-        toast.error(`${date} 하루 체크를 저장하지 못했습니다: ${errorText(cause)}`);
+        toast.error(`Could not save the daily check for ${date}: ${errorText(cause)}`);
         return;
       }
       error(cause);
@@ -124,7 +124,7 @@ function CheckForm({
         </div>
       ))}
       <div className="flex flex-col gap-2">
-        <Label htmlFor="check-memo">메모</Label>
+        <Label htmlFor="check-memo">Note</Label>
         <Input
           id="check-memo"
           autoComplete="off"
@@ -136,18 +136,18 @@ function CheckForm({
           onChange={(event) => setForm((current) => ({ ...current, memo: event.target.value }))}
         />
         <p id="check-memo-hint" className="text-caption text-muted-foreground">
-          {maxMemo}자까지 쓸 수 있습니다.
+          Up to {maxMemo} characters.
         </p>
       </div>
       <Notice notice={notice} />
       <div className="flex flex-wrap gap-2">
         <BusyButton type="submit" busy={saving} aria-busy={saving || undefined}>
-          {saving ? <Spinner size="sm" label="저장하는 중" /> : null}
-          저장
+          {saving ? <Spinner size="sm" label="Saving" /> : null}
+          Save
         </BusyButton>
         {onCancel ? (
           <BusyButton type="button" variant="outline" busy={saving} onClick={onCancel}>
-            취소
+            Cancel
           </BusyButton>
         ) : null}
       </div>
@@ -175,22 +175,22 @@ function CheckView({
         ))}
         {record.memo ? (
           <div className="sm:col-span-2">
-            <dt className="text-muted-foreground">메모</dt>
+            <dt className="text-muted-foreground">Note</dt>
             <dd className="break-words">{record.memo}</dd>
           </div>
         ) : null}
       </dl>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={onEdit}>
-          수정
+          Edit
         </Button>
         <ConfirmDialog
-          title="하루 체크를 삭제할까요?"
-          description="삭제하면 되돌릴 수 없습니다."
+          title="Delete this daily check?"
+          description="This cannot be undone."
           onConfirm={onDelete}
           trigger={
             <Button variant="outline" size="sm">
-              삭제
+              Delete
             </Button>
           }
         />
@@ -205,8 +205,8 @@ function PeriodRates({ title, summary }: { title: string; summary: CheckSummary 
       <p className="font-medium">
         {title} <span className="font-normal text-muted-foreground">{spanText(summary)}</span>
       </p>
-      <p className="break-keep">식단: {rateText(summary.diet, '지킴')}</p>
-      <p className="break-keep">수면: {rateText(summary.sleep, '잘 잠')}</p>
+      <p className="break-keep">Diet: {rateText(summary.diet, 'Kept')}</p>
+      <p className="break-keep">Sleep: {rateText(summary.sleep, 'Slept well')}</p>
     </section>
   );
 }
@@ -265,7 +265,7 @@ export function ChecksCard({ date }: { date: string }) {
         throw cause;
       }
     }
-    toast.success('삭제했습니다');
+    toast.success('Deleted');
     setEditing(false);
     setMoveFocus((count) => count + 1);
     // The rates changed too; until they arrive the old ones would be wrong.
@@ -279,7 +279,7 @@ export function ChecksCard({ date }: { date: string }) {
     <Card>
       <CardHeader>
         <div ref={heading} tabIndex={-1} className="outline-none">
-          <CardTitle asHeading="h2">하루 체크</CardTitle>
+          <CardTitle asHeading="h2">Daily check</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -294,11 +294,11 @@ export function ChecksCard({ date }: { date: string }) {
               setMoveFocus((count) => count + 1);
             }}
           >
-            다시 시도
+            Try again
           </Button>
         ) : null}
         {!notice && day === undefined ? (
-          <div role="status" aria-busy="true" aria-label="하루 체크 불러오는 중">
+          <div role="status" aria-busy="true" aria-label="Loading daily check">
             <SkeletonText lines={2} />
           </div>
         ) : null}
@@ -307,7 +307,7 @@ export function ChecksCard({ date }: { date: string }) {
             date={date}
             record={record ?? null}
             onSaved={(saved) => {
-              toast.success('저장했습니다');
+              toast.success('Saved');
               finish(saved);
             }}
             onCancel={record ? () => finish(day) : undefined}
@@ -325,8 +325,8 @@ export function ChecksCard({ date }: { date: string }) {
         ) : null}
         {day ? (
           <div className="flex flex-col gap-3 border-t pt-4">
-            <PeriodRates title="이 주" summary={day.week} />
-            <PeriodRates title="이 달" summary={day.month} />
+            <PeriodRates title="This week" summary={day.week} />
+            <PeriodRates title="This month" summary={day.month} />
           </div>
         ) : null}
       </CardContent>

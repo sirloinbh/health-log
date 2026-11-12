@@ -36,7 +36,7 @@ const server = (empty: (url: string) => unknown) => {
     waiting
       .splice(0)
       .forEach((resolve) =>
-        resolve(new Response(JSON.stringify({ error: '서버 오류입니다' }), { status: 500 })),
+        resolve(new Response(JSON.stringify({ error: 'It is a server error' }), { status: 500 })),
       );
   return { writes, fail };
 };
@@ -52,28 +52,28 @@ const cases: {
   fill: () => Promise<HTMLElement>;
 }[] = [
   {
-    name: '수면',
+    name: 'Sleep',
     ui: <SleepCard date={date} />,
     empty: () => ({ record: null }),
     fill: async () => {
-      await screen.findByLabelText('취침 시각');
-      change('취침 시각', '23:30');
-      change('기상 시각', '07:00');
-      return screen.getByRole('button', { name: '저장' });
+      await screen.findByLabelText('Bedtime');
+      change('Bedtime', '23:30');
+      change('Wake-up time', '07:00');
+      return screen.getByRole('button', { name: 'Save' });
     },
   },
   {
-    name: '신체',
+    name: 'Body',
     ui: <BodyCard date={date} />,
     empty: (url) => (url.startsWith('/api/body?') ? { records: [] } : { record: null }),
     fill: async () => {
-      await screen.findByLabelText('체중 (kg)');
-      change('체중 (kg)', '71.5');
-      return screen.getByRole('button', { name: '저장' });
+      await screen.findByLabelText('Weight (kg)');
+      change('Weight (kg)', '71.5');
+      return screen.getByRole('button', { name: 'Save' });
     },
   },
   {
-    name: '술·담배',
+    name: 'Alcohol and tobacco',
     ui: <HabitsCard date={date} />,
     empty: () => {
       const period = {
@@ -83,13 +83,13 @@ const cases: {
       return { record: null, week: { ...week, ...period }, month: { ...month, ...period } };
     },
     fill: async () => {
-      await screen.findByLabelText('담배 (개비)');
-      change('담배 (개비)', '2');
-      return screen.getByRole('button', { name: '저장' });
+      await screen.findByLabelText('Cigarettes');
+      change('Cigarettes', '2');
+      return screen.getByRole('button', { name: 'Save' });
     },
   },
   {
-    name: '하루 체크',
+    name: 'Daily check',
     ui: <ChecksCard date={date} />,
     empty: () => ({
       record: null,
@@ -97,13 +97,13 @@ const cases: {
       month: { ...month, diet: noRate, sleep: noRate },
     }),
     fill: async () => {
-      await screen.findByLabelText('메모');
-      change('메모', '테스트');
-      return screen.getByRole('button', { name: '저장' });
+      await screen.findByLabelText('Note');
+      change('Note', '테스트');
+      return screen.getByRole('button', { name: 'Save' });
     },
   },
   {
-    name: '식단 바로 기록',
+    name: 'Record diet now',
     ui: <MealCard date={date} />,
     empty: (url) =>
       url === '/api/foods/recent'
@@ -121,14 +121,14 @@ const cases: {
             junk: { week: { ...week, ...noJunk }, month: { ...month, ...noJunk } },
           },
     fill: async () => {
-      await screen.findByLabelText('음식 이름');
-      change('음식 이름', '떡볶이');
-      change('1회 칼로리 (kcal)', '480');
-      return screen.getByRole('button', { name: '바로 기록' });
+      await screen.findByLabelText('Food name');
+      change('Food name', '떡볶이');
+      change('Calories per serving (kcal)', '480');
+      return screen.getByRole('button', { name: 'Record now' });
     },
   },
   {
-    name: '목표 설정',
+    name: 'Set goals',
     ui: <GoalsSettings />,
     empty: () => ({
       today: '2026-11-06',
@@ -137,9 +137,9 @@ const cases: {
       history: [],
     }),
     fill: async () => {
-      const field = await screen.findByLabelText('하루 칼로리 상한 (kcal)');
-      change('하루 칼로리 상한 (kcal)', '2200');
-      return within(field.closest('form') as HTMLElement).getByRole('button', { name: '저장' });
+      const field = await screen.findByLabelText('Daily calorie limit (kcal)');
+      change('Daily calorie limit (kcal)', '2200');
+      return within(field.closest('form') as HTMLElement).getByRole('button', { name: 'Save' });
     },
   },
 ];
@@ -163,7 +163,7 @@ test.each(cases)(
     expect(writes()).toBe(1);
 
     fail();
-    expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류입니다');
+    expect(await screen.findByRole('alert')).toHaveTextContent('It is a server error');
     expect(save).not.toHaveAttribute('aria-disabled');
     expect(save).toHaveFocus();
 
@@ -171,7 +171,7 @@ test.each(cases)(
     fireEvent.click(save);
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
     fail();
-    expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류입니다');
+    expect(await screen.findByRole('alert')).toHaveTextContent('It is a server error');
     expect(save).toHaveFocus();
     expect(writes()).toBe(2);
   },
@@ -197,11 +197,11 @@ test('a busy button ignores presses and does not submit its form', () => {
   const { rerender } = render(
     <form onSubmit={(event) => submitted(event.nativeEvent)}>
       <BusyButton type="submit" busy onClick={pressed}>
-        저장
+        Save
       </BusyButton>
     </form>,
   );
-  const button = screen.getByRole('button', { name: '저장' });
+  const button = screen.getByRole('button', { name: 'Save' });
   fireEvent.click(button);
   expect(pressed).not.toHaveBeenCalled();
   expect(submitted).not.toHaveBeenCalled();
@@ -209,7 +209,7 @@ test('a busy button ignores presses and does not submit its form', () => {
   rerender(
     <form onSubmit={(event) => submitted(event.nativeEvent)}>
       <BusyButton type="submit" busy={false} onClick={pressed}>
-        저장
+        Save
       </BusyButton>
     </form>,
   );

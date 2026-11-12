@@ -24,7 +24,7 @@ export const minutesBetween = (bed: string, wake: string) =>
 export function formatMinutes(total: number) {
   const hours = Math.floor(total / 60);
   const minutes = total % 60;
-  return [hours ? `${hours}시간` : '', minutes ? `${minutes}분` : ''].filter(Boolean).join(' ');
+  return [hours ? `${hours} h` : '', minutes ? `${minutes} min` : ''].filter(Boolean).join(' ');
 }
 
 export const clockOf = (instant: string) => inService(instant).slice(11, 16);

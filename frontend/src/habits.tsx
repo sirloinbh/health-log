@@ -42,9 +42,9 @@ const maxDrinks = 20;
 
 type DrinkMode = 'unrecorded' | 'none' | 'some';
 const drinkModes: { mode: DrinkMode; label: string }[] = [
-  { mode: 'unrecorded', label: '기록 안 함' },
-  { mode: 'none', label: '안 마심' },
-  { mode: 'some', label: '마심' },
+  { mode: 'unrecorded', label: 'Not recorded' },
+  { mode: 'none', label: 'No drinking' },
+  { mode: 'some', label: 'Drank' },
 ];
 
 type DraftDrink = { key: number; kind: DrinkKind; unit: DrinkUnit; amount: string };
@@ -82,30 +82,30 @@ const formOf = (record: HabitRecord | null): Form => ({
 /** The request body, or the message that says why there is none. */
 const readForm = (form: Form) => {
   const cigarettes = parseAmount(form.cigarettes);
-  if (cigarettes === undefined) return unreadableAmount('담배 (개비)');
+  if (cigarettes === undefined) return unreadableAmount('Cigarettes');
   if (cigarettes !== null && !Number.isInteger(cigarettes)) {
-    return '담배는 개비 수를 정수로 입력해 주세요';
+    return 'Cigarettes must be a whole number';
   }
-  if (cigarettes !== null && cigarettes > 200) return '담배는 200개비 이하로 입력해 주세요';
+  if (cigarettes !== null && cigarettes > 200) return 'Cigarettes must be 200 or fewer';
   let drinks: Drink[] | null = null;
   if (form.mode === 'none') drinks = [];
   if (form.mode === 'some') {
-    if (form.drinks.length === 0) return '마신 술을 하나 이상 입력해 주세요';
+    if (form.drinks.length === 0) return 'Enter at least one drink';
     drinks = [];
     for (const [index, draft] of form.drinks.entries()) {
-      const label = `${index + 1}번째 술의 양`;
+      const label = `Drink ${index + 1} amount`;
       const amount = parseAmount(draft.amount);
       if (amount === undefined) return unreadableAmount(label);
-      if (amount === null || amount <= 0) return `${label}을 0보다 큰 숫자로 입력해 주세요`;
-      if (amount > 99) return `${label}은 99 이하로 입력해 주세요`;
-      if (!hasTwoDecimalsAtMost(amount)) return `${label}은 소수 둘째 자리까지 입력해 주세요`;
+      if (amount === null || amount <= 0) return `${label} must be a number greater than 0`;
+      if (amount > 99) return `${label} must be 99 or less`;
+      if (!hasTwoDecimalsAtMost(amount)) return `${label} can have at most 2 decimal places`;
       if (drinks.some((drink) => drink.kind === draft.kind && drink.unit === draft.unit)) {
-        return `${drinkKinds[draft.kind]} ${drinkUnits[draft.unit]}이(가) 두 번 있습니다. 한 줄로 합쳐 주세요`;
+        return `${drinkKinds[draft.kind]} (${drinkUnits[draft.unit]}) appears twice. Combine them into one line`;
       }
       drinks.push({ kind: draft.kind, unit: draft.unit, amount });
     }
   }
-  if (cigarettes === null && drinks === null) return '술이나 담배 중 하나 이상 기록해 주세요';
+  if (cigarettes === null && drinks === null) return 'Record at least one drink or cigarette count';
   return { cigarettes, drinks };
 };
 
@@ -120,14 +120,14 @@ function DrinkRow({
   onChange: (next: DraftDrink) => void;
   onRemove: () => void;
 }) {
-  const name = `${index + 1}번째 술`;
+  const name = `Drink ${index + 1}`;
   return (
     <li className="flex flex-wrap items-center gap-2">
       <Select
         value={drink.kind}
         onValueChange={(kind) => onChange({ ...drink, kind: kind as DrinkKind })}
       >
-        <SelectTrigger aria-label={`${name} 종류`} className="w-28">
+        <SelectTrigger aria-label={`${name} type`} className="w-28">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -141,7 +141,7 @@ function DrinkRow({
       {/* Amount, unit and its remove button wrap together on a narrow screen. */}
       <div className="flex items-center gap-2">
         <Input
-          aria-label={`${name} 양`}
+          aria-label={`${name} amount`}
           className="w-20"
           inputMode="decimal"
           autoComplete="off"
@@ -152,7 +152,7 @@ function DrinkRow({
           value={drink.unit}
           onValueChange={(unit) => onChange({ ...drink, unit: unit as DrinkUnit })}
         >
-          <SelectTrigger aria-label={`${name} 단위`} className="w-20">
+          <SelectTrigger aria-label={`${name} unit`} className="w-20">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -167,7 +167,7 @@ function DrinkRow({
           type="button"
           variant="ghost"
           size="icon"
-          aria-label={`${name} 빼기`}
+          aria-label={`${name} remove`}
           onClick={onRemove}
         >
           <X aria-hidden />
@@ -225,7 +225,9 @@ function HabitForm({
     } catch (cause) {
       // Moving to another day removes this form, and the record still was not saved.
       if (!mounted.current) {
-        toast.error(`${date} 술·담배 기록을 저장하지 못했습니다: ${errorText(cause)}`);
+        toast.error(
+          `Could not save the alcohol and tobacco record for ${date}: ${errorText(cause)}`,
+        );
         return;
       }
       error(cause);
@@ -236,7 +238,7 @@ function HabitForm({
   return (
     <form onSubmit={(event) => void submit(event)} noValidate className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
-        <Label htmlFor="habit-cigarettes">담배 (개비)</Label>
+        <Label htmlFor="habit-cigarettes">Cigarettes</Label>
         <Input
           id="habit-cigarettes"
           className="w-28"
@@ -249,12 +251,12 @@ function HabitForm({
           }
         />
         <p id="habit-cigarettes-hint" className="text-caption break-keep text-muted-foreground">
-          피우지 않았으면 0, 비워 두면 기록하지 않습니다.
+          Enter 0 if you did not smoke; leave blank to skip recording.
         </p>
       </div>
       <fieldset className="flex flex-col gap-3">
-        <legend className="mb-2 text-body-sm font-medium">술</legend>
-        <div role="group" aria-label="술 기록" className="flex flex-wrap gap-2">
+        <legend className="mb-2 text-body-sm font-medium">Drinks</legend>
+        <div role="group" aria-label="Drink record" className="flex flex-wrap gap-2">
           {drinkModes.map(({ mode, label }) => (
             <Button
               key={mode}
@@ -270,7 +272,7 @@ function HabitForm({
         </div>
         {form.mode === 'some' ? (
           <>
-            <ul aria-label="마신 술" className="flex flex-col gap-2">
+            <ul aria-label="Drinks had" className="flex flex-col gap-2">
               {form.drinks.map((drink, index) => (
                 <DrinkRow
                   key={drink.key}
@@ -295,7 +297,8 @@ function HabitForm({
               disabled={form.drinks.length >= maxDrinks}
               onClick={() => setDrinks((drinks) => [...drinks, newDraft(drinks)])}
             >
-              <Plus aria-hidden />술 추가
+              <Plus aria-hidden />
+              Add drink
             </Button>
           </>
         ) : null}
@@ -303,12 +306,12 @@ function HabitForm({
       <Notice notice={notice} />
       <div className="flex flex-wrap gap-2">
         <BusyButton type="submit" busy={saving} aria-busy={saving || undefined}>
-          {saving ? <Spinner size="sm" label="저장하는 중" /> : null}
-          저장
+          {saving ? <Spinner size="sm" label="Saving" /> : null}
+          Save
         </BusyButton>
         {onCancel ? (
           <BusyButton type="button" variant="outline" busy={saving} onClick={onCancel}>
-            취소
+            Cancel
           </BusyButton>
         ) : null}
       </div>
@@ -329,25 +332,25 @@ function HabitView({
     <div className="flex flex-col gap-4">
       <dl className="grid grid-cols-1 gap-4 text-body-sm sm:grid-cols-2">
         <div>
-          <dt className="text-muted-foreground">담배</dt>
+          <dt className="text-muted-foreground">Cigarettes</dt>
           <dd>{smokingText(record.cigarettes)}</dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">술</dt>
+          <dt className="text-muted-foreground">Drinks</dt>
           <dd className="break-keep">{drinkingText(record.drinks)}</dd>
         </div>
       </dl>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={onEdit}>
-          수정
+          Edit
         </Button>
         <ConfirmDialog
-          title="술·담배 기록을 삭제할까요?"
-          description="삭제하면 되돌릴 수 없습니다."
+          title="Delete this alcohol and tobacco record?"
+          description="This cannot be undone."
           onConfirm={onDelete}
           trigger={
             <Button variant="outline" size="sm">
-              삭제
+              Delete
             </Button>
           }
         />
@@ -363,8 +366,8 @@ function PeriodSummary({ title, summary }: { title: string; summary: HabitSummar
       <p className="font-medium">
         {title} <span className="font-normal text-muted-foreground">{spanText(summary)}</span>
       </p>
-      <p className="break-keep">담배: {lines.smoking}</p>
-      <p className="break-keep">술: {lines.drinking}</p>
+      <p className="break-keep">Cigarettes: {lines.smoking}</p>
+      <p className="break-keep">Drinks: {lines.drinking}</p>
     </section>
   );
 }
@@ -423,7 +426,7 @@ export function HabitsCard({ date }: { date: string }) {
         throw cause;
       }
     }
-    toast.success('삭제했습니다');
+    toast.success('Deleted');
     setEditing(false);
     setMoveFocus((count) => count + 1);
     // The totals changed too; until they arrive the old ones would be wrong.
@@ -437,7 +440,7 @@ export function HabitsCard({ date }: { date: string }) {
     <Card>
       <CardHeader>
         <div ref={heading} tabIndex={-1} className="outline-none">
-          <CardTitle asHeading="h2">술·담배</CardTitle>
+          <CardTitle asHeading="h2">Alcohol and tobacco</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -452,11 +455,11 @@ export function HabitsCard({ date }: { date: string }) {
               setMoveFocus((count) => count + 1);
             }}
           >
-            다시 시도
+            Try again
           </Button>
         ) : null}
         {!notice && day === undefined ? (
-          <div role="status" aria-busy="true" aria-label="술·담배 기록 불러오는 중">
+          <div role="status" aria-busy="true" aria-label="Loading alcohol and tobacco records">
             <SkeletonText lines={2} />
           </div>
         ) : null}
@@ -465,7 +468,7 @@ export function HabitsCard({ date }: { date: string }) {
             date={date}
             record={record ?? null}
             onSaved={(saved) => {
-              toast.success('저장했습니다');
+              toast.success('Saved');
               finish(saved);
             }}
             onCancel={record ? () => finish(day) : undefined}
@@ -483,8 +486,8 @@ export function HabitsCard({ date }: { date: string }) {
         ) : null}
         {day ? (
           <div className="flex flex-col gap-3 border-t pt-4">
-            <PeriodSummary title="이 주" summary={day.week} />
-            <PeriodSummary title="이 달" summary={day.month} />
+            <PeriodSummary title="This week" summary={day.week} />
+            <PeriodSummary title="This month" summary={day.month} />
           </div>
         ) : null}
       </CardContent>

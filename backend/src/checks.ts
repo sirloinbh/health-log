@@ -12,30 +12,30 @@ import { charCount } from './text.js';
 // null: not checked. Never read as false.
 const check = (label: string) =>
   z
-    .boolean({ error: `${label}은(는) 예, 아니오 중 하나로 보내 주세요` })
+    .boolean({ error: `${label} must be either yes or no` })
     .nullable()
     .default(null);
 
 const checkInput = z
   .object(
     {
-      dietKept: check('식단 지킴'),
-      sleepGood: check('수면 만족'),
+      dietKept: check('Diet kept'),
+      sleepGood: check('Sleep good'),
       memo: z
-        .string({ error: '메모가 올바르지 않습니다' })
+        .string({ error: 'The note is not valid' })
         .trim()
         // Counted as the database's char_length does, so 200 emoji fit as the screen says.
         // U+0000 is refused for every request by rejectNul in app.ts.
-        .refine((value) => charCount(value) <= 200, '메모는 200자 이하로 입력해 주세요')
+        .refine((value) => charCount(value) <= 200, 'The note must be 200 characters or fewer')
         .nullable()
         .default(null)
         .transform((value) => value || null),
     },
-    { error: '요청 본문이 올바르지 않습니다' },
+    { error: 'The request body is not valid' },
   )
   .superRefine((input, ctx) => {
     if (Object.values(input).every((value) => value === null)) {
-      ctx.addIssue({ code: 'custom', message: '체크나 메모 중 하나 이상 입력해 주세요' });
+      ctx.addIssue({ code: 'custom', message: 'Enter at least one check or a note' });
     }
   });
 
@@ -120,7 +120,7 @@ export function checksRouter(pool: Pool, limits: RateLimitSettings) {
   router.delete('/:date', async (req, res) => {
     const date = parseDate(req.params.date);
     const { rowCount } = await pool.query('DELETE FROM day_checks WHERE record_date = $1', [date]);
-    if (!rowCount) throw new HttpError(404, '하루 체크를 찾을 수 없습니다');
+    if (!rowCount) throw new HttpError(404, 'Daily check not found');
     res.status(204).end();
   });
 

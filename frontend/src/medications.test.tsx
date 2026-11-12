@@ -14,7 +14,7 @@ const prescribed: Medication = {
   id: 3,
   name: '가상정',
   dose: '500mg',
-  directions: '하루 2번 식후',
+  directions: 'twice a day after meals',
   startOn: '2026-03-10',
   endOn: null,
   note: '가상 메모',
@@ -91,19 +91,19 @@ test('the main menu opens the medicine page, split into taken now and finished',
   window.history.replaceState(null, '', '/');
   render(<App />);
   const menu = screen.getByRole('navigation', { name: 'Main menu' });
-  fireEvent.click(within(menu).getByRole('link', { name: '약' }));
-  expect(await screen.findByRole('heading', { level: 1, name: '약' })).toBeInTheDocument();
+  fireEvent.click(within(menu).getByRole('link', { name: 'Medication' }));
+  expect(await screen.findByRole('heading', { level: 1, name: 'Medication' })).toBeInTheDocument();
 
-  const current = await screen.findByRole('region', { name: '복용 중 1' });
+  const current = await screen.findByRole('region', { name: 'Taking now 1' });
   expect(within(current).getByRole('heading', { name: '가상정' })).toBeInTheDocument();
-  expect(within(current).getByText('2026-03-10부터')).toBeInTheDocument();
-  expect(within(current).getByText('500mg · 하루 2번 식후')).toBeInTheDocument();
-  expect(within(current).getByText('2026-03-10 가상내과 처방')).toBeInTheDocument();
-  const past = screen.getByRole('region', { name: '지난 약 1' });
+  expect(within(current).getByText('From 2026-03-10')).toBeInTheDocument();
+  expect(within(current).getByText('500mg · twice a day after meals')).toBeInTheDocument();
+  expect(within(current).getByText('2026-03-10 가상내과 prescription')).toBeInTheDocument();
+  const past = screen.getByRole('region', { name: 'Past medication 1' });
   expect(within(past).getByText('2026-02-01 ~ 2026-02-07')).toBeInTheDocument();
   // Nothing starting later, so that list is left out.
-  expect(screen.queryByRole('region', { name: /시작 예정/ })).not.toBeInTheDocument();
-  expect(screen.getByText(/오늘\(2026-03-15\) 기준/)).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: /Starting soon/ })).not.toBeInTheDocument();
+  expect(screen.getByText(/as of today \(2026-03-15\)/)).toBeInTheDocument();
 });
 
 test('a new medicine starts today, can be linked to a visit, and is sent as typed', async () => {
@@ -111,14 +111,14 @@ test('a new medicine starts today, can be linked to a visit, and is sent as type
     init?.method === 'POST' ? json(prescribed, 201) : json(lists({ current: [] })),
   );
   open();
-  fireEvent.click(await screen.findByRole('button', { name: '약 기록' }));
-  expect(within(dialog()).getByLabelText('시작일')).toHaveValue('2026-03-15');
-  fill('약 이름', '가상정');
-  fill('용량', '500mg');
+  fireEvent.click(await screen.findByRole('button', { name: 'Medication record' }));
+  expect(within(dialog()).getByLabelText('Start date')).toHaveValue('2026-03-15');
+  fill('Medication name', '가상정');
+  fill('Dose', '500mg');
   await within(dialog()).findByRole('option', { name: '2026-03-10 가상내과' });
-  fill('처방받은 병원 방문', '7');
-  fill('종료일', '2026-03-21');
-  fireEvent.click(within(dialog()).getByRole('button', { name: '저장' }));
+  fill('Prescribing clinic visit', '7');
+  fill('End date', '2026-03-21');
+  fireEvent.click(within(dialog()).getByRole('button', { name: 'Save' }));
 
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   const [post] = writes(fetchMock);
@@ -139,12 +139,12 @@ test('editing starts from the medicine, and taking the link off sends no visit',
     init?.method === 'PUT' ? json(prescribed) : json(lists()),
   );
   open();
-  fireEvent.click(await screen.findByRole('button', { name: '가상정 수정' }));
-  expect(within(dialog()).getByLabelText('약 이름')).toHaveValue('가상정');
-  expect(within(dialog()).getByLabelText('복용법')).toHaveValue('하루 2번 식후');
-  expect(within(dialog()).getByLabelText('처방받은 병원 방문')).toHaveValue('7');
-  fill('처방받은 병원 방문', '');
-  fireEvent.click(within(dialog()).getByRole('button', { name: '저장' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit 가상정' }));
+  expect(within(dialog()).getByLabelText('Medication name')).toHaveValue('가상정');
+  expect(within(dialog()).getByLabelText('Directions')).toHaveValue('twice a day after meals');
+  expect(within(dialog()).getByLabelText('Prescribing clinic visit')).toHaveValue('7');
+  fill('Prescribing clinic visit', '');
+  fireEvent.click(within(dialog()).getByRole('button', { name: 'Save' }));
 
   await waitFor(() => expect(writes(fetchMock)).toHaveLength(1));
   const [put] = writes(fetchMock);
@@ -155,34 +155,34 @@ test('editing starts from the medicine, and taking the link off sends no visit',
 test('what cannot be sent is explained before anything is sent', async () => {
   const fetchMock = serve(() => json(lists()));
   open();
-  fireEvent.click(await screen.findByRole('button', { name: '약 기록' }));
-  const save = () => fireEvent.click(within(dialog()).getByRole('button', { name: '저장' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Medication record' }));
+  const save = () => fireEvent.click(within(dialog()).getByRole('button', { name: 'Save' }));
   const said = async (text: string) =>
     expect(await within(dialog()).findByRole('alert')).toHaveTextContent(text);
 
   save();
-  await said('약 이름을 입력해 주세요');
-  fill('약 이름', '💊'.repeat(101));
+  await said('Enter the medication name');
+  fill('Medication name', '💊'.repeat(101));
   save();
-  await said('약 이름은 100자 이하로 입력해 주세요');
-  fill('약 이름', '가상정');
-  fill('종료일', '2026-03-14');
+  await said('Medication name must be 100 characters or fewer');
+  fill('Medication name', '가상정');
+  fill('End date', '2026-03-14');
   save();
-  await said('종료일은 시작일보다 빠를 수 없습니다');
-  fill('종료일', '');
-  fill('시작일', '1999-12-31');
+  await said('The end date cannot be before the start date');
+  fill('End date', '');
+  fill('Start date', '1999-12-31');
   save();
-  await said('시작일: 2000-01-01부터 2099-12-31까지 기록할 수 있습니다');
+  await said('Start date: Records can be kept from 2000-01-01 to 2099-12-31');
   expect(writes(fetchMock)).toHaveLength(0);
 });
 
 test('a visit’s link opens a medicine linked to it, starting on its day', async () => {
   serve(() => json(lists()));
   open('/medications?visit=7&date=2026-03-10');
-  expect(await screen.findByRole('dialog', { name: '약 기록' })).toBeInTheDocument();
-  expect(within(dialog()).getByLabelText('시작일')).toHaveValue('2026-03-10');
+  expect(await screen.findByRole('dialog', { name: 'Medication record' })).toBeInTheDocument();
+  expect(within(dialog()).getByLabelText('Start date')).toHaveValue('2026-03-10');
   await waitFor(() =>
-    expect(within(dialog()).getByLabelText('처방받은 병원 방문')).toHaveValue('7'),
+    expect(within(dialog()).getByLabelText('Prescribing clinic visit')).toHaveValue('7'),
   );
   expect(window.location.search).toBe('');
 });
@@ -198,40 +198,42 @@ test('deleting asks first, removes the medicine and keeps keyboard focus on the 
   });
   const success = vi.spyOn(toast, 'success');
   open();
-  fireEvent.click(await screen.findByRole('button', { name: '가상캡슐 삭제' }));
-  const confirm = screen.getByRole('dialog', { name: '약 기록을 삭제할까요?' });
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete 가상캡슐' }));
+  const confirm = screen.getByRole('dialog', { name: 'Delete this medication record?' });
   fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
 
-  expect(await screen.findByText('끝난 약이 없습니다.')).toBeInTheDocument();
+  expect(await screen.findByText('No finished medication.')).toBeInTheDocument();
   expect(writes(fetchMock)[0][0]).toBe('/api/medications/4');
-  expect(success).toHaveBeenCalledWith('삭제했습니다');
-  await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: '약' })).toHaveFocus());
+  expect(success).toHaveBeenCalledWith('Deleted');
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { level: 1, name: 'Medication' })).toHaveFocus(),
+  );
 });
 
 test('a failed save keeps the dialog, what was typed and the focus inside it', async () => {
   serve((_url, init) =>
     init?.method === 'POST'
-      ? json({ error: '연결할 병원 방문을 찾을 수 없습니다' }, 400)
+      ? json({ error: 'The linked clinic visit could not be found' }, 400)
       : json(lists()),
   );
   open();
-  fireEvent.click(await screen.findByRole('button', { name: '약 기록' }));
-  fill('약 이름', '가상정');
-  const save = within(dialog()).getByRole('button', { name: '저장' });
+  fireEvent.click(await screen.findByRole('button', { name: 'Medication record' }));
+  fill('Medication name', '가상정');
+  const save = within(dialog()).getByRole('button', { name: 'Save' });
   save.focus();
   fireEvent.click(save);
   expect(await within(dialog()).findByRole('alert')).toHaveTextContent(
-    '연결할 병원 방문을 찾을 수 없습니다',
+    'The linked clinic visit could not be found',
   );
-  expect(within(dialog()).getByLabelText('약 이름')).toHaveValue('가상정');
-  expect(within(dialog()).getByRole('button', { name: '저장' })).toHaveFocus();
+  expect(within(dialog()).getByLabelText('Medication name')).toHaveValue('가상정');
+  expect(within(dialog()).getByRole('button', { name: 'Save' })).toHaveFocus();
 });
 
 test('a visit card links to recording what was prescribed there', async () => {
   serve(() => json(lists()));
   open('/visits');
   expect(
-    await screen.findByRole('link', { name: '2026-03-10 가상내과 처방 약 기록' }),
+    await screen.findByRole('link', { name: '2026-03-10 가상내과 prescribed medication records' }),
   ).toHaveAttribute('href', '/medications?visit=7&date=2026-03-10');
 });
 
@@ -247,10 +249,10 @@ const renderCard = (date = '2026-03-12') =>
 test('the daily card lists the medicines taken that day', async () => {
   const fetchMock = serve(() => json({ date: '2026-03-12', medications: [prescribed] }));
   renderCard();
-  const part = await screen.findByRole('region', { name: '이 날 먹은 약' });
+  const part = await screen.findByRole('region', { name: 'Medication taken this day' });
   expect(within(part).getByText('가상정')).toBeInTheDocument();
-  expect(within(part).getByText('· 500mg · 하루 2번 식후')).toBeInTheDocument();
-  expect(within(part).getByRole('link', { name: '약 기록 보기' })).toHaveAttribute(
+  expect(within(part).getByText('· 500mg · twice a day after meals')).toBeInTheDocument();
+  expect(within(part).getByRole('link', { name: 'View medication records' })).toHaveAttribute(
     'href',
     '/medications',
   );
@@ -260,7 +262,7 @@ test('the daily card lists the medicines taken that day', async () => {
 test('a day without medicines says so', async () => {
   serve(() => json({ date: '2026-03-12', medications: [] }));
   renderCard();
-  expect(await screen.findByText('이 날 먹은 약 기록이 없습니다.')).toBeInTheDocument();
+  expect(await screen.findByText('No medication records for this day.')).toBeInTheDocument();
 });
 
 test('a linked visit older than the recent ones is still offered, and an unknown one is named plainly', async () => {
@@ -272,22 +274,22 @@ test('a linked visit older than the recent ones is still offered, and an unknown
   };
   serve(() => json(lists({ current: [older] })));
   open();
-  fireEvent.click(await screen.findByRole('button', { name: '가상오래된약 수정' }));
-  const select = within(dialog()).getByLabelText('처방받은 병원 방문');
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit 가상오래된약' }));
+  const select = within(dialog()).getByLabelText('Prescribing clinic visit');
   expect(select).toHaveValue('2');
   expect(within(select).getByRole('option', { name: '2025-01-05 가상옛의원' })).toBeInTheDocument();
-  fireEvent.click(within(dialog()).getByRole('button', { name: '취소' }));
+  fireEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
   // A link without a date names the visit without inventing one.
   window.history.pushState(null, '', '/medications?visit=99');
   window.dispatchEvent(new PopStateEvent('popstate'));
-  const linked = await screen.findByRole('dialog', { name: '약 기록' });
+  const linked = await screen.findByRole('dialog', { name: 'Medication record' });
   await waitFor(() =>
-    expect(within(linked).getByLabelText('처방받은 병원 방문')).toHaveValue('99'),
+    expect(within(linked).getByLabelText('Prescribing clinic visit')).toHaveValue('99'),
   );
-  expect(within(linked).getByRole('option', { name: '선택한 방문' })).toBeInTheDocument();
-  expect(within(linked).getByLabelText('시작일')).toHaveValue('2026-03-15');
+  expect(within(linked).getByRole('option', { name: 'Selected visit' })).toBeInTheDocument();
+  expect(within(linked).getByLabelText('Start date')).toHaveValue('2026-03-15');
 });
 
 test('medicines starting later have their own list', async () => {
@@ -299,8 +301,8 @@ test('medicines starting later have their own list', async () => {
     ),
   );
   open();
-  const upcoming = await screen.findByRole('region', { name: '시작 예정 1' });
-  expect(within(upcoming).getByText('2026-04-01부터')).toBeInTheDocument();
+  const upcoming = await screen.findByRole('region', { name: 'Starting soon 1' });
+  expect(within(upcoming).getByText('From 2026-04-01')).toBeInTheDocument();
 });
 
 test('when the day’s medicines fail to load, trying again brings both parts back with focus on the card', async () => {
@@ -312,7 +314,7 @@ test('when the day’s medicines fail to load, trying again brings both parts ba
         medicineCalls += 1;
         return Promise.resolve(
           medicineCalls === 1
-            ? json({ error: '서버 오류가 발생했습니다' }, 500)
+            ? json({ error: 'Server error occurred' }, 500)
             : json({ date: '2026-03-12', medications: [prescribed] }),
         );
       }
@@ -320,14 +322,18 @@ test('when the day’s medicines fail to load, trying again brings both parts ba
     }),
   );
   renderCard();
-  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
-  const again = screen.getByRole('button', { name: '다시 시도' });
+  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  const again = screen.getByRole('button', { name: 'Try again' });
   again.focus();
   fireEvent.click(again);
-  expect(await screen.findByRole('region', { name: '이 날 먹은 약' })).toBeInTheDocument();
-  expect(screen.getByRole('list', { name: '이 날 병원 방문' })).toBeInTheDocument();
+  expect(
+    await screen.findByRole('region', { name: 'Medication taken this day' }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('list', { name: 'Clinic visits on this day' })).toBeInTheDocument();
   await waitFor(() =>
-    expect(screen.getByRole('heading', { name: '병원·약' }).parentElement).toHaveFocus(),
+    expect(
+      screen.getByRole('heading', { name: 'Clinic and medication' }).parentElement,
+    ).toHaveFocus(),
   );
 });
 
@@ -344,24 +350,28 @@ test('the daily card waits for a medicine save still on its way', async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(fetchMock).not.toHaveBeenCalled();
   finish();
-  expect(await screen.findByRole('region', { name: '이 날 먹은 약' })).toBeInTheDocument();
+  expect(
+    await screen.findByRole('region', { name: 'Medication taken this day' }),
+  ).toBeInTheDocument();
 });
 
 test('a list that failed to load can be tried again, and focus stays on the page (#127)', async () => {
   let fail = true;
-  serve(() => (fail ? json({ error: '가상 서버 오류' }, 500) : json(lists())));
+  serve(() => (fail ? json({ error: 'Fake server error' }, 500) : json(lists())));
   open();
-  expect(await screen.findByRole('alert')).toHaveTextContent('가상 서버 오류');
-  const retry = screen.getByRole('button', { name: '다시 시도' });
+  expect(await screen.findByRole('alert')).toHaveTextContent('Fake server error');
+  const retry = screen.getByRole('button', { name: 'Try again' });
   fail = false;
   retry.focus();
   fireEvent.click(retry);
-  expect(await screen.findByRole('region', { name: '복용 중 1' })).toBeInTheDocument();
+  expect(await screen.findByRole('region', { name: 'Taking now 1' })).toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
   // Said once the list is in, as focus on the title alone says nothing about it.
-  expect(screen.getByRole('status')).toHaveTextContent('목록을 다시 불러왔습니다.');
-  await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: '약' })).toHaveFocus());
+  expect(screen.getByRole('status')).toHaveTextContent('The list was reloaded.');
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { level: 1, name: 'Medication' })).toHaveFocus(),
+  );
 });
 
 test('trying again also asks again for the visits a medicine can be linked to (#127)', async () => {
@@ -370,7 +380,7 @@ test('trying again also asks again for the visits a medicine can be linked to (#
     Promise.resolve(
       url.startsWith('/api/medications') || url.startsWith('/api/visits')
         ? down
-          ? json({ error: '가상 서버 오류' }, 500)
+          ? json({ error: 'Fake server error' }, 500)
           : url.startsWith('/api/visits')
             ? json({ visits: [visit], more: false })
             : json(lists())
@@ -381,11 +391,11 @@ test('trying again also asks again for the visits a medicine can be linked to (#
   open();
   await screen.findByRole('alert');
   down = false;
-  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
-  expect(screen.getByRole('status')).toHaveTextContent('목록을 다시 불러오는 중…');
-  await screen.findByRole('region', { name: '복용 중 1' });
-  fireEvent.click(screen.getByRole('button', { name: '약 기록' }));
-  const choices = within(dialog()).getByLabelText('처방받은 병원 방문');
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(screen.getByRole('status')).toHaveTextContent('Reloading the list…');
+  await screen.findByRole('region', { name: 'Taking now 1' });
+  fireEvent.click(screen.getByRole('button', { name: 'Medication record' }));
+  const choices = within(dialog()).getByLabelText('Prescribing clinic visit');
   await waitFor(() => expect(within(choices).getAllByRole('option')).toHaveLength(2));
   expect(
     fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/visits')),
@@ -393,11 +403,11 @@ test('trying again also asks again for the visits a medicine can be linked to (#
 });
 
 test('failing again says so again (#127)', async () => {
-  serve(() => json({ error: '가상 서버 오류' }, 500));
+  serve(() => json({ error: 'Fake server error' }, 500));
   open();
   await screen.findByRole('alert');
-  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  expect(await screen.findByRole('alert')).toHaveTextContent('가상 서버 오류');
-  expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+  expect(await screen.findByRole('alert')).toHaveTextContent('Fake server error');
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
 });

@@ -13,26 +13,26 @@ import { charCount } from './text.js';
 const nutrients = ['calories', 'carbs', 'protein', 'fat', 'sugars', 'sodium'] as const;
 
 const mealKey = z.enum(['breakfast', 'lunch', 'dinner', 'snack'], {
-  error: '끼니를 선택해 주세요',
+  error: 'Choose a meal',
 });
 
 /** How many servings: the same rule for a meal entry and a combo item. */
 export const servingsInput = z
-  .number({ error: '수량을 숫자로 입력해 주세요' })
-  .positive('수량은 0보다 커야 합니다')
-  .max(999, '수량이 너무 큽니다')
-  .refine(hasTwoDecimalsAtMost, '수량은 소수 둘째 자리까지 입력해 주세요');
+  .number({ error: 'The quantity must be a number' })
+  .positive('The quantity must be greater than 0')
+  .max(999, 'The quantity is too large')
+  .refine(hasTwoDecimalsAtMost, 'The quantity can have at most 2 decimal places');
 
-const comboUse = z.object({ meal: mealKey }, { error: '요청 본문이 올바르지 않습니다' });
+const comboUse = z.object({ meal: mealKey }, { error: 'The request body is not valid' });
 
 const mealCopy = z.object(
   {
     from: z
-      .string({ error: '복사할 날짜를 골라 주세요' })
-      .refine(isRealDate, '복사할 날짜가 올바르지 않습니다'),
+      .string({ error: 'Choose a date to copy from' })
+      .refine(isRealDate, 'The date to copy from is not valid'),
     meal: mealKey,
   },
-  { error: '요청 본문이 올바르지 않습니다' },
+  { error: 'The request body is not valid' },
 );
 
 const entryInput = z
@@ -41,39 +41,42 @@ const entryInput = z
       meal: mealKey,
       servings: servingsInput,
       foodId: z
-        .number({ error: '음식이 올바르지 않습니다' })
-        .int('음식이 올바르지 않습니다')
-        .positive('음식이 올바르지 않습니다')
+        .number({ error: 'The food is not valid' })
+        .int('The food is not valid')
+        .positive('The food is not valid')
         .optional(),
       name: z
-        .string({ error: '음식 이름을 입력해 주세요' })
+        .string({ error: 'Enter a food name' })
         .trim()
-        .refine((value) => value.length >= 1, '음식 이름을 입력해 주세요')
-        .refine((value) => charCount(value) <= 100, '음식 이름은 100자 이하로 입력해 주세요')
+        .refine((value) => value.length >= 1, 'Enter a food name')
+        .refine((value) => charCount(value) <= 100, 'The food name must be 100 characters or fewer')
         .optional(),
       calories: z
-        .number({ error: '칼로리를 숫자로 입력해 주세요' })
-        .min(0, '칼로리는 0 이상이어야 합니다')
-        .max(99_999, '칼로리가 너무 큽니다')
-        .refine(hasTwoDecimalsAtMost, '칼로리는 소수 둘째 자리까지 입력해 주세요')
+        .number({ error: 'Calories must be a number' })
+        .min(0, 'Calories must be 0 or more')
+        .max(99_999, 'Calories are too large')
+        .refine(hasTwoDecimalsAtMost, 'Calories can have at most 2 decimal places')
         .optional(),
       // Typed-in food only: a stored food brings its own mark.
-      isJunk: z.boolean({ error: '정크푸드 표시가 올바르지 않습니다' }).optional(),
+      isJunk: z.boolean({ error: 'The junk food flag is not valid' }).optional(),
     },
-    { error: '요청 본문이 올바르지 않습니다' },
+    { error: 'The request body is not valid' },
   )
   .superRefine((entry, ctx) => {
     if (entry.foodId !== undefined) {
       if (entry.name !== undefined || entry.calories !== undefined || entry.isJunk !== undefined) {
-        ctx.addIssue({ code: 'custom', message: '음식 선택과 직접 입력은 함께 쓸 수 없습니다' });
+        ctx.addIssue({
+          code: 'custom',
+          message: 'A chosen food and manual entry cannot be used together',
+        });
       }
       return;
     }
     if (entry.name === undefined) {
-      ctx.addIssue({ code: 'custom', message: '음식을 선택하거나 이름을 입력해 주세요' });
+      ctx.addIssue({ code: 'custom', message: 'Choose a food or enter a name' });
     }
     if (entry.calories === undefined) {
-      ctx.addIssue({ code: 'custom', message: '직접 입력할 때는 칼로리가 필요합니다' });
+      ctx.addIssue({ code: 'custom', message: 'Calories are required for manual entry' });
     }
   });
 
@@ -201,7 +204,7 @@ export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
            FROM foods WHERE id = $4`,
           [date, entry.meal, entry.servings, entry.foodId],
         );
-        if (!rowCount) throw new HttpError(404, '음식을 찾을 수 없습니다');
+        if (!rowCount) throw new HttpError(404, 'Food not found');
       } else {
         await client.query(
           `INSERT INTO meal_entries (entry_date, meal, servings, name, calories, is_junk)
@@ -217,7 +220,7 @@ export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
   // Every food of the combo goes in with one statement, so either all of them are recorded or none.
   router.post('/:date/combos/:id', async (req, res) => {
     const date = parseDate(req.params.date);
-    const comboId = parseId(req.params.id, '조합');
+    const comboId = parseId(req.params.id, 'combo');
     const { meal } = comboUse.parse(req.body);
     const answer = await inTransaction(pool, async (client) => {
       const { rowCount } = await client.query(
@@ -235,8 +238,8 @@ export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
           comboId,
         ]);
         throw found
-          ? new HttpError(400, '조합에 음식이 없습니다')
-          : new HttpError(404, '조합을 찾을 수 없습니다');
+          ? new HttpError(400, 'The combo has no foods')
+          : new HttpError(404, 'Combo not found');
       }
       return day(client, date);
     });
@@ -248,7 +251,7 @@ export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
   router.post('/:date/copy', async (req, res) => {
     const date = parseDate(req.params.date);
     const { from, meal } = mealCopy.parse(req.body);
-    if (from === date) throw new HttpError(400, '다른 날짜를 골라 주세요');
+    if (from === date) throw new HttpError(400, 'Choose a different date');
     const answer = await inTransaction(pool, async (client) => {
       const { rowCount } = await client.query(
         `INSERT INTO meal_entries (entry_date, meal, servings, food_id, name, brand, serving_size,
@@ -260,7 +263,7 @@ export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
          ORDER BY id`,
         [date, from, meal],
       );
-      if (!rowCount) throw new HttpError(404, '복사할 기록이 없습니다');
+      if (!rowCount) throw new HttpError(404, 'There are no records to copy');
       return day(client, date);
     });
     res.status(201).json(answer);
@@ -268,13 +271,13 @@ export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
 
   router.delete('/:date/entries/:id', async (req, res) => {
     const date = parseDate(req.params.date);
-    const id = parseId(req.params.id, '식사 기록');
+    const id = parseId(req.params.id, 'meal record');
     const answer = await inTransaction(pool, async (client) => {
       const { rowCount } = await client.query(
         'DELETE FROM meal_entries WHERE id = $1 AND entry_date = $2',
         [id, date],
       );
-      if (!rowCount) throw new HttpError(404, '식사 기록을 찾을 수 없습니다');
+      if (!rowCount) throw new HttpError(404, 'Meal record not found');
       return day(client, date);
     });
     res.json(answer);

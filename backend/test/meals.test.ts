@@ -27,44 +27,48 @@ const rejects = async (target: string, body: object | undefined, message: string
 };
 
 test('a meal has to be one of the four', async () => {
-  await rejects(path, { ...fromFood, meal: 'brunch' }, '끼니를 선택해 주세요');
+  await rejects(path, { ...fromFood, meal: 'brunch' }, 'Choose a meal');
 });
 
 test('a quantity must be positive, sane, and at most two decimals', async () => {
-  await rejects(path, { ...fromFood, servings: 0 }, '수량은 0보다 커야 합니다');
-  await rejects(path, { ...fromFood, servings: 1000 }, '수량이 너무 큽니다');
-  await rejects(path, { ...fromFood, servings: 1.555 }, '수량은 소수 둘째 자리까지 입력해 주세요');
-  await rejects(path, { meal: 'lunch', foodId: 7 }, '수량을 숫자로 입력해 주세요');
+  await rejects(path, { ...fromFood, servings: 0 }, 'The quantity must be greater than 0');
+  await rejects(path, { ...fromFood, servings: 1000 }, 'The quantity is too large');
+  await rejects(
+    path,
+    { ...fromFood, servings: 1.555 },
+    'The quantity can have at most 2 decimal places',
+  );
+  await rejects(path, { meal: 'lunch', foodId: 7 }, 'The quantity must be a number');
 });
 
 test('an entry is either a chosen food or a typed name with calories', async () => {
   await rejects(
     path,
     { meal: 'lunch', servings: 1 },
-    '음식을 선택하거나 이름을 입력해 주세요, 직접 입력할 때는 칼로리가 필요합니다',
+    'Choose a food or enter a name, Calories are required for manual entry',
   );
   await rejects(
     path,
     { meal: 'lunch', servings: 1, name: '떡볶이' },
-    '직접 입력할 때는 칼로리가 필요합니다',
+    'Calories are required for manual entry',
   );
   await rejects(
     path,
     { ...fromFood, name: '떡볶이' },
-    '음식 선택과 직접 입력은 함께 쓸 수 없습니다',
+    'A chosen food and manual entry cannot be used together',
   );
-  await rejects(path, { ...typed, name: '   ' }, '음식 이름을 입력해 주세요');
-  await rejects(path, { ...typed, calories: -1 }, '칼로리는 0 이상이어야 합니다');
+  await rejects(path, { ...typed, name: '   ' }, 'Enter a food name');
+  await rejects(path, { ...typed, calories: -1 }, 'Calories must be 0 or more');
 });
 
 test('typed entries have limits of their own', async () => {
   await rejects(
     path,
     { ...typed, name: 'a'.repeat(101) },
-    '음식 이름은 100자 이하로 입력해 주세요',
+    'The food name must be 100 characters or fewer',
   );
-  await rejects(path, { ...typed, calories: 100_000 }, '칼로리가 너무 큽니다');
-  await rejects(path, { ...typed, calories: 1.555 }, '칼로리는 소수 둘째 자리까지 입력해 주세요');
+  await rejects(path, { ...typed, calories: 100_000 }, 'Calories are too large');
+  await rejects(path, { ...typed, calories: 1.555 }, 'Calories can have at most 2 decimal places');
 });
 
 // A change whose answer cannot be read must not stay, or a retry would repeat it.
@@ -113,12 +117,12 @@ test('a delete whose answer cannot be read is rolled back', async () => {
 });
 
 test('a food id too large to be exact is rejected', async () => {
-  await rejects(path, { ...fromFood, foodId: 2 ** 53 }, '음식이 올바르지 않습니다');
+  await rejects(path, { ...fromFood, foodId: 2 ** 53 }, 'The food is not valid');
 });
 
 test('a date in the path has to exist', async () => {
-  await rejects('/api/meals/2026-02-30', undefined, '날짜가 올바르지 않습니다');
-  await rejects('/api/meals/2026-02-30', typed, '날짜가 올바르지 않습니다');
+  await rejects('/api/meals/2026-02-30', undefined, 'The date is not valid');
+  await rejects('/api/meals/2026-02-30', typed, 'The date is not valid');
 });
 
 test('the meals API is rate limited', async () => {
@@ -135,7 +139,7 @@ test('the meals API is rate limited', async () => {
       assert.equal((await call(path)).status, 200);
       const limited = await call(path);
       assert.equal(limited.status, 429);
-      assert.match(String(limited.data.error), /요청이 너무 많습니다/);
+      assert.match(String(limited.data.error), /Too many requests/);
     },
     { rateLimit: { max: 1, windowMs: 60_000 } },
   );
@@ -144,12 +148,20 @@ test('the meals API is rate limited', async () => {
 const copy = { from: '2026-03-14', meal: 'breakfast' };
 
 test('copying needs another real day and one of the four meals', async () => {
-  await rejects(`${path}/copy`, { ...copy, meal: 'brunch' }, '끼니를 선택해 주세요');
-  await rejects(`${path}/copy`, { meal: 'lunch' }, '복사할 날짜를 골라 주세요');
-  await rejects(`${path}/copy`, { ...copy, from: '2026-02-30' }, '복사할 날짜가 올바르지 않습니다');
-  await rejects(`${path}/copy`, { ...copy, from: '2026/03/14' }, '복사할 날짜가 올바르지 않습니다');
-  await rejects(`${path}/copy`, { ...copy, from: '2026-03-15' }, '다른 날짜를 골라 주세요');
-  await rejects('/api/meals/2026-02-30/copy', copy, '날짜가 올바르지 않습니다');
+  await rejects(`${path}/copy`, { ...copy, meal: 'brunch' }, 'Choose a meal');
+  await rejects(`${path}/copy`, { meal: 'lunch' }, 'Choose a date to copy from');
+  await rejects(
+    `${path}/copy`,
+    { ...copy, from: '2026-02-30' },
+    'The date to copy from is not valid',
+  );
+  await rejects(
+    `${path}/copy`,
+    { ...copy, from: '2026/03/14' },
+    'The date to copy from is not valid',
+  );
+  await rejects(`${path}/copy`, { ...copy, from: '2026-03-15' }, 'Choose a different date');
+  await rejects('/api/meals/2026-02-30/copy', copy, 'The date is not valid');
 });
 
 test('a copy whose answer cannot be read is rolled back, so a retry cannot double it', async () => {
@@ -158,7 +170,11 @@ test('a copy whose answer cannot be read is rolled back, so a retry cannot doubl
 
 // #38. A stored food brings its own junk food mark; only typed-in food is marked in the request.
 test('the junk food mark is a yes or no, and only for typed-in food', async () => {
-  await rejects(path, { ...typed, isJunk: 'true' }, '정크푸드 표시가 올바르지 않습니다');
-  await rejects(path, { ...typed, isJunk: 1 }, '정크푸드 표시가 올바르지 않습니다');
-  await rejects(path, { ...fromFood, isJunk: true }, '음식 선택과 직접 입력은 함께 쓸 수 없습니다');
+  await rejects(path, { ...typed, isJunk: 'true' }, 'The junk food flag is not valid');
+  await rejects(path, { ...typed, isJunk: 1 }, 'The junk food flag is not valid');
+  await rejects(
+    path,
+    { ...fromFood, isJunk: true },
+    'A chosen food and manual entry cannot be used together',
+  );
 });

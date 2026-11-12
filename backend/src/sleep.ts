@@ -13,12 +13,11 @@ const maxSpan = 24 * 60 * 60_000;
 export const sleepMinutes = (bedAt: string, wakeAt: string) =>
   Math.round((new Date(wakeAt).getTime() - new Date(bedAt).getTime()) / 60_000);
 
-const instant = (label: string) =>
-  z.iso.datetime({ offset: true, error: `${label}이(가) 올바르지 않습니다` });
+const instant = (label: string) => z.iso.datetime({ offset: true, error: `${label} is not valid` });
 
 const sleepInput = z.object(
-  { bedAt: instant('취침 시각'), wakeAt: instant('기상 시각') },
-  { error: '요청 본문이 올바르지 않습니다' },
+  { bedAt: instant('Bedtime'), wakeAt: instant('Wake-up time') },
+  { error: 'The request body is not valid' },
 );
 
 type SleepRow = {
@@ -72,12 +71,12 @@ export function sleepRouter(pool: Pool, limits: RateLimitSettings) {
     const wakeAt = new Date(input.wakeAt).toISOString();
     // The exact span, as the database checks it: rounded minutes would let 24h 20s through to a 500.
     const span = new Date(wakeAt).getTime() - new Date(bedAt).getTime();
-    if (span <= 0) throw new HttpError(400, '기상 시각은 취침 시각보다 늦어야 합니다');
-    if (span > maxSpan) throw new HttpError(400, '수면 시간은 24시간을 넘을 수 없습니다');
+    if (span <= 0) throw new HttpError(400, 'The wake-up time must be after the bedtime');
+    if (span > maxSpan) throw new HttpError(400, 'Sleep cannot be longer than 24 hours');
     const minutes = sleepMinutes(bedAt, wakeAt);
-    if (minutes < 1) throw new HttpError(400, '수면 시간은 1분 이상이어야 합니다');
+    if (minutes < 1) throw new HttpError(400, 'Sleep must be at least 1 minute');
     if (serviceDate(new Date(wakeAt)) !== date) {
-      throw new HttpError(400, '기상 시각의 날짜가 기록 날짜와 다릅니다');
+      throw new HttpError(400, 'The wake-up date does not match the record date');
     }
     const { rows } = await pool.query<SleepRow>(
       `INSERT INTO sleep_records (sleep_date, bed_at, wake_at, duration_minutes, source)
@@ -104,7 +103,7 @@ export function sleepRouter(pool: Pool, limits: RateLimitSettings) {
     const { rowCount } = await pool.query('DELETE FROM sleep_records WHERE sleep_date = $1', [
       date,
     ]);
-    if (!rowCount) throw new HttpError(404, '수면 기록을 찾을 수 없습니다');
+    if (!rowCount) throw new HttpError(404, 'Sleep record not found');
     res.status(204).end();
   });
 

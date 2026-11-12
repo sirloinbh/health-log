@@ -87,7 +87,7 @@ test('text without a table reads as nothing', () => {
 
 test('a package larger than the basis says how many servings it is', () => {
   expect(packageText(readNutritionLabel(per100g))).toBe(
-    '총 내용량 500g은(는) 1회 제공량(100g)의 5배, 약 1,250kcal입니다. 포장 하나를 다 먹었으면 식사에 5회분으로 기록하세요.',
+    'The total amount of 500g is 5 times the serving size (100g), about 1,250kcal. If you ate the whole package, record it as 5 servings.',
   );
   // Same size, other units, or no package: nothing to say.
   expect(packageText(readNutritionLabel('총 내용량 250ml 135kcal'))).toBeNull();

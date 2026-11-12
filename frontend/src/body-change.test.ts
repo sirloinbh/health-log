@@ -63,5 +63,5 @@ test('a change reads with its sign and unit', () => {
   const change = { from: '2026-03-10', to: '2026-03-15' };
   expect(formatChange({ ...change, amount: 1.5 }, 'kg')).toBe('+1.5kg');
   expect(formatChange({ ...change, amount: -0.4 }, 'kg')).toBe('−0.4kg');
-  expect(formatChange({ ...change, amount: 0 }, 'kg')).toBe('변화 없음');
+  expect(formatChange({ ...change, amount: 0 }, 'kg')).toBe('No change');
 });

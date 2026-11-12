@@ -31,25 +31,25 @@ export type Reminders = {
 /** Path every reminder write goes under, so a reload waits for it (#71). */
 export const remindersPath = '/api/reminders';
 
-/** "오늘", "내일", "3일 뒤". */
+/** "Today", "Tomorrow", "In 3 days". */
 export const whenText = (daysLeft: number) =>
-  daysLeft === 0 ? '오늘' : daysLeft === 1 ? '내일' : `${daysLeft}일 뒤`;
+  daysLeft === 0 ? 'Today' : daysLeft === 1 ? 'Tomorrow' : `In ${daysLeft} days`;
 
-/** "가상피부과 · 피부과 예약", "가상정 복용 종료". */
+/** "Sample Clinic · Dermatology appointment", "Sample tablet ends". */
 export const reminderTitle = (item: Reminder) =>
-  item.kind === 'visit' ? `${clinicText(item)} 예약` : `${item.name} 복용 종료`;
+  item.kind === 'visit' ? `${clinicText(item)} appointment` : `${item.name} ends`;
 
-/** What came before, when it helps: "지난번 시술: 레이저, 주사". */
+/** What came before, when it helps: "Last procedures: laser, injection". */
 export const reminderDetail = (item: Reminder) =>
   item.kind === 'visit' && item.procedures.length
-    ? `지난번 시술: ${item.procedures.join(', ')}`
+    ? `Last procedures: ${item.procedures.join(', ')}`
     : null;
 
 /** The page the record is written on. */
 export const reminderPage = (item: Reminder) =>
   item.kind === 'visit'
-    ? { to: visitsPagePath, label: '병원 기록' }
-    : { to: medicationsPagePath, label: '약 기록' };
+    ? { to: visitsPagePath, label: 'Clinic records' }
+    : { to: medicationsPagePath, label: 'Medication records' };
 
 /** Stable across reloads, and apart for a visit and a medicine with the same id. */
 export const reminderKey = (item: Reminder) => `${item.kind}-${item.id}-${item.dueOn}`;

@@ -39,8 +39,8 @@ test('a failed save also ends the wait, and its failure still reaches the caller
   const tracked = trackWrite('/api/sleep/2026-03-15', save.promise);
   const waiting = writesSettled('/api/sleep/2026-03-15');
 
-  save.reject(new Error('서버 오류'));
-  await expect(tracked).rejects.toThrow('서버 오류');
+  save.reject(new Error('Server error'));
+  await expect(tracked).rejects.toThrow('Server error');
   expect(await settledYet(waiting)).toBe(true);
 });
 

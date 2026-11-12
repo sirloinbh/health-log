@@ -14,7 +14,7 @@ import { migrate, migrationStatus, readMigrations } from './migrations.js';
 const dir = fileURLToPath(new URL('../../database/migrations/', import.meta.url));
 const url = process.env.DATABASE_URL;
 if (!url) {
-  console.error('DATABASE_URL이 필요합니다. .env를 확인하세요.');
+  console.error('DATABASE_URL is required. Check your .env file.');
   process.exit(1);
 }
 const client = new Client({ connectionString: url });
@@ -25,14 +25,14 @@ try {
     const status = await migrationStatus(client, files);
     const done = new Set(status.applied.map((row) => row.name));
     for (const file of files)
-      console.log(`${done.has(file.name) ? '적용됨' : '대기'}  ${file.name}`);
-    for (const error of status.errors) console.error(`오류  ${error}`);
+      console.log(`${done.has(file.name) ? 'applied' : 'pending'}  ${file.name}`);
+    for (const error of status.errors) console.error(`error  ${error}`);
     process.exitCode = status.errors.length ? 1 : 0;
   } else {
     // A deploy stops on a non-zero exit code, before it starts the new version.
     const applied = await migrate(client, files);
     console.log(
-      applied.length ? `적용 완료: ${applied.join(', ')}` : '적용할 마이그레이션이 없습니다.',
+      applied.length ? `Applied: ${applied.join(', ')}` : 'There are no migrations to apply.',
     );
   }
 } catch (e) {

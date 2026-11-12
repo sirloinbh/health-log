@@ -222,7 +222,7 @@ test('moving the day reminds again, and an old day cannot be marked', { skip }, 
       // A screen still showing the old day must not hide the new one.
       const stale = await done(call, { kind: 'visit', id: visitId, dueOn: '1985-11-13' });
       assert.equal(stale.status, 404);
-      assert.equal(stale.data.error, '알림을 찾을 수 없습니다');
+      assert.equal(stale.data.error, 'Reminder not found');
       assert.equal((await mine(call)).reminders.length, 1);
 
       // Moving back to the day marked earlier keeps that mark.

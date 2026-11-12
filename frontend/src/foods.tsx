@@ -34,20 +34,20 @@ import { isCoupangUrl, packageText, readNutritionLabel } from './nutrition-label
 import { useReturnFocus } from './return-focus';
 
 const nutrients = [
-  { key: 'calories', label: '칼로리', unit: 'kcal' },
-  { key: 'carbs', label: '탄수화물', unit: 'g' },
-  { key: 'protein', label: '단백질', unit: 'g' },
-  { key: 'fat', label: '지방', unit: 'g' },
-  { key: 'sugars', label: '당류', unit: 'g' },
-  { key: 'sodium', label: '나트륨', unit: 'mg' },
+  { key: 'calories', label: 'Calories', unit: 'kcal' },
+  { key: 'carbs', label: 'Carbs', unit: 'g' },
+  { key: 'protein', label: 'Protein', unit: 'g' },
+  { key: 'fat', label: 'Fat', unit: 'g' },
+  { key: 'sugars', label: 'Sugars', unit: 'g' },
+  { key: 'sodium', label: 'Sodium', unit: 'mg' },
 ] as const;
 
 const sourceLabels = {
-  official: '공식 자료',
-  public: '공공 자료',
-  label: '제품 표기',
-  estimate: '추정값',
-  manual: '직접 입력',
+  official: 'Official data',
+  public: 'Public data',
+  label: 'Product label',
+  estimate: 'Estimate',
+  manual: 'Manual entry',
 } as const;
 
 type NutrientKey = (typeof nutrients)[number]['key'];
@@ -117,7 +117,7 @@ const formOf = (food: Food): Form => ({
 const textOrNull = (value: string) => value.trim() || null;
 
 const numberFields = [
-  { key: 'servingSize', label: '1회 제공량' },
+  { key: 'servingSize', label: 'Serving size' },
   ...nutrients.map(({ key, label, unit }) => ({ key, label: `${label} (${unit})` })),
 ] as const;
 
@@ -182,7 +182,7 @@ function FoodDialog({
   const update = (key: keyof Form) => (event: { target: { value: string } }) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
 
-  // Fills the form only; nothing is saved until 저장 is pressed, so the person checks it first.
+  // Fills the form only; nothing is saved until Save is pressed, so the person checks it first.
   const fill = () => {
     const reading = readNutritionLabel(pasted);
     const reads = (filled?.reads ?? 0) + 1;
@@ -194,9 +194,9 @@ function FoodDialog({
         reads,
         lines: [
           reading.basis
-            ? `기준량(${reading.basis.size}${reading.basis.unit})은 찾았지만 영양성분 값을 읽지 못해 아무 칸도 바꾸지 않았습니다.`
-            : '영양성분 표를 찾지 못했습니다. 글자로 된 표만 읽을 수 있습니다.',
-          '표가 이미지로만 있거나 모양이 달라 읽지 못하면 값을 직접 입력해 주세요.',
+            ? `Found the basis amount (${reading.basis.size}${reading.basis.unit}) but could not read the nutrition values, so no field was changed.`
+            : 'Could not find a nutrition table. Only tables in text can be read.',
+          'If the table is only an image or its layout differs, enter the values by hand.',
         ],
       });
       return;
@@ -209,9 +209,9 @@ function FoodDialog({
         kind: 'error',
         reads,
         lines: [
-          '1회 제공량을 찾지 못해 아무 칸도 바꾸지 않았습니다. 값이 어느 양의 것인지 알 수 없습니다.',
-          `읽은 값: ${found.map(({ key, label }) => `${label} ${reading.values[key]}${units[key]}`).join(', ')}`,
-          '1회 제공량을 확인해 직접 입력해 주세요.',
+          'Could not find the serving size, so no field was changed. It is not clear what amount the values are for.',
+          `Values read: ${found.map(({ key, label }) => `${label} ${reading.values[key]}${units[key]}`).join(', ')}`,
+          'Check the serving size and enter it by hand.',
         ],
       });
       return;
@@ -238,31 +238,37 @@ function FoodDialog({
     const total = packageText(reading);
     const basisLine = reading.basisFromTotal
       ? [
-          `1회 제공량 표기가 없어 총 내용량(${basis.size}${basis.unit})을 기준으로 채웠습니다. 표가 다른 양 기준이면 고쳐 주세요.`,
+          `No serving size was given, so the total amount (${basis.size}${basis.unit}) was used as the basis. Correct it if the table is for another amount.`,
         ]
       : [];
     setFilled({
       kind: 'status',
       reads,
       lines: [
-        `채운 칸: ${['1회 제공량', ...found.map(({ label }) => label)].join(', ')}`,
+        `Filled in: ${['Serving size', ...found.map(({ label }) => label)].join(', ')}`,
         ...basisLine,
         ...(reading.lessThan.length
-          ? [`"미만" 표기라 비운 칸: ${reading.lessThan.map(labelOf).join(', ')}`]
+          ? [
+              `Cleared because the table says "less than": ${reading.lessThan.map(labelOf).join(', ')}`,
+            ]
           : []),
         ...(reading.outOfRange.length
-          ? [`값이 너무 커서 비운 칸: ${reading.outOfRange.map(labelOf).join(', ')}`]
+          ? [
+              `Cleared because the value is too large: ${reading.outOfRange.map(labelOf).join(', ')}`,
+            ]
           : []),
         ...(missing.length
-          ? [`표에서 읽지 못해 비운 칸: ${missing.map(({ label }) => label).join(', ')}`]
+          ? [
+              `Cleared because the table has no value: ${missing.map(({ label }) => label).join(', ')}`,
+            ]
           : []),
         ...(wasPublished
           ? [
-              '출처 종류를 "제품 표기"로 바꿨습니다. 출처 주소가 이 제품을 가리키는지 확인해 주세요.',
+              'The source type was changed to "Product label". Check that the source URL points to this product.',
             ]
           : []),
         ...(total ? [total] : []),
-        '값을 확인한 뒤 저장을 눌러야 저장됩니다.',
+        'Check the values, then press Save to save them.',
       ],
     });
   };
@@ -297,14 +303,14 @@ function FoodDialog({
     <Dialog open onOpenChange={(open) => (open || saving ? undefined : onClose())}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{food ? '음식 수정' : '음식 추가'}</DialogTitle>
+          <DialogTitle>{food ? 'Edit food' : 'Add food'}</DialogTitle>
           <DialogDescription>
-            영양성분은 1회 제공량 기준입니다. 모르는 값은 비워 두세요.
+            Nutrition values are per serving. Leave unknown values blank.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={(event) => void submit(event)} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="food-label-text">영양성분 표 붙여넣기</Label>
+            <Label htmlFor="food-label-text">Paste a nutrition table</Label>
             <textarea
               id="food-label-text"
               aria-describedby="food-label-text-help"
@@ -316,14 +322,14 @@ function FoodDialog({
                 setFilled((current) => (current?.kind === 'error' ? null : current));
               }}
               className="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-body-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
-              placeholder={'예: 100g당 250kcal\n나트륨 300mg 탄수화물 30g …'}
+              placeholder={'e.g. 100g당 250kcal\n나트륨 300mg 탄수화물 30g …'}
             />
             <p id="food-label-text-help" className="text-caption break-keep text-muted-foreground">
-              상품 페이지의 영양성분 표 글자를 복사해 넣으면 아래 칸을 채웁니다. 앱은 상품 페이지를
-              열지 않습니다.
+              Copy the nutrition table text (in Korean, as on the product page) and paste it to fill
+              the fields below. The app does not open the product page.
             </p>
             <Button type="button" variant="outline" size="sm" className="self-start" onClick={fill}>
-              표 읽어 채우기
+              Read the table and fill in
             </Button>
             {filled ? (
               <div
@@ -337,17 +343,17 @@ function FoodDialog({
               </div>
             ) : null}
           </div>
-          <Field id="food-name" label="음식 이름">
+          <Field id="food-name" label="Food name">
             <Input id="food-name" value={form.name} onChange={update('name')} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field id="food-brand" label="브랜드">
+            <Field id="food-brand" label="Brand">
               <Input id="food-brand" value={form.brand} onChange={update('brand')} />
             </Field>
-            <Field id="food-category" label="분류">
+            <Field id="food-category" label="Category">
               <Input id="food-category" value={form.category} onChange={update('category')} />
             </Field>
-            <Field id="food-serving-size" label="1회 제공량">
+            <Field id="food-serving-size" label="Serving size">
               <Input
                 id="food-serving-size"
                 inputMode="decimal"
@@ -356,7 +362,7 @@ function FoodDialog({
                 onChange={update('servingSize')}
               />
             </Field>
-            <Field id="food-serving-unit" label="단위">
+            <Field id="food-serving-unit" label="Unit">
               <Input
                 id="food-serving-unit"
                 value={form.servingUnit}
@@ -375,7 +381,7 @@ function FoodDialog({
               </Field>
             ))}
           </div>
-          <Field id="food-source-type" label="출처 종류">
+          <Field id="food-source-type" label="Source type">
             <Select
               value={form.sourceType}
               onValueChange={(value) =>
@@ -394,7 +400,7 @@ function FoodDialog({
               </SelectContent>
             </Select>
           </Field>
-          <Field id="food-source-url" label="출처 주소">
+          <Field id="food-source-url" label="Source URL">
             <Input
               id="food-source-url"
               type="url"
@@ -408,12 +414,13 @@ function FoodDialog({
                 id="food-source-url-help"
                 className="text-caption break-keep text-muted-foreground"
               >
-                쿠팡 링크는 출처로만 저장합니다. 앱은 이 페이지를 열지 않으니, 영양성분 표 글자를
-                위에 붙여넣거나 값을 직접 입력해 주세요. 표가 이미지로만 있으면 직접 입력해 주세요.
+                Coupang links are saved only as the source. The app does not open the page, so paste
+                the nutrition table text above or enter the values by hand. If the table is only an
+                image, enter them by hand.
               </p>
             ) : null}
           </Field>
-          <Field id="food-checked-on" label="확인 날짜">
+          <Field id="food-checked-on" label="Verified date">
             <Input
               id="food-checked-on"
               type="date"
@@ -432,10 +439,11 @@ function FoodDialog({
                   setForm((current) => ({ ...current, isJunk: checked === true }))
                 }
               />
-              <Label htmlFor="food-is-junk">정크푸드</Label>
+              <Label htmlFor="food-is-junk">Junk food</Label>
             </div>
             <p id="food-is-junk-help" className="text-caption break-keep text-muted-foreground">
-              식단에서 정크푸드 횟수로 셉니다. 표시를 바꿔도 이미 기록한 식사는 그대로입니다.
+              Counts toward junk food times in the diet. Changing the flag leaves meals already
+              recorded as they are.
             </p>
           </div>
           <Notice notice={notice} />
@@ -451,7 +459,7 @@ function FoodDialog({
                 if (!saving) onClose();
               }}
             >
-              취소
+              Cancel
             </Button>
             <Button
               type="submit"
@@ -461,7 +469,7 @@ function FoodDialog({
               aria-busy={saving || undefined}
               className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
             >
-              {saving ? '저장 중…' : '저장'}
+              {saving ? 'Saving…' : 'Save'}
             </Button>
           </DialogFooter>
         </form>
@@ -478,7 +486,7 @@ function FoodCard({ food, onEdit }: { food: Food; onEdit: (opener: HTMLElement) 
           {food.name}
         </CardTitle>
         <p className="text-body-sm text-muted-foreground">
-          {[food.brand, food.category, `1회 ${food.servingSize}${food.servingUnit}`]
+          {[food.brand, food.category, `Serving ${food.servingSize}${food.servingUnit}`]
             .filter(Boolean)
             .join(' · ')}
         </p>
@@ -488,14 +496,14 @@ function FoodCard({ food, onEdit }: { food: Food; onEdit: (opener: HTMLElement) 
           {nutrients.map(({ key, label, unit }) => (
             <div key={key}>
               <dt className="text-muted-foreground">{label}</dt>
-              <dd>{food[key] === null ? '값 없음' : `${food[key]}${unit}`}</dd>
+              <dd>{food[key] === null ? 'No value' : `${food[key]}${unit}`}</dd>
             </div>
           ))}
         </dl>
         <div className="flex flex-wrap items-center gap-2 text-caption text-muted-foreground">
-          {food.isJunk ? <Badge variant="warning">정크푸드</Badge> : null}
+          {food.isJunk ? <Badge variant="warning">Junk food</Badge> : null}
           <Badge variant="secondary">{sourceLabels[food.sourceType]}</Badge>
-          {food.checkedOn ? <span>{food.checkedOn} 확인</span> : null}
+          {food.checkedOn ? <span>Verified {food.checkedOn}</span> : null}
           {food.sourceUrl && isSafeLink(food.sourceUrl) ? (
             <a
               href={food.sourceUrl}
@@ -503,18 +511,18 @@ function FoodCard({ food, onEdit }: { food: Food; onEdit: (opener: HTMLElement) 
               rel="noreferrer noopener"
               className="underline underline-offset-4"
             >
-              출처 보기
+              View source
             </a>
           ) : null}
           <Button
             variant="outline"
             size="sm"
             className="ml-auto"
-            aria-label={`${food.name} 수정`}
+            aria-label={`Edit ${food.name}`}
             onClick={(event) => onEdit(event.currentTarget)}
           >
             <Pencil aria-hidden />
-            수정
+            Edit
           </Button>
         </div>
       </CardContent>
@@ -572,9 +580,9 @@ export function FoodsPage() {
           tabIndex={-1}
           className="rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         >
-          음식
+          Foods
         </h1>
-        <p className="text-body text-muted-foreground">영양성분과 출처를 관리합니다.</p>
+        <p className="text-body text-muted-foreground">Manage nutrition values and sources.</p>
       </header>
       <div className="flex flex-wrap items-center gap-2">
         <form
@@ -587,28 +595,28 @@ export function FoodsPage() {
         >
           <Input
             type="search"
-            aria-label="음식 검색"
-            placeholder="이름 또는 브랜드"
+            aria-label="Search foods"
+            placeholder="Name or brand"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
           <Button type="submit" variant="outline">
-            검색
+            Search
           </Button>
         </form>
         <Button onClick={(event) => openDialog(event.currentTarget, 'new')}>
           <Plus aria-hidden />
-          음식 추가
+          Add food
         </Button>
       </div>
       <Notice notice={notice} />
       {foods === null && !notice ? (
         <p role="status" className="text-body-sm text-muted-foreground">
-          불러오는 중…
+          Loading…
         </p>
       ) : null}
       {foods?.length === 0 ? (
-        <EmptyState title="음식이 없습니다" description="검색어를 바꾸거나 음식을 추가해 보세요." />
+        <EmptyState title="No foods" description="Change the search term or add a food." />
       ) : null}
       {foods?.length ? (
         <div className="grid gap-4 md:grid-cols-2">
@@ -626,8 +634,8 @@ export function FoodsPage() {
       >
         {foods?.length
           ? more
-            ? `음식 ${foods.length}개 표시 중. 더 있습니다.`
-            : `음식 ${foods.length}개`
+            ? `Showing ${foods.length} foods. There are more.`
+            : `${foods.length} ${foods.length === 1 ? 'food' : 'foods'}`
           : null}
       </p>
       {foods?.length && more ? (
@@ -641,7 +649,7 @@ export function FoodsPage() {
           onSaved={() => {
             closeDialog();
             // The saved food may not match the current search, so the list alone cannot confirm it.
-            toast.success('저장했습니다');
+            toast.success('Saved');
             void load(applied.current);
           }}
         />

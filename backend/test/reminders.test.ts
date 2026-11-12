@@ -22,13 +22,13 @@ const rejects = async (body: unknown, message: string) => {
 
 test('marking a reminder done needs a known kind, a record id and a real day', async () => {
   const valid = { kind: 'visit', id: 1, dueOn: '2026-03-10' };
-  await rejects({ ...valid, kind: 'procedure' }, '알림 종류가 올바르지 않습니다');
-  await rejects({ ...valid, id: 0 }, '알림 대상이 올바르지 않습니다');
-  await rejects({ ...valid, id: 1.5 }, '알림 대상이 올바르지 않습니다');
-  await rejects({ ...valid, id: '1' }, '알림 대상이 올바르지 않습니다');
-  await rejects({ ...valid, dueOn: '2026-02-30' }, '알림 날짜가 올바르지 않습니다');
-  await rejects({ kind: 'visit', id: 1 }, '알림 날짜가 올바르지 않습니다');
-  await rejects([], '요청 본문이 올바르지 않습니다');
+  await rejects({ ...valid, kind: 'procedure' }, 'The reminder type is not valid');
+  await rejects({ ...valid, id: 0 }, 'The reminder target is not valid');
+  await rejects({ ...valid, id: 1.5 }, 'The reminder target is not valid');
+  await rejects({ ...valid, id: '1' }, 'The reminder target is not valid');
+  await rejects({ ...valid, dueOn: '2026-02-30' }, 'The reminder date is not valid');
+  await rejects({ kind: 'visit', id: 1 }, 'The reminder date is not valid');
+  await rejects([], 'The request body is not valid');
 });
 
 test('the days ahead are counted on the calendar, across a month and a year', async () => {

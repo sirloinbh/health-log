@@ -38,13 +38,13 @@ const pages = {
 
 // Main menu (LNB) items, in display order.
 const nav: NavItem[] = [
-  { to: pages.overview, label: '대시보드', icon: LayoutDashboard },
-  { to: pages.daily, label: '하루 기록', icon: CalendarDays },
-  { to: pages.foods, label: '음식', icon: Utensils },
-  { to: pages.combos, label: '조합', icon: Layers },
-  { to: pages.visits, label: '병원', icon: Stethoscope },
-  { to: pages.medications, label: '약', icon: Pill },
-  { to: pages.settings, label: '설정', icon: Settings2 },
+  { to: pages.overview, label: 'Dashboard', icon: LayoutDashboard },
+  { to: pages.daily, label: 'Daily record', icon: CalendarDays },
+  { to: pages.foods, label: 'Foods', icon: Utensils },
+  { to: pages.combos, label: 'Combos', icon: Layers },
+  { to: pages.visits, label: 'Clinic', icon: Stethoscope },
+  { to: pages.medications, label: 'Medication', icon: Pill },
+  { to: pages.settings, label: 'Settings', icon: Settings2 },
 ];
 
 // An app left open past midnight must not keep yesterday as "today".
@@ -66,7 +66,7 @@ function useHealth() {
           report(
             response.ok && data.today
               ? { state: 'ok', today: data.today }
-              : { state: 'error', message: data.error ?? '서버 상태를 확인할 수 없습니다' },
+              : { state: 'error', message: data.error ?? 'Cannot check the server status' },
           );
         })
         .catch(() => report({ state: 'error', message: 'Cannot reach the server' }));
@@ -113,8 +113,8 @@ function Page({
       </header>
       {children ?? (
         <EmptyState
-          title="아직 기능이 없습니다"
-          description="기능은 GitHub 이슈 카드로 등록한 뒤 하나씩 추가합니다."
+          title="No features yet"
+          description="Features are registered as GitHub issue cards and added one at a time."
         />
       )}
     </section>
@@ -128,7 +128,7 @@ export function App() {
     health.state === 'ok' ? health.today : health.state === 'loading' ? undefined : null;
   return (
     <BrowserRouter>
-      <AppShell appName="식단·수면·건강 기록" nav={nav}>
+      <AppShell appName="Diet, Sleep and Health Log" nav={nav}>
         <Routes>
           <Route path={pages.overview} element={<ReportPage health={health} />} />
           <Route
@@ -146,7 +146,11 @@ export function App() {
           <Route
             path={pages.settings}
             element={
-              <Page title="설정" description="앱 환경과 데이터 관리" health={health}>
+              <Page
+                title="Settings"
+                description="App preferences and data management"
+                health={health}
+              >
                 <GoalsSettings />
               </Page>
             }

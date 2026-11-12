@@ -8,10 +8,8 @@ import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.j
 import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 
 const reportQuery = z.object({
-  period: z.enum(['week', 'month'], { error: '기간은 week 또는 month로 보내 주세요' }),
-  date: z
-    .string({ error: '날짜가 올바르지 않습니다' })
-    .refine(isRealDate, '날짜가 올바르지 않습니다'),
+  period: z.enum(['week', 'month'], { error: 'The period must be week or month' }),
+  date: z.string({ error: 'The date is not valid' }).refine(isRealDate, 'The date is not valid'),
 });
 
 type Span = { from: string; to: string };

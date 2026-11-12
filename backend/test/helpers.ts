@@ -15,11 +15,13 @@ export function testDatabaseSkip(url: string | undefined): false | string {
     } catch {
       // Node's error carries the whole value (input), password included, and prints it; no cause.
       throw new Error(
-        'TEST_DATABASE_URL을 주소로 읽을 수 없습니다(값은 비밀번호가 있을 수 있어 표시하지 않습니다).',
+        'TEST_DATABASE_URL cannot be read as an address (the value may contain a password, so it is not shown).',
       );
     }
   }
-  return name === 'health_test' ? false : `health_test 전용 DB가 아닙니다: ${name || '없음'}`;
+  return name === 'health_test'
+    ? false
+    : `Not the dedicated health_test database: ${name || 'none'}`;
 }
 
 /**

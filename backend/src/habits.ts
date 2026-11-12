@@ -15,15 +15,15 @@ const maxDrinks = 20;
 
 const drinkInput = z.object(
   {
-    kind: z.enum(drinkKinds, { error: '술 종류가 올바르지 않습니다' }),
-    unit: z.enum(drinkUnits, { error: '술 단위가 올바르지 않습니다' }),
+    kind: z.enum(drinkKinds, { error: 'The drink type is not valid' }),
+    unit: z.enum(drinkUnits, { error: 'The drink unit is not valid' }),
     amount: z
-      .number({ error: '술의 양은 숫자로 입력해 주세요' })
-      .gt(0, '술의 양은 0보다 커야 합니다')
-      .max(99, '술의 양은 99 이하로 입력해 주세요')
-      .refine(hasTwoDecimalsAtMost, '술의 양은 소수 둘째 자리까지 입력해 주세요'),
+      .number({ error: 'The drink amount must be a number' })
+      .gt(0, 'The drink amount must be greater than 0')
+      .max(99, 'The drink amount must be 99 or less')
+      .refine(hasTwoDecimalsAtMost, 'The drink amount can have at most 2 decimal places'),
   },
-  { error: '술 기록이 올바르지 않습니다' },
+  { error: 'The drink record is not valid' },
 );
 
 const habitInput = z
@@ -31,28 +31,28 @@ const habitInput = z
     {
       // null: not recorded. 0: recorded as none.
       cigarettes: z
-        .number({ error: '담배는 개비 수를 숫자로 입력해 주세요' })
-        .int('담배는 개비 수를 정수로 입력해 주세요')
-        .min(0, '담배는 0개비 이상으로 입력해 주세요')
-        .max(200, '담배는 200개비 이하로 입력해 주세요')
+        .number({ error: 'Cigarettes must be a number' })
+        .int('Cigarettes must be a whole number')
+        .min(0, 'Cigarettes must be 0 or more')
+        .max(200, 'Cigarettes must be 200 or fewer')
         .nullable()
         .default(null),
       // null: not recorded. []: recorded as not drinking.
       drinks: z
-        .array(drinkInput, { error: '술 기록이 올바르지 않습니다' })
-        .max(maxDrinks, `술은 하루 ${maxDrinks}가지까지 입력할 수 있습니다`)
+        .array(drinkInput, { error: 'The drink record is not valid' })
+        .max(maxDrinks, `You can enter up to ${maxDrinks} drinks per day`)
         .nullable()
         .default(null),
     },
-    { error: '요청 본문이 올바르지 않습니다' },
+    { error: 'The request body is not valid' },
   )
   .superRefine((input, ctx) => {
     if (input.cigarettes === null && input.drinks === null) {
-      ctx.addIssue({ code: 'custom', message: '술이나 담배 중 하나 이상 기록해 주세요' });
+      ctx.addIssue({ code: 'custom', message: 'Record at least one drink or cigarette count' });
     }
     const pairs = (input.drinks ?? []).map(({ kind, unit }) => `${kind}/${unit}`);
     if (new Set(pairs).size !== pairs.length) {
-      ctx.addIssue({ code: 'custom', message: '같은 술과 단위는 한 번만 입력해 주세요' });
+      ctx.addIssue({ code: 'custom', message: 'Enter each drink and unit only once' });
     }
   });
 
@@ -177,7 +177,7 @@ export function habitsRouter(pool: Pool, limits: RateLimitSettings) {
   router.delete('/:date', async (req, res) => {
     const date = parseDate(req.params.date);
     const { rowCount } = await pool.query('DELETE FROM habit_days WHERE record_date = $1', [date]);
-    if (!rowCount) throw new HttpError(404, '술·담배 기록을 찾을 수 없습니다');
+    if (!rowCount) throw new HttpError(404, 'Alcohol and tobacco record not found');
     res.status(204).end();
   });
 

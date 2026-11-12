@@ -30,7 +30,7 @@ import {
 } from './med-text';
 import { trackWrite } from './pending-writes';
 import { useReturnFocus } from './return-focus';
-import { type Visit, visitsPath, withTopic } from './visit-text';
+import { type Visit, visitsPath } from './visit-text';
 
 type Draft = {
   name: string;
@@ -55,22 +55,23 @@ const draftOf = (item: Medication | null, start: { date: string; visitId: string
 
 /** The request body, or the first reason it cannot be sent. */
 function readDraft(draft: Draft) {
-  if (!draft.name.trim()) return '약 이름을 입력해 주세요';
+  if (!draft.name.trim()) return 'Enter the medication name';
   const long = (
     [
-      ['약 이름', draft.name, 100],
-      ['용량', draft.dose, 50],
-      ['복용법', draft.directions, 100],
-      ['메모', draft.note, 500],
+      ['Medication name', draft.name, 100],
+      ['Dose', draft.dose, 50],
+      ['Directions', draft.directions, 100],
+      ['Note', draft.note, 500],
     ] as const
   ).find(([, value, max]) => charCount(value.trim()) > max);
-  if (long) return `${withTopic(long[0])} ${long[2]}자 이하로 입력해 주세요`;
-  if (!isValidDate(draft.startOn)) return '시작일을 골라 주세요';
+  if (long) return `${long[0]} must be ${long[2]} characters or fewer`;
+  if (!isValidDate(draft.startOn)) return 'Choose a start date';
   // The daily page opens only these days (#50).
-  if (!inDailyRange(draft.startOn)) return `시작일: ${dailyRangeText}`;
-  if (draft.endOn && !isValidDate(draft.endOn)) return '종료일이 올바르지 않습니다';
-  if (draft.endOn && !inDailyRange(draft.endOn)) return `종료일: ${dailyRangeText}`;
-  if (draft.endOn && draft.endOn < draft.startOn) return '종료일은 시작일보다 빠를 수 없습니다';
+  if (!inDailyRange(draft.startOn)) return `Start date: ${dailyRangeText}`;
+  if (draft.endOn && !isValidDate(draft.endOn)) return 'The end date is not valid';
+  if (draft.endOn && !inDailyRange(draft.endOn)) return `End date: ${dailyRangeText}`;
+  if (draft.endOn && draft.endOn < draft.startOn)
+    return 'The end date cannot be before the start date';
   return {
     name: draft.name,
     dose: draft.dose,
@@ -125,7 +126,7 @@ function MedicationDialog({
     options.unshift({
       id: Number(draft.visitId),
       date: start.visitDate ?? '',
-      clinic: '선택한 방문',
+      clinic: 'Selected visit',
     });
   }
 
@@ -159,20 +160,21 @@ function MedicationDialog({
     <Dialog open onOpenChange={(open) => (open || saving ? undefined : onClose())}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{item ? '약 기록 수정' : '약 기록'}</DialogTitle>
+          <DialogTitle>{item ? 'Edit medication record' : 'Medication record'}</DialogTitle>
           <DialogDescription>
-            종료일을 비워 두면 지금도 먹는 약으로 셉니다. 모르는 값은 비워 두세요.
+            Leave the end date blank to count it as a medication you still take. Leave unknown
+            values blank.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={(event) => void submit(event)} noValidate className="flex flex-col gap-4">
-          <Field id="med-name" label="약 이름">
+          <Field id="med-name" label="Medication name">
             <Input id="med-name" autoComplete="off" value={draft.name} onChange={set('name')} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field id="med-dose" label="용량">
+            <Field id="med-dose" label="Dose">
               <Input id="med-dose" autoComplete="off" value={draft.dose} onChange={set('dose')} />
             </Field>
-            <Field id="med-directions" label="복용법">
+            <Field id="med-directions" label="Directions">
               <Input
                 id="med-directions"
                 autoComplete="off"
@@ -180,7 +182,7 @@ function MedicationDialog({
                 onChange={set('directions')}
               />
             </Field>
-            <Field id="med-start" label="시작일">
+            <Field id="med-start" label="Start date">
               <Input
                 id="med-start"
                 type="date"
@@ -190,7 +192,7 @@ function MedicationDialog({
                 onChange={set('startOn')}
               />
             </Field>
-            <Field id="med-end" label="종료일">
+            <Field id="med-end" label="End date">
               <Input
                 id="med-end"
                 type="date"
@@ -201,14 +203,14 @@ function MedicationDialog({
               />
             </Field>
           </div>
-          <Field id="med-visit" label="처방받은 병원 방문">
+          <Field id="med-visit" label="Prescribing clinic visit">
             <select
               id="med-visit"
               className={`${fieldClass} h-9 pointer-coarse:min-h-11`}
               value={draft.visitId}
               onChange={set('visitId')}
             >
-              <option value="">연결 안 함 (처방 없이 산 약)</option>
+              <option value="">Not linked (bought without a prescription)</option>
               {options.map((option) => (
                 <option key={option.id} value={String(option.id)}>
                   {[option.date, option.clinic].filter(Boolean).join(' ')}
@@ -216,7 +218,7 @@ function MedicationDialog({
               ))}
             </select>
           </Field>
-          <Field id="med-note" label="메모">
+          <Field id="med-note" label="Note">
             <textarea
               id="med-note"
               className={`${fieldClass} min-h-20 py-2`}
@@ -236,7 +238,7 @@ function MedicationDialog({
                 if (!saving) onClose();
               }}
             >
-              취소
+              Cancel
             </Button>
             <Button
               type="submit"
@@ -245,7 +247,7 @@ function MedicationDialog({
               aria-busy={saving || undefined}
               className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
             >
-              {saving ? '저장 중…' : '저장'}
+              {saving ? 'Saving…' : 'Save'}
             </Button>
           </DialogFooter>
         </form>
@@ -276,30 +278,30 @@ function MedicationCard({
         {how ? <p className="wrap-anywhere">{how}</p> : null}
         {item.visit ? (
           <p className="wrap-anywhere text-muted-foreground">
-            {item.visit.date} {item.visit.clinic} 처방
+            {item.visit.date} {item.visit.clinic} prescription
           </p>
         ) : null}
         {item.note ? <p className="wrap-anywhere whitespace-pre-line">{item.note}</p> : null}
         <div className="flex flex-wrap justify-end gap-2">
           <ConfirmDialog
-            title="약 기록을 삭제할까요?"
-            description="삭제하면 되돌릴 수 없습니다. 연결된 병원 방문은 그대로 남습니다."
+            title="Delete this medication record?"
+            description="This cannot be undone. The linked clinic visit stays."
             onConfirm={onDelete}
             trigger={
-              <Button variant="outline" size="sm" aria-label={`${item.name} 삭제`}>
+              <Button variant="outline" size="sm" aria-label={`Delete ${item.name}`}>
                 <Trash2 aria-hidden />
-                삭제
+                Delete
               </Button>
             }
           />
           <Button
             variant="outline"
             size="sm"
-            aria-label={`${item.name} 수정`}
+            aria-label={`Edit ${item.name}`}
             onClick={(event) => onEdit(event.currentTarget)}
           >
             <Pencil aria-hidden />
-            수정
+            Edit
           </Button>
         </div>
       </CardContent>
@@ -308,9 +310,9 @@ function MedicationCard({
 }
 
 const sections = [
-  { key: 'current', title: '복용 중', empty: '지금 먹는 약이 없습니다.' },
-  { key: 'upcoming', title: '시작 예정', empty: null },
-  { key: 'past', title: '지난 약', empty: '끝난 약이 없습니다.' },
+  { key: 'current', title: 'Taking now', empty: 'No medication is being taken now.' },
+  { key: 'upcoming', title: 'Starting soon', empty: null },
+  { key: 'past', title: 'Past medication', empty: 'No finished medication.' },
 ] as const;
 
 /** `today` is undefined while the server is still being asked, and null if it could not say. */
@@ -407,7 +409,7 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
         throw cause;
       }
     }
-    toast.success('삭제했습니다');
+    toast.success('Deleted');
     // Dropped now, so its delete button is not what the closing dialog hands focus back to.
     setLists((current) =>
       current
@@ -432,16 +434,18 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
           tabIndex={-1}
           className="rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         >
-          약
+          Medication
         </h1>
         <p className="text-body text-muted-foreground">
-          처방받거나 산 약과 먹는 기간을 기록합니다. 오늘
-          {lists ? `(${lists.today})` : ''} 기준으로 지금 먹는 약과 지난 약을 나눕니다.
+          Record medications you were prescribed or bought and how long you take them. Current and
+          past medications are split as of today
+          {lists ? ` (${lists.today})` : ''}.
         </p>
       </header>
       <div>
         <Button onClick={(event) => openDialog(event.currentTarget, null)}>
-          <Plus aria-hidden />약 기록
+          <Plus aria-hidden />
+          Medication record
         </Button>
       </div>
       <Notice notice={notice} />
@@ -452,19 +456,19 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
           onClick={() => {
             // A word in its place: the same failure twice is announced again, and a list already
             // on screen does not look fixed while the new one is on its way.
-            status('목록을 다시 불러오는 중…');
-            void load('목록을 다시 불러왔습니다.');
+            status('Reloading the list…');
+            void load('The list was reloaded.');
             loadVisits();
             // Trying again removes this button, which would drop keyboard focus to the page (#65, #127).
             setMoveFocus((count) => count + 1);
           }}
         >
-          다시 시도
+          Try again
         </Button>
       ) : null}
       {lists === null && !notice ? (
         <p role="status" className="text-body-sm text-muted-foreground">
-          불러오는 중…
+          Loading…
         </p>
       ) : null}
       {lists
@@ -502,7 +506,7 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
           onClose={closeDialog}
           onSaved={() => {
             closeDialog();
-            toast.success('저장했습니다');
+            toast.success('Saved');
             void load();
           }}
         />

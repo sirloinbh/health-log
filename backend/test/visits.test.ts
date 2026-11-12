@@ -27,43 +27,49 @@ const rejects = async (body: unknown, message: string, method = 'POST', path = '
 };
 
 test('a visit needs a real date and a clinic', async () => {
-  await rejects({ clinic: '가상의원' }, '방문 날짜를 골라 주세요');
-  await rejects({ ...visit, date: '2026-02-30' }, '방문 날짜가 올바르지 않습니다');
-  await rejects({ ...visit, date: '3000-01-01' }, '방문 날짜가 올바르지 않습니다');
-  await rejects({ date: visit.date }, '병원 이름을\\(를\\) 입력해 주세요');
-  await rejects({ ...visit, clinic: '   ' }, '병원 이름을\\(를\\) 입력해 주세요');
-  await rejects([], '요청 본문');
+  await rejects({ clinic: '가상의원' }, 'Choose a visit date');
+  await rejects({ ...visit, date: '2026-02-30' }, 'The visit date is not valid');
+  await rejects({ ...visit, date: '3000-01-01' }, 'The visit date is not valid');
+  await rejects({ date: visit.date }, 'Enter clinic name');
+  await rejects({ ...visit, clinic: '   ' }, 'Enter clinic name');
+  await rejects([], 'request body');
 });
 
 test('lengths are counted in characters, so the limit holds for emoji as well', async () => {
-  await rejects({ ...visit, clinic: '🏥'.repeat(101) }, '병원 이름은\\(는\\) 100자 이하');
-  await rejects({ ...visit, department: '가'.repeat(51) }, '진료과은\\(는\\) 50자 이하');
-  await rejects({ ...visit, note: '가'.repeat(1001) }, '1000자 이하');
+  await rejects(
+    { ...visit, clinic: '🏥'.repeat(101) },
+    'Clinic name must be 100 characters or fewer',
+  );
+  await rejects(
+    { ...visit, department: '가'.repeat(51) },
+    'Department must be 50 characters or fewer',
+  );
+  await rejects({ ...visit, note: '가'.repeat(1001) }, '1000 characters or fewer');
 });
 
 test('costs are whole won from 0 to 100 million', async () => {
   for (const [value, message] of [
-    ['1000', '숫자로'],
-    [12.5, '원 단위 정수로'],
-    [-1, '0원 이상'],
-    [100_000_001, '1억 원 이하'],
+    ['1000', 'a number'],
+    [12.5, 'a whole number of won'],
+    [-1, '0 won or more'],
+    [100_000_001, '100 million won or less'],
   ] as const) {
-    await rejects({ ...visit, cost: value }, `진료비은\\(는\\) ${message}`);
+    await rejects({ ...visit, cost: value }, `Visit cost must be ${message}`);
     await rejects({ ...visit, procedures: [{ name: '가상 시술', cost: value }] }, message);
   }
 });
 
 test('the next appointment cannot come before the visit', async () => {
-  await rejects({ ...visit, nextVisitOn: '2026-03-14' }, '방문 날짜보다 빠를 수 없습니다');
-  await rejects({ ...visit, nextVisitOn: '2026-13-01' }, '다음 예약일이 올바르지 않습니다');
+  await rejects({ ...visit, nextVisitOn: '2026-03-14' }, 'cannot be before the visit date');
+  await rejects({ ...visit, nextVisitOn: '2026-13-01' }, 'The next appointment date is not valid');
 });
 
 test('procedures need a name and stop at ten', async () => {
-  await rejects({ ...visit, procedures: [{ area: '이마' }] }, '시술 이름을\\(를\\) 입력해 주세요');
-  await rejects({ ...visit, procedures: ['가상 시술'] }, '시술 항목이 올바르지 않습니다');
+  await rejects({ ...visit, procedures: [{ area: '이마' }] }, 'Enter procedure name');
+  await rejects({ ...visit, procedures: ['가상 시술'] }, 'The procedure is not valid');
   await rejects(
     { ...visit, procedures: Array.from({ length: 11 }, () => ({ name: '가상 시술' })) },
-    '10개까지',
+    'up to 10 procedures',
   );
 });
 
@@ -85,11 +91,11 @@ test('refusals never repeat what was entered', async () => {
 test('ids, dates and search words are checked before the database', async () => {
   await withApi(untouched(), async (call) => {
     for (const [method, path, message] of [
-      ['PUT', '/api/visits/abc', '병원 방문 ID'],
-      ['DELETE', '/api/visits/0', '병원 방문 ID'],
-      ['GET', '/api/visits?date=2026-02-30', '날짜가 올바르지 않습니다'],
-      ['GET', `/api/visits?q=${'가'.repeat(101)}`, '검색어는 100자 이하'],
-      ['GET', '/api/visits?offset=-1', '목록 위치'],
+      ['PUT', '/api/visits/abc', 'clinic visit ID'],
+      ['DELETE', '/api/visits/0', 'clinic visit ID'],
+      ['GET', '/api/visits?date=2026-02-30', 'The date is not valid'],
+      ['GET', `/api/visits?q=${'가'.repeat(101)}`, 'search term must be 100 characters or fewer'],
+      ['GET', '/api/visits?offset=-1', 'list offset'],
     ] as const) {
       const { status, data } = await call(path, {
         method,

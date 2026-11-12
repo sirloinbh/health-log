@@ -19,7 +19,7 @@ export const isRealDate = (value: string) => {
 /** A date in a path, or a 400 HttpError. */
 export const parseDate = (value: unknown) => {
   if (typeof value !== 'string' || !isRealDate(value)) {
-    throw new HttpError(400, '날짜가 올바르지 않습니다');
+    throw new HttpError(400, 'The date is not valid');
   }
   return value;
 };

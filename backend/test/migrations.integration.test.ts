@@ -111,10 +111,7 @@ test(
           index === 0 ? { ...file, sql: 'SELECT 2', checksum: checksum('SELECT 2') } : file,
         );
         const extra = { name: '900_new.sql', sql: 'SELECT 1', checksum: checksum('SELECT 1') };
-        await assert.rejects(
-          migrate(client, [...changed, extra]),
-          /내용이 바뀌었습니다: 001_initial\.sql/,
-        );
+        await assert.rejects(migrate(client, [...changed, extra]), /has changed: 001_initial\.sql/);
         assert.deepEqual(await recorded(client), names, 'the new file did not run');
       });
 
@@ -128,7 +125,10 @@ test(
             '901_bad.sql',
             'CREATE TABLE migrate_partial (id int); SELECT no_such_column FROM migrate_partial',
           );
-          await assert.rejects(migrate(client, [...files, good, bad]), /901_bad\.sql 적용 실패/);
+          await assert.rejects(
+            migrate(client, [...files, good, bad]),
+            /901_bad\.sql failed to apply/,
+          );
           const found = await tables(client, schema);
           assert.ok(found.includes('migrate_good'), 'the earlier file stays');
           assert.ok(!found.includes('migrate_partial'), 'the failed file left nothing');
@@ -153,13 +153,13 @@ test('the migrate command applies, then reports nothing to apply', { skip }, asy
       });
 
     const first = await command();
-    assert.equal(first.stdout.trim(), `적용 완료: ${names.join(', ')}`);
+    assert.equal(first.stdout.trim(), `Applied: ${names.join(', ')}`);
     const second = await command();
-    assert.equal(second.stdout.trim(), '적용할 마이그레이션이 없습니다.');
+    assert.equal(second.stdout.trim(), 'There are no migrations to apply.');
     const status = await command('--status');
     assert.deepEqual(
       status.stdout.trim().split('\n'),
-      names.map((name) => `적용됨  ${name}`),
+      names.map((name) => `applied  ${name}`),
     );
     assert.deepEqual(await recorded(client), names);
   });

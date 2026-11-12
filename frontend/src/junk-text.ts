@@ -1,3 +1,5 @@
+import { count } from './plural';
+
 /** Junk food of a week or a month, as the meals API answers it (#38). */
 export type JunkPeriod = {
   from: string;
@@ -10,14 +12,14 @@ export type JunkPeriod = {
   calories: { value: number | null; missing: number };
 };
 
-/** "3회 · 먹은 날 2일 · 1850kcal" */
+/** "3 times · 2 days · 1850kcal" */
 export function junkText({ times, days, calories }: JunkPeriod) {
-  if (times === 0) return '없음';
+  if (times === 0) return 'None';
   const kcal =
     calories.value === null
-      ? '칼로리 값 없음'
+      ? 'No calorie value'
       : calories.missing > 0
-        ? `${calories.value}kcal 이상 (칼로리 모르는 기록 ${calories.missing}개 제외)`
+        ? `${calories.value}kcal or more (excludes ${count(calories.missing, 'record')} with unknown calories)`
         : `${calories.value}kcal`;
-  return `${times}회 · 먹은 날 ${days}일 · ${kcal}`;
+  return `${count(times, 'time')} · ${count(days, 'day')} · ${kcal}`;
 }

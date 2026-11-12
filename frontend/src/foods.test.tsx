@@ -49,9 +49,9 @@ test('the main menu opens the foods page', async () => {
   serve(() => json({ foods: [] }));
   render(<App />);
   const menu = screen.getByRole('navigation', { name: 'Main menu' });
-  fireEvent.click(within(menu).getByRole('link', { name: '음식' }));
-  expect(await screen.findByRole('heading', { level: 1, name: '음식' })).toBeInTheDocument();
-  expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
+  fireEvent.click(within(menu).getByRole('link', { name: 'Foods' }));
+  expect(await screen.findByRole('heading', { level: 1, name: 'Foods' })).toBeInTheDocument();
+  expect(await screen.findByText('No foods')).toBeInTheDocument();
 });
 
 test('a food shows its numbers, separates zero from no value, and links its source', async () => {
@@ -59,12 +59,12 @@ test('a food shows its numbers, separates zero from no value, and links its sour
   open();
   const heading = await screen.findByRole('heading', { level: 2, name: '치즈버거' });
   const card = heading.closest<HTMLElement>('[data-slot=card]')!;
-  expect(within(card).getByText('샘플버거 · 1회 120g')).toBeInTheDocument();
+  expect(within(card).getByText('샘플버거 · Serving 120g')).toBeInTheDocument();
   expect(within(card).getByText('300kcal')).toBeInTheDocument();
   expect(within(card).getByText('0g')).toBeInTheDocument();
-  expect(within(card).getAllByText('값 없음')).toHaveLength(3);
-  expect(within(card).getByText('공식 자료')).toBeInTheDocument();
-  expect(within(card).getByRole('link', { name: '출처 보기' })).toHaveAttribute(
+  expect(within(card).getAllByText('No value')).toHaveLength(3);
+  expect(within(card).getByText('Official data')).toBeInTheDocument();
+  expect(within(card).getByRole('link', { name: 'View source' })).toHaveAttribute(
     'href',
     'https://example.com/menu',
   );
@@ -74,15 +74,15 @@ test('a source address that is not http is not turned into a link', async () => 
   serve(() => json({ foods: [{ ...food, sourceUrl: 'javascript:alert(1)' }] }));
   open();
   await screen.findByRole('heading', { level: 2, name: '치즈버거' });
-  expect(screen.queryByRole('link', { name: '출처 보기' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'View source' })).not.toBeInTheDocument();
 });
 
 test('searching sends the encoded words', async () => {
   const fetchMock = serve(() => json({ foods: [] }));
   open();
-  await screen.findByText('음식이 없습니다');
-  fireEvent.change(screen.getByLabelText('음식 검색'), { target: { value: '와퍼 100%' } });
-  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  await screen.findByText('No foods');
+  fireEvent.change(screen.getByLabelText('Search foods'), { target: { value: '와퍼 100%' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   await vi.waitFor(() =>
     expect(foodCalls(fetchMock).at(-1)?.[0]).toBe('/api/foods?q=%EC%99%80%ED%8D%BC%20100%25'),
   );
@@ -96,12 +96,12 @@ test('a slow older search does not overwrite a newer one', async () => {
     return json({ foods: [food] });
   });
   open();
-  await screen.findByText('음식이 없습니다');
-  const search = screen.getByLabelText('음식 검색');
+  await screen.findByText('No foods');
+  const search = screen.getByLabelText('Search foods');
   fireEvent.change(search, { target: { value: 'old' } });
-  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   fireEvent.change(search, { target: { value: 'new' } });
-  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   await screen.findByRole('heading', { level: 2, name: '치즈버거' });
 
   finishOld(json({ foods: [] }));
@@ -119,12 +119,12 @@ test('adding sends blanks as no value, then shows the list again', async () => {
     return json({ foods: saved ? [food] : [] });
   });
   open();
-  fireEvent.click(await screen.findByRole('button', { name: '음식 추가' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Add food' }));
   const dialog = await screen.findByRole('dialog');
-  fireEvent.change(within(dialog).getByLabelText('음식 이름'), { target: { value: '치즈버거' } });
-  fireEvent.change(within(dialog).getByLabelText('1회 제공량'), { target: { value: '120' } });
-  fireEvent.change(within(dialog).getByLabelText('칼로리 (kcal)'), { target: { value: '0' } });
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  fireEvent.change(within(dialog).getByLabelText('Food name'), { target: { value: '치즈버거' } });
+  fireEvent.change(within(dialog).getByLabelText('Serving size'), { target: { value: '120' } });
+  fireEvent.change(within(dialog).getByLabelText('Calories (kcal)'), { target: { value: '0' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
   expect(await screen.findByRole('heading', { level: 2, name: '치즈버거' })).toBeInTheDocument();
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -145,19 +145,17 @@ test('adding sends blanks as no value, then shows the list again', async () => {
 
 test('a server rejection keeps the form open with the Korean message and the typed values', async () => {
   serve((_url, init) =>
-    init?.method === 'POST'
-      ? json({ error: '1회 제공량을 입력해 주세요' }, 400)
-      : json({ foods: [] }),
+    init?.method === 'POST' ? json({ error: 'Enter a serving size' }, 400) : json({ foods: [] }),
   );
   open();
-  fireEvent.click(await screen.findByRole('button', { name: '음식 추가' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Add food' }));
   const dialog = await screen.findByRole('dialog');
-  fireEvent.change(within(dialog).getByLabelText('음식 이름'), { target: { value: '치즈버거' } });
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  fireEvent.change(within(dialog).getByLabelText('Food name'), { target: { value: '치즈버거' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-  expect(await within(dialog).findByRole('alert')).toHaveTextContent('1회 제공량을 입력해 주세요');
-  expect(within(dialog).getByLabelText('음식 이름')).toHaveValue('치즈버거');
-  expect(within(dialog).getByRole('button', { name: '저장' })).toBeEnabled();
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent('Enter a serving size');
+  expect(within(dialog).getByLabelText('Food name')).toHaveValue('치즈버거');
+  expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled();
 });
 
 test('editing starts from the food and saves to its address', async () => {
@@ -165,13 +163,13 @@ test('editing starts from the food and saves to its address', async () => {
     init?.method === 'PUT' ? json({ ...food, calories: 310 }) : json({ foods: [food] }),
   );
   open();
-  fireEvent.click(await screen.findByRole('button', { name: '치즈버거 수정' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit 치즈버거' }));
   const dialog = await screen.findByRole('dialog');
-  expect(within(dialog).getByLabelText('칼로리 (kcal)')).toHaveValue('300');
-  expect(within(dialog).getByLabelText('지방 (g)')).toHaveValue('');
-  expect(within(dialog).getByLabelText('확인 날짜')).toHaveValue('2026-10-31');
-  fireEvent.change(within(dialog).getByLabelText('칼로리 (kcal)'), { target: { value: '310' } });
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  expect(within(dialog).getByLabelText('Calories (kcal)')).toHaveValue('300');
+  expect(within(dialog).getByLabelText('Fat (g)')).toHaveValue('');
+  expect(within(dialog).getByLabelText('Verified date')).toHaveValue('2026-10-31');
+  fireEvent.change(within(dialog).getByLabelText('Calories (kcal)'), { target: { value: '310' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
   await vi.waitFor(() =>
     expect(foodCalls(fetchMock).some(([, init]) => init?.method === 'PUT')).toBe(true),
@@ -187,28 +185,28 @@ test('editing starts from the food and saves to its address', async () => {
 });
 
 test.each([
-  '1회 제공량',
-  '칼로리 (kcal)',
-  '탄수화물 (g)',
-  '단백질 (g)',
-  '지방 (g)',
-  '당류 (g)',
-  '나트륨 (mg)',
+  'Serving size',
+  'Calories (kcal)',
+  'Carbs (g)',
+  'Protein (g)',
+  'Fat (g)',
+  'Sugars (g)',
+  'Sodium (mg)',
 ])('a comma decimal in %s is refused, never read as ten times the value', async (label) => {
   const fetchMock = serve(() => json({ foods: [] }));
   open();
-  fireEvent.click(await screen.findByRole('button', { name: '음식 추가' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Add food' }));
   const dialog = await screen.findByRole('dialog');
-  fireEvent.change(within(dialog).getByLabelText('음식 이름'), { target: { value: '치즈버거' } });
-  fireEvent.change(within(dialog).getByLabelText('1회 제공량'), { target: { value: '120' } });
+  fireEvent.change(within(dialog).getByLabelText('Food name'), { target: { value: '치즈버거' } });
+  fireEvent.change(within(dialog).getByLabelText('Serving size'), { target: { value: '120' } });
   const field = within(dialog).getByLabelText(label);
   fireEvent.change(field, { target: { value: '49,5' } });
   // A number field would have dropped the comma and shown 495 here.
   expect(field).toHaveValue('49,5');
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
   expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-    `${label}: 숫자만 입력해 주세요. 소수점은 마침표로 씁니다`,
+    `${label}: enter digits only. Use a period for the decimal point`,
   );
   expect(field).toHaveValue('49,5');
   expect(foodCalls(fetchMock).some(([, init]) => init?.method === 'POST')).toBe(false);
@@ -219,12 +217,12 @@ test('a decimal written with a point is sent as that number', async () => {
     init?.method === 'POST' ? json(food, 201) : json({ foods: [] }),
   );
   open();
-  fireEvent.click(await screen.findByRole('button', { name: '음식 추가' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Add food' }));
   const dialog = await screen.findByRole('dialog');
-  fireEvent.change(within(dialog).getByLabelText('음식 이름'), { target: { value: '치즈버거' } });
-  fireEvent.change(within(dialog).getByLabelText('1회 제공량'), { target: { value: ' 49.5 ' } });
-  fireEvent.change(within(dialog).getByLabelText('단백질 (g)'), { target: { value: '15.25' } });
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  fireEvent.change(within(dialog).getByLabelText('Food name'), { target: { value: '치즈버거' } });
+  fireEvent.change(within(dialog).getByLabelText('Serving size'), { target: { value: ' 49.5 ' } });
+  fireEvent.change(within(dialog).getByLabelText('Protein (g)'), { target: { value: '15.25' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
   await vi.waitFor(() =>
     expect(foodCalls(fetchMock).some(([, init]) => init?.method === 'POST')).toBe(true),
@@ -239,12 +237,12 @@ test('a save in progress cannot be cancelled or closed', async () => {
     init?.method === 'POST' ? new Promise((resolve) => (finish = resolve)) : json({ foods: [] }),
   );
   open();
-  fireEvent.click(await screen.findByRole('button', { name: '음식 추가' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Add food' }));
   const dialog = await screen.findByRole('dialog');
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
-  await within(dialog).findByRole('button', { name: '저장 중…' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  await within(dialog).findByRole('button', { name: 'Saving…' });
 
-  const cancel = within(dialog).getByRole('button', { name: '취소' });
+  const cancel = within(dialog).getByRole('button', { name: 'Cancel' });
   expect(cancel).toHaveAttribute('aria-disabled', 'true');
   fireEvent.click(cancel);
   fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
@@ -260,12 +258,12 @@ test('a save is confirmed even when the current search hides the food', async ()
   const success = vi.spyOn(toast, 'success');
   serve((_url, init) => (init?.method === 'POST' ? json(food, 201) : json({ foods: [] })));
   open();
-  await screen.findByText('음식이 없습니다');
-  fireEvent.click(screen.getByRole('button', { name: '음식 추가' }));
+  await screen.findByText('No foods');
+  fireEvent.click(screen.getByRole('button', { name: 'Add food' }));
   const dialog = await screen.findByRole('dialog');
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
-  await vi.waitFor(() => expect(success).toHaveBeenCalledWith('저장했습니다'));
-  expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  await vi.waitFor(() => expect(success).toHaveBeenCalledWith('Saved'));
+  expect(await screen.findByText('No foods')).toBeInTheDocument();
 });
 
 test('saving reloads the search on screen, not words typed but not searched', async () => {
@@ -273,16 +271,16 @@ test('saving reloads the search on screen, not words typed but not searched', as
     init?.method === 'POST' ? json(food, 201) : json({ foods: [] }),
   );
   open();
-  await screen.findByText('음식이 없습니다');
-  const search = screen.getByLabelText('음식 검색');
+  await screen.findByText('No foods');
+  const search = screen.getByLabelText('Search foods');
   fireEvent.change(search, { target: { value: 'applied' } });
-  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   await vi.waitFor(() => expect(foodCalls(fetchMock).at(-1)?.[0]).toBe('/api/foods?q=applied'));
   fireEvent.change(search, { target: { value: 'typed' } });
 
-  fireEvent.click(screen.getByRole('button', { name: '음식 추가' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add food' }));
   const dialog = await screen.findByRole('dialog');
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
   await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   await vi.waitFor(() => expect(foodCalls(fetchMock).at(-1)?.[0]).toBe('/api/foods?q=applied'));
 });
@@ -290,31 +288,31 @@ test('saving reloads the search on screen, not words typed but not searched', as
 test('after a failed search, saving reloads the search the list still shows', async () => {
   const fetchMock = serve((url, init) => {
     if (init?.method === 'PUT') return json(food);
-    if (url.endsWith('q=broken')) return json({ error: '서버 오류가 발생했습니다' }, 500);
+    if (url.endsWith('q=broken')) return json({ error: 'Server error occurred' }, 500);
     return json({ foods: [food] });
   });
   open();
   await screen.findByRole('heading', { level: 2, name: '치즈버거' });
-  const search = screen.getByLabelText('음식 검색');
+  const search = screen.getByLabelText('Search foods');
   fireEvent.change(search, { target: { value: 'shown' } });
-  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   await vi.waitFor(() => expect(foodCalls(fetchMock).at(-1)?.[0]).toBe('/api/foods?q=shown'));
   fireEvent.change(search, { target: { value: 'broken' } });
-  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   await screen.findByRole('alert');
 
-  fireEvent.click(screen.getByRole('button', { name: '치즈버거 수정' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Edit 치즈버거' }));
   const dialog = await screen.findByRole('dialog');
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
   await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   await vi.waitFor(() => expect(foodCalls(fetchMock).at(-1)?.[0]).toBe('/api/foods?q=shown'));
 });
 
 test('a failed load shows the server message', async () => {
-  serve(() => json({ error: '서버 오류가 발생했습니다' }, 500));
+  serve(() => json({ error: 'Server error occurred' }, 500));
   open();
-  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
-  expect(screen.queryByText('음식이 없습니다')).not.toBeInTheDocument();
+  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(screen.queryByText('No foods')).not.toBeInTheDocument();
 });
 
 test('a long list says more foods are waiting and adds the next page below', async () => {
@@ -325,17 +323,17 @@ test('a long list says more foods are waiting and adds the next page below', asy
   );
   open();
   await screen.findByRole('heading', { level: 2, name: '치즈버거' });
-  expect(screen.getByText('음식 1개 표시 중. 더 있습니다.')).toBeInTheDocument();
+  expect(screen.getByText('Showing 1 foods. There are more.')).toBeInTheDocument();
 
-  const more = screen.getByRole('button', { name: '결과 더 보기' });
+  const more = screen.getByRole('button', { name: 'Show more results' });
   more.focus();
   fireEvent.click(more);
   expect(await screen.findByRole('heading', { level: 2, name: '피자' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { level: 2, name: '치즈버거' })).toBeInTheDocument();
   expect(foodCalls(fetchMock).at(-1)?.[0]).toBe('/api/foods?q=&offset=100');
-  expect(screen.queryByRole('button', { name: '결과 더 보기' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Show more results' })).not.toBeInTheDocument();
   // With the button gone, focus lands on the line that says how many foods are shown.
-  await vi.waitFor(() => expect(screen.getByText('음식 2개')).toHaveFocus());
+  await vi.waitFor(() => expect(screen.getByText('2 foods')).toHaveFocus());
 });
 
 test('while the next page loads, the button keeps the focus and ignores presses', async () => {
@@ -346,7 +344,7 @@ test('while the next page loads, the button keeps the focus and ignores presses'
       : json({ foods: [food], nextOffset: 100 }),
   );
   open();
-  const more = await screen.findByRole('button', { name: '결과 더 보기' });
+  const more = await screen.findByRole('button', { name: 'Show more results' });
   more.focus();
   fireEvent.click(more);
   await vi.waitFor(() => expect(more).toHaveAttribute('aria-disabled', 'true'));
@@ -368,10 +366,10 @@ test('after the last page, focus moved elsewhere while waiting stays there', asy
       : json({ foods: [food], nextOffset: 100 }),
   );
   open();
-  const more = await screen.findByRole('button', { name: '결과 더 보기' });
+  const more = await screen.findByRole('button', { name: 'Show more results' });
   more.focus();
   fireEvent.click(more);
-  const search = screen.getByLabelText('음식 검색');
+  const search = screen.getByLabelText('Search foods');
   search.focus();
   finish(json({ foods: [{ ...food, id: 2, name: '피자' }], nextOffset: null }));
   await screen.findByRole('heading', { level: 2, name: '피자' });
@@ -381,34 +379,36 @@ test('after the last page, focus moved elsewhere while waiting stays there', asy
 
 test('a next page leaves the message of a failed search in place', async () => {
   serve((url) => {
-    if (url.endsWith('q=broken')) return json({ error: '검색이 실패했습니다' }, 500);
+    if (url.endsWith('q=broken')) return json({ error: 'The search failed' }, 500);
     return url.includes('offset=')
       ? json({ foods: [{ ...food, id: 2, name: '피자' }], nextOffset: null })
       : json({ foods: [food], nextOffset: 100 });
   });
   open();
   await screen.findByRole('heading', { level: 2, name: '치즈버거' });
-  fireEvent.change(screen.getByLabelText('음식 검색'), { target: { value: 'broken' } });
-  fireEvent.click(screen.getByRole('button', { name: '검색' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('검색이 실패했습니다');
+  fireEvent.change(screen.getByLabelText('Search foods'), { target: { value: 'broken' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('The search failed');
 
-  fireEvent.click(screen.getByRole('button', { name: '결과 더 보기' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Show more results' }));
   await screen.findByRole('heading', { level: 2, name: '피자' });
   // The list is still the answer to the earlier words, so the failure must stay in view.
-  expect(screen.getByRole('alert')).toHaveTextContent('검색이 실패했습니다');
+  expect(screen.getByRole('alert')).toHaveTextContent('The search failed');
 });
 
 test('a failed next page keeps the list and the button to try again', async () => {
   serve((url) =>
     url.endsWith('offset=100')
-      ? json({ error: '서버 오류가 발생했습니다' }, 500)
+      ? json({ error: 'Server error occurred' }, 500)
       : json({ foods: [food], nextOffset: 100 }),
   );
   open();
-  fireEvent.click(await screen.findByRole('button', { name: '결과 더 보기' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  fireEvent.click(await screen.findByRole('button', { name: 'Show more results' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
   expect(screen.getByRole('heading', { level: 2, name: '치즈버거' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '결과 더 보기' })).not.toHaveAttribute('aria-disabled');
+  expect(screen.getByRole('button', { name: 'Show more results' })).not.toHaveAttribute(
+    'aria-disabled',
+  );
 });
 
 // Focuses the button first, as a keyboard user would; a pointer click does not in every browser.
@@ -422,15 +422,15 @@ const openWith = async (name: string) => {
 test('cancelling the add dialog returns focus to the add button', async () => {
   serve(() => json({ foods: [] }));
   open();
-  const { opener, dialog } = await openWith('음식 추가');
-  fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+  const { opener, dialog } = await openWith('Add food');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
   await vi.waitFor(() => expect(opener).toHaveFocus());
 });
 
 test('closing the edit dialog with Escape returns focus to that food’s edit button', async () => {
   serve(() => json({ foods: [food, { ...food, id: 2, name: '감자튀김' }] }));
   open();
-  const { opener, dialog } = await openWith('치즈버거 수정');
+  const { opener, dialog } = await openWith('Edit 치즈버거');
   fireEvent.keyDown(dialog, { key: 'Escape' });
   await vi.waitFor(() => expect(opener).toHaveFocus());
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -439,10 +439,10 @@ test('closing the edit dialog with Escape returns focus to that food’s edit bu
 test('saving returns focus to the edit button while the food is still listed', async () => {
   serve((_url, init) => (init?.method === 'PUT' ? json(food) : json({ foods: [food] })));
   open();
-  const { dialog } = await openWith('치즈버거 수정');
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  const { dialog } = await openWith('Edit 치즈버거');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
   await vi.waitFor(() =>
-    expect(screen.getByRole('button', { name: '치즈버거 수정' })).toHaveFocus(),
+    expect(screen.getByRole('button', { name: 'Edit 치즈버거' })).toHaveFocus(),
   );
 });
 
@@ -456,11 +456,11 @@ test('a saved food the search no longer finds leaves focus on the page title, no
     return json({ foods: saved ? [] : [food] });
   });
   open();
-  const { dialog } = await openWith('치즈버거 수정');
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
-  expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
+  const { dialog } = await openWith('Edit 치즈버거');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  expect(await screen.findByText('No foods')).toBeInTheDocument();
   await vi.waitFor(() =>
-    expect(screen.getByRole('heading', { level: 1, name: '음식' })).toHaveFocus(),
+    expect(screen.getByRole('heading', { level: 1, name: 'Foods' })).toHaveFocus(),
   );
 });
 
@@ -477,36 +477,36 @@ test('a slow reload that drops the saved food still leaves focus on the page tit
     return new Promise<Response>((resolve) => (finishReload = () => resolve(json({ foods: [] }))));
   });
   open();
-  const { opener, dialog } = await openWith('치즈버거 수정');
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  const { opener, dialog } = await openWith('Edit 치즈버거');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
   await vi.waitFor(() => expect(opener).toHaveFocus());
 
   // The reload has to be on its way, or finishing it would do nothing.
   await vi.waitFor(() => expect(finishReload).toBeDefined());
   finishReload?.();
-  expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
+  expect(await screen.findByText('No foods')).toBeInTheDocument();
   await vi.waitFor(() =>
-    expect(screen.getByRole('heading', { level: 1, name: '음식' })).toHaveFocus(),
+    expect(screen.getByRole('heading', { level: 1, name: 'Foods' })).toHaveFocus(),
   );
 });
 
 test('once focus has moved on from the edit button, a later redraw leaves it alone', async () => {
   serve((url) => json({ foods: url === '/api/foods?q=' ? [food] : [] }));
   open();
-  const { opener, dialog } = await openWith('치즈버거 수정');
-  fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+  const { opener, dialog } = await openWith('Edit 치즈버거');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
   await vi.waitFor(() => expect(opener).toHaveFocus());
 
   // Typing in the search field moves focus on. A mouse click on 검색 that does not focus the
   // button (as in Safari) then leaves focus on <body> while the search removes the card.
-  const field = screen.getByRole('searchbox', { name: '음식 검색' });
+  const field = screen.getByRole('searchbox', { name: 'Search foods' });
   field.focus();
   fireEvent.change(field, { target: { value: '없는음식' } });
   field.blur();
-  fireEvent.click(screen.getByRole('button', { name: '검색' }));
-  expect(await screen.findByText('음식이 없습니다')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  expect(await screen.findByText('No foods')).toBeInTheDocument();
   await new Promise((resolve) => setTimeout(resolve, 0));
-  expect(screen.getByRole('heading', { level: 1, name: '음식' })).not.toHaveFocus();
+  expect(screen.getByRole('heading', { level: 1, name: 'Foods' })).not.toHaveFocus();
 });
 
 // #38
@@ -520,13 +520,13 @@ test('a food can be marked junk food, shown on its card, and the edit starts fro
     return json({ foods: [current] });
   });
   open();
-  fireEvent.click(await screen.findByRole('button', { name: '치즈버거 수정' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit 치즈버거' }));
   let dialog = await screen.findByRole('dialog');
-  const mark = within(dialog).getByRole('checkbox', { name: '정크푸드' });
+  const mark = within(dialog).getByRole('checkbox', { name: 'Junk food' });
   expect(mark).not.toBeChecked();
-  expect(mark).toHaveAccessibleDescription(/이미 기록한 식사는 그대로입니다/);
+  expect(mark).toHaveAccessibleDescription(/meals already recorded as they are/);
   fireEvent.click(mark);
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
   await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   const put = foodCalls(fetchMock).find(([, init]) => init?.method === 'PUT')!;
@@ -534,11 +534,11 @@ test('a food can be marked junk food, shown on its card, and the edit starts fro
   const card = (await screen.findByRole('heading', { level: 2, name: '치즈버거' })).closest(
     '[data-slot="card"]',
   ) as HTMLElement;
-  expect(await within(card).findByText('정크푸드')).toBeVisible();
+  expect(await within(card).findByText('Junk food')).toBeVisible();
 
-  fireEvent.click(screen.getByRole('button', { name: '치즈버거 수정' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Edit 치즈버거' }));
   dialog = await screen.findByRole('dialog');
-  expect(within(dialog).getByRole('checkbox', { name: '정크푸드' })).toBeChecked();
+  expect(within(dialog).getByRole('checkbox', { name: 'Junk food' })).toBeChecked();
 });
 
 test('while saving and after a failed save, keyboard focus stays in the dialog', async () => {
@@ -547,14 +547,14 @@ test('while saving and after a failed save, keyboard focus stays in the dialog',
     init?.method === 'POST' ? new Promise((resolve) => (finish = resolve)) : json({ foods: [] }),
   );
   open();
-  const { dialog } = await openWith('음식 추가');
-  fireEvent.change(within(dialog).getByLabelText('음식 이름'), { target: { value: '김밥' } });
-  fireEvent.change(within(dialog).getByLabelText('1회 제공량'), { target: { value: '1' } });
-  const save = within(dialog).getByRole('button', { name: '저장' });
+  const { dialog } = await openWith('Add food');
+  fireEvent.change(within(dialog).getByLabelText('Food name'), { target: { value: '김밥' } });
+  fireEvent.change(within(dialog).getByLabelText('Serving size'), { target: { value: '1' } });
+  const save = within(dialog).getByRole('button', { name: 'Save' });
   save.focus();
   fireEvent.click(save);
 
-  const busy = await within(dialog).findByRole('button', { name: '저장 중…' });
+  const busy = await within(dialog).findByRole('button', { name: 'Saving…' });
   expect(busy).toBe(save);
   expect(busy).toHaveAttribute('aria-disabled', 'true');
   expect(busy).toHaveFocus();
@@ -562,10 +562,10 @@ test('while saving and after a failed save, keyboard focus stays in the dialog',
   fireEvent.click(busy);
   expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
 
-  finish(json({ error: '이미 등록된 항목입니다' }, 409));
-  expect(await within(dialog).findByRole('alert')).toHaveTextContent('이미 등록된 항목입니다');
-  expect(within(dialog).getByRole('button', { name: '저장' })).toHaveFocus();
-  expect(within(dialog).getByRole('button', { name: '저장' })).not.toHaveAttribute('aria-disabled');
+  finish(json({ error: 'This item already exists' }, 409));
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent('This item already exists');
+  expect(within(dialog).getByRole('button', { name: 'Save' })).toHaveFocus();
+  expect(within(dialog).getByRole('button', { name: 'Save' })).not.toHaveAttribute('aria-disabled');
 });
 
 test('Enter in a field while saving sends nothing more, and the same failure twice is said twice', async () => {
@@ -576,27 +576,27 @@ test('Enter in a field while saving sends nothing more, and the same failure twi
       : json({ foods: [] }),
   );
   open();
-  const { dialog } = await openWith('음식 추가');
-  const name = within(dialog).getByLabelText('음식 이름');
+  const { dialog } = await openWith('Add food');
+  const name = within(dialog).getByLabelText('Food name');
   fireEvent.change(name, { target: { value: '김밥' } });
-  fireEvent.change(within(dialog).getByLabelText('1회 제공량'), { target: { value: '1' } });
+  fireEvent.change(within(dialog).getByLabelText('Serving size'), { target: { value: '1' } });
   const posts = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST');
 
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
-  await within(dialog).findByRole('button', { name: '저장 중…' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  await within(dialog).findByRole('button', { name: 'Saving…' });
   // Enter in a field submits the form.
   fireEvent.submit(name.closest('form')!);
   expect(posts()).toHaveLength(1);
 
-  finishers[0](json({ error: '이미 등록된 항목입니다' }, 409));
-  expect(await within(dialog).findByRole('alert')).toHaveTextContent('이미 등록된 항목입니다');
+  finishers[0](json({ error: 'This item already exists' }, 409));
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent('This item already exists');
 
   // A second try clears the message, so the same answer appears anew and is read out again.
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
-  await within(dialog).findByRole('button', { name: '저장 중…' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  await within(dialog).findByRole('button', { name: 'Saving…' });
   expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
-  finishers[1](json({ error: '이미 등록된 항목입니다' }, 409));
-  expect(await within(dialog).findByRole('alert')).toHaveTextContent('이미 등록된 항목입니다');
+  finishers[1](json({ error: 'This item already exists' }, 409));
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent('This item already exists');
   expect(posts()).toHaveLength(2);
 });
 
@@ -604,40 +604,42 @@ const label = `총 내용량 90g
 1봉지(45g)당 230kcal
 나트륨 210mg 탄수화물 25g 당류 1g 미만 지방 13g 트랜스지방 0g 포화지방 4g 단백질 3g`;
 
-test('a pasted nutrition table fills the form, and nothing is saved until 저장 is pressed', async () => {
+test('a pasted nutrition table fills the form, and nothing is saved until Save is pressed', async () => {
   const fetchMock = serve((_url, init) =>
     init?.method === 'POST' ? json({ ...food, id: 2 }, 201) : json({ foods: [] }),
   );
   open();
-  const { dialog } = await openWith('음식 추가');
-  fireEvent.change(within(dialog).getByLabelText('영양성분 표 붙여넣기'), {
+  const { dialog } = await openWith('Add food');
+  fireEvent.change(within(dialog).getByLabelText('Paste a nutrition table'), {
     target: { value: label },
   });
-  fireEvent.click(within(dialog).getByRole('button', { name: '표 읽어 채우기' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Read the table and fill in' }));
 
   const summary = within(dialog).getByRole('status');
-  expect(summary).toHaveTextContent('채운 칸: 1회 제공량, 칼로리, 탄수화물, 단백질, 지방, 나트륨');
-  expect(summary).toHaveTextContent('"미만" 표기라 비운 칸: 당류');
-  expect(summary).toHaveTextContent('1회 제공량(45g)의 2배, 약 460kcal');
-  expect(within(dialog).getByLabelText('1회 제공량')).toHaveValue('45');
-  expect(within(dialog).getByLabelText('단위')).toHaveValue('g');
-  expect(within(dialog).getByLabelText('칼로리 (kcal)')).toHaveValue('230');
-  expect(within(dialog).getByLabelText('지방 (g)')).toHaveValue('13');
-  expect(within(dialog).getByLabelText('나트륨 (mg)')).toHaveValue('210');
-  expect(within(dialog).getByLabelText('당류 (g)')).toHaveValue('');
-  // The values are the product's own label, checked today.
-  expect(within(dialog).getByRole('combobox', { name: '출처 종류' })).toHaveTextContent(
-    '제품 표기',
+  expect(summary).toHaveTextContent(
+    'Filled in: Serving size, Calories, Carbs, Protein, Fat, Sodium',
   );
-  expect(within(dialog).getByLabelText('확인 날짜')).not.toHaveValue('');
+  expect(summary).toHaveTextContent('Cleared because the table says "less than": Sugars');
+  expect(summary).toHaveTextContent('2 times the serving size (45g), about 460kcal');
+  expect(within(dialog).getByLabelText('Serving size')).toHaveValue('45');
+  expect(within(dialog).getByLabelText('Unit')).toHaveValue('g');
+  expect(within(dialog).getByLabelText('Calories (kcal)')).toHaveValue('230');
+  expect(within(dialog).getByLabelText('Fat (g)')).toHaveValue('13');
+  expect(within(dialog).getByLabelText('Sodium (mg)')).toHaveValue('210');
+  expect(within(dialog).getByLabelText('Sugars (g)')).toHaveValue('');
+  // The values are the product's own label, checked today.
+  expect(within(dialog).getByRole('combobox', { name: 'Source type' })).toHaveTextContent(
+    'Product label',
+  );
+  expect(within(dialog).getByLabelText('Verified date')).not.toHaveValue('');
   // Reading the table sends nothing.
   expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
 
-  fireEvent.change(within(dialog).getByLabelText('음식 이름'), { target: { value: '감자칩' } });
-  fireEvent.change(within(dialog).getByLabelText('출처 주소'), {
+  fireEvent.change(within(dialog).getByLabelText('Food name'), { target: { value: '감자칩' } });
+  fireEvent.change(within(dialog).getByLabelText('Source URL'), {
     target: { value: 'https://www.coupang.com/vp/products/1' },
   });
-  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
   await vi.waitFor(() =>
     expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1),
   );
@@ -662,63 +664,65 @@ test('a pasted nutrition table fills the form, and nothing is saved until 저장
 test('text without a table says so and changes nothing', async () => {
   serve(() => json({ foods: [] }));
   open();
-  const { dialog } = await openWith('음식 추가');
-  fireEvent.change(within(dialog).getByLabelText('영양성분 표 붙여넣기'), {
+  const { dialog } = await openWith('Add food');
+  fireEvent.change(within(dialog).getByLabelText('Paste a nutrition table'), {
     target: { value: '맛있는 감자칩 로켓배송' },
   });
-  fireEvent.click(within(dialog).getByRole('button', { name: '표 읽어 채우기' }));
-  expect(within(dialog).getByRole('alert')).toHaveTextContent('영양성분 표를 찾지 못했습니다');
-  expect(within(dialog).getByLabelText('1회 제공량')).toHaveValue('');
-  expect(within(dialog).getByRole('combobox', { name: '출처 종류' })).toHaveTextContent(
-    '직접 입력',
-  );
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Read the table and fill in' }));
+  expect(within(dialog).getByRole('alert')).toHaveTextContent('Could not find a nutrition table');
+  expect(within(dialog).getByLabelText('Serving size')).toHaveValue('');
+  expect(within(dialog).getByRole('combobox', { name: 'Source type' })).toHaveTextContent('Manual');
 });
 
 test('a Coupang source link explains that the app never opens it', async () => {
   serve(() => json({ foods: [] }));
   open();
-  const { dialog } = await openWith('음식 추가');
-  const url = within(dialog).getByLabelText('출처 주소');
-  expect(within(dialog).queryByText(/쿠팡 링크는 출처로만 저장합니다/)).not.toBeInTheDocument();
+  const { dialog } = await openWith('Add food');
+  const url = within(dialog).getByLabelText('Source URL');
+  expect(
+    within(dialog).queryByText(/Coupang links are saved only as the source/),
+  ).not.toBeInTheDocument();
   fireEvent.change(url, { target: { value: 'https://link.coupang.com/a/abc' } });
-  const help = within(dialog).getByText(/쿠팡 링크는 출처로만 저장합니다/);
+  const help = within(dialog).getByText(/Coupang links are saved only as the source/);
   expect(url).toHaveAttribute('aria-describedby', help.id);
   fireEvent.change(url, { target: { value: 'https://example.com/menu' } });
-  expect(within(dialog).queryByText(/쿠팡 링크는 출처로만 저장합니다/)).not.toBeInTheDocument();
+  expect(
+    within(dialog).queryByText(/Coupang links are saved only as the source/),
+  ).not.toBeInTheDocument();
 });
 
 test('reading a table into a published food clears stale values and marks it as the label', async () => {
   serve(() => json({ foods: [{ ...food, sugars: 10, fat: 9, checkedOn: '2026-10-31' }] }));
   open();
-  const { dialog } = await openWith('치즈버거 수정');
-  expect(within(dialog).getByLabelText('당류 (g)')).toHaveValue('10');
-  fireEvent.change(within(dialog).getByLabelText('영양성분 표 붙여넣기'), {
+  const { dialog } = await openWith('Edit 치즈버거');
+  expect(within(dialog).getByLabelText('Sugars (g)')).toHaveValue('10');
+  fireEvent.change(within(dialog).getByLabelText('Paste a nutrition table'), {
     target: { value: '영양정보 1회 제공량 100g 열량 280kcal 당류 1g 미만 단백질 12g' },
   });
-  fireEvent.click(within(dialog).getByRole('button', { name: '표 읽어 채우기' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Read the table and fill in' }));
 
   // "미만" really empties the field, and so does a nutrient the new table leaves out.
-  expect(within(dialog).getByLabelText('당류 (g)')).toHaveValue('');
-  expect(within(dialog).getByLabelText('지방 (g)')).toHaveValue('');
-  expect(within(dialog).getByLabelText('칼로리 (kcal)')).toHaveValue('280');
+  expect(within(dialog).getByLabelText('Sugars (g)')).toHaveValue('');
+  expect(within(dialog).getByLabelText('Fat (g)')).toHaveValue('');
+  expect(within(dialog).getByLabelText('Calories (kcal)')).toHaveValue('280');
   const summary = within(dialog).getByRole('status');
-  expect(summary).toHaveTextContent('표에서 읽지 못해 비운 칸: 탄수화물, 지방, 나트륨');
-  expect(summary).toHaveTextContent('출처 종류를 "제품 표기"로 바꿨습니다');
+  expect(summary).toHaveTextContent('Cleared because the table has no value: Carbs, Fat, Sodium');
+  expect(summary).toHaveTextContent('The source type was changed to "Product label"');
   // Read today, not the date of the official source it replaced.
-  expect(within(dialog).getByRole('combobox', { name: '출처 종류' })).toHaveTextContent(
-    '제품 표기',
+  expect(within(dialog).getByRole('combobox', { name: 'Source type' })).toHaveTextContent(
+    'Product label',
   );
-  expect(within(dialog).getByLabelText('확인 날짜')).not.toHaveValue('2026-10-31');
+  expect(within(dialog).getByLabelText('Verified date')).not.toHaveValue('2026-10-31');
 });
 
 test('reading the same table again announces the result again', async () => {
   serve(() => json({ foods: [] }));
   open();
-  const { dialog } = await openWith('음식 추가');
-  fireEvent.change(within(dialog).getByLabelText('영양성분 표 붙여넣기'), {
+  const { dialog } = await openWith('Add food');
+  fireEvent.change(within(dialog).getByLabelText('Paste a nutrition table'), {
     target: { value: '100g당 250kcal 단백질 5g' },
   });
-  const read = within(dialog).getByRole('button', { name: '표 읽어 채우기' });
+  const read = within(dialog).getByRole('button', { name: 'Read the table and fill in' });
   fireEvent.click(read);
   const first = within(dialog).getByRole('status');
   fireEvent.click(read);
@@ -729,38 +733,38 @@ test('reading the same table again announces the result again', async () => {
 test('values without a basis change nothing and are shown to type in', async () => {
   serve(() => json({ foods: [{ ...food, sugars: 10 }] }));
   open();
-  const { dialog } = await openWith('치즈버거 수정');
-  fireEvent.change(within(dialog).getByLabelText('영양성분 표 붙여넣기'), {
+  const { dialog } = await openWith('Edit 치즈버거');
+  fireEvent.change(within(dialog).getByLabelText('Paste a nutrition table'), {
     target: { value: '열량 310kcal 단백질 12g' },
   });
-  fireEvent.click(within(dialog).getByRole('button', { name: '표 읽어 채우기' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Read the table and fill in' }));
   // Values of an unknown amount would sit next to the official 120g serving: nothing changes (#120).
-  expect(within(dialog).getByLabelText('칼로리 (kcal)')).toHaveValue('300');
-  expect(within(dialog).getByLabelText('당류 (g)')).toHaveValue('10');
-  expect(within(dialog).getByLabelText('1회 제공량')).toHaveValue('120');
-  expect(within(dialog).getByRole('combobox', { name: '출처 종류' })).toHaveTextContent(
-    '공식 자료',
+  expect(within(dialog).getByLabelText('Calories (kcal)')).toHaveValue('300');
+  expect(within(dialog).getByLabelText('Sugars (g)')).toHaveValue('10');
+  expect(within(dialog).getByLabelText('Serving size')).toHaveValue('120');
+  expect(within(dialog).getByRole('combobox', { name: 'Source type' })).toHaveTextContent(
+    'Official data',
   );
   const alert = within(dialog).getByRole('alert');
-  expect(alert).toHaveTextContent('1회 제공량을 찾지 못해 아무 칸도 바꾸지 않았습니다');
-  expect(alert).toHaveTextContent('읽은 값: 칼로리 310kcal, 단백질 12g');
+  expect(alert).toHaveTextContent('Could not find the serving size, so no field was changed');
+  expect(alert).toHaveTextContent('Values read: Calories 310kcal, Protein 12g');
 });
 
 test('a basis read without any value changes nothing', async () => {
   serve(() => json({ foods: [{ ...food, sugars: 10 }] }));
   open();
-  const { dialog } = await openWith('치즈버거 수정');
-  fireEvent.change(within(dialog).getByLabelText('영양성분 표 붙여넣기'), {
+  const { dialog } = await openWith('Edit 치즈버거');
+  fireEvent.change(within(dialog).getByLabelText('Paste a nutrition table'), {
     // A table whose numbers are only in an image: the basis is there, no value is.
     target: { value: '100g당\n수치는 상세 이미지를 참고하세요' },
   });
-  fireEvent.click(within(dialog).getByRole('button', { name: '표 읽어 채우기' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Read the table and fill in' }));
   expect(within(dialog).getByRole('alert')).toHaveTextContent(
-    '기준량(100g)은 찾았지만 영양성분 값을 읽지 못해 아무 칸도 바꾸지 않았습니다',
+    'Found the basis amount (100g) but could not read the nutrition values, so no field was changed',
   );
-  expect(within(dialog).getByLabelText('1회 제공량')).toHaveValue('120');
-  expect(within(dialog).getByLabelText('당류 (g)')).toHaveValue('10');
-  expect(within(dialog).getByRole('combobox', { name: '출처 종류' })).toHaveTextContent(
-    '공식 자료',
+  expect(within(dialog).getByLabelText('Serving size')).toHaveValue('120');
+  expect(within(dialog).getByLabelText('Sugars (g)')).toHaveValue('10');
+  expect(within(dialog).getByRole('combobox', { name: 'Source type' })).toHaveTextContent(
+    'Official data',
   );
 });

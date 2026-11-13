@@ -1,63 +1,63 @@
-# #70 음식·식사 숫자 칸의 쉼표 입력
+# #70 Comma input in the number fields of foods and meals
 
-- 이슈: [#70](https://github.com/sirloinbh/health-log/issues/70)
-- 브랜치: `fix/70-food-meal-comma-input`
+- Issue: [#70](https://github.com/sirloinbh/health-log/issues/70)
+- Branch: `fix/70-food-meal-comma-input`
 
-## 목적
+## Purpose
 
-Chrome의 `type="number"` 칸은 입력 단계에서 쉼표를 지운다. `49,5`가 `495`가 되고 `badInput`도 켜지지 않아 경고 없이 10배 값이 저장된다. 신체 화면은 #44에서 고쳤고, 같은 구조인 음식과 식사 화면을 고친다.
+A `type="number"` field in Chrome removes the comma at the input stage. `49,5` becomes `495`, and `badInput` is not turned on either, so a value 10 times too large is saved with no warning. We fixed the body screen in #44, and now fix the food and meal screens, which have the same structure.
 
-## 변경 — 2026-11-04
+## Changes: 2026-11-04
 
-- **음식 화면** `frontend/src/foods.tsx`: 1회 제공량과 영양성분 6개를 텍스트 입력(`inputMode="decimal"`)으로 바꿨다. 저장 전에 `parseAmount`로 읽고, 읽지 못하면 그 칸 이름으로 안내한 뒤 보내지 않는다. 동작하지 않던 `badInput` 검사는 지웠다.
-- **식사 화면** `frontend/src/meals.tsx`: 수량과 1회 칼로리를 같은 방식으로 바꿨다. 빈 값, 0, 소수 셋째 자리 안내는 그대로다. 쉼표처럼 읽을 수 없는 값은 `수량: 숫자만 입력해 주세요…`로 안내한다.
-- **안내 문구** `frontend/src/number-input.ts`: 신체·음식·식사가 같은 문구를 쓰도록 `unreadableAmount`로 묶었다. 신체 화면 문구는 바뀌지 않았다.
+- **Food screen** `frontend/src/foods.tsx`: changed the serving and the 6 nutrition fields to text inputs (`inputMode="decimal"`). Before saving, they are read with `parseAmount`, and if one cannot be read, the notice names that field and nothing is sent. We removed the `badInput` check that did not work.
+- **Meal screen** `frontend/src/meals.tsx`: changed the quantity and the calories per serving in the same way. The notices for an empty value, 0, and a third decimal place stay the same. A value that cannot be read, such as one with a comma, gets the notice `수량: 숫자만 입력해 주세요…` ("Quantity: enter numbers only…").
+- **Notice text** `frontend/src/number-input.ts`: grouped it as `unreadableAmount`, so that the body, food, and meal screens use the same text. The text on the body screen did not change.
 
-## 검증
+## Verification
 
-- 테스트
-  - `frontend/src/foods.test.tsx`: `validity`를 강제로 덮어쓰던 테스트를 지웠다. 7개 칸 각각에 `49,5`를 넣으면 칸에 그대로 남고, 안내가 나오고, POST가 없는지 검사한다. `49.5`는 숫자로 보내는지도 검사한다.
-  - `frontend/src/meals.test.tsx`: 수량에 `49,5`, `1.5.1`을 넣으면 거부하는 경우를 더했다. 수량과 1회 칼로리의 쉼표 거부, `0.5`회분 `49.5`kcal 전송도 검사한다.
-  - 수정 전 코드로 되돌려 같은 테스트를 돌리면 15개가 실패하고, 수정 후에는 모두 통과한다.
-- `npm test -w frontend`: 30개 파일, 208개 통과, 2개 건너뜀. 건너뛴 2개는 다크 전용 앱 조건 테스트이며 이 변경과 무관하다.
-- `npm run check`: 통과. 포맷, 린트, 타입 검사, 빌드 통과. 백엔드 97개 중 60개 통과, 37개 건너뜀(`TEST_DATABASE_URL`이 없어 DB 통합 테스트를 건너뜀. 성공으로 세지 않는다). 프런트엔드 208개 통과, 2개 건너뜀. 스킬 검사 4개 통과.
-  - 첫 실행에서는 이 변경과 관계없는 `daily.test.tsx`의 `the main menu opens the day the server counts as today`가 한 번 실패했다. 따로 3번 돌리면 모두 통과했고, 다시 돌린 전체 검사도 통과했다. 부하가 있을 때 시간 초과로 실패하는 것으로 보인다.
+- Tests
+  - `frontend/src/foods.test.tsx`: removed the test that forced `validity` to be overwritten. For each of the 7 fields, it checks that `49,5` stays in the field as it is, a notice appears, and there is no POST. It also checks that `49.5` is sent as a number.
+  - `frontend/src/meals.test.tsx`: added cases where `49,5` and `1.5.1` in the quantity are rejected. It also checks the rejection of a comma in the quantity and the calories per serving, and the sending of `49.5` kcal for `0.5` servings.
+  - If we put the code back to before the fix and run the same tests, 15 fail, and after the fix all pass.
+- `npm test -w frontend`: 30 files, 208 passed, 2 skipped. The 2 skipped are condition tests for the dark-only app and unrelated to this change.
+- `npm run check`: passed. Format, lint, type check, and build passed. Backend: 60 of 97 passed, 37 skipped (the DB integration tests were skipped because there is no `TEST_DATABASE_URL`; they are not counted as a success). Frontend: 208 passed, 2 skipped. 4 skill checks passed.
+  - In the first run, `the main menu opens the day the server counts as today` in `daily.test.tsx`, unrelated to this change, failed once. When we ran it 3 times separately, all passed, and the full check we ran again also passed. It seems to fail by a timeout under load.
 
-### 브라우저 확인
+### Browser check
 
-헤드리스 Chrome을 CDP로 움직였다. 값을 직접 넣지 않고 키를 하나씩 눌렀다. 이 PC에는 PostgreSQL이 없어서 API는 실제 서버 대신 임시 스텁을 썼다. 스텁은 받은 쓰기 요청 본문을 기록한다. 이 변경은 요청을 보내기 전 화면 검사이므로 스텁으로 확인할 수 있다. 서버 검증은 바뀌지 않았다.
+We drove headless Chrome with CDP. We did not set the value directly; we pressed the keys one by one. There is no PostgreSQL on this PC, so the API used a temporary stub instead of the real server. The stub records the body of the write requests it receives. This change is a screen check before the request is sent, so a stub is enough to verify it. The server validation did not change.
 
-**수정 전 재현:** `origin/main`의 `foods.tsx`, `meals.tsx`에서 9개 칸 모두 `49,5`를 누르면 칸 값이 `495`가 됐다(390×844, 1440×900).
+**Reproduction before the fix:** in `foods.tsx` and `meals.tsx` of `origin/main`, pressing `49,5` in all 9 fields made the field value `495` (390×844, 1440×900).
 
-**수정 후:**
+**After the fix:**
 
-| 항목                                                 | 390×844 | 1440×900 |
-| ---------------------------------------------------- | ------- | -------- |
-| 음식 7개 칸 각각 `49,5`: 칸 값 유지, 안내, 요청 없음 | 통과    | 통과     |
-| 음식 1회 제공량 `49.5` 저장 시 `servingSize: 49.5`   | 통과    | 통과     |
-| 식사 수량, 1회 칼로리 `49,5`: 칸 값 유지, 안내       | 통과    | 통과     |
-| 식사 `1.5`회분 `49.5`kcal 기록 시 같은 숫자 전송     | 통과    | 통과     |
-| 가로 넘침, 콘솔 오류                                 | 없음    | 없음     |
+| Item                                                                            | 390×844 | 1440×900 |
+| ------------------------------------------------------------------------------- | ------- | -------- |
+| `49,5` in each of the 7 food fields: the value stays, a notice, no request      | pass    | pass     |
+| `49.5` in the food serving is saved as `servingSize: 49.5`                      | pass    | pass     |
+| `49,5` in the meal quantity and calories per serving: the value stays, a notice | pass    | pass     |
+| Recording `1.5` servings and `49.5` kcal in a meal sends the same numbers       | pass    | pass     |
+| Horizontal overflow, console errors                                             | none    | none     |
 
-## 1차 리뷰 — 2026-11-04
+## First review: 2026-11-04
 
-독립 리뷰에서 높음·중간 지적은 없었고, 낮음 1건이 나왔다.
+The independent review had no high or medium findings, and gave 1 low finding.
 
-- **`.5` 입력:** 예전 숫자 칸은 `.5`를 0.5로 받았지만, 이제는 앞자리 숫자가 없어 거부하고 "소수점은 마침표로 씁니다"라고 안내한다. 마침표를 쓴 사람에게는 이유가 분명하지 않다. `parseAmount`의 의도된 규칙이고 신체 화면도 #44부터 같다. 규칙을 바꾸면 세 화면이 함께 바뀌므로 이 PR에서는 아래 제한에 적기만 했다.
+- **`.5` input:** the old number field accepted `.5` as 0.5, but now there is no leading digit, so it is rejected and explained as "write the decimal point as a period" (in Korean). It is not clear why for someone who did use a period. It is the intended rule of `parseAmount`, and the body screen has been the same since #44. If we change the rule, all three screens change together, so in this PR we only wrote it in the limits below.
 
-## 2차 리뷰 — 2026-11-04
+## Second review: 2026-11-04
 
-보완점 없음. 1차 지적이 위처럼 기록됐는지 확인했고, 최종 전체 변경도 다시 봤다. 리뷰는 2회까지이므로 더 하지 않는다.
+Nothing to fix. We checked that the first finding was recorded as above, and looked again at the final whole change. The review is at most 2 rounds, so we do no more.
 
-- 식사 화면의 검사 순서는 수량, 이름, 칼로리다. 오류는 누른 버튼 쪽 안내 칸에 나오고, 이전 안내는 지워진다.
-- 저장이 거부되면 요청을 보내지 않고, 입력값과 버튼 상태가 남지 않는다.
-- 기존 음식을 열어 그대로 저장해도 거부되지 않는다.
-- 신체 화면 안내 문구는 바뀌지 않았다.
-- 참고: 일부 외국어 휴대폰 키보드는 `inputMode="decimal"`에서 쉼표를 보여 줄 수 있다. 그래도 10배로 저장되지 않고 안내가 나온다.
+- The order of the checks on the meal screen is the quantity, the name, and the calories. The error appears in the notice area next to the button that was pressed, and the earlier notice is cleared.
+- If a save is rejected, no request is sent, and the input values and the button state are not left behind.
+- Opening an existing food and saving it as it is is not rejected.
+- The notice text on the body screen did not change.
+- Note: the keyboards of some foreign-language phones may show a comma with `inputMode="decimal"`. Even so, it is not saved as 10 times the value, and a notice appears.
 
-## 제한·후속
+## Limits and follow-up
 
-- 음수를 넣으면 범위 오류가 아니라 숫자 형식 안내가 나온다. 신체 화면과 같다.
-- `.5`처럼 앞자리 0을 뺀 소수는 거부되고, 안내 문구가 그 이유를 말하지 않는다(`0.5`로 써야 한다). 신체 화면과 같다.
-- 다크 모드와 실제 휴대폰, Firefox, Safari는 확인하지 않았다.
-- 실제 DB와 연결한 브라우저 확인은 하지 못했다. DB 통합 테스트는 CI에서 돈다.
+- If you enter a negative number, you get the number format notice, not a range error. The same as the body screen.
+- A decimal without the leading 0, such as `.5`, is rejected, and the notice text does not say that reason (you must write `0.5`). The same as the body screen.
+- We did not check dark mode, a real phone, Firefox, or Safari.
+- We could not do a browser check connected to a real DB. The DB integration tests run in CI.

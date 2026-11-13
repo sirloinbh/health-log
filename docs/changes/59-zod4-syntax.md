@@ -1,35 +1,35 @@
-# #59 백엔드 검증 코드를 zod 4 문법으로 옮기기
+# #59 Move the backend validation code to zod 4 syntax
 
-- 이슈: [#59](https://github.com/sirloinbh/health-log/issues/59)
-- 브랜치: `chore/59-zod4-syntax`
+- Issue: [#59](https://github.com/sirloinbh/health-log/issues/59)
+- Branch: `chore/59-zod4-syntax`
 
-## 목적
+## Purpose
 
-중앙 `sirloinbh/project-standards#386`의 1단계다. 중앙이 `zod`를 4.6.7로 올릴 때 이 앱이 깨지지 않도록 코드를 먼저 옮긴다. 보안 권고 GHSA-mrhx-c7xc-m3w5의 Dependabot 알림은 그 동기화로 닫힌다. 이 PR만으로는 닫히지 않는다.
+This is step 1 of the central `sirloinbh/project-standards#386`. We move the code first so that this app does not break when the central repository raises `zod` to 4.6.7. The Dependabot alert for the security advisory GHSA-mrhx-c7xc-m3w5 is closed by that sync. This PR alone does not close it.
 
-## 변경 — 2026-11-01
+## Changes: 2026-11-01
 
-- `backend/src/foods.ts`가 `zod/v4`에서 불러온다. 설치된 3.25.76에 이 경로가 들어 있어 `package.json`과 잠금 파일은 바꾸지 않았다.
-- `required_error`, `invalid_type_error`, `errorMap`을 `error`로 옮겼다.
-- 문자열의 `.min()`, `.max()`를 `.refine()`으로 바꿨다. zod 4의 길이 검사는 `.length`가 있는 입력이면 타입 실패 뒤에도 돌아, 배열을 보내면 메시지가 두 개가 된다.
-- 브랜드와 분류의 길이 검사에 `abort: true`를 넣었다. zod 3은 뒤에 `.transform()`이 있는 필드가 실패하면 객체 단위 출처 규칙을 건너뛰었는데, zod 4는 그대로 돌려 메시지가 늘어난다.
+- `backend/src/foods.ts` imports from `zod/v4`. The installed 3.25.76 contains this path, so we did not change `package.json` or the lock file.
+- Moved `required_error`, `invalid_type_error`, and `errorMap` to `error`.
+- Changed `.min()` and `.max()` on strings to `.refine()`. The length check of zod 4 runs even after a type failure when the input has `.length`, so sending an array gives two messages.
+- Put `abort: true` on the length checks of brand and category. In zod 3, when a field with a `.transform()` after it failed, the object-level source rule was skipped, but zod 4 runs it anyway and the messages increase.
 
-## 바뀌는 응답
+## Responses that change
 
-전환 전, 3.25.76의 `zod/v4`, 4.6.7을 같은 입력 1302개로 실제 라우트에 보내 상태 코드, 응답 본문, DB에 넘기는 값을 비교했다. 달라진 것은 22개이고 모두 아래 한 가지다. 상태 코드와 저장되는 값은 그대로다. 3.25.76과 4.6.7 사이의 차이는 없었다.
+We sent the same 1302 inputs to the real routes before the move, with `zod/v4` of 3.25.76, and with 4.6.7, and compared the status code, the response body, and the values passed to the DB. 22 differ, and all are the one case below. The status codes and the stored values stay the same. There was no difference between 3.25.76 and 4.6.7.
 
-| 입력                     | 전                                 | 후                                  |
-| ------------------------ | ---------------------------------- | ----------------------------------- |
-| 숫자 필드에 `1e999`      | `칼로리이(가) 너무 큽니다`         | `칼로리은(는) 숫자로 입력해 주세요` |
-| 숫자 필드에 `-1e999`     | `칼로리은(는) 0 이상이어야 합니다` | `칼로리은(는) 숫자로 입력해 주세요` |
-| `servingSize`에 `1e999`  | `1회 제공량이 너무 큽니다`         | `1회 제공량을 입력해 주세요`        |
-| `servingSize`에 `-1e999` | `1회 제공량은 0보다 커야 합니다`   | `1회 제공량을 입력해 주세요`        |
+| Input                      | Before                                                 | After                                                |
+| -------------------------- | ------------------------------------------------------ | ---------------------------------------------------- |
+| `1e999` in a number field  | `칼로리이(가) 너무 큽니다` (calories too large)        | `칼로리은(는) 숫자로 입력해 주세요` (enter a number) |
+| `-1e999` in a number field | `칼로리은(는) 0 이상이어야 합니다` (must be 0 or more) | `칼로리은(는) 숫자로 입력해 주세요` (enter a number) |
+| `1e999` in `servingSize`   | `1회 제공량이 너무 큽니다` (serving too large)         | `1회 제공량을 입력해 주세요` (enter the serving)     |
+| `-1e999` in `servingSize`  | `1회 제공량은 0보다 커야 합니다` (must be above 0)     | `1회 제공량을 입력해 주세요` (enter the serving)     |
 
-zod 4의 `z.number()`가 무한대를 타입 단계에서 거절해서 생긴다. 이때 `.superRefine`이 돌지 않아, 같은 요청에 출처 규칙 위반이 함께 있으면 출처 문구도 나오지 않는다. 예를 들어 `calories: 1e999`에 `sourceType: "official"`이면 전에는 칼로리, 출처 주소, 확인 날짜 문구가 함께 나왔고 이제 칼로리 문구만 나온다. JSON 본문을 직접 만들 때만 나오는 입력이고, 400은 유지되므로 고치지 않았다.
+This happens because `z.number()` of zod 4 rejects infinity at the type stage. Then `.superRefine` does not run, so if the same request also breaks a source rule, the source message is not shown either. For example, with `calories: 1e999` and `sourceType: "official"`, the calories, source URL, and checked date messages used to appear together, and now only the calories message appears. It is an input that appears only when you build the JSON body by hand, and the 400 is kept, so we did not fix it.
 
-`z.record`는 쓰지 않는다. 본문의 `constructor` 키가 null, 숫자, 객체인 입력은 전후 응답이 같고 500이 나지 않는다.
+We do not use `z.record`. For an input whose body has a `constructor` key that is null, a number, or an object, the responses before and after are the same and there is no 500.
 
-## 검증
+## Verification
 
-- `npm run check`: 통과(백엔드 42개 중 31개 통과, 11개 건너뜀, 프론트엔드 97개 통과, 2개 건너뜀, 스킬 4개 통과). `TEST_DATABASE_URL`을 비워 DB 통합 테스트는 로컬에서 돌리지 않았고 PR CI로 확인한다.
-- 4.6.7: `knip`이 함께 설치한 사본으로 타입 검사와 전후 비교를 통과했다. `docs/food-data.md`를 포함한 복사본에서 백엔드 테스트도 실패 없이 통과했다(DB 통합 테스트는 건너뜀). 설치 자체의 확인은 중앙 동기화 PR의 CI로 한다.
+- `npm run check`: passed (backend 31 of 42 passed and 11 skipped, frontend 97 passed and 2 skipped, 4 skill checks passed). We left `TEST_DATABASE_URL` empty, so the DB integration tests were not run locally and are checked in the PR CI.
+- 4.6.7: the type check and the before and after comparison passed with the copy that `knip` installed along with it. The backend tests also passed with no failure in a copy that includes `docs/food-data.md` (the DB integration tests were skipped). The install itself is checked in the CI of the central sync PR.

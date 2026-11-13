@@ -1,55 +1,55 @@
-# #74 compose 배포 계약 (이 저장소 부분)
+# #74 The compose deploy contract (the part in this repository)
 
-- 이슈: [#74](https://github.com/sirloinbh/health-log/issues/74) (이 PR은 `Refs #74`)
-- 브랜치: `chore/74-compose-contract`
+- Issue: [#74](https://github.com/sirloinbh/health-log/issues/74) (this PR is `Refs #74`)
+- Branch: `chore/74-compose-contract`
 
-## 목적
+## Purpose
 
-공유 서버에 health-log를 올릴 때 중앙 배포 스크립트(`deploy/remote-deploy.sh`)가 기대하는 `compose.yaml` 계약을 지킨다. 서버 `.env` 값과 방화벽에서 열 포트를 문서로 정한다.
+Keep the `compose.yaml` contract that the central deploy script (`deploy/remote-deploy.sh`) expects when health-log goes on the shared server. Decide the server `.env` values and the port to open in the firewall in a document.
 
-방화벽 변경(`sirloinbh/shared-aws-infrastructure`의 `main.tf`), `terraform plan`·`apply`, 서버 `.env`, 첫 배포와 그 확인은 사용자가 한다. 그래서 #74는 이 PR로 닫지 않는다.
+The firewall change (`main.tf` of `sirloinbh/shared-aws-infrastructure`), `terraform plan` and `apply`, the server `.env`, and the first deploy and its check are done by the user. So #74 is not closed by this PR.
 
-## 정한 것
+## What we decided
 
-- **들어올 길:** 새 포트. 이슈의 할 일이 방화벽 `port_info` 추가다. 80은 workout-memo 웹이 쓰므로, 80을 나눠 쓰려면 호스트 프록시를 새로 두어야 한다.
-- **웹 포트:** 중앙 레지스트리의 health-log 웹 포트 `8103`을 서버에서도 쓴다. 로컬과 서버 포트가 같아 SSH 터널 안내(`-L 18103:127.0.0.1:8103`)도 그대로다.
-- **서버 `.env`:** `WEB_BIND=0.0.0.0`, `WEB_PORT=8103`. `IMAGE_TAG`는 배포 스크립트가 넣는다.
+- **The way in:** a new port. The issue task is to add a firewall `port_info`. Port 80 is used by the workout-memo web, so sharing 80 would need a new host proxy.
+- **Web port:** use the health-log web port `8103` of the central registry on the server too. The local and server ports are the same, so the SSH tunnel notes (`-L 18103:127.0.0.1:8103`) stay as they are.
+- **Server `.env`:** `WEB_BIND=0.0.0.0`, `WEB_PORT=8103`. The deploy script sets `IMAGE_TAG`.
 
-## 변경 — 2026-11-08
+## Changes: 2026-11-08
 
 - **`compose.yaml`**
   - api: `image: health-backend:${IMAGE_TAG:-local}`
   - web: `image: health-frontend:${IMAGE_TAG:-local}`
-  - web 포트: `'${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8103}:80'`. 값이 없으면 예전과 같은 `127.0.0.1:8103`이다.
-  - workout-memo의 `compose.yaml`과 같은 모양이다(그 저장소는 고치지 않았다).
-- **`.env.example`:** 서버에서만 `WEB_BIND`, `WEB_PORT`를 적는다는 주석을 더했다.
-- **`docs/access-protection.md`:** "지금 상태"를 고치고 "서버 설정" 절을 더했다. 서버 `.env` 값, 열 포트, 접속 주소를 적었다. 실제 IP는 적지 않았다.
-- **#74 댓글:** `main.tf`의 `aws_lightsail_instance_public_ports`에 넣을 `port_info` 초안을 남겼다. 그 저장소는 고치지 않았고 이슈도 만들지 않았다.
+  - web port: `'${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8103}:80'`. If no value is set, it is the same `127.0.0.1:8103` as before.
+  - It has the same shape as the `compose.yaml` of workout-memo (we did not change that repository).
+- **`.env.example`:** added a comment that `WEB_BIND` and `WEB_PORT` are written only on the server.
+- **`docs/access-protection.md`:** fixed the "current state" and added the "Server setup" section. It lists the server `.env` values, the port to open, and the address to connect to. It does not write the real IPs.
+- **#74 comment:** left a draft of the `port_info` to put in `aws_lightsail_instance_public_ports` of `main.tf`. We did not change that repository and did not create an issue.
 
-## 검증
+## Verification
 
-- Docker 데몬은 이 PC에서 실행되지 않는다(`dockerDesktopLinuxEngine` 파이프 없음). 그러나 `docker compose config`는 데몬 없이 동작해 그대로 확인했다. `.env` 대신 `--env-file /dev/null`과 임시 값(`POSTGRES_PASSWORD=x`, `NODE_AUTH_TOKEN=x`)을 썼다.
-  - 기본값: web `127.0.0.1:8103`, 이미지 `health-frontend:local`, `health-backend:local`. DB는 `127.0.0.1:15403` 그대로다.
-  - 서버 값(`WEB_BIND=0.0.0.0`, `WEB_PORT=8103`, `IMAGE_TAG=0123abc`): web `0.0.0.0:8103`, 이미지 `health-*:0123abc`. DB는 `127.0.0.1:15403` 그대로다.
-- `npm run check`(DB 없이): 아래 PR 기록 참고.
+- The Docker daemon is not running on this PC (no `dockerDesktopLinuxEngine` pipe). But `docker compose config` works without the daemon, so we checked with it as it is. We used `--env-file /dev/null` and temporary values (`POSTGRES_PASSWORD=x`, `NODE_AUTH_TOKEN=x`) instead of `.env`.
+  - Defaults: web `127.0.0.1:8103`, images `health-frontend:local` and `health-backend:local`. The DB stays at `127.0.0.1:15403`.
+  - Server values (`WEB_BIND=0.0.0.0`, `WEB_PORT=8103`, `IMAGE_TAG=0123abc`): web `0.0.0.0:8103`, images `health-*:0123abc`. The DB stays at `127.0.0.1:15403`.
+- `npm run check` (without a DB): see the PR record below.
 
-## 변경 — 2026-11-08 (1차 리뷰 반영)
+## Changes: 2026-11-08 (first review applied)
 
-1차 리뷰(작성 문맥과 분리된 읽기 전용 리뷰)는 막는 문제를 찾지 못했다.
+The first review (a read-only review separate from the context that wrote it) found no blocking problem.
 
-- 배포 스크립트 확인 결과:
-  - `deploy/remote-deploy.sh`는 `health-backend`·`health-frontend` 이미지를 커밋 태그로 붙이고 정리한다.
-  - `WEB_PORT`는 `/opt/health-log/.env`에서 읽어 `127.0.0.1:$WEB_PORT/api/health` 상태 확인에만 쓴다. `WEB_BIND=0.0.0.0`이어도 동작한다.
-  - `deploy/notify.sh`도 같은 방식으로 읽는다.
-- **반영(낮음)** #74 댓글의 `plan` 기대 결과를 "변경 하나"에서 "교체(-/+) 하나"로 고쳤다. `aws_lightsail_instance_public_ports`는 `port_info`를 바꾸면 다시 만들어지고, apply 동안 22·80·8103이 잠깐 닫힐 수 있다.
-- **반영(낮음)** `docs/access-protection.md`의 "지켜야 할 것"에서 지금 쓰는 길(새 포트 8103)을 밝혔다.
-- **남김(낮음)** `AGENTS.md`의 "포트(127.0.0.1 바인딩)"는 로컬 기준이다. 서버 웹은 `0.0.0.0:8103`이다. `AGENTS.md`는 중앙 관리 파일(`sirloinbh/project-standards`의 `templates/app/`)이라 이 PR에서 고치지 않았다. 서버 값은 `docs/access-protection.md`의 "서버 설정"이 원본이다.
+- What we found by checking the deploy script:
+  - `deploy/remote-deploy.sh` tags the `health-backend` and `health-frontend` images with the commit tag and cleans them up.
+  - `WEB_PORT` is read from `/opt/health-log/.env` and used only for the status check at `127.0.0.1:$WEB_PORT/api/health`. It works even if `WEB_BIND=0.0.0.0`.
+  - `deploy/notify.sh` reads it in the same way.
+- **Applied (low):** fixed the expected `plan` result in the #74 comment from "one change" to "one replacement (-/+)". `aws_lightsail_instance_public_ports` is created again when `port_info` changes, and 22, 80, and 8103 may close briefly during the apply.
+- **Applied (low):** in "What must be kept" of `docs/access-protection.md`, we stated the way in that is used now (the new port 8103).
+- **Left (low):** "ports (bound to 127.0.0.1)" in `AGENTS.md` is for local. The server web is `0.0.0.0:8103`. `AGENTS.md` is a centrally managed file (`templates/app/` of `sirloinbh/project-standards`), so we did not fix it in this PR. The source of the server values is "Server setup" in `docs/access-protection.md`.
 
-## 변경 — 2026-11-08 (2차 리뷰 반영)
+## Changes: 2026-11-08 (second review applied)
 
-2차 리뷰(마지막)도 막는 문제를 찾지 못했다. CI(`ci.yml`은 compose를 쓰지 않음), `deploy/backup.sh`, `deploy/report.sh`, `deploy/notify.sh`, `docker compose build`는 그대로 동작한다.
+The second (last) review also found no blocking problem. CI (`ci.yml` does not use compose), `deploy/backup.sh`, `deploy/report.sh`, `deploy/notify.sh`, and `docker compose build` work as before.
 
-- **반영(낮음)** 이미지 이름이 정해져 한 PC의 worktree들이 `health-*:local`을 함께 쓴다. `docs/access-protection.md`에 worktree마다 `IMAGE_TAG`를 따로 두는 방법을 적었다.
-- **반영(낮음)** `.env.example` 주석에 셸 환경 변수로도 `WEB_BIND`, `WEB_PORT`를 두지 말라고 더했다. `WEB_BIND=0.0.0.0`이 로컬에 남으면 같은 네트워크에 웹이 열린다.
-- **반영(낮음)** 서버 `.env`를 바꾸면 다음 배포나 `docker compose up -d` 때 반영된다고 적었다.
-- 규칙에 따라 3차 리뷰는 하지 않는다.
+- **Applied (low):** the image names are fixed, so the worktrees of one PC share `health-*:local`. We wrote in `docs/access-protection.md` how to keep a separate `IMAGE_TAG` per worktree.
+- **Applied (low):** added to the `.env.example` comment not to set `WEB_BIND` and `WEB_PORT` as shell environment variables either. If `WEB_BIND=0.0.0.0` is left locally, the web is open to the same network.
+- **Applied (low):** wrote that a change to the server `.env` takes effect at the next deploy or at `docker compose up -d`.
+- By the rule, there is no third review.

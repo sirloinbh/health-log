@@ -1,61 +1,61 @@
-# #65 수면 카드의 다시 시도 뒤 포커스를 카드 제목으로 옮기기
+# #65 Move focus to the card title after retrying on the sleep card
 
-- 이슈: [#65](https://github.com/sirloinbh/health-log/issues/65)
-- 브랜치: `fix/65-sleep-retry-focus`
+- Issue: [#65](https://github.com/sirloinbh/health-log/issues/65)
+- Branch: `fix/65-sleep-retry-focus`
 
-## 목적
+## Purpose
 
-수면 카드에서 불러오기에 실패하면 "다시 시도" 버튼이 나온다. 버튼을 누르면 알림과 함께 버튼이 사라져 키보드 포커스가 `<body>`로 떨어진다. 키보드 사용자는 Tab을 페이지 맨 위부터 다시 눌러야 한다.
+When loading fails on the sleep card, a "다시 시도" ("Try again") button appears. When you press the button, the button disappears together with the notice, and the keyboard focus falls to `<body>`. A keyboard user has to press Tab again from the very top of the page.
 
-## 정한 것
+## What we decided
 
-이슈의 할 일대로 진행했고 사용자 확인 없이 정했다. 이슈 댓글에 같은 내용을 남겼다.
+We followed the tasks in the issue and decided without user confirmation. We left the same content in an issue comment.
 
-- **방법:** 식단 카드(#30, PR #64)와 같게, "다시 시도"를 누르면 카드 제목으로 포커스를 옮긴다. 카드에 이미 있는 제목 포커스 장치(`setMoveFocus`)를 쓴다.
-- **범위:** 신체, 술·담배, 하루 체크 카드도 같은 구조의 "다시 시도" 버튼이 있고, 브라우저에서 같은 문제를 확인해 함께 고쳤다. 이슈에는 수면 카드만 적혀 있었다.
+- **Method:** the same as the meal card (#30, PR #64): when "다시 시도" is pressed, move focus to the card title. We use the title focus mechanism that the cards already have (`setMoveFocus`).
+- **Scope:** the body, alcohol and cigarette, and daily check cards also have a "다시 시도" button of the same structure, and we confirmed the same problem in the browser, so we fixed them together. The issue named only the sleep card.
 
-## 변경 — 2026-11-06
+## Changes: 2026-11-06
 
-- `frontend/src/sleep.tsx`, `body.tsx`, `habits.tsx`, `checks.tsx`: "다시 시도"를 누르면 다시 불러오면서 카드 제목으로 포커스를 옮긴다.
+- `frontend/src/sleep.tsx`, `body.tsx`, `habits.tsx`, `checks.tsx`: when "다시 시도" is pressed, it loads again and moves focus to the card title.
 
-## 검증
+## Verification
 
-### 브라우저
+### Browser
 
-임시 DB(포트 5473, `health_browser`)에 실제 API(3973)와 Vite(5273)를 띄웠다. 헤드리스 Chrome(디버깅 포트 9673)을 CDP로 움직였다.
+We started the real API (3973) and Vite (5273) on a temporary DB (port 5473, `health_browser`). We drove headless Chrome (debugging port 9673) with CDP.
 
-1. 2026-04-01 하루 기록을 연다. 이때 네 카드의 첫 불러오기는 CDP로 500을 돌려준다.
-2. 각 카드의 "다시 시도"를 키보드(포커스 뒤 Enter)와 마우스로 누른다.
-3. 0.6초 뒤 포커스가 있는 곳을 본다.
+1. Open the daily record of 2026-04-01. At this point the first load of the four cards returns 500 through CDP.
+2. Press "다시 시도" of each card with the keyboard (focus, then Enter) and with the mouse.
+3. After 0.6 seconds, look at where focus is.
 
-| 경우                                               | 수면      | 신체      | 술·담배   | 하루 체크 |
-| -------------------------------------------------- | --------- | --------- | --------- | --------- |
-| 고치기 전(1440×900), 키보드·마우스                 | `<body>`  | `<body>`  | `<body>`  | `<body>`  |
-| 고친 뒤(320×700, 390×844, 1440×900), 키보드·마우스 | 카드 제목 | 카드 제목 | 카드 제목 | 카드 제목 |
+| Case                                                           | Sleep      | Body       | Alcohol and cigarettes | Daily check |
+| -------------------------------------------------------------- | ---------- | ---------- | ---------------------- | ----------- |
+| Before the fix (1440×900), keyboard and mouse                  | `<body>`   | `<body>`   | `<body>`               | `<body>`    |
+| After the fix (320×700, 390×844, 1440×900), keyboard and mouse | Card title | Card title | Card title             | Card title  |
 
-- 이슈에서 코드로 추론했던 포커스 유실을 실제로 확인했다.
-- 고친 뒤 세 폭 모두 가로 넘침과 콘솔 오류가 없었다.
-- 확인 뒤 임시 DB, API, Vite, Chrome을 모두 껐다.
+- We actually confirmed the focus loss that the issue had inferred from the code.
+- After the fix there was no horizontal overflow and no console error at all three widths.
+- After the check, we turned off the temporary DB, the API, Vite, and Chrome.
 
-### 테스트
+### Tests
 
-`frontend/src/sleep.test.tsx`, `body.test.tsx`, `habits.test.tsx`, `checks.test.tsx`에 "다시 시도 뒤 카드 제목에 포커스" 테스트를 하나씩 더했다. 식단 카드의 같은 테스트와 같은 모양이다. 4개 모두 고치기 전 코드에서 실패하고 고친 뒤 통과하는 것을 확인했다.
+We added one test "focus goes to the card title after retry" to each of `frontend/src/sleep.test.tsx`, `body.test.tsx`, `habits.test.tsx`, and `checks.test.tsx`. They have the same shape as the same test on the meal card. We confirmed that all 4 fail on the code before the fix and pass after it.
 
-### 명령
+### Commands
 
-- `TEST_DATABASE_URL= npm run check`: 통과
-  - 프런트 355개 통과, 2개 건너뜀. 백엔드 93개 통과, DB 테스트 77개 건너뜀. 스킬 4개 통과.
-  - 셸의 `TEST_DATABASE_URL`이 다른 프로젝트 DB를 가리켜 비우고 실행했다. 프런트만 바꾼 변경이다.
-- `npm run knip`: 통과
+- `TEST_DATABASE_URL= npm run check`: passed
+  - 355 frontend tests passed, 2 skipped. 93 backend tests passed, 77 DB tests skipped. 4 skill checks passed.
+  - `TEST_DATABASE_URL` in the shell pointed to the DB of another project, so we ran it with it emptied. It is a change in the frontend only.
+- `npm run knip`: passed
 
-## 한계
+## Limits
 
-- 신체 카드의 "변화 다시 불러오기"는 이미 같은 방식으로 포커스를 옮겨 이번 변경과 관계없다.
-- 실제 화면 읽기 프로그램, Firefox, Safari로는 확인하지 않았다.
+- "Load the changes again" on the body card already moves focus in the same way, so it is unrelated to this change.
+- We did not check with a real screen reader, Firefox, or Safari.
 
-## 1차 리뷰 — 2026-11-06
+## First review: 2026-11-06
 
-별도 읽기 전용 리뷰를 실행했다. 고칠 것이 없어 리뷰를 여기서 끝낸다.
+We ran a separate read-only review. There was nothing to fix, so we end the review here.
 
-- 확인된 것: 네 카드 모두 `load()`가 첫 `await` 전에 알림을 지워 버튼이 클릭과 같은 렌더에서 사라지고, 제목 포커스가 그 뒤에 온다. 다시 실패하면 알림이 `role="alert"`로 다시 읽히고 버튼은 제목 다음 Tab 위치에 나온다. 식단 카드와 같은 동작이다.
-- 반영하지 않은 선택 사항: 두 번 연속 실패 테스트, 신체 카드 다시 시도 뒤 기간별 변화 재요청 확인, 문서 제목에 네 카드 적기. 기존 동작이거나 "범위"에 이미 적혀 있어 그대로 두었다.
+- What was confirmed: on all four cards, `load()` clears the notice before the first `await`, so the button disappears in the same render as the click, and the title focus comes after that. If it fails again, the notice is read again as `role="alert"`, and the button appears at the Tab position after the title. It is the same behavior as the meal card.
+- Optional items not applied: a test for two failures in a row, a check that the body card asks again for the change by period after a retry, and writing the four cards in the document title. They are existing behavior or already written in "Scope", so we left them.

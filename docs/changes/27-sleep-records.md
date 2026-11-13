@@ -1,88 +1,88 @@
-# #27 수면 기록 저장과 수동 입력
+# #27 Saving sleep records and manual entry
 
-- 이슈: [#27](https://github.com/sirloinbh/health-log/issues/27)
-- 브랜치: `feat/27-sleep-records`
+- Issue: [#27](https://github.com/sirloinbh/health-log/issues/27)
+- Branch: `feat/27-sleep-records`
 
-## 목적
+## Purpose
 
-가민 연동과 상관없이 수면을 날짜별로 저장하고, 빠진 날은 직접 입력·수정·삭제한다.
+Save sleep by date regardless of the Garmin integration, and enter, edit, and delete the days that are missing by hand.
 
-## 변경 — 2026-11-01
+## Changes: 2026-11-01
 
-- **DB:** `database/migrations/003_sleep_records.sql`. 날짜당 한 건이며 기본 키는 `sleep_date`다. 취침·기상은 `timestamptz`, 길이는 `duration_minutes`(중앙 규칙의 시점·기간 형식)로 저장한다. 수면 단계와 점수 칸은 #26의 저장 항목이며 #28 전까지 비어 있다. 값이 없으면 `NULL`이고 0이 아니다.
-- **API:** `backend/src/sleep.ts`. `GET`(없으면 `{ record: null }`), `PUT`(같은 날을 덮어씀), `DELETE`(없으면 404) `/api/sleep/:date`. 요청 횟수 제한은 음식 API와 같은 방식으로 걸었다.
-- **서버 검증:** 시각은 오프셋이 있는 ISO 8601만 받는다. 기상이 취침보다 늦어야 하고, 길이는 24시간 이하이며, 기상 날짜(서비스 시간대)가 경로의 날짜와 같아야 한다. DB는 기상이 취침보다 늦을 것과 24시간 이하일 것, 각 칸의 값 범위를 강제한다. 기록 날짜와 `duration_minutes`가 시각과 맞는지는 서버가 맡는다.
-- **화면:** `frontend/src/sleep.tsx`. 하루 기록의 수면 칸을 입력·요약·수정·삭제 카드로 바꿨다. 불러오기에 실패하면 입력 폼을 숨겨, 보지 못한 기록을 덮어쓰지 않게 했다.
-- **정리:** 날짜 판정 `isRealDate`를 `backend/src/dates.ts`로 옮겨 함께 쓴다. 테스트 도우미 `withApi`가 본문 없는 204를 읽을 수 있게 고쳤다.
+- **DB:** `database/migrations/003_sleep_records.sql`. One row per date, and the primary key is `sleep_date`. Bedtime and wake time are `timestamptz`, and the length is `duration_minutes` (the point-in-time and duration format of the central rule). The sleep stage and score columns are the items to store from #26, and are empty until #28. A missing value is `NULL`, not 0.
+- **API:** `backend/src/sleep.ts`. `GET` (`{ record: null }` if there is none), `PUT` (overwrites the same day), `DELETE` (404 if there is none) on `/api/sleep/:date`. The request rate limit is applied in the same way as the food API.
+- **Server validation:** times accept only ISO 8601 with an offset. The wake time must be later than the bedtime, the length must be 24 hours or less, and the wake date (in the service time zone) must equal the date in the path. The DB enforces that the wake time is later than the bedtime, that the length is 24 hours or less, and the value range of each column. The server is in charge of whether the record date and `duration_minutes` match the times.
+- **Screen:** `frontend/src/sleep.tsx`. Changed the sleep area of the daily record into an entry, summary, edit, and delete card. If loading fails, the entry form is hidden, so that we do not overwrite a record we could not see.
+- **Cleanup:** moved the date check `isRealDate` to `backend/src/dates.ts` and share it. Fixed the test helper `withApi` so that it can read a 204 with no body.
 
-## 정한 것
+## What we decided
 
-이슈에 없던 규칙은 다음과 같이 정했다. 기록 날짜는 #26의 추천안, 입력 방식은 중앙 규칙의 자정 넘김 기준을 따랐다. 하루 한 건과 직접 수정 규칙은 에이전트의 판단이며, 사용자 확인 없이 #27 댓글에 기록하고 진행했다. 사용자가 바꾸라고 하면 후속 이슈로 고친다.
+The rules that were not in the issue were decided as follows. The record date follows the recommendation of #26, and the input method follows the midnight-crossing standard of the central rule. The one-per-day rule and the manual edit rule are the agent judgement, and we recorded them in a #27 comment and went on without user confirmation. If the user says to change them, we fix them in a follow-up issue.
 
-- **기록 날짜:** 기상한 날짜(#26 추천안).
-- **입력 방식:** 시각만 두 칸 입력한다. 취침이 기상보다 시계상 늦으면 전날로 본다. 입력 중에 "전날 23:30에 잠들어 7시간 30분"으로 보여 준다. 낮잠 13:00~14:00은 이날이고, 24시간 넘는 수면은 입력할 수 없다.
-- **총 수면 시간:** 이슈대로 취침~기상 전체 길이다. 중간에 깬 시간을 빼지 않는다.
-- **하루 한 건:** 같은 날 낮잠과 밤잠을 따로 저장하지 않는다.
-- **직접 수정:** 가져온 기록의 시각을 바꾸면 출처가 `manual`이 되고 단계와 점수를 지운다. 시각이 바뀌면 더 이상 맞지 않기 때문이다. 폼에 미리 알리고, 시각을 바꾸지 않고 저장하면 요청을 보내지 않는다.
-- **미래 날짜:** 막지 않는다. 범위는 #50에서 정한다.
+- **Record date:** the date you woke up (the #26 recommendation).
+- **Input method:** enter only two times. If the bedtime is later on the clock than the wake time, it counts as the previous day. While you type, it shows "fell asleep at 23:30 the previous day, 7 hours 30 minutes". A nap from 13:00 to 14:00 is on this day, and you cannot enter sleep longer than 24 hours.
+- **Total sleep time:** as in the issue, the whole length from bedtime to wake time. The time awake in between is not subtracted.
+- **One per day:** a nap and night sleep of the same day are not stored separately.
+- **Manual edit:** if you change the times of an imported record, the source becomes `manual` and the stages and the score are deleted, because they no longer fit once the times change. The form tells you in advance, and if you save without changing the times, no request is sent.
+- **Future dates:** not blocked. The range is decided in #50.
 
-## 후속
+## Follow-up
 
-- **#50:** 서버의 기상 날짜 판정은 `Asia/Seoul`을 쓰므로 1987~88년과 1961년 이전 날짜는 다른 오프셋으로 계산돼 거부될 수 있다. 날짜 범위를 정할 때 함께 본다.
-- **#28:** 가져오기가 사용자가 직접 입력한 기록을 덮어쓸지 정해야 한다. 단계와 점수 표시도 #28에서 더한다.
+- **#50:** the server judges the wake date with `Asia/Seoul`, so dates in 1987-88 and before 1961 are calculated with a different offset and may be rejected. Look at it together when the date range is decided.
+- **#28:** we must decide whether the import overwrites a record the user entered by hand. Showing the stages and the score is also added in #28.
 
-## 1차 리뷰 보완 — 2026-11-01
+## First review fixes: 2026-11-01
 
-독립 리뷰의 지적을 이 PR에서 고쳤다.
+We fixed the findings of the independent review in this PR.
 
-- **수정 버튼 포커스:** 누르면 포커스가 `body`로 빠졌다. 카드 제목으로 옮긴다.
-- **가져온 기록의 소실:** 바꾼 것 없이 저장해도 단계와 점수가 지워졌다. 요청을 보내지 않고, 지워진다는 안내를 폼에 넣었다. 정확히 24시간인 기록을 다시 저장하지 못하던 문제도 함께 해결됐다.
-- **테스트 공백:** 늘 통과하던 지난 날짜 응답 테스트를 앱 전체를 거치는 테스트로 바꿨다. 이중 저장, 삭제 실패 문구, 요청 횟수 제한, 자정 기상 테스트를 더했다.
-- **큰 오프셋의 500:** `+16:00` 같은 값을 PostgreSQL이 거부해 500이 났다. DB에는 UTC로 바꿔 넘긴다.
-- **날짜를 떠난 뒤의 저장 실패:** 알림 없이 사라졌다. 토스트로 날짜와 함께 알린다.
-- **1989년 이전 날짜의 표시:** 입력은 `+09:00`, 표시는 `Asia/Seoul`이라 시각이 달라졌다. 표시도 고정 오프셋으로 맞췄다.
-- **DB 제약:** 24시간 제한을 DB에도 더했다. 문서의 "같은 제약" 표현은 실제에 맞게 고쳤다.
-- **화면 규칙:** 저장 버튼에 공통 `Spinner`를 쓰고, 미리 보기의 `aria-live` 영역을 항상 두었다.
+- **Focus on the edit button:** pressing it dropped focus to `body`. It now moves to the card title.
+- **Loss of an imported record:** saving with no change erased the stages and the score. It now sends no request, and the form has a notice that they will be erased. The problem that a record of exactly 24 hours could not be saved again was solved too.
+- **Test gap:** replaced the always-passing past-date response test with a test that goes through the whole app. Added tests for double save, the delete failure message, the request rate limit, and wake at midnight.
+- **500 on a large offset:** PostgreSQL rejected a value such as `+16:00` and gave a 500. We now pass it to the DB converted to UTC.
+- **A save failure after leaving the date:** it vanished silently. It is now reported with a toast together with the date.
+- **Display of dates before 1989:** the input was `+09:00` and the display was `Asia/Seoul`, so the times differed. The display also uses the fixed offset now.
+- **DB constraint:** added the 24-hour limit to the DB too. Fixed the "same constraint" wording in the docs to match reality.
+- **Screen rules:** the save button uses the shared `Spinner`, and the `aria-live` area of the preview is always present.
 
-## 2차 리뷰 보완 — 2026-11-01
+## Second review fixes: 2026-11-01
 
-- **24시간을 몇 초 넘는 입력의 500:** 1차 보완에서 넣은 DB 제약은 정확한 길이를, 서버는 반올림한 분을 봐서 24시간 20초가 500이 됐다. 서버도 정확한 길이로 판정한다. 30초 미만의 수면은 "1분 이상" 문구로 거부한다.
-- **테스트 공백:** 저장 중 `Spinner`, 미리 보기 영역이 처음부터 있는지 테스트를 더했다.
-- **문서:** DB 제약 설명과 건너뛴 테스트의 위치를 고쳤다. 1989년 이전 날짜 판정은 #50 댓글에 옮겨 적었다.
+- **500 on an input a few seconds over 24 hours:** the DB constraint added in the first fixes looks at the exact length, and the server looked at the rounded minutes, so 24 hours 20 seconds became a 500. The server now judges by the exact length too. A sleep shorter than 30 seconds is rejected with a "1 minute or more" message.
+- **Test gap:** added tests for the `Spinner` while saving and for the preview area existing from the start.
+- **Docs:** fixed the DB constraint description and the place of the skipped test. We copied the date judgement for dates before 1989 into a #50 comment.
 
-## 검증
+## Verification
 
-- 추가한 테스트: `backend/test/sleep.test.ts`, `backend/test/sleep.integration.test.ts`, `frontend/src/sleep-time.test.ts`, `frontend/src/sleep.test.tsx`, `frontend/src/daily.test.tsx`(날짜별 불러오기)
-- 완료 기준의 23:30~07:00 = 7시간 30분은 서버와 화면 양쪽에서 확인했다.
+- Tests added: `backend/test/sleep.test.ts`, `backend/test/sleep.integration.test.ts`, `frontend/src/sleep-time.test.ts`, `frontend/src/sleep.test.tsx`, `frontend/src/daily.test.tsx` (loading by date)
+- The done criterion 23:30 to 07:00 = 7 hours 30 minutes was checked on both the server and the screen.
 
-- `npm run check`(임시 DB 사용): 통과. 백엔드 61개 통과, 건너뜀 0개. 프런트엔드 123개 통과, 2개 건너뜀(`lib/theme.test.ts`와 `components/layout/app-shell.test.tsx`의 다크 전용 앱용 조건, 이 변경과 무관). 스킬 검사 4개 통과
-- `npm run knip`, `npm run standards:check`: 통과
+- `npm run check` (with a temporary DB): passed. 61 backend tests passed, 0 skipped. 123 frontend tests passed, 2 skipped (the conditions for the dark-only app in `lib/theme.test.ts` and `components/layout/app-shell.test.tsx`, unrelated to this change). 4 skill checks passed
+- `npm run knip`, `npm run standards:check`: passed
 
-### DB 통합 테스트
+### DB integration tests
 
-이 PC의 DB 계정은 `health_test`를 만들 수 없어, `initdb`로 임시 폴더에 PostgreSQL 17 클러스터를 따로 띄워 `health_test`를 만들었다. 기존 DB는 건드리지 않았고 확인 뒤 지웠다.
+The DB account on this PC cannot create `health_test`, so we started a PostgreSQL 17 cluster separately in a temporary folder with `initdb` and created `health_test` there. We did not touch the existing DB, and we deleted it after the check.
 
-- 마이그레이션 3개 적용, `003` 재실행도 통과
-- `TEST_DATABASE_URL`을 임시 DB로 두고 `npm run test -w backend`: 61개 통과, 건너뜀 0개
+- Applied 3 migrations, and running `003` again also passed
+- With `TEST_DATABASE_URL` pointing to the temporary DB, `npm run test -w backend`: 61 passed, 0 skipped
 
-### 브라우저 확인
+### Browser check
 
-헤드리스 Chrome을 CDP로 움직였다. API는 실제 서버, DB는 위 임시 클러스터다. 시각 입력은 키보드가 아니라 값을 넣고 입력 이벤트를 발생시키는 방식이다.
+We drove headless Chrome with CDP. The API is a real server and the DB is the temporary cluster above. Times are entered not by keyboard but by setting the value and firing the input event.
 
-| 항목                                | 390×844 | 1440×900 |
-| ----------------------------------- | ------- | -------- |
-| 기록 없는 날의 입력 폼              | 통과    | 통과     |
-| 빈 값 저장 시 안내                  | 통과    | 통과     |
-| "전날 23:30에 잠들어 7시간 30분"    | 통과    | 통과     |
-| 같은 시각 저장 시 서버 오류 문구    | 통과    | 통과     |
-| 저장 뒤 요약 표시와 포커스 이동     | 통과    | 통과     |
-| 새로고침 뒤 기록 유지               | 통과    | 통과     |
-| 수정 반영, 다른 날의 빈 폼          | 통과    | 통과     |
-| 삭제 확인, 삭제 뒤 폼과 포커스 이동 | 통과    | 통과     |
-| 가로 넘침, 콘솔 오류                | 없음    | 없음     |
+| Item                                                          | 390×844 | 1440×900 |
+| ------------------------------------------------------------- | ------- | -------- |
+| The entry form on a day with no record                        | pass    | pass     |
+| The notice when saving an empty value                         | pass    | pass     |
+| "Fell asleep at 23:30 the previous day, 7 hours 30 minutes"   | pass    | pass     |
+| The server error message when saving the same time            | pass    | pass     |
+| The summary after saving and the focus move                   | pass    | pass     |
+| The record stays after a reload                               | pass    | pass     |
+| An edit is applied, and an empty form on another day          | pass    | pass     |
+| Delete confirmation, and the form and focus move after delete | pass    | pass     |
+| Horizontal overflow, console errors                           | none    | none     |
 
-1차 리뷰 보완과 `main`(zod 4.6.7) 병합 뒤에 다시 돌려 3회 모두 위 항목을 통과했다. 그 전 한 번은 확인 스크립트가 새로고침 완료를 기다리지 않아 실패했고, 스크립트를 고친 뒤 나오지 않았다.
+After the first review fixes and the merge of `main` (zod 4.6.7), we ran it again, and all 3 runs passed the items above. Once before that, the check script failed because it did not wait for the reload to finish, and it did not happen after we fixed the script.
 
-`key={date}`를 빼면 지난 날짜 응답 테스트가 실패하는 것도 확인했다.
+We also confirmed that the past-date response test fails if `key={date}` is removed.
 
-실제 휴대폰, 다크 모드, 화면 읽기 프로그램은 확인하지 않았다.
+We did not check a real phone, dark mode, or a screen reader.

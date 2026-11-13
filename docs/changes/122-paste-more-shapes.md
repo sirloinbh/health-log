@@ -1,99 +1,101 @@
-# #122 영양성분 표 붙여넣기의 남은 표 모양
+# #122 Remaining table shapes in nutrition label paste
 
-- 이슈: [#122](https://github.com/sirloinbh/health-log/issues/122)
-- 브랜치: `feat/122-paste-more-shapes`
+- Issue: [#122](https://github.com/sirloinbh/health-log/issues/122)
+- Branch: `feat/122-paste-more-shapes`
 
-## 목적
+## Purpose
 
-PR #121 2차 리뷰에서 나누어 둔 표 모양을 읽는다. 먼저 **틀린 값**이 들어가던 `1회 제공량 30g (100g당)`을 고친다. 그 뒤로 지금 빈 칸으로 끝나는 모양을 읽는다. 읽을 수 없는 모양은 지금처럼 칸을 바꾸지 않는다.
+Read the table shapes that were split off in the second review of PR #121. First fix `1회 제공량 30g (100g당)` (serving 30g (per 100g)), which put in **wrong values**. After that, read the shapes that now end as empty fields. Shapes that cannot be read still change no field, as now.
 
-## 정한 것
+Korean label words that the parser matches on are kept as they are, with a gloss: "1회 제공량" (serving size), "총 내용량" (total amount), "…당" (per …), "기준" (basis), "열량" (calories), "당류" (sugars).
 
-- **`1회 제공량 30g (100g당)`:** 기준량이 없다고 본다. 화면은 칸을 바꾸지 않고 읽은 값만 보여 준다.
-  - 1회 제공량이라고 적고 괄호 안에서는 100g당이라고 한다. 값 한 줄이 둘 다의 값일 수는 없고, 어느 쪽인지 글만으로는 알 수 없다.
-  - 반대 모양 `100g당 (1회 제공량 30g)`은 지금처럼 100g으로 읽는다. "당"은 100g에만 붙어 있고, 괄호는 1회 제공량을 덧붙인 것이다.
-  - 괄호 안이 같은 크기(`1회 제공량 30g (30g당)`)면 30g으로 읽는다.
-- **칸이 모자란 행:** 표의 다른 행이 이름을 따로 한 칸에 적을 때만(`열량 | 250kcal | 75kcal`) 모자란 행(`열량 | 250kcal`)의 값을 첫 칸 값으로 읽는다.
-  - 복사할 때 행 끝의 빈 칸은 빠지지만, 가운데 빈 칸은 `당류 | | 5g`처럼 빈 칸으로 남는다고 본다.
-  - 이름과 첫 값을 한 칸에 적는 표(`열량 250kcal | 75kcal`)에서는 `당류 | 2g`가 "첫 칸이 비었다"는 뜻이라 지금처럼 비운다.
-  - 모든 행이 모자라면 어느 쪽인지 알 수 없어 비운다.
+## Decisions
 
-## 변경 — 2026-11-08
+- **`1회 제공량 30g (100g당)`:** the basis amount is treated as absent. The screen changes no field and only shows the values read.
+  - It says serving size, and the parentheses say per 100g. One line of values cannot be the values of both, and the text alone does not tell which.
+  - The opposite shape `100g당 (1회 제공량 30g)` is still read as 100g. "당" is attached only to 100g, and the parentheses add the serving size.
+  - If the parentheses hold the same size (`1회 제공량 30g (30g당)`), it is read as 30g.
+- **Rows with too few columns:** only when the other rows of the table write the name in its own column (`열량 | 250kcal | 75kcal`) is the value of a short row (`열량 | 250kcal`) read as the first-column value.
+  - It is assumed that copying drops empty columns at the end of a row, while an empty column in the middle stays as an empty column like `당류 | | 5g`.
+  - In a table that writes the name and the first value in one column (`열량 250kcal | 75kcal`), `당류 | 2g` means "the first column is empty", so it is left empty as now.
+  - If every row is short, it cannot tell which case it is, so it is left empty.
+
+## Change — 2026-11-08
 
 - **`frontend/src/nutrition-label.ts`**
-  - 1회 제공량의 크기는 바로 뒤에 적힌 크기를 먼저 읽는다. 이전에는 `1개(30g)` 꼴을 찾다가 `30g (100g`까지 건너뛰어 100g을 1회 제공량으로 읽었다. 괄호 속 크기는 앞에 크기가 없을 때만 쓴다(`1회 제공량 1개(30g)`).
-  - 1회 제공량 머리 바로 뒤 괄호 안에 다른 기준량이 있으면 기준량이 없다고 본다(`bracketedBasis`, 1차 리뷰 반영에서 넓힘).
-  - 2021년 쿠팡 형식 `1회 제공량당 | 1일 영양성분 기준치에 대한 비율`을 읽는다.
-    - 비율 칸의 머리는 값 칸으로 세지 않는다(`shareHead`).
-    - 값이 이어지는지 볼 때 그 머리를 건너뛴다. 그래서 "1회 제공량당"이 기준량이 되고, 크기는 같은 표의 "1회 제공량 30g"에서 빌린다(#120 규칙).
-    - 행 끝의 빈 칸(`열량 150kcal |`)은 칸으로 세지 않는다.
-  - Markdown 표의 `|---|` 줄은 지운다. 막대가 없는 `---` 줄은 두 상품을 나누는 줄일 수 있어 지금처럼 표를 끝낸다.
-  - 칸이 모자란 행은 위 "정한 것"대로 읽는다(`namesInOwnCell`).
-  - 이름 칸 목록을 넓혔다: 구분, 항목, 내용, 영양성분(명), 영양정보, 영양소(명), 성분(명), 뒤에 "(단위)"가 붙은 것.
+  - The size of a serving is read first from the size written right after it. Before, it looked for the `1개(30g)` form and skipped ahead to `30g (100g`, reading 100g as the serving. A size in parentheses is used only when there is no size before it (`1회 제공량 1개(30g)`).
+  - If another basis amount is inside the parentheses right after the serving head, the basis amount is treated as absent (`bracketedBasis`, widened in the first-review changes).
+  - It reads the 2021 Coupang format `1회 제공량당 | 1일 영양성분 기준치에 대한 비율` (per serving | percent of the daily nutrient reference value).
+    - The head of the ratio column is not counted as a value column (`shareHead`).
+    - When checking whether values follow, that head is skipped. So "1회 제공량당" becomes the basis amount, and the size is borrowed from "1회 제공량 30g" in the same table (the #120 rule).
+    - An empty column at the end of a row (`열량 150kcal |`) is not counted as a column.
+  - The `|---|` line of a Markdown table is removed. A `---` line without bars can be a line that separates two products, so it ends the table as now.
+  - Rows with too few columns are read as in "Decisions" above (`namesInOwnCell`).
+  - The list of name columns was widened: 구분, 항목, 내용, 영양성분(명), 영양정보, 영양소(명), 성분(명), and those with "(단위)" (unit) after them.
 
-## 읽지 않는 모양(빈 칸)
+## Shapes that are not read (empty fields)
 
-아래 모양은 계속 칸을 바꾸지 않는다. 직접 입력할 수 있다. 이슈 댓글에도 같은 목록을 남긴다.
+The shapes below still change no field. They can be entered by hand. The same list was left as an issue comment.
 
-- 1회 제공량 머리에 1회 제공량과 다른 크기가 함께 있는 모양(2차 리뷰 반영 뒤 규칙)
-  - 예: `1회 제공량 30g (100g당)`, `… (100g 기준)`, `… (100g 중)`, `… (100g)`, `… (100ml당)`, `약 30g (100g당)`, `30g, 100g당`, `1회 제공량 2개(30g) 기준 1개 15g`
-  - 머리말 줄의 기준량(`영양정보 (100g당)`)이 1회 제공량과 다른 크기인 경우도 같다.
-  - 총 내용량(`총 내용량 300g`, `총 2회 제공량(60g)`), 가격(`100g당 2,211원`), 다른 단위의 무게(`200ml (206g)`)는 다른 크기로 보지 않는다.
-- 모든 행의 칸이 머리줄보다 모자란 표
-- 이름과 첫 값을 한 칸에 적는 표에서 칸이 모자란 행(`당류 | 2g`)
-- 단위가 값이 아니라 이름에 붙은 표(`열량(kcal) | 250`)
-- 크기 없는 "1회 제공량당" 표에서 같은 표 안에 "1회 제공량 N"이 없는 경우(#120 규칙)
-- 위에 나열한 것 밖의 이름 칸(예: "영양성분 함량")
-- 비율 칸이 값 칸 사이에 있는 표에서 빈 비율 칸이 있는 행(`열량 | 250kcal | | 75kcal`)
+- A serving head that has a size different from the serving size together with it (the rule after the second review)
+  - Examples: `1회 제공량 30g (100g당)`, `… (100g 기준)`, `… (100g 중)`, `… (100g)`, `… (100ml당)`, `약 30g (100g당)`, `30g, 100g당`, `1회 제공량 2개(30g) 기준 1개 15g`
+  - The same holds when the basis amount of the heading line (`영양정보 (100g당)`) is a size different from the serving.
+  - The total amount (`총 내용량 300g`, `총 2회 제공량(60g)`), a price (`100g당 2,211원`), and a weight in another unit (`200ml (206g)`) are not seen as a different size.
+- A table in which every row has fewer columns than the header row
+- A row with too few columns in a table that writes name and first value in one column (`당류 | 2g`)
+- A table where the unit is attached to the name instead of the value (`열량(kcal) | 250`)
+- A size-less "1회 제공량당" table with no "1회 제공량 N" in the same table (the #120 rule)
+- Name columns other than those listed above (for example "영양성분 함량")
+- A row with an empty ratio column in a table where the ratio column sits between value columns (`열량 | 250kcal | | 75kcal`)
 
-## 검증
+## Verification
 
-- 테스트: `frontend/src/nutrition-label.test.ts`에 5개를 더했다(42개).
-  - 괄호 속 다른 기준량은 기준량 없음, `100g당 (1회 제공량 30g)`과 `1회 제공량 1개(30g)`는 그대로
-  - 2021년 형식의 막대 표와 탭 표, 비율 칸 머리 뒤의 `열량 | 120kcal`
-  - Markdown 표의 `|---|` 줄, 막대 없는 `---`에서 표가 끝남
-  - 칸이 모자란 행: 이름을 따로 적는 표, 탭 표, 이름과 값을 한 칸에 적는 표, 모든 행이 모자란 표
-  - 넓힌 이름 칸 5개
-- 이슈와 PR #121 두 리뷰의 재현 입력을 main 해석기와 나란히 돌렸다.
-  - 그때 돌린 예전 재현 입력 중 main과 결과가 다른 것은 `1회 제공량 30g (100g당)`(100g → 기준량 없음) 하나였다. 새로 읽는 모양(2021년 형식, Markdown, 모자란 행, 이름 칸)은 당연히 main과 다르다.
-  - 새 입력 약 30개는 모두 맞는 값이거나 빈 칸이다.
+- Tests: added 5 to `frontend/src/nutrition-label.test.ts` (42 tests).
+  - Another basis amount in parentheses gives "no basis amount", while `100g당 (1회 제공량 30g)` and `1회 제공량 1개(30g)` stay as they are
+  - The bar table and tab table of the 2021 format, and `열량 | 120kcal` after the ratio column head
+  - The `|---|` line of a Markdown table, and the table ending at a `---` without bars
+  - Rows with too few columns: a table that writes names separately, a tab table, a table that writes name and value in one column, and a table where every row is short
+  - 5 widened name columns
+- The reproduction inputs of the issue and the two reviews of PR #121 were run side by side with the main parser.
+  - Of the old reproduction inputs run then, the only one whose result differs from main was `1회 제공량 30g (100g당)` (100g became "no basis amount"). The newly read shapes (2021 format, Markdown, short rows, name columns) naturally differ from main.
+  - About 30 new inputs are all correct values or empty fields.
 
-## 변경 — 2026-11-08 (1차 리뷰 반영)
+## Change — 2026-11-08 (first review applied)
 
-PR #123의 1차 리뷰(작성 문맥과 분리된 읽기 전용 리뷰)는 main 해석기와 나란히 약 50개 입력을 돌렸다. 새로 읽는 모양(2021년 형식, Markdown, 모자란 행)에서는 틀린 값이 없었다. 그러나 괄호 규칙이 적는 방식에 따라 빠져나갔다.
+The first review of PR #123 (a read-only review separate from the authoring context) ran about 50 inputs side by side with the main parser. There were no wrong values in the newly read shapes (2021 format, Markdown, short rows). But the parentheses rule slipped through depending on how the text was written.
 
-- **반영 1(높음, 이 PR이 만듦)** `1회 제공량 30g (100g 기준)`은 "당"이 없어 기준량 후보가 아니라서, 크기 정규식 변경 뒤 30g이 됐다(main은 100g).
-- **반영 2(높음, main도 같음)** `1회 제공량 약 30g (100g당)`, `1회 제공량은 30g …`, `1회 제공량 1/2봉지 30g …`은 크기 정규식이 괄호 안의 100g을 1회 제공량으로 읽었다. 그러면 괄호 규칙이 비교할 둘째 머리가 없었다. 첫 기록의 "고쳤다"는 크기가 말 바로 뒤에 올 때만 맞았다.
-- **반영 3(높음, main도 같음)** `1회 제공량 1개(30g) (100g당)`, `1회 제공량(30g) (100g당)`은 `) (`가 머리 사이 구분자로 인정되지 않아 30g이 됐다.
-- **반영 4(중간, main도 같음)** `(1봉지 100g당)`, `[100g당]`, `, 100g당`, `/ 100g당`, 머리말 줄의 `영양정보 (100g당)` 아래 1회 제공량은 30g이 됐다.
-- 고친 방법: 후보끼리 비교하던 `bracketedBasis`를 1회 제공량 머리의 글 전체를 보는 규칙으로 바꿨다.
-  - 머리는 1회 제공량부터 그 줄의 열량·영양성분 이름 앞까지다. 막대가 있는 머리줄은 칸 머리줄이라 제외한다.
-  - 머리에 크기가 둘 이상 있고, 그중 하나가 기준량("…당", "… 기준")이면 기준량 없음이다.
-  - 머리 안의 "총 내용량당"이 1회 제공량과 다른 크기면 기준량 없음이다.
-  - 머리말 줄에 1회 제공량과 다른 크기의 기준량이 있으면 기준량 없음이다.
-  - `1회 제공량 200ml (206g)`, `1회 제공량 1개(30g)`, `1회 제공량(30g)당`처럼 기준량 표시 없는 크기는 같은 1회 제공량으로 보고 그대로 읽는다.
-- **반영 5(중간)** 문서의 "읽지 않는 모양"과 "main과 다른 것은 하나" 문장을 사실에 맞게 고쳤다.
-- **반영 6(낮음)** `1회 제공량 200ml (206g)`이 206g에서 200ml로 바뀐 것을 테스트로 고정했다.
-- **남김(낮음)** 비율 칸이 값 칸 사이에 있고 그 칸이 빈 행은 열량이 빈 칸이 된다. 틀린 값은 아니라 "읽지 않는 모양"에 적었다.
-- 테스트: 위 입력 11개와 200ml, `1회 제공량(30g)당`을 기존 테스트에 더했다(42개 그대로).
-- 리뷰 프로브와 앞선 프로브를 모두 다시 돌렸다. 모두 맞는 값이거나 빈 칸이다. `1회 제공량: 1개 (30g) / 100g당`도 이제 기준량 없음이다.
+- **Applied 1 (high, created by this PR)** `1회 제공량 30g (100g 기준)` has no "당", so it was not a basis candidate, and after the size regex change it became 30g (main gave 100g).
+- **Applied 2 (high, same on main)** For `1회 제공량 약 30g (100g당)` (about), `1회 제공량은 30g …` (is), and `1회 제공량 1/2봉지 30g …` (half a bag), the size regex read the 100g in the parentheses as the serving. Then the parentheses rule had no second head to compare. The "fixed" in the first note was true only when the size comes right after the word.
+- **Applied 3 (high, same on main)** For `1회 제공량 1개(30g) (100g당)` and `1회 제공량(30g) (100g당)`, `) (` was not accepted as a separator between heads, so they became 30g.
+- **Applied 4 (medium, same on main)** `(1봉지 100g당)` (per bag, 100g), `[100g당]`, `, 100g당`, `/ 100g당`, and a serving under the heading line `영양정보 (100g당)` became 30g.
+- How it was fixed: `bracketedBasis`, which compared candidates with each other, was replaced by a rule that looks at the whole text of the serving head.
+  - The head runs from the serving size to just before the calorie or nutrient name on that line. A header row with bars is a column header row, so it is excluded.
+  - If the head has two or more sizes and one of them is a basis amount ("…당", "… 기준"), there is no basis amount.
+  - If the "총 내용량당" inside the head is a size different from the serving, there is no basis amount.
+  - If the heading line has a basis amount of a size different from the serving, there is no basis amount.
+  - Sizes without a basis mark, like `1회 제공량 200ml (206g)`, `1회 제공량 1개(30g)`, and `1회 제공량(30g)당`, are seen as the same serving and read as they are.
+- **Applied 5 (medium)** The "shapes that are not read" and the "only one differs from main" sentences in this document were corrected to match the facts.
+- **Applied 6 (low)** The change of `1회 제공량 200ml (206g)` from 206g to 200ml was fixed with a test.
+- **Left (low)** A row whose ratio column sits between value columns and is empty gets an empty calories field. It is not a wrong value, so it is written under "shapes that are not read".
+- Tests: added the 11 inputs above plus 200ml and `1회 제공량(30g)당` to the existing tests (still 42 tests).
+- The review's probes and the earlier probes were all run again. All are correct values or empty fields. `1회 제공량: 1개 (30g) / 100g당` is also "no basis amount" now.
 
-## 변경 — 2026-11-08 (2차 리뷰 반영)
+## Change — 2026-11-08 (second review applied)
 
-2차 리뷰(마지막)는 main 해석기와 나란히 약 120개 입력을 돌렸다. 새로 읽는 모양(비율 칸, Markdown, 모자란 행, 이름 칸)에서는 틀린 값이 없었다. 1차 반영 규칙에서 두 가지가 나왔다.
+The second review (the last) ran about 120 inputs side by side with the main parser. There were no wrong values in the newly read shapes (ratio column, Markdown, short rows, name columns). Two things came out of the first-review rule.
 
-- **반영 1(높음, 이 PR이 만듦)** "당"이나 "기준"이 아닌 말(`(100g 중)`, `(100g에 대해)`, `(100g 함량)`, `(100g 대비)`, `(100g/당)`)은 기준량 표시로 보지 않았다. 그래서 크기 정규식 변경 뒤 30g에 100g 기준 값이 짝지어졌다(main은 100g).
-  - 이제 1회 제공량 머리에 같은 단위의 다른 크기가 있으면, 기준량 표시가 없어도 기준량 없음이다. `1회 제공량 30g (100g)`도 같다.
-  - 기준량 표시가 있는 다른 크기는 단위가 달라도 기준량 없음이다(`30g (100ml당)`).
-- **반영 2(중간, 이 PR이 만듦)** 맞던 표가 빈 칸이 됐다.
-  - 1회 제공량 자신의 "30g당"과 총 내용량을 함께 적은 머리(`1회 제공량 30g당 (총 내용량 300g)`)
-  - 머리말 줄의 가격(`영양정보 총 내용량 300g (100g당 2,211원)`)
-  - 이제 총 내용량(`총 …` 바로 뒤의 크기, `총 2회 제공량(60g)` 포함)과 가격("가격", "N원")은 다른 기준량으로 보지 않는다.
-- **반영 3(중간)** 문서의 "읽지 않는 모양"을 위 규칙대로 고쳤다.
-- **남김(낮음)**
-  - `--- | ---`처럼 막대가 든 대시 줄은 Markdown 구분 줄로 지운다. 정한 대로다.
-  - 모자란 행 규칙은 "복사가 행 끝의 빈 칸만 뺀다"는 가정에 기댄다. 가정은 위 "정한 것"에 적었다.
-  - `1회 제공량 2개(30g) 기준 1개 15g`, `1회 제공량 3g 2봉(6g)`은 이제 기준량 없음이다. 크기가 둘이라 빈 칸으로 둔다.
-- 테스트: 위 입력 12개를 기존 테스트에 더했다(42개 그대로).
-- 리뷰 프로브와 이 PR의 앞선 프로브, PR #121 리뷰 프로브를 모두 다시 돌렸다. 모두 맞는 값이거나 빈 칸이다.
-- 규칙에 따라 3차 리뷰는 하지 않는다.
+- **Applied 1 (high, created by this PR)** Words that are not "당" or "기준" (`(100g 중)` (of), `(100g에 대해)` (about), `(100g 함량)` (content), `(100g 대비)` (compared with), `(100g/당)`) were not seen as basis marks. So after the size regex change, values for a 100g basis were paired with 30g (main gave 100g).
+  - Now if the serving head has another size of the same unit, there is no basis amount even without a basis mark. `1회 제공량 30g (100g)` is the same.
+  - Another size with a basis mark means no basis amount even if the unit differs (`30g (100ml당)`).
+- **Applied 2 (medium, created by this PR)** Tables that were correct became empty fields.
+  - A head that writes the serving's own "30g당" together with the total amount (`1회 제공량 30g당 (총 내용량 300g)`)
+  - A price on the heading line (`영양정보 총 내용량 300g (100g당 2,211원)`)
+  - Now the total amount (the size right after `총 …`, including `총 2회 제공량(60g)`) and a price ("가격" (price), "N원" (N won)) are not seen as another basis amount.
+- **Applied 3 (medium)** The "shapes that are not read" in this document were corrected to match the rule above.
+- **Left (low)**
+  - A dash line that contains bars, like `--- | ---`, is removed as a Markdown separator line. This is as decided.
+  - The short-row rule relies on the assumption that "copying drops only the empty columns at the end of a row". The assumption is written under "Decisions" above.
+  - `1회 제공량 2개(30g) 기준 1개 15g` and `1회 제공량 3g 2봉(6g)` are now "no basis amount". They have two sizes, so they are left empty.
+- Tests: added the 12 inputs above to the existing tests (still 42 tests).
+- The review's probes, the earlier probes of this PR, and the probes of the PR #121 review were all run again. All are correct values or empty fields.
+- By the rule, there is no third review.

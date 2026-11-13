@@ -1,76 +1,77 @@
-# #127 조합·약 목록 다시 시도, #131 병원 검색창 안내 잘림
+# #127 Retry for the combo and medication lists, #131 clinic search box hint cut off
 
-- 이슈: [#127](https://github.com/sirloinbh/health-log/issues/127), [#131](https://github.com/sirloinbh/health-log/issues/131)
-- 브랜치: `fix/127-131-list-retry`
-- 두 이슈 모두 P4이고, 앱 전체 점검에서 나왔다. 같은 화면 묶음(#85 병원·약)이라 PR 하나로 처리한다.
+- Issues: [#127](https://github.com/sirloinbh/health-log/issues/127), [#131](https://github.com/sirloinbh/health-log/issues/131)
+- Branch: `fix/127-131-list-retry`
+- Both issues are P4 and came out of the whole-app check. They belong to the same group of screens (#85 clinics and medications), so they are handled in one PR.
 
-## 목적
+## Purpose
 
-- #127: 조합·약 화면에서 목록을 불러오지 못하면 빨간 오류 문구만 나왔다. 다시 불러오려면 브라우저를 새로 고침해야 했다.
-- #131: 폭 390px 이하에서 병원 검색창이 "방문 기록" 버튼과 한 줄에 놓였다. 그래서 안내 문구 "병원 이름 또는 시술 이름"이 잘렸다.
+- #127: when the list could not be loaded on the combo and medication screens, only a red error message appeared. To load it again, the browser had to be refreshed.
+- #131: at widths of 390px or less, the clinic search box sat on one line with the "방문 기록" (Visit record) button. So the hint text "병원 이름 또는 시술 이름" (clinic name or procedure name) was cut off.
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
 - `frontend/src/combos.tsx`, `frontend/src/medications.tsx`
-  - 목록을 불러오지 못하면 오류 문구 아래에 "다시 시도" 버튼이 나온다.
-  - 누르면 오류 대신 "목록을 다시 불러오는 중…"을 알리고 다시 불러온다. 그래서 같은 실패가 다시 나도 새로 알리고, 목록이 이미 보일 때도 기다리는 중임을 알 수 있다.
-  - 처음 불러오기뿐 아니라, 저장·삭제 뒤 다시 불러오기가 실패해 예전 목록 위에 오류가 났을 때도 나온다. 이 화면의 안내는 목록 불러오기만 쓰고, 조합 대화상자는 자기 안내를 따로 쓴다.
-  - 약 화면은 처방 방문 선택지(최근 방문 목록)도 함께 다시 받는다.
-  - 버튼이 사라져도 포커스가 `<body>`로 떨어지지 않도록 페이지 제목(h1)으로 옮긴다(#65 규칙).
-- `frontend/src/visits.tsx`: 검색 줄을 고쳤다.
-  - `sm` 미만(휴대폰)에서는 검색창과 "검색" 버튼이 한 줄을 다 쓰고, "방문 기록" 버튼은 다음 줄로 내려간다.
-  - `sm` 이상은 전과 같다.
-  - 문구는 바꾸지 않았다. 시술 이름으로도 찾을 수 있다는 안내가 핵심이기 때문이다.
-- 테스트
-  - `frontend/src/combos.test.tsx`: 다시 시도하면 목록이 보이고, 오류와 버튼이 사라지며, 포커스가 제목에 있다. 다시 실패하면 다시 알린다.
-  - `frontend/src/medications.test.tsx`: 다시 시도하면 목록이 보이고, 포커스가 제목에 있다.
+  - When the list cannot be loaded, a "다시 시도" (Try again) button appears under the error message.
+  - Pressing it announces "목록을 다시 불러오는 중…" (reloading the list…) instead of the error, and loads again. So even if the same failure happens again, it is announced anew, and when a list is already visible, the user can still tell it is waiting.
+  - It appears not only for the first load but also when reloading after a save or delete fails and an error shows over the old list. The message on this screen is used only for list loading, and the combo dialog uses its own message separately.
+  - The medication screen also reloads the prescription visit choices (the recent visits list) at the same time.
+  - So that focus does not fall to `<body>` when the button disappears, it moves to the page title (h1) (the #65 rule).
+- `frontend/src/visits.tsx`: fixed the search row.
+  - Below `sm` (phones), the search box and the "검색" (Search) button use the whole row, and the "방문 기록" button drops to the next row.
+  - At `sm` and above it is the same as before.
+  - The wording was not changed. The hint that procedure names can be searched too is the point.
+- Tests
+  - `frontend/src/combos.test.tsx`: on retry the list appears, the error and button disappear, and focus is on the title. If it fails again, it is announced again.
+  - `frontend/src/medications.test.tsx`: on retry the list appears, and focus is on the title.
 
-## 확인
+## Check
 
-- `TEST_DATABASE_URL=<임시 PG17 health_test> npm run check`: 통과(백엔드 263개, 건너뜀 0. 프런트 510개 통과, 2개 건너뜀. 스킬 4개).
-- `npm run knip`: 통과.
-- 실제 브라우저(headless Chrome 156, 폭 320·390·1440, 임시 DB)
-  - 조합·약: 해당 API를 Chrome에서 막고 화면을 열었다. 오류 문구와 "다시 시도"가 나왔다. 막은 것을 풀고 "다시 시도"를 키보드(Enter)로 누르자 목록이 나오고, 오류와 버튼이 사라졌으며, 포커스가 제목("조합", "약")으로 갔다. 세 폭 모두 같았다.
-  - 병원 검색창: 안내 문구의 글자 폭과 입력칸 안쪽 폭을 쟀다.
+- `TEST_DATABASE_URL=<temporary PG17 health_test> npm run check`: passed (backend 263, skipped 0. Frontend 510 passed, 2 skipped. Skills 4).
+- `npm run knip`: passed.
+- Real browser (headless Chrome 156, widths 320, 390, 1440, temporary DB)
+  - Combos and medications: the API was blocked in Chrome and the screen was opened. The error message and "다시 시도" appeared. After unblocking and pressing "다시 시도" with the keyboard (Enter), the list appeared, the error and button disappeared, and focus went to the title ("조합" (Combos), "약" (Medications)). It was the same at all three widths.
+  - Clinic search box: the text width of the hint and the inner width of the input were measured.
 
-    | 폭   | 문구  | 고치기 전 칸 | 고친 뒤 칸 | 넘침 |
-    | ---- | ----- | ------------ | ---------- | ---- |
-    | 320  | 154px | 88px         | 196px      | 없음 |
-    | 390  | 154px | 158px        | 266px      | 없음 |
-    | 1440 | 135px | —            | 888px      | 없음 |
-    - "고치기 전 칸"은 화면에서 새 클래스를 빼고 잰 값이다.
-    - 390px는 고치기 전에도 4px만 남았다. 점검에서 잘려 보인 것과 같은 상태다.
-    - 휴대폰 폭에서는 "방문 기록" 버튼이 검색창 아래 줄에 놓인다. 1440은 전과 같이 한 줄이다. 콘솔 오류는 0건이었다.
+    | Width | Text  | Field before the fix | Field after the fix | Overflow |
+    | ----- | ----- | -------------------- | ------------------- | -------- |
+    | 320   | 154px | 88px                 | 196px               | none     |
+    | 390   | 154px | 158px                | 266px               | none     |
+    | 1440  | 135px | —                    | 888px               | none     |
 
-  - 확인 뒤 DB, 서버, Chrome을 모두 껐다.
-- 확인하지 못한 것: 실제 화면 읽기 프로그램(2차 리뷰의 위험 참고), Firefox, Safari, 다크 모드 화면(배치만 바뀌어 색에는 영향이 없다).
+    - "Field before the fix" is the value measured on screen with the new class removed.
+    - At 390px, only 4px was left even before the fix. This is the same state as what looked cut off in the check.
+    - At phone widths the "방문 기록" button sits on the row below the search box. At 1440 it is on one row as before. There were 0 console errors.
 
-## 리뷰
+  - After checking, the DB, servers, and Chrome were all shut down.
+- Not checked: a real screen reader (see the risk in the second review), Firefox, Safari, and the dark mode screen (only the layout changed, so colors are not affected).
 
-### 1차 (독립 읽기 전용 리뷰)
+## Review
 
-막아야 할 버그는 없었다. 아래를 반영했다.
+### First (independent read-only review)
 
-- **[중] 약 화면 다시 시도가 방문 목록은 다시 받지 않음:** 처음에 둘 다 실패하면 처방 방문 선택지가 빈 채로 남았다. 방문 목록 요청을 `loadVisits`로 빼서 다시 시도 때 함께 부른다. 테스트를 추가했다.
-- **[중하] 반복 실패 테스트가 다시 알림을 증명하지 못함:** 누른 직후 예전 alert가 사라졌는지 확인하도록 고쳤다. 응답을 붙잡아 두고 진행 안내를 확인한 뒤 실패를 돌려준다. 약 화면에도 같은 테스트를 넣었다.
-- **[하] 기존 화면과 버튼이 나오는 조건이 다름:** 목록이 보이는 상태에서 다시 불러오기가 실패해도 버튼이 나오는 것은 의도다. 테스트(삭제 뒤 다시 불러오기 실패 → 다시 시도 → 갱신)와 위 변경 설명으로 못 박았다.
-- **[하] 목록이 보일 때 다시 시도 중 신호 없음:** "목록을 다시 불러오는 중…" 상태 안내를 띄운다.
-- **반영하지 않음:** 병원 목록의 다시 시도[참고]. #127 본문대로 병원 화면은 "검색" 버튼이 다시 불러오기 역할을 하므로 범위 밖이다.
-- 반영 뒤 확인
-  - `TEST_DATABASE_URL=<임시 health_test> npm run check`: 첫 실행에서 백엔드 `foods.integration.test.ts`의 "with 150 matching foods, paging reaches every one exactly once"가 451 !== 450으로 한 번 실패했다. 이 테스트는 전체 음식 수를 센 뒤 페이지를 넘기는데, 동시에 도는 다른 테스트 파일이 그 사이에 음식을 넣으면 실패할 수 있다. 원래 있던 불안정성이고 이 PR은 프런트만 바꾼다. 다시 실행하자 통과했다(백엔드 263개, 건너뜀 0. 프런트 513개 통과, 2개 건너뜀. 스킬 4개).
-  - `npm run knip`: 통과.
+There was no bug that must be stopped. The following were applied.
 
-### 2차 (독립 읽기 전용 리뷰)
+- **[medium] Retry on the medication screen did not reload the visit list:** if both failed at first, the prescription visit choices stayed empty. The visit list request was moved out into `loadVisits`, and it is called together on retry. A test was added.
+- **[medium-low] The repeated-failure test did not prove the re-announcement:** it was fixed to check that the old alert disappeared right after the press. It holds the response, checks the progress message, and then returns the failure. The same test was put on the medication screen.
+- **[low] The condition for showing the button differs from the existing screen:** that the button shows even when a reload fails while the list is visible is intended. It was pinned down by a test (reload fails after delete → retry → refreshed) and by the change description above.
+- **[low] No signal during retry when the list is visible:** a status message "목록을 다시 불러오는 중…" is shown.
+- **Not applied:** retry for the clinic list [note]. As #127 says, the "검색" button on the clinic screen works as the reload, so it is out of scope.
+- Check after the changes
+  - `TEST_DATABASE_URL=<temporary health_test> npm run check`: in the first run, the backend `foods.integration.test.ts` test "with 150 matching foods, paging reaches every one exactly once" failed once with 451 !== 450. This test counts all foods and then pages through them, so it can fail if another test file running at the same time adds a food in between. It is a flakiness that was already there, and this PR changes only the frontend. On rerun it passed (backend 263, skipped 0. Frontend 513 passed, 2 skipped. Skills 4).
+  - `npm run knip`: passed.
 
-막아야 할 버그는 없었다.
+### Second (independent read-only review)
 
-- **[하] 다시 시도가 성공해도 안내가 없음 — 반영:** 다시 시도로 시작한 불러오기가 성공하면 "목록을 다시 불러왔습니다."를 상태 안내로 띄운다. 이 안내는 진행 안내("목록을 다시 불러오는 중…")와 같은 상태 영역의 글자만 바꾼다. 저장·삭제 뒤의 다시 불러오기는 전처럼 안내를 지운다. 성공 테스트에서 이 안내를 확인한다.
-- **[중하] 상태 문구를 화면 읽기 프로그램이 놓칠 위험 — 기록만 함:** `components/ui/notice.tsx`는 하나의 `<p>`에서 `role`(alert/status)과 글자만 바꾼다. 그래서 alert에서 status로 바뀔 때 NVDA·JAWS가 진행 안내를 읽지 않을 수 있다. 이 파일은 중앙 관리 파일이라 `sirloinbh/project-standards`에서 고쳐야 하고, 여기서는 고치지 않는다. 실제 화면 읽기 프로그램으로 확인하지 못했다.
-- **반영하지 않음**
-  - 다시 실패하면 버튼까지 Tab이 필요함[하]: 포커스를 제목에 두는 것은 #65 규칙에 맞고, 다시 실패하면 alert로 알린다.
-  - 응답이 끝나지 않으면 진행 안내가 남음[하]: `requestJson`에 시간 제한이 없는 기존 성질이다. 처음 "불러오는 중…"도 같다.
-  - `loadVisits`에 최신 요청 확인이 없음[참고]: 성공한 응답은 사실상 같은 데이터라 피해가 없다.
-- 반영 뒤 확인
-  - `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과. 백엔드 263개(건너뜀 0), 프런트 513개(2개 건너뜀), 스킬 4개.
-  - `npm run knip`: 통과.
-  - 실제 브라우저(폭 320·390·1440)에서 다시 확인했다. 다시 시도 뒤 목록이 나오고 포커스가 제목에 있었다. 병원 검색칸 폭은 위 표와 같았고 콘솔 오류는 0건이었다. 확인 뒤 DB, 서버, Chrome을 껐다.
+There was no bug that must be stopped.
+
+- **[low] No message when retry succeeds — applied:** when a load started by retry succeeds, "목록을 다시 불러왔습니다." (the list was reloaded) is shown as a status message. This message only changes the text in the same status area as the progress message ("목록을 다시 불러오는 중…"). A reload after save or delete clears the message as before. The success test checks this message.
+- **[medium-low] Risk that a screen reader misses the status text — recorded only:** `components/ui/notice.tsx` changes only the `role` (alert/status) and the text on a single `<p>`. So when it changes from alert to status, NVDA and JAWS may not read the progress message. This file is a centrally managed file, so it must be fixed in `sirloinbh/project-standards`, and it was not fixed here. It was not checked with a real screen reader.
+- **Not applied**
+  - Tab is needed to reach the button again if it fails again [low]: putting focus on the title matches the #65 rule, and a repeated failure is announced with an alert.
+  - The progress message stays if the response never ends [low]: this is an existing property that `requestJson` has no time limit. The first "loading…" is the same.
+  - `loadVisits` has no check for the latest request [note]: a successful response is effectively the same data, so there is no harm.
+- Check after the changes
+  - `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed. Backend 263 (skipped 0), frontend 513 (2 skipped), skills 4.
+  - `npm run knip`: passed.
+  - Checked again in the real browser (widths 320, 390, 1440). After retry the list appeared and focus was on the title. The clinic search field width was the same as the table above, and there were 0 console errors. After checking, the DB, servers, and Chrome were shut down.

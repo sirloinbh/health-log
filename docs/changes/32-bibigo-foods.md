@@ -48,12 +48,12 @@ The names are kept in Korean because they are the data values stored in the DB. 
 
 ## Products not found or left out
 
-| Product                                                                    | Reason                                              |
-| -------------------------------------------------------------------------- | --------------------------------------------------- |
-| 비비고 윤주모 삼계탕 850g (Bibigo Yunjumo Samgyetang 850g)                  | Chilled product (outside the shelf-stable scope)    |
-| 비비고 윤주모 셰프 황태국·감자탕·부대찌개·육개장 200g (Bibigo Yunjumo Chef Hwangtae soup, Gamjatang, Budae stew, Yukgaejang 200g) | Frozen product (outside the shelf-stable scope)     |
-| 비비고 윤주모 셰프 부대찌개·육개장 200g (Bibigo Yunjumo Chef Budae stew, Yukgaejang 200g) | (Note) the nutrition response also had no values    |
-| Bundle and set products (for example `비비고 갈비탕 400g, 6개`, a 6-pack)   | Same product as the single item                     |
+| Product                                                                                                                           | Reason                                           |
+| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| 비비고 윤주모 삼계탕 850g (Bibigo Yunjumo Samgyetang 850g)                                                                        | Chilled product (outside the shelf-stable scope) |
+| 비비고 윤주모 셰프 황태국·감자탕·부대찌개·육개장 200g (Bibigo Yunjumo Chef Hwangtae soup, Gamjatang, Budae stew, Yukgaejang 200g) | Frozen product (outside the shelf-stable scope)  |
+| 비비고 윤주모 셰프 부대찌개·육개장 200g (Bibigo Yunjumo Chef Budae stew, Yukgaejang 200g)                                         | (Note) the nutrition response also had no values |
+| Bundle and set products (for example `비비고 갈비탕 400g, 6개`, a 6-pack)                                                         | Same product as the single item                  |
 
 Among the shelf-stable single Bibigo items in the `ctgrId=004012` list, there is none for which official numbers could not be found. `비비고 순대곱창전골 550g` (Bibigo Sundae Gopchang Jeongol 550g) is only inside a set (40239023) in this category, and its single-item page was not checked, so it was not included.
 
@@ -67,17 +67,17 @@ Among the shelf-stable single Bibigo items in the `ctgrId=004012` list, there is
 - **Random cross-check of 10** (completion criterion of the issue): The product pages and nutrition responses of 10 randomly chosen products were fetched again. Product code, total content, label reference amount, energy, carbohydrate, protein, fat, sugars, and sodium all equaled the registered values.
 
   | Product                  | Registered values (total/reference/energy/carb/protein/fat/sugars/sodium) | Values fetched again         | Result |
-  | ------------------------ | ------------------------------------------------------------------------ | ---------------------------- | ------ |
-  | 도가니곰탕 460g          | 460/460/100/0/19/2.4/0/950                                               | 460/460/100/0/19/2.4/0/950   | Match  |
-  | 시래기듬뿍 장터국 500g   | 500/500/120/11/10/3.8/-/1750                                             | 500/500/120/11/10/3.8/-/1750 | Match  |
-  | 두부듬뿍 청국장찌개 460g | 460/460/310/23/25/13/4/1690                                              | 460/460/310/23/25/13/4/1690  | Match  |
-  | 시래기듬뿍 된장국 460g   | 460/460/150/13/13/5/1/1690                                               | 460/460/150/13/13/5/1/1690   | Match  |
-  | 닭곰탕 500g              | 500/500/145/2/21/6/0/1360                                                | 500/500/145/2/21/6/0/1360    | Match  |
-  | 설렁탕 500g              | 500/500/110/2/16/4.1/0/1070                                              | 500/500/110/2/16/4.1/0/1070  | Match  |
-  | 소고기 미역국 500g       | 500/500/115/8/7/6/0/1710                                                 | 500/500/115/8/7/6/0/1710     | Match  |
-  | 시래기 감자탕 460g       | 460/460/270/18/31/8/2/1530                                               | 460/460/270/18/31/8/2/1530   | Match  |
-  | 차돌된장찌개 460g        | 460/460/240/19/19/10/4/1830                                              | 460/460/240/19/19/10/4/1830  | Match  |
-  | 소고기듬뿍 육개장 460g   | 460/460/205/11/22/8/4/1740                                               | 460/460/205/11/22/8/4/1740   | Match  |
+  | ------------------------ | ------------------------------------------------------------------------- | ---------------------------- | ------ |
+  | 도가니곰탕 460g          | 460/460/100/0/19/2.4/0/950                                                | 460/460/100/0/19/2.4/0/950   | Match  |
+  | 시래기듬뿍 장터국 500g   | 500/500/120/11/10/3.8/-/1750                                              | 500/500/120/11/10/3.8/-/1750 | Match  |
+  | 두부듬뿍 청국장찌개 460g | 460/460/310/23/25/13/4/1690                                               | 460/460/310/23/25/13/4/1690  | Match  |
+  | 시래기듬뿍 된장국 460g   | 460/460/150/13/13/5/1/1690                                                | 460/460/150/13/13/5/1/1690   | Match  |
+  | 닭곰탕 500g              | 500/500/145/2/21/6/0/1360                                                 | 500/500/145/2/21/6/0/1360    | Match  |
+  | 설렁탕 500g              | 500/500/110/2/16/4.1/0/1070                                               | 500/500/110/2/16/4.1/0/1070  | Match  |
+  | 소고기 미역국 500g       | 500/500/115/8/7/6/0/1710                                                  | 500/500/115/8/7/6/0/1710     | Match  |
+  | 시래기 감자탕 460g       | 460/460/270/18/31/8/2/1530                                                | 460/460/270/18/31/8/2/1530   | Match  |
+  | 차돌된장찌개 460g        | 460/460/240/19/19/10/4/1830                                               | 460/460/240/19/19/10/4/1830  | Match  |
+  | 소고기듬뿍 육개장 460g   | 460/460/205/11/22/8/4/1740                                                | 460/460/205/11/22/8/4/1740   | Match  |
 
   (`-` is a value left NULL because the source gave a "less than" mark.)
 

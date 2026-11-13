@@ -1,91 +1,91 @@
-# #78 음식·조합 대화상자를 닫으면 연 버튼으로 포커스 돌려주기
+# #78 Return focus to the opening button when the food and combo dialogs close
 
-- 이슈: [#78](https://github.com/sirloinbh/health-log/issues/78)
-- 브랜치: `fix/78-dialog-focus-return`
+- Issue: [#78](https://github.com/sirloinbh/health-log/issues/78)
+- Branch: `fix/78-dialog-focus-return`
 
-## 목적
+## Purpose
 
-음식과 조합 화면의 추가·수정 대화상자는 `DialogTrigger` 없이 열린다. 그래서 닫힐 때 Radix가 포커스를 돌려줄 곳이 없어 `<body>`로 간다. 키보드 사용자는 Tab을 페이지 맨 위부터 다시 눌러야 한다.
+The add and edit dialogs of the food and combo screens are opened without a `DialogTrigger`. So when they close, Radix has no place to return focus to, and it goes to `<body>`. A keyboard user has to press Tab again from the top of the page.
 
-## 정한 것
+## Decisions
 
-이슈의 할 일대로 진행했고 사용자 확인 없이 정했다.
+It was done as the issue's to-do items said, and decided without asking the user.
 
-- **돌아갈 곳:** 대화상자를 연 버튼이다. 추가는 "음식 추가"·"조합 추가", 수정은 그 카드의 "수정" 버튼이다.
-- **버튼이 사라졌을 때:** 페이지 제목(`h1`)으로 보낸다. 예를 들어 수정한 음식이 지금 검색어에 더는 맞지 않으면 목록을 다시 읽을 때 카드가 빠진다.
-  - 닫힐 때 이미 버튼이 없으면 바로 제목으로 보낸다.
-  - 닫힐 때는 있었는데 다시 읽은 목록에서 빠지면, 목록을 다시 그린 뒤 포커스가 `<body>`로 떨어진 경우에만 제목으로 보낸다. 그 사이 사용자가 다른 곳으로 옮긴 포커스는 건드리지 않는다.
-- **공통 `confirm-dialog.tsx`의 `returnFocusRef`를 쓰지 않은 이유:** 이 두 대화상자는 확인 대화상자가 아니고, 공통 파일은 중앙 관리 파일이다. 같은 생각을 화면 쪽 훅으로 만들었다.
+- **Where to return:** The button that opened the dialog. For add it is "음식 추가" (add food) or "조합 추가" (add combo), and for edit it is the "수정" (edit) button of that card.
+- **When the button has disappeared:** Send it to the page heading (`h1`). For example, if an edited food no longer matches the current search term, the card drops out when the list is read again.
+  - If the button is already gone when closing, it goes to the heading right away.
+  - If it existed at closing but dropped out of the list read again, focus is sent to the heading only if it fell to `<body>` after the list was redrawn. Focus that the user moved elsewhere in the meantime is not touched.
+- **Why `returnFocusRef` of the shared `confirm-dialog.tsx` was not used:** These two dialogs are not confirmation dialogs, and the shared file is a centrally managed file. The same idea was made as a hook on the screen side.
 
-## 변경 — 2026-11-06
+## Change — 2026-11-06
 
-- **새 파일** `frontend/src/return-focus.ts`: `useReturnFocus(fallback)`
-  - `remember(element)`: 연 버튼을 기억한다.
-  - `returnFocus()`: 닫힐 때 부른다. 대화상자가 자기 타이머로 포커스를 옮긴 뒤, 기억한 버튼이 아직 화면에 있으면 그 버튼으로, 없으면 `fallback`으로 보낸다.
-  - 화면을 다시 그릴 때마다 도는 effect: 닫은 뒤 연 버튼이 화면에서 사라졌고 포커스가 `<body>`에 있으면 `fallback`으로 보낸다. 연 버튼이 사라졌을 때, 포커스를 돌려준 뒤 사용자가 다른 곳으로 옮겼을 때, 새 대화상자를 열 때 그만 본다(1차·2차 리뷰 뒤 바꿈).
-- **화면** `frontend/src/foods.tsx`, `frontend/src/combos.tsx`
-  - 추가·수정 버튼이 누른 버튼을 넘겨 대화상자를 연다.
-  - 취소, Esc, 바깥 누르기, 저장으로 닫히면 `returnFocus()`를 부른다.
-  - 음식 화면 제목에 `ref`와 `tabIndex={-1}`을 달았다. 조합 화면 제목은 삭제 때문에 이미 있었다.
+- **New file** `frontend/src/return-focus.ts`: `useReturnFocus(fallback)`
+  - `remember(element)`: Remembers the opening button.
+  - `returnFocus()`: Called when closing. After the dialog moves focus with its own timer, it sends focus to the remembered button if it is still on screen, or to `fallback` if not.
+  - An effect that runs every time the screen is redrawn: after closing, if the opening button has disappeared from the screen and focus is on `<body>`, it sends focus to `fallback`. It stops watching when the opening button has disappeared, when the user moved focus elsewhere after focus was returned, and when a new dialog is opened (changed after the first and second reviews).
+- **Screens** `frontend/src/foods.tsx`, `frontend/src/combos.tsx`
+  - The add and edit buttons pass the pressed button and open the dialog.
+  - When closed by cancel, Esc, clicking outside, or saving, `returnFocus()` is called.
+  - A `ref` and `tabIndex={-1}` were put on the food screen heading. The combo screen heading already had them because of delete.
 
-## 검증
+## Verification
 
-### 브라우저
+### Browser
 
-임시 DB(포트 5473, `health_browser`)에 실제 API(3973)와 Vite(5273)를 띄웠다. 헤드리스 Chrome(디버깅 포트 9673)을 CDP로 움직였다. 음식 "브라우저김밥"과 조합 "브라우저 세트"를 넣고, 화면마다 세 경우를 확인했다.
+A real API (3973) and Vite (5273) were started on a temporary DB (port 5473, `health_browser`). Headless Chrome (debugging port 9673) was driven over CDP. A food "브라우저김밥" (browser gimbap) and a combo "브라우저 세트" (browser set) were put in, and three cases were checked on each screen.
 
-| 경우                                   | 고치기 전(1440×900) | 고친 뒤(320×700, 390×844, 1440×900) |
-| -------------------------------------- | ------------------- | ----------------------------------- |
-| 키보드 Enter로 추가 버튼 → Esc         | 추가 버튼           | 추가 버튼                           |
-| 마우스로 카드의 "수정" → 마우스로 취소 | `<body>`            | 그 카드의 "수정" 버튼               |
-| 마우스로 카드의 "수정" → 마우스로 저장 | `<body>`            | 그 카드의 "수정" 버튼               |
+| Case                                                    | Before the fix (1440×900) | After the fix (320×700, 390×844, 1440×900) |
+| ------------------------------------------------------- | ------------------------- | ------------------------------------------ |
+| Add button with keyboard Enter → Esc                    | Add button                | Add button                                 |
+| "수정" of a card with the mouse → cancel with the mouse | `<body>`                  | The "수정" button of that card             |
+| "수정" of a card with the mouse → save with the mouse   | `<body>`                  | The "수정" button of that card             |
 
-- 음식, 조합 화면 모두 결과가 같았다.
-- 고치기 전에도 키보드로 열고 Esc로 닫으면 Chrome에서는 돌아갔다. 마우스로 열고 닫으면 `<body>`로 갔다.
-- 고친 뒤 세 폭 모두 가로 넘침과 콘솔 오류가 없었다.
-- 1차 리뷰 뒤 "저장하면 카드가 목록에서 빠지는 경우"를 더 확인했다. 음식을 검색어로 찾아 검색어에 맞지 않는 이름으로 바꿔 저장하고, 저장 뒤 목록 읽기를 1.2초 늦췄다.
-  - 320×700, 390×844, 1440×900 모두 같았다. 목록을 읽는 동안에는 그 음식의 "수정" 버튼에, 카드가 빠진 뒤에는 제목 "음식"에 포커스가 있었다.
-  - 저장을 누른 직후 저장 중에는 포커스가 `<body>`에 있었다. 저장 버튼이 `disabled`가 되며 포커스를 잃는 원래 동작이고, 저장 실패 뒤에도 그대로다. 이 PR 범위 밖이라 [#98](https://github.com/sirloinbh/health-log/issues/98)로 분리했다.
-- 확인 뒤 임시 DB, API, Vite, Chrome을 모두 껐다.
+- The results were the same on both the food and combo screens.
+- Even before the fix, opening with the keyboard and closing with Esc returned focus in Chrome. Opening and closing with the mouse went to `<body>`.
+- After the fix, at all three widths there was no horizontal overflow and no console errors.
+- After the first review, the case "saving makes the card drop out of the list" was checked more. A food was found with a search term, saved with a name that does not match the search term, and the list read after saving was delayed by 1.2 seconds.
+  - It was the same at 320×700, 390×844, and 1440×900. While the list was being read, focus was on the "수정" button of that food, and after the card dropped out, it was on the heading "음식" (foods).
+  - Right after pressing save, during the save, focus was on `<body>`. This is the original behavior where the save button becomes `disabled` and loses focus, and it is the same even after a save failure. It is outside the scope of this PR, so it was split into [#98](https://github.com/sirloinbh/health-log/issues/98).
+- After the check, the temporary DB, API, Vite, and Chrome were all shut down.
 
-### 테스트
+### Tests
 
-`frontend/src/foods.test.tsx`, `frontend/src/combos.test.tsx`에 처음 4개씩, 1차 리뷰 뒤 1개씩 더해 5개씩이다. 처음 8개는 고치기 전 코드에서, 1차 리뷰 뒤 2개는 1차 리뷰 전 코드에서 실패하고 고친 뒤 통과하는 것을 확인했다.
+In `frontend/src/foods.test.tsx` and `frontend/src/combos.test.tsx`, 4 each at first and 1 each added after the first review, making 5 each. It was confirmed that the first 8 fail on the code before the fix, and the 2 after the first review fail on the code before the first review, and all pass after the fix.
 
-- 추가 대화상자를 취소하면 추가 버튼으로 돌아간다.
-- 수정 대화상자를 Esc로 닫으면 그 카드의 수정 버튼으로 돌아간다. 카드가 둘 있어 다른 카드로 가지 않는 것도 본다.
-- 저장으로 닫으면 목록에 남은 카드의 수정 버튼으로 돌아간다.
-- 저장 뒤 다시 읽은 목록에서 카드가 빠지면 `<body>`가 아니라 페이지 제목으로 간다.
-- 목록 읽기가 대화상자가 닫힌 뒤에 끝나 카드가 빠져도 페이지 제목으로 간다(1차 리뷰 뒤 추가).
+- Cancelling the add dialog returns to the add button.
+- Closing the edit dialog with Esc returns to the edit button of that card. There are two cards, so it also checks that it does not go to the other card.
+- Closing by saving returns to the edit button of the card that remains in the list.
+- If the card drops out of the list read again after saving, it goes to the page heading, not `<body>`.
+- Even if the list read finishes after the dialog closes and the card drops out, it goes to the page heading (added after the first review).
 
-### 명령
+### Commands
 
-- `TEST_DATABASE_URL= npm run check`: 통과
-  - 프런트 350개 통과, 2개 건너뜀(1차 리뷰 반영 뒤). 백엔드 89개 통과, DB 테스트 77개 건너뜀. 스킬 4개 통과.
-  - 셸의 `TEST_DATABASE_URL`이 다른 프로젝트 DB를 가리켜 비우고 실행했다. 프런트만 바꾼 변경이다.
-- `npm run knip`: 통과
+- `TEST_DATABASE_URL= npm run check`: passed
+  - Frontend 350 passed, 2 skipped (after applying the first review). Backend 89 passed, 77 DB tests skipped. Skill checks 4 passed.
+  - The `TEST_DATABASE_URL` of the shell pointed to the DB of another project, so it was run with it emptied. This change changed only the frontend.
+- `npm run knip`: passed
 
-## 한계
+## Limits
 
-- 하루 기록 화면의 식단 카드 등 다른 대화상자는 이번에 보지 않았다. 확인 대화상자는 `trigger`나 `returnFocusRef`로 이미 처리한다.
-- 실제 화면 읽기 프로그램, Firefox, Safari로는 확인하지 않았다.
-- 저장 중과 저장 실패 뒤 대화상자 안의 포커스는 [#98](https://github.com/sirloinbh/health-log/issues/98)에서 다룬다.
+- Other dialogs such as the meal card of the daily record screen were not looked at this time. Confirmation dialogs are already handled with `trigger` or `returnFocusRef`.
+- It was not checked with a real screen reader, Firefox, or Safari.
+- Focus inside the dialog during a save and after a save failure is handled in [#98](https://github.com/sirloinbh/health-log/issues/98).
 
-## 1차 리뷰 — 2026-11-06
+## First review — 2026-11-06
 
-별도 읽기 전용 리뷰를 실행했다. 반드시 고칠 것 하나가 나와 고쳤다.
+A separate read-only review was run. One must-fix point came up and was fixed.
 
-- **목록을 다시 그리기 전에 확인하던 문제(반드시 고칠 것):** 저장 뒤 목록 읽기가 대화상자 닫힘보다 늦으면, 읽기가 끝난 직후의 확인 시점에 연 버튼이 아직 화면에 있었다. 그 뒤 React가 카드를 지우면서 포커스가 `<body>`로 떨어졌다. 테스트의 가짜 응답은 바로 와서 이 경우를 잡지 못했다. 확인을 화면을 다시 그린 뒤 도는 effect로 옮기고, 느린 목록 읽기 테스트를 두 화면에 더했다.
-- **제목 포커스 표시:** 두 화면 제목에 `focus-visible` 테두리를 달아, 키보드 사용자가 포커스가 간 곳을 볼 수 있게 했다.
-- **설명 바로잡기:** 조합 화면의 삭제 포커스 주석에 이 훅과의 관계를 적었다. 테스트 도우미 주석을 실제 동작(버튼에 먼저 포커스를 두고 누름)에 맞췄다.
-- **반영하지 않은 것:** 두 화면의 `openDialog`·`closeDialog` 중복은 몇 줄이라 그대로 두었다.
+- **Checking before the list was redrawn (must fix):** If the list read after saving is later than the dialog closing, then at the moment of the check right after the read finished, the opening button was still on screen. After that, React removed the card and focus fell to `<body>`. The fake response in the test came right away and could not catch this case. The check was moved to an effect that runs after the screen is redrawn, and a slow list read test was added to both screens.
+- **Heading focus indicator:** A `focus-visible` border was put on the headings of both screens so that keyboard users can see where focus went.
+- **Correcting descriptions:** The delete focus comment of the combo screen now writes its relation to this hook. The test helper comment was aligned to the real behavior (put focus on the button first and then press).
+- **Not applied:** The duplication of `openDialog` and `closeDialog` in the two screens is only a few lines, so it was left.
 
-## 2차 리뷰 — 2026-11-06
+## Second review — 2026-11-06
 
-1차 반영 내용과 전체 diff를 별도 읽기 전용 리뷰로 다시 봤다. 반드시 고칠 것은 없었고, 다음을 반영했다. 리뷰는 여기서 끝낸다.
+The first round of fixes and the whole diff were reviewed again by a separate read-only review. Nothing had to be fixed, and the following was applied. Reviews end here.
 
-- **지켜보기가 끝나지 않던 문제:** 취소·Esc로 닫고 연 버튼이 남아 있으면, 지켜보기가 페이지를 떠날 때까지 계속됐다. 나중에 다른 이유로 포커스가 `<body>`에 있을 때 검색으로 카드가 빠지면, 포커스가 예고 없이 제목으로 갔다. 예를 들어 Safari에서 마우스로 "검색"을 누르면 버튼에 포커스가 가지 않는다. 포커스를 돌려준 뒤 사용자가 다른 곳으로 옮기면 지켜보기를 끝낸다. `frontend/src/foods.test.tsx`에 테스트를 더했고(음식 6개, 조합 5개), 2차 리뷰 전 코드에서 실패하는 것을 확인했다.
-- **테스트 보강:** 느린 목록 읽기 테스트가 목록 요청이 실제로 나간 것을 확인한 뒤 응답을 끝낸다. 요청 전에 다른 단계가 끼면 조용히 아무 일도 하지 않는 일을 막는다.
-- **설명 바로잡기:** 지켜보기가 끝나는 조건을 위 "변경"에 맞게 고쳤다.
-- **반영하지 않은 것:** `openDialog`·`closeDialog` 중복은 1차와 같은 이유로 그대로 두었다.
-- 반영 뒤 `TEST_DATABASE_URL= npm run check`: 통과(프런트 351개 통과, 2개 건너뜀. 백엔드 89개 통과, DB 테스트 77개 건너뜀. 스킬 4개 통과). `npm run knip`: 통과.
+- **Watching that did not end:** If the dialog was closed by cancel or Esc and the opening button remained, watching continued until the page was left. If later, for another reason, focus was on `<body>` and the card dropped out by a search, focus went to the heading without notice. For example, in Safari, pressing "검색" (search) with the mouse does not give the button focus. Watching ends if the user moves focus elsewhere after focus was returned. Tests were added to `frontend/src/foods.test.tsx` (6 for food, 5 for combo), and it was confirmed that they fail on the code before the second review.
+- **Test addition:** The slow list read test finishes the response after checking that the list request actually went out. This prevents it from silently doing nothing if another step comes in before the request.
+- **Correcting descriptions:** The condition for ending the watching was fixed to match "Change" above.
+- **Not applied:** The duplication of `openDialog` and `closeDialog` was left, for the same reason as in the first review.
+- After applying, `TEST_DATABASE_URL= npm run check`: passed (frontend 351 passed, 2 skipped. Backend 89 passed, 77 DB tests skipped. Skill checks 4 passed). `npm run knip`: passed.

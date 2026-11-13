@@ -1,92 +1,92 @@
-# #98 음식·조합 대화상자의 저장 중과 저장 실패 뒤 포커스 지키기
+# #98 Keep focus during a save and after a save failure in the food and combo dialogs
 
-- 이슈: [#98](https://github.com/sirloinbh/health-log/issues/98)
-- 브랜치: `fix/98-dialog-save-focus`
+- Issue: [#98](https://github.com/sirloinbh/health-log/issues/98)
+- Branch: `fix/98-dialog-save-focus`
 
-## 목적
+## Purpose
 
-음식·조합 대화상자에서 저장을 누르면 저장 버튼이 `disabled`가 되어 포커스를 잃고, 포커스가 `<body>`로 갔다. 저장이 실패해 안내가 나와도 포커스는 `<body>`에 남았다. 키보드 사용자는 대화상자 안으로 다시 들어가야 했다. 저장에 성공했을 때는 #78에서 연 버튼으로 포커스를 돌려준다.
+When save is pressed in the food or combo dialog, the save button became `disabled`, lost focus, and focus went to `<body>`. Even when the save failed and a notice appeared, focus stayed on `<body>`. A keyboard user had to go back into the dialog. When the save succeeds, #78 returns focus to the button that opened it.
 
-## 정한 것
+## Decisions
 
-- **저장 중:** 저장 버튼을 `disabled` 대신 `aria-disabled`(그리고 `aria-busy`)로 둔다. 포커스는 버튼에 남고, 버튼 이름이 "저장 중…"으로 바뀐다. 이미 쓰고 있는 "결과 더 보기" 버튼(`more-foods-button.tsx`)과 같은 방식이다. 저장 중에 다시 누르거나 칸에서 Enter를 눌러도 요청을 더 보내지 않는다.
-- **저장 실패 뒤:** 포커스는 그대로 저장 버튼(다시 "저장")에 있다. 실패 이유는 대화상자 안의 안내(`role="alert"`)가 읽어 준다.
-  - 이슈는 "안내나 저장 버튼 등 알맞은 곳"이라고 했다. 다시 저장하기 쉬운 저장 버튼으로 정했다.
-  - Enter로 저장했다면 포커스는 그 칸에 그대로 남는다.
-- **취소 버튼:** 저장 중에는 저장 버튼과 같이 `aria-disabled`로 두고 눌러도 닫지 않는다. Safari는 마우스로 누른 버튼에 포커스를 옮기지 않아, 저장을 누를 때 포커스가 취소에 있을 수 있다(1차 리뷰 뒤 바꿈).
-- **실패 안내:** 저장할 때마다 이전 안내를 먼저 지운다. 같은 이유로 두 번 실패해도 안내가 새로 나타나 다시 읽힌다(1차 리뷰 뒤 추가).
+- **During a save:** The save button is set to `aria-disabled` (and `aria-busy`) instead of `disabled`. Focus stays on the button, and the button name changes to "저장 중…" (saving…). It is the same approach as the "결과 더 보기" (show more results) button already in use (`more-foods-button.tsx`). Even if pressed again during a save, or Enter is pressed in a field, no more requests are sent.
+- **After a save failure:** Focus stays on the save button (now "저장" again). The failure reason is read out by the notice inside the dialog (`role="alert"`).
+  - The issue said "a suitable place such as the notice or the save button". The save button, where it is easy to save again, was chosen.
+  - If it was saved with Enter, focus stays on that field.
+- **Cancel button:** During a save it is set to `aria-disabled` like the save button and does not close even when pressed. Safari does not move focus to a button pressed with the mouse, so focus may be on cancel when save is pressed (changed after the first review).
+- **Failure notice:** Every time it saves, the previous notice is cleared first. Even if it fails twice for the same reason, the notice appears anew and is read again (added after the first review).
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
 - `frontend/src/foods.tsx`
-  - 저장 버튼: `disabled={saving}` → `aria-disabled`, `aria-busy`, 흐린 모양(`aria-disabled:` 클래스)
-  - `submit`: 저장 중이면 아무것도 하지 않는다. 저장 전에 이전 안내를 지운다(1차 리뷰 뒤).
-  - 취소 버튼: 저장 중에는 `aria-disabled`이고 눌러도 닫지 않는다(1차 리뷰 뒤).
-- `frontend/src/combos.tsx`: 저장 버튼, `save`, 취소 버튼을 같은 방식으로 바꿨다.
+  - Save button: `disabled={saving}` → `aria-disabled`, `aria-busy`, a dimmed look (`aria-disabled:` class)
+  - `submit`: Does nothing if a save is in progress. Clears the previous notice before saving (after the first review).
+  - Cancel button: During a save it is `aria-disabled` and does not close even when pressed (after the first review).
+- `frontend/src/combos.tsx`: The save button, `save`, and the cancel button were changed in the same way.
 
-## 검증
+## Verification
 
-### 브라우저
+### Browser
 
-임시 DB(포트 5473, `health_browser`)에 실제 API(3973)와 Vite(5273)를 띄웠다. 헤드리스 Chrome(디버깅 포트 9673)을 CDP로 움직였다. 모든 쓰기 요청을 1초 늦췄다.
+A real API (3973) and Vite (5273) were started on a temporary DB (port 5473, `health_browser`). Headless Chrome (debugging port 9673) was driven over CDP. All write requests were delayed by 1 second.
 
-- 음식 추가: 이미 있는 이름으로 저장해 409 "이미 등록된 항목입니다"를 받는다.
-- 조합 수정: 다른 조합과 같은 이름으로 바꿔 409 "같은 이름의 조합이 이미 있습니다"를 받는다.
-- 저장은 마우스로 누르고, 0.4초 뒤(저장 중)와 응답 뒤의 포커스를 봤다.
+- Add food: Save with a name that already exists and get 409 "이미 등록된 항목입니다" (this item is already registered).
+- Edit combo: Change to the same name as another combo and get 409 "같은 이름의 조합이 이미 있습니다" (a combo with the same name already exists).
+- Save was pressed with the mouse, and focus was looked at 0.4 seconds later (during the save) and after the response.
 
-| 경우                                | 저장 중                     | 실패 뒤                 |
-| ----------------------------------- | --------------------------- | ----------------------- |
-| 고치기 전(1440×900), 두 대화상자    | `<body>`                    | `<body>`                |
-| 고친 뒤(320×700, 390×844, 1440×900) | 대화상자 안 "저장 중…" 버튼 | 대화상자 안 "저장" 버튼 |
+| Case                                       | During the save                     | After the failure               |
+| ------------------------------------------ | ----------------------------------- | ------------------------------- |
+| Before the fix (1440×900), both dialogs    | `<body>`                            | `<body>`                        |
+| After the fix (320×700, 390×844, 1440×900) | The "저장 중…" button in the dialog | The "저장" button in the dialog |
 
-- 두 대화상자 모두 결과가 같았고, 실패 안내도 보였다.
-- 세 폭 모두 가로 넘침과 콘솔 오류가 없었다.
-- 확인 뒤 임시 DB, API, Vite, Chrome을 모두 껐다.
-- 브라우저 확인은 임시 DB에 `012_goals.sql`·`013_foods_franchise.sql`을 적용하기 전에 했다. 012는 목표 표만 새로 만들고 013은 음식 데이터만 넣어, 두 대화상자의 동작과는 관계없다.
+- The results were the same in both dialogs, and the failure notice was also visible.
+- At all three widths there was no horizontal overflow and no console errors.
+- After the check, the temporary DB, API, Vite, and Chrome were all shut down.
+- The browser check was done before `012_goals.sql` and `013_foods_franchise.sql` were applied to the temporary DB. 012 only creates a new goals table and 013 only inserts food data, so they are unrelated to the behavior of the two dialogs.
 
-### 테스트
+### Tests
 
-`frontend/src/foods.test.tsx`, `frontend/src/combos.test.tsx`에 처음 1개씩, 1차 리뷰 뒤 1개씩 더해 2개씩이다. 모두 고치기 전 코드에서 실패하고 고친 뒤 통과한다.
+In `frontend/src/foods.test.tsx` and `frontend/src/combos.test.tsx`, 1 each at first and 1 each added after the first review, making 2 each. All fail on the code before the fix and pass after.
 
-- 저장 중에는 같은 저장 버튼이 "저장 중…", `aria-disabled`이고 포커스를 가진다.
-- 다시 눌러도 쓰기 요청은 한 번이다.
-- 저장이 실패하면 안내가 나오고, 포커스는 대화상자 안의 "저장" 버튼에 있다.
+- During a save, the same save button is "저장 중…", `aria-disabled`, and has focus.
+- Even if pressed again, there is one write request.
+- If the save fails, the notice appears and focus is on the "저장" button in the dialog.
 
-### 명령
+### Commands
 
-- 임시 `health_test`(`npm run db:migrate`로 001~013 적용)로 `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과
-  - 백엔드 220개 통과, 0개 건너뜀(DB 통합 테스트 포함). 프런트 397개 통과, 2개 건너뜀. 스킬 4개 통과.
-- `npm run knip`: 통과
+- With a temporary `health_test` (001 to 013 applied with `npm run db:migrate`), `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed
+  - Backend 220 passed, 0 skipped (including DB integration tests). Frontend 397 passed, 2 skipped. Skill checks 4 passed.
+- `npm run knip`: passed
 
-## 한계
+## Limits
 
-- 저장 중에도 입력칸은 바뀔 수 있다. 저장 중에 바꾼 값은 보낸 요청에 들어가지 않는다. 지금까지와 같은 동작이다(하루 체크 카드는 #37에서 `readOnly`로 막았다).
-- 실제 화면 읽기 프로그램, Firefox, Safari로는 확인하지 않았다.
+- Even during a save, the input fields can be changed. A value changed during a save does not go into the request that was sent. This is the same behavior as before (the daily check card was blocked with `readOnly` in #37).
+- It was not checked with a real screen reader, Firefox, or Safari.
 
-## 1차 리뷰 — 2026-11-08
+## First review — 2026-11-08
 
-별도 읽기 전용 리뷰를 실행했다. 반드시 고칠 것은 없었고, 다음을 반영했다.
+A separate read-only review was run. Nothing had to be fixed, and the following was applied.
 
-- **확인된 것:** 두 번째 저장은 어디서도 시작되지 않는다(다시 누름, 폼 제출, 빠른 두 번 클릭). 저장에 성공하면 #78의 장치가 연 버튼으로 포커스를 돌려준다. 저장 중 닫기는 그대로 막힌다.
-- **같은 실패가 다시 읽히지 않던 문제(고치면 좋을 것):** 실패 안내가 다음 시도 동안에도 남아, 같은 내용으로 다시 실패하면 화면이 바뀌지 않아 화면 읽기 프로그램이 아무 말도 하지 않았다. 포커스가 움직이지 않으니 알 길도 없었다. 저장 전에 안내를 지운다.
-- **취소 버튼 포커스:** Safari처럼 누른 버튼에 포커스를 주지 않는 브라우저에서는 저장 중 비활성이 된 취소 버튼이 포커스를 떨어뜨릴 수 있었다. 취소도 `aria-disabled`로 바꿨다.
-- **테스트 보강**
-  - 저장 중 폼 제출(칸에서 Enter)이 요청을 더 보내지 않는다.
-  - 같은 실패 두 번이 매번 새 안내로 나온다(두 화면).
-  - 저장 중 취소를 눌러도 닫히지 않는다(기존 테스트를 `aria-disabled` 기준으로 바꿈).
-  - 리뷰 전 코드에서 3개가 실패한다.
-- **반영하지 않은 것:** 버튼의 `aria-busy`는 "결과 더 보기"와 맞춘 것이고, 저장 중 마우스를 올렸을 때 배경이 바뀌는 것은 모양만의 문제라 두었다.
-- 반영 뒤 `npm run check`: 통과(프런트 399개 통과, 2개 건너뜀. 백엔드 117개 통과, DB 통합 테스트 98개 건너뜀. 스킬 4개). 이번에는 임시 DB 없이 실행했고, `testDatabaseSkip`이 `health_test`가 아닌 DB를 건너뛰어 다른 프로젝트 DB에는 닿지 않았다. 반영 내용은 화면만 바꾼다. `npm run knip`: 통과.
+- **What was confirmed:** A second save is not started anywhere (pressing again, form submit, a quick double click). If the save succeeds, the mechanism of #78 returns focus to the opening button. Closing during a save is still blocked.
+- **The same failure not being read again (should fix):** The failure notice stayed during the next attempt, so when it failed again with the same content, the screen did not change and the screen reader said nothing. Since focus does not move, there was no way to know either. The notice is cleared before saving.
+- **Cancel button focus:** In browsers such as Safari that do not give focus to a pressed button, the cancel button that became disabled during a save could drop focus. Cancel was also changed to `aria-disabled`.
+- **Test additions**
+  - A form submit during a save (Enter in a field) does not send more requests.
+  - The same failure twice comes out as a new notice each time (both screens).
+  - Pressing cancel during a save does not close (an existing test was changed to be based on `aria-disabled`).
+  - 3 fail on the code before the review.
+- **Not applied:** The `aria-busy` of the button was matched to "결과 더 보기", and the background changing when the mouse is hovered during a save is only a matter of look, so it was left.
+- After applying, `npm run check`: passed (frontend 399 passed, 2 skipped. Backend 117 passed, 98 DB integration tests skipped. Skill checks 4). This time it was run without a temporary DB, and `testDatabaseSkip` skipped a DB that is not `health_test`, so the DB of another project was not touched. What was applied changes only the screen. `npm run knip`: passed.
 
-## 2차 리뷰 — 2026-11-08
+## Second review — 2026-11-08
 
-1차 반영과 전체 diff를 별도 읽기 전용 리뷰로 다시 봤다. 반드시 고칠 것은 없었다. 리뷰는 여기서 끝낸다.
+The first round of fixes and the whole diff were reviewed again by a separate read-only review. There was nothing that must be fixed. Reviews end here.
 
-- **확인된 것**
-  - 입력 검사 안내는 `clear()` 전에 나오고 돌아가므로 잃지 않는다.
-  - 안내는 지워졌다가 새 요소로 다시 들어가 읽힌다.
-  - 취소는 Radix의 닫기 요소가 아니라 막아 둔 `onClick`만으로 닫힌다. X, Esc, 바깥 누르기는 저장 중에 그대로 막힌다.
-- **테스트 보강:** 조합 테스트가 저장 중 취소에 `aria-disabled`가 있는지만 봤다. 이제 실제로 눌러도 대화상자가 남는지 확인한다.
-- **문서:** "변경"에 취소 버튼과 안내 지우기를 적고 테스트 수를 고쳤다.
-- **반영하지 않은 것:** 저장 중 마우스를 올리면 배경이 바뀌는 모양은 그대로 둔다. `pointer-events-none`을 쓰면 누름 막기 처리에 닿지 않게 된다.
-- 반영 뒤 `npm run check`: 통과(프런트 399개 통과, 2개 건너뜀. 백엔드는 임시 DB 없이 실행해 DB 통합 테스트를 건너뜀. 스킬 4개). `npm run knip`: 통과.
+- **What was confirmed**
+  - The input validation notice appears and returns before `clear()`, so it is not lost.
+  - The notice is cleared and then comes back in as a new element and is read.
+  - Cancel closes only through the blocked `onClick`, not through Radix's close element. The X, Esc, and clicking outside are still blocked during a save.
+- **Test addition:** The combo test only checked that cancel during a save has `aria-disabled`. Now it checks that the dialog stays even when actually pressed.
+- **Docs:** Wrote the cancel button and the notice clearing in "Change" and fixed the number of tests.
+- **Not applied:** The look where the background changes when the mouse is hovered during a save is left as it is. If `pointer-events-none` were used, the click-blocking handling would no longer be reached.
+- After applying, `npm run check`: passed (frontend 399 passed, 2 skipped. Backend was run without a temporary DB, so DB integration tests were skipped. Skill checks 4). `npm run knip`: passed.

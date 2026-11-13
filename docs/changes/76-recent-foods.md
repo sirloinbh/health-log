@@ -1,101 +1,101 @@
-# #76 식사 입력에서 최근 먹은 음식 먼저 보여주기
+# #76 Show recently eaten foods first in meal entry
 
-- 이슈: [#76](https://github.com/sirloinbh/health-log/issues/76)
-- 브랜치: `feat/76-recent-foods`
+- Issue: [#76](https://github.com/sirloinbh/health-log/issues/76)
+- Branch: `feat/76-recent-foods`
 
-## 목적
+## Purpose
 
-자주 먹는 음식을 매번 검색하지 않도록, 식단 카드를 열면 최근에 기록한 음식을 먼저 보여 바로 추가하게 한다.
+So that frequently eaten foods do not have to be searched each time, show the recently recorded foods first when the meal card is opened, and let them be added right away.
 
-## 정한 규칙
+## Rules decided
 
-요구사항에 없던 규칙이다. 사용자 확인 없이 [#76 댓글](https://github.com/sirloinbh/health-log/issues/76#issuecomment-6621425811)에 기록하고 진행했다. 다르게 원하면 후속 이슈로 고친다.
+These are rules that were not in the requirements. They were recorded in the [#76 comment](https://github.com/sirloinbh/health-log/issues/76#issuecomment-6621425811) and applied without asking the user. If something different is wanted, it is fixed in a follow-up issue.
 
-- **"최근"의 기준:** 기록한 순서(식사 기록 ID가 가장 큰 것)다. 먹은 날짜가 아니다. 조합 기록과 복사로 들어간 음식도 포함한다.
-- **개수:** 최대 10개이고, 같은 음식은 한 번만 나온다.
-- **대상:** 음식 저장소의 음식만 나온다. 직접 입력한 음식과 저장소에서 지워진 음식(기록의 음식 연결이 비워짐)은 나오지 않는다.
-- **표시 값:** 음식 저장소의 현재 값이다. 추가하면 검색해서 추가하는 것과 같다.
+- **The criterion for "recent":** The order of recording (the largest meal record ID). It is not the date eaten. Foods that came in through a combo record or a copy are also included.
+- **Count:** At most 10, and the same food appears only once.
+- **Target:** Only foods from the food store appear. Foods entered directly and foods deleted from the store (the record's food link was cleared) do not appear.
+- **Displayed values:** The current values in the food store. Adding one is the same as adding it by search.
 
-## 변경 — 2026-11-04
+## Change — 2026-11-04
 
-- **API** `backend/src/foods.ts`: `GET /api/foods/recent`를 추가했다.
-  - 응답은 검색과 같은 `{ foods: [...] }`다.
-  - `meal_entries`를 `food_id`로 묶어 가장 큰 기록 ID 순으로 10개를 고르고 `foods`와 잇는다.
-  - 음식 라우터의 요청 제한을 그대로 받는다. DB 변경은 없다.
-- **화면** `frontend/src/meals.tsx`:
-  - 식단 카드의 수량 입력 아래, 검색 위에 "최근 먹은 음식"을 보인다. 항목마다 "추가" 버튼이 있고, 고른 끼니와 수량으로 기록한다.
-  - 카드를 열 때 한 번 읽는다. 저장소 음식, 조합, 복사로 기록한 뒤 다시 읽어 방금 먹은 음식을 위로 올린다. 직접 입력한 음식은 목록에 영향이 없으므로 다시 읽지 않는다.
-  - 늦게 온 이전 응답은 새 응답을 덮지 않는다.
-  - 최근 기록이 없으면 영역을 보이지 않는다. 읽지 못하면 이유와 "다시 불러오기" 버튼을 보인다.
-  - 수량 오류와 서버 거절은 최근 목록 옆에 보인다. 검색 결과에서 추가할 때는 지금처럼 검색 결과 옆이다.
-  - 검색 결과와 최근 목록은 같은 모양이라 `FoodChoices` 컴포넌트로 묶었다.
-- **테스트 도구**
-  - `frontend/src/meals.test.tsx`: 카드가 스스로 보내는 최근 음식 요청을 `stubFetch`가 따로 답한다. 기존 테스트가 순서대로 적은 응답과 호출 횟수는 그대로다.
-  - `frontend/src/daily.test.tsx`: 최근 음식 요청에 빈 목록을 답한다.
+- **API** `backend/src/foods.ts`: Added `GET /api/foods/recent`.
+  - The response is `{ foods: [...] }`, the same as search.
+  - It groups `meal_entries` by `food_id`, picks 10 in order of the largest record ID, and joins with `foods`.
+  - It takes the request limit of the food router as it is. There is no DB change.
+- **Screen** `frontend/src/meals.tsx`:
+  - It shows "최근 먹은 음식" (recently eaten foods) below the quantity input of the meal card and above search. Each item has an "추가" (add) button, and records with the chosen meal and quantity.
+  - It reads once when the card is opened. After recording with a food store food, a combo, or a copy, it reads again and raises the food just eaten to the top. Foods entered directly do not affect the list, so it does not read again.
+  - A late previous response does not overwrite a new response.
+  - If there are no recent records, the area is not shown. If it cannot be read, the reason and a "다시 불러오기" (reload) button are shown.
+  - Quantity errors and server refusals are shown next to the recent list. When adding from a search result, it is next to the search result as now.
+  - The search results and the recent list have the same shape, so they were put together in a `FoodChoices` component.
+- **Test tools**
+  - `frontend/src/meals.test.tsx`: `stubFetch` answers separately the recent food request that the card sends by itself. The responses and call counts that the existing tests wrote in order stay as they were.
+  - `frontend/src/daily.test.tsx`: It answers the recent food request with an empty list.
 
-## 검증
+## Verification
 
-### 테스트
+### Tests
 
-- `backend/test/recent-foods.integration.test.ts`: 실제 DB 3개. 이슈 완료 기준 두 가지가 여기 있다.
-  - "같은 음식은 한 번만, 가장 최근 기록 순": 밥을 두 번(그 사이 국과 달걀) 기록하고, 직접 입력한 음식도 하나 기록한다. 그 뒤 밥의 칼로리를 바꾼다. 목록이 밥(바뀐 값 320), 달걀, 국 순이고, 같은 음식이 두 번 나오지 않고, 10개 이하인지 본다.
-  - "직접 입력한 음식은 나오지 않음": 직접 입력한 기록은 음식이 없어 응답에 나올 수 없다. 그래서 자리를 차지하지 않는지 본다. 이 파일의 음식 10개를 기록한 뒤 가장 최근에 직접 입력한 기록을 더하고, 목록이 여전히 10개인지 확인한다. 음식 없는 기록이 한 묶음으로 세어지면 9개가 된다. 이 개수는 다른 테스트 파일이 동시에 기록해도 달라지지 않는다.
-  - 저장소에서 지운 음식은 나오지 않는다.
-  - 최근 목록은 DB 전체를 보므로, 동시에 도는 다른 테스트 파일의 음식이 섞일 수 있다. 그래서 이 파일의 음식만 골라 순서를 비교한다.
-- `frontend/src/meals.test.tsx`: 7개 추가.
-  - 최근순 표시, 고른 끼니·수량으로 추가, 기록 뒤 다시 읽기
-  - 최근 기록이 없으면 영역 없음
-  - 수량 오류와 서버 거절을 최근 목록 옆에 보이고, 실패하면 다시 읽지 않음
-  - 읽기 실패 안내와 다시 불러오기, 다른 동작 뒤에도 실패 이유 유지, 성공 뒤 안내 제거와 포커스 이동
-  - 조합·복사 뒤에는 다시 읽고 직접 입력 뒤에는 읽지 않음
-  - 다시 불러온 목록이 비면 음식 검색 칸으로 포커스 이동
-  - 다시 불러오기와 추가 뒤 읽기가 겹쳐도 포커스 이동
+- `backend/test/recent-foods.integration.test.ts`: 3 real DB tests. Two of the issue's completion criteria are here.
+  - "The same food only once, in the order of the most recent record": Rice is recorded twice (with soup and egg in between), and one directly entered food is also recorded. Then the calories of the rice are changed. It checks that the list is rice (changed value 320), egg, soup, that the same food does not appear twice, and that there are at most 10.
+  - "Directly entered foods do not appear": A directly entered record has no food, so it cannot appear in the response. So it checks that it does not take up a place. After recording the 10 foods of this file, the most recent directly entered record is added, and it checks that the list is still 10. If records with no food were counted as one group, it would be 9. This count does not change even if other test files record at the same time.
+  - A food deleted from the store does not appear.
+  - The recent list looks at the whole DB, so foods of other test files running at the same time may get mixed in. So only the foods of this file are picked and their order is compared.
+- `frontend/src/meals.test.tsx`: 7 added.
+  - Display in recent order, adding with the chosen meal and quantity, reading again after recording
+  - No area if there are no recent records
+  - A quantity error and a server refusal are shown next to the recent list, and it does not read again on failure
+  - The read failure notice and reload, keeping the failure reason even after other actions, removing the notice and moving focus after success
+  - After a combo or copy it reads again, and after direct entry it does not read
+  - If the reloaded list is empty, focus moves to the food search field
+  - Focus moves even if a reload and a read after an add overlap
 
-### 실행 결과
+### Run results
 
-- `npm test -w backend`: 120개 중 67개 통과, 53개 건너뜀. 이 PC에는 PostgreSQL이 없어 DB 통합 테스트(새 3개 포함)를 건너뛰었고, 성공으로 세지 않는다. CI 결과는 PR에 적는다.
-- `npm test -w frontend`: 32개 파일, 247개 통과, 2개 건너뜀(다크 전용 앱 조건, 무관).
-- `npm run check`: 통과. 포맷, 린트, 타입 검사, 빌드, 스킬 검사 4개 통과. 처음 실행에서 새 테스트의 `mock.calls` 타입 오류로 타입 검사가 실패해, 기존 `request` 도우미로 바꾼 뒤 통과했다.
+- `npm test -w backend`: 67 of 120 passed, 53 skipped. This PC has no PostgreSQL, so the DB integration tests (including the 3 new ones) were skipped, and they are not counted as success. The CI result is written in the PR.
+- `npm test -w frontend`: 32 files, 247 passed, 2 skipped (a dark-only app condition, unrelated).
+- `npm run check`: passed. Formatting, lint, type check, build, and 4 skill checks passed. In the first run the type check failed on a `mock.calls` type error in the new test, and it passed after changing to the existing `request` helper.
 
-### 브라우저 확인
+### Browser check
 
-헤드리스 Chrome을 CDP로 움직였다. PostgreSQL이 없어 API는 메모리 스텁을 썼다. 서버의 정렬·중복 제거는 위 DB 통합 테스트가 맡는다.
+Headless Chrome was driven over CDP. There is no PostgreSQL, so the API used an in-memory stub. The server's sorting and duplicate removal are covered by the DB integration tests above.
 
-| 항목                                                            | 390×844 | 1440×900 |
-| --------------------------------------------------------------- | ------- | -------- |
-| 기록이 없으면 최근 영역 없음                                    | 통과    | -        |
-| 검색으로 두 음식을 기록한 뒤 최근순 표시                        | 통과    | 통과     |
-| 최근 목록에서 저녁으로 추가 요청 `{"meal":"dinner","foodId":1}` | 통과    | 통과     |
-| 같은 음식은 한 번, 방금 먹은 음식이 맨 위                       | 통과    | 통과     |
-| 가로 넘침, 콘솔 오류                                            | 없음    | 없음     |
+| Item                                                                      | 390×844 | 1440×900 |
+| ------------------------------------------------------------------------- | ------- | -------- |
+| No recent area if there are no records                                    | Pass    | -        |
+| Display in recent order after recording two foods by search               | Pass    | Pass     |
+| Add request from the recent list as dinner `{"meal":"dinner","foodId":1}` | Pass    | Pass     |
+| The same food once, the food just eaten at the top                        | Pass    | Pass     |
+| Horizontal overflow, console errors                                       | None    | None     |
 
-첫 실행에서 1440×900의 "최근순 표시"가 한 번 실패했다. 원인은 스크립트의 기대값이었다. 앞선 390×844 실행이 햇반을 마지막에 기록했으므로 햇반이 맨 위인 것이 맞는데, 기대값이 반대로 적혀 있었다. 기대값을 고치고 처음 상태부터 다시 실행해 모두 통과했다.
+In the first run, the "display in recent order" at 1440×900 failed once. The cause was the expected value in the script. The earlier 390×844 run recorded Hetbahn (a rice product) last, so Hetbahn being at the top was right, but the expected value was written the other way around. After fixing the expected value and running again from the initial state, everything passed.
 
-## 1차 리뷰 반영 — 2026-11-04
+## First review applied — 2026-11-04
 
-- **실패 이유가 남거나 사라짐:**
-  - 문제 1: 다시 불러오기에 성공해도 이전 오류가 목록 아래에 남았다.
-  - 문제 2: 검색 같은 다른 동작을 하면 실패 이유만 지워지고 "다시 불러오기" 버튼은 남았다.
-  - 수정: 읽기 실패 이유를 추가 오류와 분리했다. 실패 이유는 성공할 때만 사라지고, 추가 오류는 다음 동작이 지운다.
-- **다시 불러오기 뒤 포커스:** 성공하면 버튼이 사라져 포커스가 페이지로 떨어졌다. 이제 "최근 먹은 음식" 제목으로 옮긴다. 목록이 비어 영역이 사라지면 음식 검색 칸으로 옮긴다.
-  - 테스트: 프런트엔드 테스트를 고쳐 위 세 가지를 확인한다. 고치기 전 코드에서 이 테스트가 실패하는 것을 확인했다.
-- **직접 입력 제외 테스트:** 원래 확인은 실패할 수 없는 구조였다. 직접 입력한 기록은 음식이 없어 응답에 나올 수 없기 때문이다. 대신 자리를 차지하지 않는지 보는 테스트로 바꿨다. `WHERE food_id IS NOT NULL`이 빠지면 이 테스트가 실패한다.
-- **동시 실행 설명:** 테스트 주석의 위험 구간 설명을 고쳤다. 구간은 "마지막 기록부터"가 아니라 "이 파일의 가장 오래된 기록부터"다.
+- **The failure reason staying or disappearing:**
+  - Problem 1: Even when reload succeeded, the previous error stayed below the list.
+  - Problem 2: When another action such as search was done, only the failure reason was erased and the "다시 불러오기" button remained.
+  - Fix: The read failure reason was separated from the add error. The failure reason disappears only on success, and the add error is cleared by the next action.
+- **Focus after reload:** When it succeeds, the button disappears and focus fell to the page. Now it moves to the "최근 먹은 음식" heading. If the list is empty and the area disappears, it moves to the food search field.
+  - Test: The frontend test was fixed to check the three above. It was confirmed that this test fails on the code before the fix.
+- **Direct entry exclusion test:** The original check had a structure that could not fail, because a directly entered record has no food and cannot appear in the response. Instead it was changed to a test that checks that it does not take up a place. If `WHERE food_id IS NOT NULL` is removed, this test fails.
+- **Description of concurrent runs:** The description of the risky interval in the test comment was fixed. The interval is "from the oldest record of this file", not "from the last record".
 
-## 2차 리뷰 반영 — 2026-11-04
+## Second review applied — 2026-11-04
 
-- **포커스 테스트 바로잡기:**
-  - 문제: 1차 반영 때 포커스 확인을 "포커스된 요소의 글에 '최근 먹은 음식'이 있는가"로 썼다. 포커스가 페이지 본문에 떨어져도 본문 글에 그 제목이 있어 통과했다. 그래서 위 "고치기 전 코드에서 실패"는 다른 두 확인 덕분이었다.
-  - 수정: 포커스된 요소가 제목 자체인지 비교한다.
-  - 추가: 목록이 비어 검색 칸으로 옮기는 경우의 테스트를 더했다.
-- **겹친 읽기에서 포커스:**
-  - 문제: 음식 추가를 기다리는 동안 다시 불러오기를 누르면, 추가 뒤 읽기가 더 새 요청이 된다. 그 읽기가 실패 안내와 버튼을 지우는데 포커스는 옮기지 않았다.
-  - 수정: 다시 불러오기가 포커스 이동을 예약하고, 실제로 화면을 바꾼 읽기가 그 예약을 처리한다.
-- **테스트 확인:** 새 포커스 테스트 세 개는 1차 반영 전 코드에서 모두 실패한다. 겹친 읽기 테스트는 1차 반영 코드(`96096d5`)에서도 실패한다. 지금 코드에서는 모두 통과한다.
+- **Correcting the focus test:**
+  - Problem: In the first round, the focus check was written as "does the text of the focused element contain '최근 먹은 음식'". Even when focus fell to the page body, the body text contains that heading, so it passed. So the "fails on the code before the fix" above was thanks to the other two checks.
+  - Fix: It compares whether the focused element is the heading itself.
+  - Added: A test for the case where the list is empty and focus moves to the search field was added.
+- **Focus in overlapping reads:**
+  - Problem: If reload is pressed while waiting for a food add, the read after the add becomes the newer request. That read erases the failure notice and the button but did not move focus.
+  - Fix: Reload reserves the focus move, and the read that actually changed the screen handles that reservation.
+- **Test confirmation:** The three new focus tests all fail on the code before the first round. The overlapping read test also fails on the first round code (`96096d5`). On the current code all pass.
 
-## 제한·후속
+## Limits and follow-ups
 
-- 기록을 지워도 최근 목록은 다음에 카드를 열 때 바뀐다.
-- `meal_entries.food_id`에 인덱스가 없어 기록 전체를 묶는다. 한 사람이 쓰는 앱의 기록 규모에서는 문제없다고 보고 두었다.
-- 최근 목록에서 음식을 숨기거나 고정하는 기능은 없다.
-- 다크 모드, 실제 휴대폰, Firefox, Safari, 실제 DB와 연결한 화면은 확인하지 않았다.
+- Even if a record is deleted, the recent list changes the next time the card is opened.
+- `meal_entries.food_id` has no index, so it groups all records. It was left because it was judged not a problem at the scale of records of an app used by one person.
+- There is no feature to hide or pin a food in the recent list.
+- Dark mode, a real phone, Firefox, Safari, and a screen connected to a real DB were not checked.

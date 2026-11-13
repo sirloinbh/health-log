@@ -127,14 +127,14 @@ After the second review was applied, the #40 medication records (PR #117) were m
 
 A real API (127.0.0.1:3971) and Vite (5271) were started on a temporary PostgreSQL 17 (5471, `health_test`), and the food screen was opened in headless Chrome (debugging 9671). In "음식 추가" (add food), a potato chip table was pasted (total content 90g, 230kcal per 1 bag (45g), sugars less than 1g, and so on).
 
-| Item                                                                                                                                                | 390×844 | 1440×900 |
-| --------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
-| After "표 읽어 채우기": serving size 45 g, calories 230, sodium 210, sugars empty, check date 2026-11-08                                              | Pass    | Pass     |
-| Source type "제품 표기" (product label), result guidance (fields filled, less than, 2 times and about 460kcal, it is saved only when saved)          | Pass    | Pass     |
-| Putting a Coupang link in the source URL shows the guidance                                                                                         | Pass    | Pass     |
-| The food appears in the list only after pressing save                                                                                               | Pass    | Pass     |
-| 0 requests sent by the page to Coupang (`performance.getEntriesByType('resource')`)                                                                 | Pass    | Pass     |
-| No horizontal overflow in the dialog                                                                                                                | Pass    | Pass     |
+| Item                                                                                                                                        | 390×844 | 1440×900 |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
+| After "표 읽어 채우기": serving size 45 g, calories 230, sodium 210, sugars empty, check date 2026-11-08                                    | Pass    | Pass     |
+| Source type "제품 표기" (product label), result guidance (fields filled, less than, 2 times and about 460kcal, it is saved only when saved) | Pass    | Pass     |
+| Putting a Coupang link in the source URL shows the guidance                                                                                 | Pass    | Pass     |
+| The food appears in the list only after pressing save                                                                                       | Pass    | Pass     |
+| 0 requests sent by the page to Coupang (`performance.getEntriesByType('resource')`)                                                         | Pass    | Pass     |
+| No horizontal overflow in the dialog                                                                                                        | Pass    | Pass     |
 
 - Following the decision, a real Coupang product page was not opened. The link used for the check (`https://www.coupang.com/vp/products/1234567`) was stored only as a string.
 - After the check, Chrome, Vite, the API, and the temporary DB were all shut down.

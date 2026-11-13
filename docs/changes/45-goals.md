@@ -1,147 +1,147 @@
-# #45 목표 설정과 달성 자동 판정
+# #45 Goal setting and automatic achievement judgment
 
-- 이슈: [#45](https://github.com/sirloinbh/health-log/issues/45)
-- 브랜치: `feat/45-goals`
+- Issue: [#45](https://github.com/sirloinbh/health-log/issues/45)
+- Branch: `feat/45-goals`
 
-## 목적
+## Purpose
 
-#37의 직접 체크만으로는 날마다 기준이 달라질 수 있다. 칼로리, 단백질, 수면 시간, 금주 일수에 숫자 목표를 정하고, 하루 기록에서 지켰는지 같은 기준으로 자동 판정한다.
+The direct checks of #37 alone can use a different standard each day. Set numeric goals for calories, protein, sleep time, and alcohol-free days, and have the daily record judge automatically, by the same standard, whether they were kept.
 
-## 정한 것
+## Decisions
 
-이슈에 정해지지 않은 규칙은 아래 기본안으로 정했고 사용자 확인은 받지 않았다. 이슈 댓글에 같은 내용을 남겼다.
+Rules the issue did not settle were decided with the defaults below, and the user was not asked. The same content was left as an issue comment.
 
-- **목표 방향과 범위**
-  - 칼로리: 하루 상한(이하), 100~10000kcal 정수.
-  - 단백질: 하루 하한(이상), 1~1000g 정수.
-  - 수면: 하루 하한(이상), 1~24시간. 수면 카드처럼 시간과 분을 따로 입력하고(분은 비우면 0) 분으로 저장한다.
-  - 금주: 주(월~일) N일 이상, 1~7일.
-- **적용 시작일:** 목표를 바꾸면 덮어쓰지 않고 시작일과 함께 새로 저장한다. 각 날짜는 그 날 이전에 시작한 가장 최근 목표로 판정한다. 시작일은 미래도 고를 수 있고 "(예정)"으로 표시한다. 같은 시작일로 다시 저장하면 그 변경만 바뀐다.
-- **목표 끄기:** 목표값이 없는 변경으로 저장한다. 그 날부터는 판정하지 않고, 그 전 날짜는 그대로 판정한다. 변경 하나를 지우면 그 날짜부터 바로 앞의 목표가 다시 적용된다.
-- **판정 상태**
-  - 달성 / 미달.
-  - 기록 없음: 그 날 기록이 없다. 미달로 세지 않는다.
-  - 판정 보류: 기록은 있지만 결론을 낼 수 없다.
-    - 칼로리·단백질: 값을 모르는 음식이 있고, 아는 값만으로는 결론이 나지 않을 때. 아는 값만으로 이미 상한을 넘었거나 하한을 채웠으면 판정한다.
-    - 금주: 아직 기록하지 않은 날에 따라 결과가 달라질 때.
-- **금주 일수:** 술 기록이 "안 마심"인 날만 금주한 날로 센다. 기록이 없는 날은 세지 않는다. 주의 목표는 그 주 일요일에 적용되는 목표 하나를 쓴다. 그래서 주 중간에 바꾸면 그 주 전체에 새 목표가 적용된다.
-- **식사 합계:** 식단 카드와 같은 방식(1회분 값 × 수량을 항목마다 소수 둘째 자리로 반올림한 합)으로 센다. 하루 식사를 다 기록했는지는 알 수 없다. 그래서 점심만 기록한 날도 칼로리 상한은 "달성"으로 나온다.
-- **수면 날짜:** #27과 같이 기상한 날짜의 기록으로 판정한다.
-- **직접 체크와 나란히:** "목표 달성" 카드의 식단 묶음에 "식단 지킴"을, 수면 묶음에 "수면 만족"을 함께 보인다. 금주에는 직접 체크가 없다.
+- **Goal direction and range**
+  - Calories: a daily upper limit (at most), an integer from 100 to 10000kcal.
+  - Protein: a daily lower limit (at least), an integer from 1 to 1000g.
+  - Sleep: a daily lower limit (at least), 1 to 24 hours. Hours and minutes are entered separately, as in the sleep card (minutes count as 0 if left empty), and it is stored in minutes.
+  - Alcohol-free: N or more days per week (Monday to Sunday), 1 to 7 days.
+- **Start date of application:** When a goal is changed, it is not overwritten but saved anew with a start date. Each date is judged by the most recent goal that started before that day. The start date can also be in the future and is marked "(예정)" (scheduled). Saving again with the same start date changes only that change.
+- **Turning a goal off:** Save it as a change with no goal value. From that day it is not judged, and dates before that are judged as they were. If one change is deleted, the goal right before it applies again from that date.
+- **Judgment states**
+  - Achieved / not achieved.
+  - No record: there is no record for that day. It is not counted as not achieved.
+  - Judgment pending: there is a record but no conclusion can be reached.
+    - Calories and protein: when there are foods with unknown values and the known values alone do not give a conclusion. If the known values alone have already exceeded the upper limit or met the lower limit, it is judged.
+    - Alcohol-free: when the result depends on days not yet recorded.
+- **Alcohol-free days:** Only days whose alcohol record is "안 마심" (did not drink) are counted as alcohol-free days. Days with no record are not counted. For the weekly goal, the one goal that applies on that week's Sunday is used. So if it is changed in the middle of a week, the new goal applies to that whole week.
+- **Meal total:** Counted the same way as the meal card (the sum of per-serving value × quantity, rounded to two decimal places per item). It cannot be known whether the whole day's meals were recorded. So a day with only lunch recorded also comes out as "achieved" for the calorie upper limit.
+- **Sleep date:** As in #27, it is judged by the record of the day of waking up.
+- **Side by side with direct checks:** In the "목표 달성" (goal achieved) card, "식단 지킴" (diet kept) is shown together with the diet group and "수면 만족" (sleep satisfied) with the sleep group. Alcohol-free has no direct check.
 
-## 변경 — 2026-11-06 (첫 구현)
+## Change — 2026-11-06 (first implementation)
 
-- **DB** `database/migrations/012_goals.sql`: `goals`(항목, 적용 시작일, 목표값). 기본 키는 (항목, 시작일)이다. 항목별 범위는 DB도 검사한다. 목표값 `NULL`은 목표를 끈 것이다.
+- **DB** `database/migrations/012_goals.sql`: `goals` (item, start date of application, goal value). The primary key is (item, start date). The DB also checks the range per item. A goal value of `NULL` means the goal is turned off.
 - **API** `backend/src/goals.ts`, `backend/src/app.ts`
-  - `GET /api/goals`: 오늘 기준 현재 목표와 모든 변경 기록.
-  - `PUT /api/goals/:item`: `{ from, target }`을 저장한다(`target: null`은 끄기). 같은 트랜잭션에서 목록을 다시 읽어 답한다.
-  - `DELETE /api/goals/:item/:from`: 변경 하나를 지운다. 없으면 404다.
-  - `GET /api/goals/days/:date`: 항목별 목표, 판정, 실제 값과 그 날의 직접 체크를 한 스냅샷에서 준다.
-  - 없는 항목은 404, 범위 밖 값·없는 날짜는 한국어 메시지와 함께 400이다. 요청 횟수 제한을 건다.
-- **화면** `frontend/src/goals.tsx`, `frontend/src/goal-text.ts`, `frontend/src/app.tsx`, `frontend/src/daily.tsx`
-  - 설정 화면에 항목별 목표 카드가 생겼다. 카드마다 값 입력, 적용 시작일, 저장, "시작일부터 목표 끄기", 변경 기록과 확인을 거치는 삭제가 있다.
-  - 하루 기록에 "목표 달성" 카드를 더했다. 판정 배지, 실제 값과 목표, 판정 보류 이유, 직접 체크를 보인다. 목표가 하나도 없으면 설정으로 가는 링크를 보인다.
-  - 다른 카드에서 저장해도 이 카드는 다시 읽지 않는다. 대신 "다시 판정" 버튼이 있다.
+  - `GET /api/goals`: the current goals as of today and all change records.
+  - `PUT /api/goals/:item`: Saves `{ from, target }` (`target: null` is turn off). The list is read again in the same transaction and returned.
+  - `DELETE /api/goals/:item/:from`: Deletes one change. 404 if it does not exist.
+  - `GET /api/goals/days/:date`: Gives the goal per item, the judgment, the actual value, and that day's direct checks from one snapshot.
+  - An item that does not exist is 404, and an out-of-range value or a date that does not exist is 400 with a Korean message. A request rate limit is applied.
+- **Screen** `frontend/src/goals.tsx`, `frontend/src/goal-text.ts`, `frontend/src/app.tsx`, `frontend/src/daily.tsx`
+  - The settings screen has a goal card per item. Each card has a value input, a start date of application, save, "시작일부터 목표 끄기" (turn the goal off from the start date), a change history, and delete through a confirmation.
+  - Added a "목표 달성" card to the daily record. It shows the judgment badge, the actual value and goal, the reason for a pending judgment, and the direct checks. If there is no goal at all, it shows a link to the settings.
+  - Even when saved on another card, this card does not read again. Instead it has a "다시 판정" (judge again) button.
 
-## 변경 — 2026-11-08 (main 병합 뒤 맞춤)
+## Change — 2026-11-08 (aligned after merging main)
 
-- `origin/main`을 병합했다. main에 `011_junk_food.sql`이 있고, 실행기(#53)가 이미 적용된 번호보다 앞선 새 파일을 거부한다. 그래서 마이그레이션을 `010_goals.sql`에서 `012_goals.sql`로 옮겼다.
-- #52: 통합 테스트가 `testDatabaseSkip(url)`을 쓴다.
-- #71: 목표 저장·삭제를 `trackWrite('/api/goals', …)`로 등록한다. 설정 화면은 `writesSettled('/api/goals')` 뒤에 읽는다. "목표 달성" 카드는 그 날의 식사·수면·하루 체크, 술(주 단위라 `/api/habits/` 전체), 목표에 대한 쓰기가 끝난 뒤에 읽는다.
-- #65: 설정 화면의 "다시 시도" 뒤에는 포커스를 "목표" 제목으로 옮긴다. 저장으로 폼이 다시 그려지거나 삭제로 목록이 다시 그려질 때는 그 항목 카드의 제목으로 옮긴다. "다시 판정" 버튼은 사라지지 않으므로 비활성으로 바꾸지 않고, 읽는 중에는 눌러도 무시한다.
-- 모든 음식의 값을 모를 때 "0g (… 제외)" 대신 "값을 모르는 음식 2개"로 보인다. 브라우저 확인 중 발견했다.
-- `goalItems`의 불필요한 export를 지웠다(knip).
+- Merged `origin/main`. main has `011_junk_food.sql`, and the runner (#53) rejects a new file numbered below an already applied one. So the migration was moved from `010_goals.sql` to `012_goals.sql`.
+- #52: The integration tests use `testDatabaseSkip(url)`.
+- #71: Goal save and delete are registered with `trackWrite('/api/goals', …)`. The settings screen reads after `writesSettled('/api/goals')`. The "목표 달성" card reads after the writes to that day's meals, sleep, and daily checks, alcohol (the whole `/api/habits/` since it is weekly), and goals have finished.
+- #65: After "다시 시도" (retry) on the settings screen, focus moves to the "목표" (goals) heading. When the form is redrawn by saving or the list is redrawn by deleting, it moves to the heading of that item's card. The "다시 판정" button does not disappear, so it is not made disabled, and a press while reading is ignored.
+- When the values of all foods are unknown, it shows "값을 모르는 음식 2개" (2 foods with unknown values) instead of "0g (… 제외)" (0g (… excluded)). This was found during the browser check.
+- Removed an unnecessary export of `goalItems` (knip).
 
-## 변경 — 2026-11-08 (1차 리뷰 반영)
+## Change — 2026-11-08 (first review applied)
 
-PR #103의 1차 리뷰(작성 문맥과 분리된 읽기 전용 리뷰)에서 high는 없었고 지적 6개가 나왔다.
+The first review of PR #103 (a read-only review separated from the authoring context) had no high points and raised 6 points.
 
-- **반영 1** `docs/next-steps/README.md`: Windows 경로의 `\17`, `\b`가 이스케이프로 해석돼 제어 문자가 들어갔다. `C:\Program Files\PostgreSQL\17\bin`으로 고쳤다.
-- **반영 2** 설정 화면의 금주 카드 안내: "시작일 전 날짜는 그때의 목표로 판정합니다"가 주 단위 판정과 맞지 않았다. 금주 카드에는 "주 중간에 바꾸면 그 주 전체를 새 목표로 판정" 안내를 보인다.
-- **반영 3** 수면 목표 입력: 소수 시간으로는 3분 단위만 쓸 수 있어 7시간 10분을 정할 수 없었다. 시간과 분을 따로 입력받는다(`toSleepTarget`, `sleepParts`).
-- **반영 5** 변경 삭제: 삭제 뒤 다시 읽기가 실패하면 지운 변경이 목록에 남았다. 삭제가 성공하면 화면에서 바로 빼고, 오늘 기준 현재 목표도 남은 변경으로 다시 계산한다(`withoutChange`). 그 뒤 서버에서 다시 읽는다. 삭제 뒤 포커스 이동 테스트도 더했다.
-- **분리 4** "목표 달성" 카드가 다른 카드의 저장 뒤 저절로 다시 판정하지 않는 문제: 카드끼리 변경을 알리는 구조가 필요해 [#104](https://github.com/sirloinbh/health-log/issues/104)로 나눴다.
-- **넘김 6** `9999-12-31`처럼 주 끝이 10000년이 되는 날짜의 500 오류와 시작일 허용 범위 차이: `periodsOf`를 쓰는 다른 API에도 이미 있는 문제라 [#50 댓글](https://github.com/sirloinbh/health-log/issues/50#issuecomment-6714930952)로 넘겼다.
-- 아래 브라우저 확인은 1차 리뷰 전 화면(수면을 소수 시간 한 칸으로 입력)에서 했다. 시간·분 두 칸으로 바꾼 뒤에는 단위 테스트로만 확인했고 브라우저로 다시 보지 않았다.
-- 테스트: `frontend/src/goal-text.test.ts`(수면 시간·분 변환과 거부, `withoutChange`), `frontend/src/goals.test.tsx`(7시간 10분 저장과 폼 다시 채우기, 삭제 뒤 포커스, 다시 읽기 실패에도 지운 변경이 보이지 않음).
+- **Applied 1** `docs/next-steps/README.md`: `\17` and `\b` in a Windows path were interpreted as escapes and control characters got in. Fixed to `C:\Program Files\PostgreSQL\17\bin`.
+- **Applied 2** Guidance on the alcohol-free card on the settings screen: "시작일 전 날짜는 그때의 목표로 판정합니다" (dates before the start date are judged by the goal of that time) did not match the weekly judgment. The alcohol-free card shows the guidance "주 중간에 바꾸면 그 주 전체를 새 목표로 판정" (if changed in the middle of a week, that whole week is judged by the new goal).
+- **Applied 3** Sleep goal input: With decimal hours only 3-minute steps could be used, so 7 hours 10 minutes could not be set. Hours and minutes are now entered separately (`toSleepTarget`, `sleepParts`).
+- **Applied 5** Deleting a change: If the re-read after the delete failed, the deleted change stayed in the list. When a delete succeeds, it is removed from the screen right away, and the current goal as of today is also recalculated from the remaining changes (`withoutChange`). After that it is read from the server again. A focus move test after delete was also added.
+- **Split off 4** The "목표 달성" card not judging again on its own after a save on another card: A structure that lets cards tell each other about changes is needed, so it was split into [#104](https://github.com/sirloinbh/health-log/issues/104).
+- **Passed on 6** The 500 error for a date such as `9999-12-31` where the end of the week becomes the year 10000, and the difference in the allowed range of the start date: This already exists in other APIs that use `periodsOf`, so it was passed on as a [#50 comment](https://github.com/sirloinbh/health-log/issues/50#issuecomment-6714930952).
+- The browser check below was done on the screen before the first review (sleep entered as one decimal-hours field). After changing to two fields for hours and minutes, it was checked only with unit tests and not viewed again in a browser.
+- Tests: `frontend/src/goal-text.test.ts` (sleep hours and minutes conversion and rejection, `withoutChange`), `frontend/src/goals.test.tsx` (saving 7 hours 10 minutes and refilling the form, focus after delete, a deleted change not visible even when the re-read fails).
 
-## 변경 — 2026-11-08 (2차 리뷰 반영)
+## Change — 2026-11-08 (second review applied)
 
-2차 리뷰는 1차 지적 1, 2, 5가 고쳐졌다고 확인했다. 3은 고쳐졌지만 새 회귀가 있었다. 지적은 3개였다. 리뷰는 이번이 마지막이다.
+The second review confirmed that points 1, 2, and 5 of the first round were fixed. Point 3 was fixed but had a new regression. There were 3 points. This review is the last one.
 
-- **반영 1 (medium)** 수면 분 칸: `parseAmount(minutes) ?? 0`이 읽을 수 없는 값(`3O`, `-10`, `30분`)도 0분으로 바꿨다. 그래서 오류 없이 7시간으로 저장됐다. 이제 빈 칸만 0분이고 읽을 수 없는 값은 보내기 전에 거부한다.
-- **반영 2 (low)** 분 칸의 접근 가능한 이름이 "분"뿐이었다. 칸에 `aria-label="하루 수면 시간 (분)"`을 준다. 보이는 라벨은 "분" 그대로다.
-- **분리 3 (low)** 설정 화면 금주 카드의 "지금 목표"는 오늘 기준이고, 하루 판정은 그 주 일요일 기준이라 숫자가 다를 수 있다. [#107](https://github.com/sirloinbh/health-log/issues/107)로 나눴다.
-- 테스트: `frontend/src/goals.test.tsx`에 "읽을 수 없는 분은 거부하고 60분 이상은 범위 오류" 테스트를 더했다(12개).
-- 검사: 이번에는 프론트엔드만 바뀌어 임시 DB 없이 `npm run check`를 실행했고 통과했다.
-  - 백엔드: 104개 통과, 93개 건너뜀. 건너뛴 것은 DB 통합 테스트다. 백엔드 코드는 1차 리뷰 커밋(DB로 202개 통과) 뒤 바뀌지 않았다.
-  - 프론트엔드: 381개 통과, 2개 건너뜀(다크 전용 조건).
-  - 스킬 검사 4개 통과, `npm run knip` 통과.
+- **Applied 1 (medium)** Sleep minutes field: `parseAmount(minutes) ?? 0` also turned values that cannot be read (`3O`, `-10`, `30분`) into 0 minutes. So it was saved as 7 hours with no error. Now only an empty field is 0 minutes, and a value that cannot be read is rejected before sending.
+- **Applied 2 (low)** The accessible name of the minutes field was only "분" (minutes). The field gets `aria-label="하루 수면 시간 (분)"` (daily sleep time (minutes)). The visible label stays "분".
+- **Split off 3 (low)** The "current goal" on the alcohol-free card of the settings screen is as of today, while the daily judgment is as of that week's Sunday, so the numbers can differ. It was split into [#107](https://github.com/sirloinbh/health-log/issues/107).
+- Tests: Added the test "읽을 수 없는 분은 거부하고 60분 이상은 범위 오류" (reject minutes that cannot be read, and 60 minutes or more is a range error) to `frontend/src/goals.test.tsx` (12 tests).
+- Checks: This time only the frontend changed, so `npm run check` was run without a temporary DB and passed.
+  - Backend: 104 passed, 93 skipped. The skipped ones are DB integration tests. The backend code did not change after the first review commit (202 passed with the DB).
+  - Frontend: 381 passed, 2 skipped (dark-only condition).
+  - Skill checks 4 passed, `npm run knip` passed.
 
-## 변경 — 2026-11-08 (병합 직전 main 다시 병합)
+## Change — 2026-11-08 (main merged again right before merging)
 
-CI가 통과한 뒤 main에 #50(날짜 허용 범위)과 #92(NUL 문자 거부)가 병합되어 PR이 충돌 상태가 됐다. `origin/main`을 다시 병합했다.
+After CI passed, #50 (allowed date range) and #92 (NUL character rejection) were merged into main and the PR went into a conflict state. `origin/main` was merged again.
 
-- `frontend/src/daily.tsx`: #50의 날짜 범위 import와 이 PR의 `GoalsCard` import가 충돌했다. 둘 다 남겼다.
-- 목표 적용 시작일을 하루 기록이 보이는 범위(#50, 2000-01-01~2099-12-31)로 맞췄다. 범위 밖이면 보내기 전에 거부한다. API는 #50의 `isRealDate`(1900~2999)를 그대로 쓴다. 그래서 1차 리뷰 넘김 6의 500 오류도 #50으로 해결됐다.
-- 테스트: `frontend/src/goals.test.tsx`에 시작일 범위 거부 테스트를 더했다(13개).
-- 다음 작업 문서에 #50, #92가 끝났다고 반영했다.
-- 검사: 같은 임시 DB에 병합된 마이그레이션을 psql로 다시 적용했고 오류가 없었다. `npm run db:migrate`는 "적용할 마이그레이션이 없습니다"였다.
-  - `npm run check`(`health_test`): 통과. 백엔드 212개 통과·0개 건너뜀, 프론트엔드 395개 통과·2개 건너뜀(다크 전용 조건), 스킬 검사 4개 통과.
-  - `npm run knip`: 통과.
+- `frontend/src/daily.tsx`: The date range import of #50 and this PR's `GoalsCard` import conflicted. Both were kept.
+- The start date of application of a goal was aligned to the range the daily record shows (#50, 2000-01-01 to 2099-12-31). If it is outside the range, it is rejected before sending. The API uses `isRealDate` of #50 (1900 to 2999) as it is. So the 500 error of point 6 passed on in the first review was also solved by #50.
+- Tests: Added a start date range rejection test to `frontend/src/goals.test.tsx` (13 tests).
+- Reflected in the next-steps document that #50 and #92 are done.
+- Checks: The merged migration was applied again with psql to the same temporary DB, with no errors. `npm run db:migrate` said "적용할 마이그레이션이 없습니다" (there are no migrations to apply).
+  - `npm run check` (`health_test`): passed. Backend 212 passed and 0 skipped, frontend 395 passed and 2 skipped (dark-only condition), skill checks 4 passed.
+  - `npm run knip`: passed.
 
-## 검증
+## Checks
 
-- 테스트
+- Tests
   - `backend/test/goals.test.ts`
-    - 판정 함수: 기록 없음, 상한·하한 경계, 값을 모르는 음식이 있을 때 결론 나는 경우와 보류, 수면 경계, 금주 주의 보류·미달·달성.
-    - 항목별 범위·정수·문자 거부, 시작일 누락·없는 날짜, 없는 항목 404, 잘못된 경로는 DB에 닿지 않음.
-  - `backend/test/goals.integration.test.ts`(1981년 날짜)
-    - 목표를 바꿔도 지난 날은 그때 목표로 판정하고, 시작일 당일부터 새 목표를 쓴다.
-    - 기록 없는 날은 네 항목 모두 "none"이다.
-    - 목표가 없거나 끈 날은 판정하지 않지만 실제 값은 보인다. 끄기 전 날짜는 그대로 판정한다.
-    - 수량을 곱한 합계와 값을 모르는 음식이 있는 날의 보류.
-    - 기상 날짜 기준 수면 판정.
-    - 월~일 금주 집계, 주 중간 변경, 술 기록이 없는 날은 금주로 세지 않음.
-    - 직접 체크 함께 응답.
-    - 현재 목표·미래 시작일·같은 시작일 덮어쓰기·변경 삭제와 404.
-    - DB 제약.
-  - `frontend/src/goal-text.test.ts`: 목표 문구, 수면 시간↔분 변환과 거부, 범위·정수 검사, 실제 값 문구.
-  - `frontend/src/goals.test.tsx`(처음 10개, 1차 리뷰 뒤 11개)
-    - 판정과 직접 체크가 나란히 보이고, 기록 없음은 미달이 아니다.
-    - 보류 이유, 목표가 없을 때 설정 링크, 다시 판정, 불러오기 실패 뒤 다시 시도.
-    - 같은 날 저장이 끝난 뒤에 읽는다.
-    - 수면 7시간 10분을 430분으로 보내고(처음에는 7.5시간), 폼을 다시 채우고, 포커스를 카드 제목으로 옮긴다.
-    - 잘못된 값은 보내기 전에 거부한다.
-    - 목표 끄기와 변경 기록, 예정 표시와 변경 삭제.
-  - `frontend/src/app.test.tsx`, `frontend/src/daily.test.tsx`: 가짜 서버가 목표 요청에도 답하게 했다. 설정 화면에 "목표" 제목이 보이는지 확인한다.
-- 임시 PostgreSQL 17 클러스터(포트 5471)의 `health_test`
-  - psql로 마이그레이션 11개를 두 번 적용했고 두 번째도 오류가 없었다.
-  - 이어서 `npm run db:migrate`를 두 번 실행했다. 첫 번째는 11개 파일을 기록했고 두 번째는 "적용할 마이그레이션이 없습니다"였다.
-- `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5471/health_test npm run check`: 통과.
-  - 백엔드: 202개 통과, 0개 건너뜀(1차 리뷰 뒤 다시 실행해도 같음).
-  - 프론트엔드: 378개 통과(1차 리뷰 뒤 380개), 2개 건너뜀. 건너뛴 2개는 다크 전용 앱 조건 테스트로, 이 변경과 관계없다.
-  - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과.
-- 처음 실행에서 통합 테스트 1개가 실패했다. 브라우저 확인용으로 같은 DB에 넣은 2026년 수면 목표가 변경 기록에 섞인 탓이다. 테스트가 1981년 변경만 보게 고쳤고 확인용 데이터도 지웠다.
+    - Judgment function: no record, the boundaries of the upper and lower limits, cases that reach a conclusion and cases that are pending when there are foods with unknown values, the sleep boundary, and pending, not achieved, and achieved for an alcohol-free week.
+    - Rejection of a range, integer, or text per item, a missing start date or a date that does not exist, 404 for an item that does not exist, and a wrong path not reaching the DB.
+  - `backend/test/goals.integration.test.ts` (dates of 1981)
+    - Even if a goal is changed, past days are judged by the goal of that time, and the new goal is used from the start date itself.
+    - A day with no record is "none" for all four items.
+    - A day with no goal or a goal turned off is not judged, but the actual values are shown. Dates before turning off are judged as they were.
+    - The total with the quantity multiplied, and pending for a day with foods with unknown values.
+    - Sleep judgment by the date of waking up.
+    - Monday to Sunday alcohol-free counting, a change in the middle of a week, and a day with no alcohol record not being counted as alcohol-free.
+    - Direct checks returned together.
+    - The current goal, a future start date, overwriting with the same start date, deleting a change and the 404.
+    - DB constraints.
+  - `frontend/src/goal-text.test.ts`: goal text, sleep hours to minutes conversion and rejection, range and integer checks, actual value text.
+  - `frontend/src/goals.test.tsx` (10 at first, 11 after the first review)
+    - The judgment and direct checks are shown side by side, and no record is not not achieved.
+    - The reason for pending, the settings link when there is no goal, judge again, and retry after a load failure.
+    - It reads after saving on the same day finishes.
+    - Sleep 7 hours 10 minutes is sent as 430 minutes (at first it was 7.5 hours), the form is refilled, and focus moves to the card heading.
+    - A wrong value is rejected before sending.
+    - Turning a goal off and the change history, the scheduled mark and deleting a change.
+  - `frontend/src/app.test.tsx`, `frontend/src/daily.test.tsx`: The fake server now also answers goal requests. Checks that the "목표" heading is shown on the settings screen.
+- `health_test` of a temporary PostgreSQL 17 cluster (port 5471)
+  - The 11 migrations were applied twice with psql and the second time had no errors either.
+  - Then `npm run db:migrate` was run twice. The first recorded 11 files and the second said "적용할 마이그레이션이 없습니다".
+- `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5471/health_test npm run check`: passed.
+  - Backend: 202 passed, 0 skipped (the same when run again after the first review).
+  - Frontend: 378 passed (380 after the first review), 2 skipped. The 2 skipped are condition tests for the dark-only app, unrelated to this change.
+  - Skill checks: 4 passed.
+- `npm run knip`: passed.
+- In the first run, one integration test failed. The sleep goal of 2026 put into the same DB for the browser check got mixed into the change history. The test was fixed to look only at the changes of 1981, and the data for the check was also deleted.
 
-### 브라우저 확인
+### Browser check
 
-임시 DB에 실제 API(3971)와 Vite(5271)를 띄우고 헤드리스 Chrome(디버깅 9671)을 CDP로 움직였다. 데이터는 API로 넣었다: 11-01부터 목표 4개, 11-05부터 칼로리 1800kcal, 11-06에 식사 2개(칼로리만 있음), 수면 7시간 10분, 술 3일(1일 음주), 직접 체크.
+A real API (3971) and Vite (5271) were started on a temporary DB, and headless Chrome (debugging 9671) was driven over CDP. Data was put in through the API: 4 goals from 11-01, calories 1800kcal from 11-05, on 11-06 2 meals (with only calories), sleep 7 hours 10 minutes, alcohol 3 days (1 day of drinking), and direct checks.
 
-| 항목                                                                                                              | 390×844 | 1440×900 |
-| ----------------------------------------------------------------------------------------------------------------- | ------- | -------- |
-| 설정: 네 목표 카드, 현재 목표와 시작일, 변경 기록이 보이고 가로 스크롤이 없음                                     | 통과    | 통과     |
-| 하루 기록 11-06: 칼로리 달성(1,370 ≤ 1,800), 단백질 판정 보류와 이유, 수면 달성, 금주 판정 보류, 직접 체크 나란히 | 통과    | 통과     |
-| 설정에서 수면 7.5시간을 11-06부터 저장 → 현재 목표·변경 기록 갱신, 포커스가 수면 카드 제목으로 이동               | 통과    | —        |
-| 저장 뒤 11-06은 새 목표로 미달(7시간 10분 < 7시간 30분), 11-05는 이전 목표(7시간)로 "기록 없음"                   | 통과    | —        |
+| Item                                                                                                                                                                       | 390×844 | 1440×900 |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
+| Settings: the four goal cards, the current goals and start dates, and the change history are shown and there is no horizontal scroll                                       | Pass    | Pass     |
+| Daily record 11-06: calories achieved (1,370 ≤ 1,800), protein judgment pending with the reason, sleep achieved, alcohol-free judgment pending, direct checks side by side | Pass    | Pass     |
+| In the settings, saving sleep 7.5 hours from 11-06 → the current goal and change history update, and focus moves to the sleep card heading                                 | Pass    | —        |
+| After saving, 11-06 is not achieved by the new goal (7 h 10 min < 7 h 30 min), and 11-05 is "기록 없음" (no record) by the previous goal (7 hours)                         | Pass    | —        |
 
-- 저장 동작은 390×844에서만 눌러 봤다. 1440×900은 같은 화면의 배치만 확인했다.
-- 확인용 식사 이름이 깨져 보였다. Windows Git Bash의 curl이 한글을 UTF-8이 아닌 바이트로 보낸 탓이다. 앱이 저장·표시하는 문제는 아니다.
-- 확인 뒤 Chrome, Vite, API, 임시 DB를 모두 껐다.
+- The save action was pressed only at 390×844. At 1440×900 only the layout of the same screen was checked.
+- The meal names for the check looked garbled. This is because curl in Windows Git Bash sent the Korean text as non-UTF-8 bytes. It is not a problem of how the app stores or shows it.
+- After the check, Chrome, Vite, the API, and the temporary DB were all shut down.
 
-## 제한·후속
+## Limits and follow-ups
 
-- 다른 카드에서 저장해도 "목표 달성" 카드는 자동으로 다시 읽지 않는다. "다시 판정"을 눌러야 한다. 카드끼리 변경을 알리는 방법은 따로 정해야 한다.
-- 하루 식사를 다 기록했는지 알 수 없어서, 일부만 기록한 날도 칼로리 상한은 "달성"으로 나온다.
-- 주·달 달성률(#37처럼)은 이번 범위에 넣지 않았다.
+- Even when saved on another card, the "목표 달성" card does not read again automatically. "다시 판정" must be pressed. How cards tell each other about changes must be decided separately.
+- It cannot be known whether the whole day's meals were recorded, so a day with only part recorded also comes out as "achieved" for the calorie upper limit.
+- The week and month achievement rates (as in #37) were not put in this scope.

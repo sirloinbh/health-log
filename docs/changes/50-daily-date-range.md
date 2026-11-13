@@ -1,103 +1,103 @@
-# #50 하루 기록의 날짜 허용 범위 정하기
+# #50 Decide the allowed date range of the daily record
 
-- 이슈: [#50](https://github.com/sirloinbh/health-log/issues/50)
-- 브랜치: `fix/50-daily-date-range`
+- Issue: [#50](https://github.com/sirloinbh/health-log/issues/50)
+- Branch: `fix/50-daily-date-range`
 
-## 목적
+## Purpose
 
-하루 기록에서 열 수 있는 날짜 범위가 곳곳에서 달랐다.
+The range of dates that can be opened in the daily record differed from place to place.
 
-- 입력칸의 하한 `2000-01-01`이 주소와 이전 날 링크에는 적용되지 않았다. `/daily/0002-03-15`도 정상 화면으로 열렸다.
-- 입력칸에 `1999-12-31`을 치면 안내 없이 무시되고, 포커스가 빠지면 원래 날짜로 돌아갔다.
-- `/daily/9999-12-31`의 다음 날 링크는 `/daily/+010000-01`이 되어 "없는 날짜" 화면으로 갔다.
-- (#43 메모) API는 실제로 있는 날인지만 봐서, `GET /api/report?date=9999-12-31`·`0001-01-01`은 PostgreSQL에서 실패해 400이 아니라 500이었다. 술·담배·하루 체크의 주·달 계산도 같은 경계를 쓴다.
+- The lower limit `2000-01-01` of the input field was not applied to the address and the previous day link. `/daily/0002-03-15` also opened as a normal screen.
+- Typing `1999-12-31` in the input field was ignored with no notice, and when focus left, it went back to the original date.
+- The next day link of `/daily/9999-12-31` became `/daily/+010000-01` and went to the "없는 날짜" (date that does not exist) screen.
+- (#43 note) The API only checked whether the day really exists, so `GET /api/report?date=9999-12-31` and `0001-01-01` failed in PostgreSQL and gave 500, not 400. The week and month calculation of alcohol and tobacco and the daily checks use the same boundary.
 
-## 정한 것
+## Decisions
 
-사용자 확인 없이 정했다. 이슈 댓글에 같은 내용을 남겼다.
+Decided without asking the user. The same content was left as an issue comment.
 
-- **화면 범위: 2000-01-01부터 2099-12-31까지.** 주소, 이전·다음 날 링크, 날짜 입력칸이 모두 이 규칙을 따른다(`frontend/src/daily-date.ts` 한 곳).
-  - 하한은 이슈 추천안대로 2000-01-01이다. #27 메모의 1987~88년 시간대 오프셋 문제도 화면에서는 생기지 않는다.
-  - 이슈 추천안은 "상한 없음"이었지만, 상한이 없으면 `9999-12-31`의 다음 날 링크가 깨진다. 병원 예약 같은 미래 기록을 넉넉히 담으면서 연도가 늘 네 자리인 2099-12-31로 정했다.
-- **API 범위: 1900-01-01부터 2999-12-31까지.** 모든 날짜 경로와 리포트, 음식 확인 날짜, 식사 복사 날짜가 쓰는 `isRealDate`에 넣었다.
-  - 화면보다 넓게 둔 이유: 통합 테스트는 실제 기록과 겹치지 않게 1979~1994년 날짜를 쓴다.
-  - 0001년과 9999년에서 충분히 떨어져 있어, 그 날의 주·달이나 다음 날을 계산해도 PostgreSQL이 담을 수 있는 범위를 벗어나지 않는다. 범위 밖은 400 "날짜가 올바르지 않습니다"다.
-- **범위 밖 화면**
-  - 주소가 범위 밖이면 "2000-01-01부터 2099-12-31까지 기록할 수 있습니다: <날짜>"와 "오늘 기록으로 이동"을 보인다. 있을 수 없는 날짜는 지금처럼 "없는 날짜입니다"다.
-  - 범위 끝에서는 이전·다음 날이 같은 링크로 남되 `aria-disabled`이고 눌러도 움직이지 않는다. 포커스가 그대로 남고, 이유(범위)를 설명으로 읽어 준다(1차 리뷰 뒤 바꿈).
-  - 입력칸에 범위 밖 날짜를 치면 날짜 이동 아래에 범위를 알린다(`aria-live`). 연도를 아직 치는 중인 값(1000년 전)에는 알리지 않는다. 범위 밖 날짜를 둔 채 입력칸을 떠나도 알린다(1차 리뷰 뒤 추가).
+- **Screen range: from 2000-01-01 to 2099-12-31.** The address, the previous and next day links, and the date input field all follow this rule (one place, `frontend/src/daily-date.ts`).
+  - The lower limit is 2000-01-01 as the issue recommended. The time zone offset problem of 1987 and 1988 in the #27 note also does not occur on the screen.
+  - The issue's recommendation was "no upper limit", but without an upper limit the next day link of `9999-12-31` breaks. To leave room for future records such as clinic appointments, while keeping the year always four digits, it was set at 2099-12-31.
+- **API range: from 1900-01-01 to 2999-12-31.** It was put in `isRealDate`, which is used by all date paths, the report, the food check date, and the meal copy date.
+  - Why it is wider than the screen: the integration tests use dates of 1979 to 1994 so as not to overlap with real records.
+  - It is far enough from the years 0001 and 9999, so even when the week or month or the next day of that day is calculated, it does not go beyond the range PostgreSQL can hold. Outside the range is 400 "날짜가 올바르지 않습니다" (the date is not valid).
+- **Screen outside the range**
+  - If the address is outside the range, it shows "2000-01-01부터 2099-12-31까지 기록할 수 있습니다: <date>" (records can be made from 2000-01-01 to 2099-12-31: <date>) and "오늘 기록으로 이동" (go to today's record). A date that cannot exist is "없는 날짜입니다" (this date does not exist), as now.
+  - At the end of the range, the previous and next day remain as the same link but are `aria-disabled` and do not move when pressed. Focus stays, and the reason (the range) is read as a description (changed after the first review).
+  - If a date outside the range is typed in the input field, the range is announced below the date navigation (`aria-live`). It is not announced for a value where the year is still being typed (before year 1000). It is also announced if the input field is left with a date outside the range (added after the first review).
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
-- **API** `backend/src/dates.ts`: `isRealDate`가 1900-01-01~2999-12-31 밖을 거부한다. `parseDate`와 리포트·음식·식사 검사는 모두 이 함수를 쓴다.
-- **화면** `frontend/src/daily-date.ts`: `earliestDate`, `latestDate`, `inDailyRange`, `dailyRangeText`
-- **화면** `frontend/src/daily.tsx`
-  - 범위 밖 주소에 안내 화면을 보인다.
-  - 범위 끝에서 이전·다음 날을 `aria-disabled` 링크로 둔다(누름은 막고, 포커스와 설명은 남긴다).
-  - 입력칸의 `max`를 `9999-12-31`에서 `2099-12-31`로 바꾸고, 범위 밖 입력에 안내를 보인다.
+- **API** `backend/src/dates.ts`: `isRealDate` rejects anything outside 1900-01-01 to 2999-12-31. `parseDate` and the report, food, and meal checks all use this function.
+- **Screen** `frontend/src/daily-date.ts`: `earliestDate`, `latestDate`, `inDailyRange`, `dailyRangeText`
+- **Screen** `frontend/src/daily.tsx`
+  - Shows a notice screen for an address outside the range.
+  - At the end of the range, the previous and next day are made `aria-disabled` links (pressing is blocked, while focus and the description remain).
+  - The `max` of the input field was changed from `9999-12-31` to `2099-12-31`, and a notice is shown for input outside the range.
 
-## 검증
+## Verification
 
-### 브라우저
+### Browser
 
-임시 DB(포트 5473, `health_browser`)에 실제 API(3973)와 Vite(5273)를 띄웠다. 헤드리스 Chrome(디버깅 포트 9673)을 CDP로 움직였다. 320×700, 390×844, 1440×900 모두 결과가 같았다.
+A real API (3973) and Vite (5273) were started on a temporary DB (port 5473, `health_browser`). Headless Chrome (debugging port 9673) was driven over CDP. The results were the same at 320×700, 390×844, and 1440×900.
 
-| 확인                                                          | 결과                                                            |
-| ------------------------------------------------------------- | --------------------------------------------------------------- |
-| `/daily/1999-12-31`, `2100-01-01`, `0002-03-15`, `9999-12-31` | 범위 안내와 "오늘 기록으로 이동", 카드 없음                     |
-| `/daily/2000-01-01`                                           | 이전 날 비활성 링크, 다음 날 링크 `/daily/2000-01-02`, 카드 6개 |
-| `/daily/2099-12-31`                                           | 이전 날 링크 `/daily/2099-12-30`, 다음 날 비활성 링크, 카드 6개 |
-| 입력칸에 키보드로 `19991231`                                  | 주소 그대로, 범위 안내 표시                                     |
-| 이어서 `20260302`                                             | `/daily/2026-03-02`로 이동, 안내 사라짐                         |
-| `GET /api/report?period=month&date=9999-12-31`·`0001-01-01`   | 400                                                             |
-| `GET /api/report?period=month&date=2999-12-31`                | 200                                                             |
+| Check                                                           | Result                                                                       |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `/daily/1999-12-31`, `2100-01-01`, `0002-03-15`, `9999-12-31`   | The range notice and "오늘 기록으로 이동", no cards                          |
+| `/daily/2000-01-01`                                             | A disabled previous day link, the next day link `/daily/2000-01-02`, 6 cards |
+| `/daily/2099-12-31`                                             | The previous day link `/daily/2099-12-30`, a disabled next day link, 6 cards |
+| `19991231` typed in the input field by keyboard                 | The address stays, the range notice is shown                                 |
+| Then `20260302`                                                 | Moves to `/daily/2026-03-02`, the notice disappears                          |
+| `GET /api/report?period=month&date=9999-12-31` and `0001-01-01` | 400                                                                          |
+| `GET /api/report?period=month&date=2999-12-31`                  | 200                                                                          |
 
-- 세 폭 모두 가로 넘침과 콘솔 오류가 없었다.
-- 확인 뒤 임시 DB, API, Vite, Chrome을 모두 껐다.
+- At all three widths there was no horizontal overflow and no console errors.
+- After the check, the temporary DB, API, Vite, and Chrome were all shut down.
 
-### 테스트
+### Tests
 
-- `backend/test/dates.test.ts`(새로 2개, 1차 리뷰 뒤 3개)
-  - `isRealDate`가 1900-01-01과 2999-12-31은 받고 그 밖은 거부한다.
-  - 0001-01-01, 1899-12-31, 3000-01-01, 9999-12-31이 리포트(주·달)와 수면·신체·술담배·하루 체크·식단 경로 모두에서 DB에 닿기 전에 400이다.
-- `backend/test/dates.integration.test.ts`(새로 1개, `testDatabaseSkip` 사용, 읽기만 함): 1900-01-01과 2999-12-31에서 리포트(주·달), 술·담배, 하루 체크, 신체 기간 조회가 200이다.
-- 고치기 전 코드에서 두 단위 테스트가 실패했다. 범위 밖 리포트는 500이었다.
-- `frontend/src/daily.test.tsx`(처음 3개 추가·1개 바꿈, 리뷰 뒤 모두 6개 추가)
-  - 범위 밖 주소 네 가지가 범위 안내와 돌아갈 링크를 보이고, 카드를 그리지 않는다.
-  - 2000-01-01에서는 이전 날이, 2099-12-31에서는 다음 날이 비활성이고, 반대쪽 링크는 범위 안이다.
-  - 입력칸에 1999-12-31과 2100-01-01을 치면 안내가 나오고 주소는 그대로다. 0199년처럼 연도를 치는 중에는 안내가 없다. 범위 안 날짜로 바꾸면 이동하고 안내가 사라진다.
-  - 입력칸의 `min`·`max`가 2000-01-01·2099-12-31이다(기존 `max` 테스트를 바꿈).
-  - 4개 모두 고치기 전 코드에서 실패하는 것을 확인했다.
-- `frontend/src/daily-date.test.ts`: `inDailyRange`의 양 끝과 바깥
+- `backend/test/dates.test.ts` (2 new, 3 after the first review)
+  - `isRealDate` accepts 1900-01-01 and 2999-12-31 and rejects anything outside.
+  - 0001-01-01, 1899-12-31, 3000-01-01, and 9999-12-31 give 400 before reaching the DB on the report (week and month) and on all of the sleep, body, alcohol and tobacco, daily check, and meal paths.
+- `backend/test/dates.integration.test.ts` (1 new, using `testDatabaseSkip`, read-only): at 1900-01-01 and 2999-12-31, the report (week and month), alcohol and tobacco, daily check, and body period reads are 200.
+- On the code before the fix, two unit tests failed. The report outside the range was 500.
+- `frontend/src/daily.test.tsx` (3 added and 1 changed at first, 6 added in total after the review)
+  - The four addresses outside the range show the range notice and the link to go back, and do not draw cards.
+  - At 2000-01-01 the previous day is disabled, and at 2099-12-31 the next day is disabled, and the link on the other side is inside the range.
+  - Typing 1999-12-31 and 2100-01-01 in the input field shows the notice and the address stays. While typing a year such as 0199 there is no notice. Changing to a date inside the range moves and the notice disappears.
+  - The `min` and `max` of the input field are 2000-01-01 and 2099-12-31 (the existing `max` test was changed).
+  - It was confirmed that all 4 fail on the code before the fix.
+- `frontend/src/daily-date.test.ts`: both ends and the outside of `inDailyRange`
 
-### 명령
+### Commands
 
-- `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과
-  - 백엔드 193개 통과, 0개 건너뜀(DB 통합 테스트 포함). 프런트 374개 통과, 2개 건너뜀. 스킬 4개 통과.
-- `npm run knip`: 통과
+- `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed
+  - Backend 193 passed, 0 skipped (including DB integration tests). Frontend 374 passed, 2 skipped. Skill checks 4 passed.
+- `npm run knip`: passed
 
-## 한계
+## Limits
 
-- 식단 카드의 "다른 날에서 복사" 날짜와 개요(리포트) 화면의 날짜는 화면 범위(2000~2099)를 따로 막지 않는다. API 범위(1900~2999) 안이면 그대로 읽고, 밖이면 API가 400으로 답한다.
-- API 범위 안의 1987~88년 등 과거 시간대 오프셋 문제(#27 메모)는 API에서는 그대로다. 화면으로는 갈 수 없다.
-- 음식 확인 날짜 입력칸과 식단 "다른 날에서 복사" 날짜 입력칸에는 `max`가 없어, Chrome에서 여섯 자리 연도를 칠 수 있다. API가 이제 500이 아니라 400으로 답한다. 이미 범위 밖 확인 날짜로 저장된 음식이 있다면 다음 저장 때 그 칸을 고치라는 400이 나온다.
+- The "copy from another day" date of the meal card and the date of the overview (report) screen are not separately blocked to the screen range (2000 to 2099). If it is inside the API range (1900 to 2999), it is read as it is, and if outside, the API answers 400.
+- The past time zone offset problem such as 1987 and 1988 inside the API range (#27 note) stays as it is in the API. It cannot be reached from the screen.
+- The food check date input field and the meal "copy from another day" date input field have no `max`, so a six-digit year can be typed in Chrome. The API now answers 400 instead of 500. If there is a food already saved with an out-of-range check date, a 400 asking to fix that field comes at the next save.
 
-## 1차 리뷰 — 2026-11-08
+## First review — 2026-11-08
 
-별도 읽기 전용 리뷰를 실행했다. 반드시 고칠 것은 없었고, 다음을 반영했다.
+A separate read-only review was run. Nothing had to be fixed, and the following was applied.
 
-- **범위 끝에서 키보드 포커스를 잃던 문제(고칠 것):** 2000-01-02에서 "이전 날"로 2000-01-01에 가면 링크가 비활성 버튼으로 바뀌며 포커스가 `<body>`로 떨어졌다. 비활성 버튼은 Tab으로 닿지 않아 이유도 들을 수 없었다. 범위 끝에서도 같은 링크(`DayLink`)를 그리되 `aria-disabled`·설명을 달고 누름을 막는다. 브라우저에서 Enter로 2000-01-01에 간 뒤 포커스가 비활성 "이전 날"에 남고, 다시 Enter를 눌러도 주소가 그대로인 것을 확인했다(320/390/1440).
-- **2100년 이후를 칠 때 안내가 없을 수 있다는 지적(고칠 것):** 리뷰는 Chrome이 연도 칸의 `max`(2099)를 넘는 자릿수를 받지 않아 `2100`이 `0210`이 될 것으로 봤다. 실제 Chrome 156에서는 키보드로 `2100`·`3000`·`1999`년을 그대로 칠 수 있었고, 칠 때와 떠난 뒤 모두 안내가 나왔다(320/390/1440). 다른 브라우저에서 연도가 잘려도 안내가 나오도록, 범위 밖 날짜를 둔 채 입력칸을 떠나면 그 날을 기억해 안내를 보인다.
-- **테스트 보강:** 범위 밖 신체 기간 조회, 음식 확인 날짜, 식사 복사 날짜가 400인 것을 `backend/test/dates.test.ts`에 더했다(3개). 화면 테스트는 범위 끝 링크, 범위 끝에서의 포커스, 떠날 때의 안내를 확인한다. 이 3개는 리뷰 전 코드에서 실패했다.
-- **기타:** 서버의 오늘이 범위 밖일 일은 2100년까지 없다는 주석을 `TodayRedirect`에 달았다. 위 "한계"에 음식·복사 날짜 입력칸을 적었다.
-- 반영 뒤 `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과(백엔드 194개, 건너뜀 0. 프런트 376개 통과, 2개 건너뜀. 스킬 4개). `npm run knip`: 통과.
+- **Keyboard focus lost at the end of the range (to fix):** Going from 2000-01-02 to 2000-01-01 with "이전 날" (previous day) changed the link into a disabled button, and focus fell to `<body>`. A disabled button cannot be reached with Tab, so the reason could not be heard either. Even at the end of the range, the same link (`DayLink`) is drawn, with `aria-disabled` and a description, and pressing is blocked. In the browser, after going to 2000-01-01 with Enter, focus stayed on the disabled "이전 날", and pressing Enter again left the address as it was (320/390/1440).
+- **The point that there may be no notice when typing year 2100 and later (to fix):** The review expected that Chrome does not accept more digits than the `max` (2099) of the year field, so `2100` would become `0210`. In real Chrome 156, `2100`, `3000`, and `1999` could be typed as they are by keyboard, and the notice appeared both while typing and after leaving (320/390/1440). So that the notice also appears when the year is cut in other browsers, if the input field is left with a date outside the range, that date is remembered and the notice is shown.
+- **Test additions:** Added to `backend/test/dates.test.ts` that the body period read, the food check date, and the meal copy date outside the range are 400 (3 tests). The screen tests check the link at the end of the range, focus at the end of the range, and the notice on leaving. These 3 failed on the code before the review.
+- **Other:** Added a comment to `TodayRedirect` that the server's today will not be outside the range until the year 2100. Wrote the food and copy date input fields in "Limits" above.
+- After applying, `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed (backend 194, 0 skipped. Frontend 376 passed, 2 skipped. Skill checks 4). `npm run knip`: passed.
 
-## 2차 리뷰 — 2026-11-08
+## Second review — 2026-11-08
 
-1차 반영과 전체 diff를 별도 읽기 전용 리뷰로 다시 봤다. 반드시 고칠 것은 없었고, 다음을 반영했다. 리뷰는 여기서 끝낸다.
+The first round of fixes and the whole diff were reviewed again by a separate read-only review. Nothing had to be fixed, and the following was applied. Reviews end here.
 
-- **확인된 것:** React Router의 `Link`는 `onClick`에서 `preventDefault`하면 이동하지 않아, 범위 끝 링크는 클릭·Enter·Ctrl 클릭 모두 막힌다. 가운데 클릭이나 "새 탭에서 열기"는 지금 날을 열 뿐이라 해가 없다. `aria-description`은 이 저장소의 접근성 lint를 통과한다.
-- **범위 안내가 되살아나던 문제(고칠 것):** 입력칸을 범위 밖 날짜로 떠나 안내가 나온 뒤, 다음 날로 갔다가 돌아오면 입력 없이도 안내가 다시 나왔다. 하루 기록 화면은 날짜가 바뀌어도 그대로 남아, 저장해 둔 날짜와 다시 같아졌기 때문이다. 날짜가 바뀌면 렌더 중에 안내 상태를 지운다(React가 권하는 "이전 값과 비교해 상태 재설정" 방식). 다음 날·이전 날로 다녀오는 테스트를 더했고, 리뷰 전 코드에서 실패한다.
-- **비활성 링크 모양:** 마우스를 올려도 배경이 바뀌지 않고 손가락 커서가 나오지 않게 했다. 이유를 알려 주는 `title` 툴팁이 남도록 `pointer-events-none`은 쓰지 않았다.
-- **문서:** "변경"의 비활성 버튼 설명과 테스트 수를 고쳤다.
-- 반영 뒤 `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과(백엔드 194개, 건너뜀 0. 프런트 377개 통과, 2개 건너뜀. 스킬 4개). `npm run knip`: 통과.
+- **Confirmed:** React Router's `Link` does not navigate if `preventDefault` is called in `onClick`, so the link at the end of the range is blocked for click, Enter, and Ctrl click. A middle click or "open in a new tab" only opens the current day, so it is harmless. `aria-description` passes this repository's accessibility lint.
+- **The range notice coming back to life (to fix):** After the input field was left with a date outside the range and the notice appeared, going to the next day and coming back made the notice appear again without any input. This is because the daily record screen stays as it is even when the date changes, and became equal again to the saved date. When the date changes, the notice state is cleared during render (the "reset state by comparing with the previous value" approach recommended by React). A test of going to the next day and previous day and coming back was added, and it fails on the code before the review.
+- **Disabled link look:** The background does not change on mouse hover and the pointer cursor does not appear. `pointer-events-none` was not used so that the `title` tooltip that tells the reason stays.
+- **Docs:** Fixed the description of the disabled button in "Change" and the test counts.
+- After applying, `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed (backend 194, 0 skipped. Frontend 377 passed, 2 skipped. Skill checks 4). `npm run knip`: passed.

@@ -1,65 +1,65 @@
-# #53 배포 스크립트가 실행할 마이그레이션 실행기
+# #53 Migration runner for the deploy script to execute
 
-- 이슈: [#53](https://github.com/sirloinbh/health-log/issues/53)
-- 브랜치: `chore/53-migration-runner`
+- Issue: [#53](https://github.com/sirloinbh/health-log/issues/53)
+- Branch: `chore/53-migration-runner`
 
-## 목적
+## Purpose
 
-`deploy/remote-deploy.sh`는 배포 중 `node dist/migrate.js`를 실행한다. 이 저장소에는 그 파일이 없어서 첫 서버 배포가 `set -e`로 이 단계에서 멈출 것이었다. 배포 스크립트가 실행할 실행기를 들인다.
+`deploy/remote-deploy.sh` runs `node dist/migrate.js` during deployment. This repository did not have that file, so the first server deployment would have stopped at this step because of `set -e`. This brings in the runner that the deploy script executes.
 
-## 정한 것
+## Decisions
 
-이슈의 추천안대로 다른 앱과 중앙 스캐폴드를 확인한 뒤, 새로 만들지 않고 중앙 표준을 그대로 들였다. 사용자 확인 없이 정했고 이슈 댓글에 남겼다.
+As the issue recommended, after checking the other apps and the central scaffold, the central standard was brought in as it is, instead of building a new one. It was decided without asking the user and left in an issue comment.
 
-- **확인한 것:** 중앙 [DB 마이그레이션 규칙](https://github.com/sirloinbh/project-standards/blob/main/docs/conventions/database.md)과 스캐폴드 `scaffold/app/backend/src/migrations.ts`, `migrate.ts`(2026-11-05 `origin/main` 기준). life-journal, plan-routine, study-log, workout-memo가 같은 실행기를 쓴다.
-- **방식:** `schema_migrations(name, checksum, applied_at)`에 적용 기록을 남기고, 기록에 없는 파일만 이름순으로 실행한다.
-  - 파일마다 한 트랜잭션이다. 실패하면 그 파일만 되돌리고 멈춘다.
-  - 기록된 파일이 없어졌거나 내용이 바뀌었거나, 기록된 마지막 파일보다 앞선 번호의 새 파일이 있으면 아무것도 적용하지 않고 실패한다.
-  - advisory lock(고정 키 `581_003`)으로 동시에 한 실행기만 적용한다.
-- **새 파일:** 010 이후 파일도 이름 형식만 맞으면 따로 등록하지 않아도 적용된다. 이 PR은 마이그레이션 파일을 추가하지 않는다.
-- **스캐폴드와 다른 점:** `migrations.ts` 정규식 안의 BOM을 보이지 않는 문자 그대로 두지 않고 유니코드 이스케이프로 썼다(life-journal과 같음). `migrate.ts`는 배포 사용법 주석만 더했다.
-- **`deploy/*`:** 고칠 점이 없었다. 배포 스크립트가 마운트하는 `/database/migrations`는 이미지 안 `/app/dist/migrate.js`에서 `../../database/migrations/`로 찾는 경로와 같다.
+- **What was checked:** The central [DB migration rules](https://github.com/sirloinbh/project-standards/blob/main/docs/conventions/database.md) and the scaffold `scaffold/app/backend/src/migrations.ts` and `migrate.ts` (as of `origin/main` on 2026-11-05). life-journal, plan-routine, study-log, and workout-memo use the same runner.
+- **Method:** Records of applied files are kept in `schema_migrations(name, checksum, applied_at)`, and only files not in the records are run, in name order.
+  - Each file is one transaction. If it fails, only that file is rolled back and it stops.
+  - If a recorded file is gone or its content changed, or there is a new file with a number lower than the last recorded file, it applies nothing and fails.
+  - With an advisory lock (fixed key `581_003`), only one runner applies at a time.
+- **New files:** Files from 010 on are also applied without being registered separately, as long as the name format is right. This PR adds no migration file.
+- **Differences from the scaffold:** The BOM inside the regular expression of `migrations.ts` is not left as an invisible character but written with a Unicode escape (same as life-journal). `migrate.ts` only has a usage comment for deployment added.
+- **`deploy/*`:** Nothing needed to be fixed. The `/database/migrations` that the deploy script mounts is the same as the path found with `../../database/migrations/` from `/app/dist/migrate.js` inside the image.
 
-## 변경 — 2026-11-06
+## Change — 2026-11-06
 
-- **실행기** `backend/src/migrations.ts`, `backend/src/migrate.ts`: 위 방식. `npm run build`가 `backend/dist/migrate.js`를 만든다.
-- **명령** 루트·`backend/package.json`에 `db:migrate`를 추가했다. 공통 CI는 이 스크립트가 있으면 psql로 한 번 적용한 뒤 실행기를 실행한다.
-- **문서** `database/README.md`의 적용 방법을 실행기 기준으로 바꿨다. `docs/project-setup.md` 6.3절의 기존 DB 적용 방법도 맞췄다.
+- **Runner** `backend/src/migrations.ts`, `backend/src/migrate.ts`: the method above. `npm run build` creates `backend/dist/migrate.js`.
+- **Command** Added `db:migrate` to the root and `backend/package.json`. If this script exists, the common CI applies once with psql and then runs the runner.
+- **Docs** Changed the way to apply in `database/README.md` to be based on the runner. The way to apply to an existing DB in section 6.3 of `docs/project-setup.md` was also aligned.
 
-## 검증
+## Verification
 
-- 테스트
-  - `backend/test/migrations.test.ts`(스캐폴드와 같음): 체크섬이 줄바꿈·BOM을 무시하는지, 파일 이름 형식과 번호 중복, 대기 목록과 바뀐·없어진·앞선 번호 파일 오류를 DB 없이 검사한다.
-  - `backend/test/migrations.integration.test.ts`: `health_test`일 때만 돈다. 테스트마다 빈 스키마를 만들어 쓰고 지우므로 `health_test`의 테이블과 병렬로 도는 다른 통합 테스트에 닿지 않는다.
-    - 빈 스키마에 모든 파일이 순서대로 적용되고 기록된다.
-    - 하루 체크 한 줄을 넣은 뒤 다시 실행하면 적용할 파일이 없고, 모든 테이블의 모든 행이 그대로다(음식 시드 포함).
-    - 기록 테이블 없이 이미 적용된 DB(빈 Docker 볼륨)에서는 모든 파일을 한 번 더 적용하며 기록하고, 데이터는 그대로다.
-    - 바뀐 파일이 있으면 뒤에 붙인 새 파일도 실행하지 않고 멈춘다(1차 리뷰 뒤 기록 확인 추가). 뒤에 붙인 새 파일은 그 파일만 실행되고, 실패한 파일은 혼자 되돌려지며 이름이 오류에 나온다.
-    - `migrate.ts` 명령을 별도 프로세스로 두 번 실행하면 "적용 완료: 001…009" 뒤 "적용할 마이그레이션이 없습니다."를 출력하고, `--status`는 모두 "적용됨"이다.
-  - `backend/test/build-output.test.ts`(1차 리뷰 뒤 추가): 임시 폴더로 백엔드를 빌드해 `migrate.js`와 `server.js`가 출력 맨 위에 생기는지 확인한다. 배포가 실행하는 `dist/migrate.js` 경로가 tsconfig 변경으로 바뀌면 실패한다.
-- 임시 PostgreSQL 17 클러스터(포트 5472)
-  - `health_test`에 CI처럼 psql로 9개를 적용한 뒤 실행기를 두 번 실행했다. 첫 번째는 9개를 기록하며 다시 적용했고, 두 번째는 적용할 파일이 없었다.
-  - `npm run build` 뒤 `backend/dist/migrate.js`를 새 빈 DB에 두 번 실행했다. 9개 적용 뒤 "적용할 마이그레이션이 없습니다.", 종료 코드 0. 확인 후 그 DB를 지웠다.
-  - 연결할 수 없는 주소로 실행하면 종료 코드 1로 끝난다(배포가 멈춘다).
-- `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5472/health_test npm run check`: 처음과 1차 보완 뒤 모두 통과.
-  - 백엔드: 170개(1차 보완 뒤 171개) 통과, 0개 건너뜀.
-  - 프런트엔드: 323개 통과, 2개 건너뜀. 건너뛴 2개는 이 변경과 관계없는 기존 조건부 테스트다.
-  - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과.
+- Tests
+  - `backend/test/migrations.test.ts` (same as the scaffold): Checks without a DB that the checksum ignores line breaks and BOM, the file name format and duplicate numbers, the pending list, and the errors for changed, missing, and lower-numbered files.
+  - `backend/test/migrations.integration.test.ts`: Runs only on `health_test`. Each test creates and drops an empty schema, so it does not touch the tables of `health_test` or the other integration tests running in parallel.
+    - In an empty schema, all files are applied in order and recorded.
+    - After inserting one daily check row and running again, there are no files to apply, and every row of every table is as it was (including the food seed).
+    - In a DB that already has the schema applied but no record table (an empty Docker volume), all files are applied once more while being recorded, and the data stays as it is.
+    - If there is a changed file, it stops without running even a new file attached after it (a check of the record was added after the first review). For a new file attached after, only that file is run, a failed file is rolled back alone, and its name appears in the error.
+    - Running the `migrate.ts` command twice as a separate process prints "적용 완료: 001…009" (applied: 001…009) and then "적용할 마이그레이션이 없습니다." (there are no migrations to apply.), and `--status` shows all as "적용됨" (applied).
+  - `backend/test/build-output.test.ts` (added after the first review): Builds the backend into a temporary folder and checks that `migrate.js` and `server.js` appear at the top of the output. If the `dist/migrate.js` path that deployment runs changes because of a tsconfig change, it fails.
+- Temporary PostgreSQL 17 cluster (port 5472)
+  - After applying the 9 to `health_test` with psql as CI does, the runner was run twice. The first applied again while recording the 9, and the second had no files to apply.
+  - After `npm run build`, `backend/dist/migrate.js` was run twice on a new empty DB. After applying 9, "적용할 마이그레이션이 없습니다.", exit code 0. After the check, that DB was dropped.
+  - Running against an address that cannot be connected ends with exit code 1 (the deployment stops).
+- `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5472/health_test npm run check`: passed both at first and after the first round of fixes.
+  - Backend: 170 (171 after the first round of fixes) passed, 0 skipped.
+  - Frontend: 323 passed, 2 skipped. The 2 skipped are existing conditional tests unrelated to this change.
+  - Skill checks: 4 passed.
+- `npm run knip`: passed.
 
-## 못 한 것
+## Not done
 
-- 실제 서버 배포(`deploy/remote-deploy.sh`)로는 실행하지 않았다. 지금은 서버에 배포하지 않는다.
-- Docker 이미지 안에서 `node dist/migrate.js`를 직접 실행해 보지는 않았다. 경로는 위처럼 코드로 확인했고, CI가 이미지를 빌드한다.
+- It was not run through a real server deployment (`deploy/remote-deploy.sh`). The server is not deployed now.
+- `node dist/migrate.js` was not run directly inside the Docker image. The path was checked in code as above, and CI builds the image.
 
-## 리뷰
+## Review
 
-- **1차:** 꼭 고칠 것은 없었다. 반영한 것은 다음과 같다.
-  - `dist/migrate.js` 경로를 자동으로 확인하는 테스트가 없었다 → `build-output.test.ts` 추가.
-  - 이 문서에 보이지 않는 BOM 문자가 들어가 있었다 → 글로 바꿨다.
-  - 바뀐 파일 테스트가 오류 메시지만 확인했다 → 새 파일이 실행되지 않았는지도 확인한다.
-  - 정리 단계의 `DROP SCHEMA`가 실패하면 원래 오류를 가렸다 → 정리 실패는 무시한다.
-  - 반영하지 않은 것: `TEST_DATABASE_URL`에 이미 있는 `options`를 덮어쓴다는 지적. 지금 그런 설정이 없어 그대로 둔다.
-- **2차:** 꼭 고칠 것은 없었다. `docs/project-setup.md`의 테스트 DB 준비 단계에 실행기를 더하고 이 문서의 문구를 다듬었다.
-  - 분리: 연결이 끊기면 `pg_advisory_unlock` 오류가 원래 오류를 가리는 문제는 중앙 스캐폴드 코드라 project-standards [#414](https://github.com/sirloinbh/project-standards/issues/414)로 넘겼다(종료 코드는 1이라 배포는 멈춘다).
-  - 그대로 둔 것: 테스트 정리 실패를 무시하므로 드물게 `migrate_*` 스키마가 남을 수 있다. 다른 테스트는 `public`만 보므로 영향이 없다.
+- **First:** Nothing had to be fixed. What was applied:
+  - There was no test that automatically checks the `dist/migrate.js` path → added `build-output.test.ts`.
+  - An invisible BOM character was in this document → changed it to words.
+  - The changed file test checked only the error message → it also checks that the new file was not run.
+  - If `DROP SCHEMA` in the cleanup step failed, it hid the original error → cleanup failures are ignored.
+  - Not applied: the point that it overwrites an `options` that is already in `TEST_DATABASE_URL`. There is no such setting now, so it is left.
+- **Second:** Nothing had to be fixed. The runner was added to the test DB preparation step of `docs/project-setup.md`, and the wording of this document was polished.
+  - Split off: The problem that when the connection drops, a `pg_advisory_unlock` error hides the original error is central scaffold code, so it was passed on to project-standards [#414](https://github.com/sirloinbh/project-standards/issues/414) (the exit code is 1, so deployment stops).
+  - Left as it is: because test cleanup failures are ignored, a `migrate_*` schema may rarely remain. Other tests look only at `public`, so there is no effect.

@@ -72,14 +72,14 @@ The recommendation in the issue was followed and decided without asking the user
 
 A real API (3993) and Vite (5203) were started on the temporary DB, and headless Chrome was driven over CDP. Numbers were typed by key input, and select fields were opened with the mouse and chosen.
 
-| Item                                                                                                                         | 320×700 | 390×844 | 1440×900 |
-| ---------------------------------------------------------------------------------------------------------------------------- | ------- | ------- | -------- |
-| "기록 없음" (no record) on an empty day, a new alcohol line starts with beer                                                 | Pass    | Pass    | Pass     |
-| Two lines of the same soju and bottle are rejected before saving                                                             | Pass    | Pass    | Pass     |
-| View after saving tobacco 3 and soju 1.5 bottles and 1 glass, kept after reload                                               | Pass    | Pass    | Pass     |
+| Item                                                                                                                                       | 320×700 | 390×844 | 1440×900 |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ------- | ------- | -------- |
+| "기록 없음" (no record) on an empty day, a new alcohol line starts with beer                                                               | Pass    | Pass    | Pass     |
+| Two lines of the same soju and bottle are rejected before saving                                                                           | Pass    | Pass    | Pass     |
+| View after saving tobacco 3 and soju 1.5 bottles and 1 glass, kept after reload                                                            | Pass    | Pass    | Pass     |
 | Saving 0 and "did not drink" on another day of the same week gives this week "3개비 (2일)" and "마신 날 1일 / 2일" (days drunk 1 / 2 days) | Pass    | Pass    | Pass     |
-| After deleting through the confirmation dialog, this week's total goes back to 1 day                                         | Pass    | Pass    | Pass     |
-| Existing values filled when editing, no horizontal overflow, no console errors                                               | Pass    | Pass    | Pass     |
+| After deleting through the confirmation dialog, this week's total goes back to 1 day                                                       | Pass    | Pass    | Pass     |
+| Existing values filled when editing, no horizontal overflow, no console errors                                                             | Pass    | Pass    | Pass     |
 
 ## First review — 2026-11-05
 

@@ -77,15 +77,15 @@ Details that were not in the issue were decided as below, without asking the use
 
 Two weeks of records were put into a temporary DB (sleep 8 days, meals 6 days with 1 day of unknown calories, alcohol and tobacco 6 days, checks 4 days). A real API (3993) and Vite (5203) were started and headless Chrome was driven over CDP. Dark mode was checked with `prefers-color-scheme: dark`.
 
-| Item                                                                                                                     | 320 light | 390 light | 390 dark | 1440 light | 1440 dark |
-| ------------------------------------------------------------------------------------------------------------------------ | --------- | --------- | -------- | ---------- | --------- |
+| Item                                                                                                                        | 320 light | 390 light | 390 dark | 1440 light | 1440 dark |
+| --------------------------------------------------------------------------------------------------------------------------- | --------- | --------- | -------- | ---------- | --------- |
 | The values, samples, and changes of the 6 cards equal hand-calculated values (for example average sleep 7 h 9 min, +14 min) | Pass      | Pass      | Pass     | Pass       | Pass      |
-| Alcohol and sleep that night: sample 2 days 6 h 48 min / sample 1 day 8 h, small-sample notice                           | Pass      | Pass      | Pass     | Pass       | Pass      |
-| The sleep chart has bars only for the 4 recorded days, description "7일 중 4일 기록" (4 of 7 days recorded)               | Pass      | Pass      | Pass     | Pass       | Pass      |
-| The bar color is the value of each mode (`rgb(42,120,214)` / `rgb(57,135,229)`)                                          | Pass      | Pass      | Pass     | Pass       | Pass      |
-| "11/4 · 8시간" (11/4 · 8 hours) by mouse (PC) or press (phone) on a bar                                                   | Pass      | Pass      | Pass     | Pass       | Pass      |
-| Previous week → Oct 26 to Nov 1, monthly → October, next month → November (average 7 h 13 min, 5 days)                   | Pass      | Pass      | Pass     | Pass       | Pass      |
-| No horizontal overflow, no console errors                                                                                | Pass      | Pass      | Pass     | Pass       | Pass      |
+| Alcohol and sleep that night: sample 2 days 6 h 48 min / sample 1 day 8 h, small-sample notice                              | Pass      | Pass      | Pass     | Pass       | Pass      |
+| The sleep chart has bars only for the 4 recorded days, description "7일 중 4일 기록" (4 of 7 days recorded)                 | Pass      | Pass      | Pass     | Pass       | Pass      |
+| The bar color is the value of each mode (`rgb(42,120,214)` / `rgb(57,135,229)`)                                             | Pass      | Pass      | Pass     | Pass       | Pass      |
+| "11/4 · 8시간" (11/4 · 8 hours) by mouse (PC) or press (phone) on a bar                                                     | Pass      | Pass      | Pass     | Pass       | Pass      |
+| Previous week → Oct 26 to Nov 1, monthly → October, next month → November (average 7 h 13 min, 5 days)                      | Pass      | Pass      | Pass     | Pass       | Pass      |
+| No horizontal overflow, no console errors                                                                                   | Pass      | Pass      | Pass     | Pass       | Pass      |
 
 The browser check found and fixed a problem with pressing on a phone. When pressing, `mouseenter` came first and showed the value, and the `click` that followed closed it again. Now pressing only shows that day.
 

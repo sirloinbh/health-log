@@ -72,13 +72,13 @@ The recommendation in the issue was followed and decided without asking the user
 
 A real API (3993) and Vite (5203) were started on the temporary DB, and headless Chrome was driven over CDP. Buttons were pressed with mouse events and the memo was entered by key input.
 
-| Item                                                                                                                                | 320×700 | 390×844 | 1440×900 |
-| ----------------------------------------------------------------------------------------------------------------------------------- | ------- | ------- | -------- |
-| "기록 없음" (no record) on an empty day; after saving diet kept and a memo, sleep stays as "체크 안 함" (not checked)                | Pass    | Pass    | Pass     |
-| Three days of the same week (kept + not checked, both no, only slept well) gives diet 1/2 days, sleep 1/2 days                      | Pass    | Pass    | Pass     |
-| Existing answers filled when editing; setting diet "no" back to "체크 안 함" gives diet 1/1 days                                     | Pass    | Pass    | Pass     |
-| Rates recalculated after deleting through the confirmation dialog                                                                   | Pass    | Pass    | Pass     |
-| No horizontal overflow, no console errors                                                                                           | Pass    | Pass    | Pass     |
+| Item                                                                                                                  | 320×700 | 390×844 | 1440×900 |
+| --------------------------------------------------------------------------------------------------------------------- | ------- | ------- | -------- |
+| "기록 없음" (no record) on an empty day; after saving diet kept and a memo, sleep stays as "체크 안 함" (not checked) | Pass    | Pass    | Pass     |
+| Three days of the same week (kept + not checked, both no, only slept well) gives diet 1/2 days, sleep 1/2 days        | Pass    | Pass    | Pass     |
+| Existing answers filled when editing; setting diet "no" back to "체크 안 함" gives diet 1/1 days                      | Pass    | Pass    | Pass     |
+| Rates recalculated after deleting through the confirmation dialog                                                     | Pass    | Pass    | Pass     |
+| No horizontal overflow, no console errors                                                                             | Pass    | Pass    | Pass     |
 
 ## First review — 2026-11-05
 

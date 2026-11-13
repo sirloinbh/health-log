@@ -77,14 +77,14 @@ The recommendation in the issue was followed and decided without asking the user
 
 A real API (3972) and Vite (5272) were started on a temporary DB (`health_browser`), and headless Chrome (CDP 9672) was driven. Buttons and checkboxes were pressed with mouse events, and text was entered by key input. All 18 items passed.
 
-| Item                                                                                                                                            | Result |
-| ----------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 390×844: An empty week and month show "없음" (none)                                                                                              | Pass   |
-| 390×844: Junk food twice on the same day and a salad → "2회 · 먹은 날 1일 · 1000kcal", the badge only on two lines                               | Pass   |
-| 390×844: Marking a direct entry on another day → "3회 · 먹은 날 2일 · 1300kcal" (week and month), mark released after recording                  | Pass   |
-| 1440×900: The food card badge, the edit dialog starts with it on, and saving with it off removes the badge                                      | Pass   |
-| 1440×900: Even after turning the mark off, past totals stay, and new records are not counted                                                    | Pass   |
-| 320×700, 390×844, 1440×900: No horizontal overflow and no console errors on the daily record and food screens                                   | Pass   |
+| Item                                                                                                                            | Result |
+| ------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 390×844: An empty week and month show "없음" (none)                                                                             | Pass   |
+| 390×844: Junk food twice on the same day and a salad → "2회 · 먹은 날 1일 · 1000kcal", the badge only on two lines              | Pass   |
+| 390×844: Marking a direct entry on another day → "3회 · 먹은 날 2일 · 1300kcal" (week and month), mark released after recording | Pass   |
+| 1440×900: The food card badge, the edit dialog starts with it on, and saving with it off removes the badge                      | Pass   |
+| 1440×900: Even after turning the mark off, past totals stay, and new records are not counted                                    | Pass   |
+| 320×700, 390×844, 1440×900: No horizontal overflow and no console errors on the daily record and food screens                   | Pass   |
 
 - After the check, the API, Vite, Chrome, and the temporary DB were all shut down.
 - Not checked: dark mode, a real phone, Firefox and Safari.

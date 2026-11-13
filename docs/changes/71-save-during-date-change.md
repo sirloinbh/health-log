@@ -1,97 +1,97 @@
-# #71 저장 중 날짜를 옮겼다 돌아와도 저장된 기록 보이기
+# #71 Show the saved record even after changing the date and coming back during a save
 
-- 이슈: [#71](https://github.com/sirloinbh/health-log/issues/71)
-- 브랜치: `fix/71-save-during-date-change`
+- Issue: [#71](https://github.com/sirloinbh/health-log/issues/71)
+- Branch: `fix/71-save-during-date-change`
 
-## 목적
+## Purpose
 
-하루 기록의 카드는 날짜마다 새로 만들어진다. 저장이 느릴 때 다른 날로 갔다가 돌아오면, 새 카드가 저장이 끝나기 전에 그 날을 읽는다. 그러면 DB에는 값이 있는데 화면은 빈 폼을 보이고 다시 읽지 않는다. 이 빈 폼에서 메모만 저장하면 하루를 통째로 바꾸는 저장이라 체중이 지워진다.
+The cards of the daily record are created anew for each date. If a save is slow and the user goes to another day and comes back, the new card reads that day before the save finishes. Then the DB has the value but the screen shows an empty form and does not read again. If only a memo is saved from this empty form, it is a save that replaces the whole day, so the weight is erased.
 
-## 정한 것
+## Decisions
 
-이슈의 할 일대로 진행했고 사용자 확인 없이 정했다. 이슈 댓글에 같은 내용을 남겼다.
+It was done as the issue's to-do items said, and decided without asking the user. The same content was left as an issue comment.
 
-- **방법:** 카드가 그 날을 읽기 전에, 그 날로 보낸 저장·삭제가 끝날 때까지 기다린다. 기다리는 동안에는 폼 대신 "불러오는 중"을 보인다.
-  - 저장이 실패해도 기다림은 끝나고, 서버에 있는 그대로를 읽는다. 실패 안내는 지금처럼 토스트로 나온다.
-  - 응답을 카드 밖에 기억해 두었다가 쓰는 방법도 있었다. 하지만 다른 탭의 변경이나 실패한 저장까지 맞추기 어려워, 끝난 뒤 서버에서 다시 읽는 쪽을 골랐다.
-- **범위:** 같은 구조인 수면, 신체, 술·담배, 하루 체크 카드에 넣었다. 식단 카드도 기록 중에 돌아오면 방금 기록한 음식이 빠진 목록이 보여 같이 고쳤다. 백엔드와 API 형태, `daily.tsx`는 바꾸지 않았다.
-- **신체 기간별 변화:** 어느 날이든 신체 기록을 저장 중이면 기다린다. 90일 범위 안의 다른 날 저장이 끝나기 전에 읽으면 변화량이 옛 값으로 나온다. 범위 밖 날의 저장까지 기다리는 것은 날짜 범위를 따지지 않는 단순함을 고른 결과다.
+- **Method:** Before a card reads that day, it waits until the saves and deletes sent for that day finish. While waiting, "불러오는 중" (loading) is shown instead of the form.
+  - Even if the save fails, the waiting ends and it reads what is on the server as it is. The failure notice appears as a toast as now.
+  - There was also a way of remembering the response outside the card and using it. But it was hard to match changes from another tab and failed saves, so reading again from the server after it ends was chosen.
+- **Scope:** It was put into the sleep, body, alcohol and tobacco, and daily check cards, which have the same structure. The meal card also showed a list missing the food just recorded if the user came back during recording, so it was fixed too. The backend, the API shape, and `daily.tsx` were not changed.
+- **Body period change:** On any day, if a body record is being saved, it waits. If it reads before a save of another day inside the 90-day range finishes, the amount of change comes out with the old value. Waiting even for saves of days outside the range is the result of choosing the simplicity of not considering the date range.
 
-## 변경 — 2026-11-06
+## Change — 2026-11-06
 
-- **새 파일** `frontend/src/pending-writes.ts`
-  - `trackWrite(path, write)`: 저장·삭제 요청을 끝날 때까지 API 경로별로 기억한다. 결과와 실패는 그대로 넘긴다.
-  - `writesSettled(prefix)`: 그 경로로 시작하는 요청이 모두 끝날 때까지 기다린다. 기다려야 했던 경우에는 그동안 새로 시작된 요청도 기다린다. 진행 중인 요청이 없으면 바로 끝나므로, 읽기와 같은 순간에 시작된 저장은 기다리지 않는다. 읽는 동안에는 폼이 없고 식단 카드는 따로 변경 횟수를 세어 이 경우를 막는다.
-- **카드** `sleep.tsx`, `body.tsx`, `habits.tsx`, `checks.tsx`, `meals.tsx`
-  - 저장(PUT·POST)과 삭제(DELETE)를 `trackWrite`로 감쌌다.
-  - 그 날을 읽기 전에 `writesSettled`를 기다린다. 신체 기간별 변화는 `/api/body/` 전체를 기다린다.
+- **New file** `frontend/src/pending-writes.ts`
+  - `trackWrite(path, write)`: Remembers save and delete requests by API path until they finish. The result and failure are passed on as they are.
+  - `writesSettled(prefix)`: Waits until all requests that start with that path finish. If it had to wait, it also waits for requests that started in the meantime. If there is no request in progress, it ends right away, so a save that started at the same moment as the read is not waited for. While reading there is no form, and the meal card counts changes separately to prevent this case.
+- **Cards** `sleep.tsx`, `body.tsx`, `habits.tsx`, `checks.tsx`, `meals.tsx`
+  - Wrapped save (PUT, POST) and delete (DELETE) with `trackWrite`.
+  - Before reading that day, they wait for `writesSettled`. The body period change waits for all of `/api/body/`.
 
-## 검증
+## Verification
 
-### 브라우저 재현과 수정 확인
+### Browser reproduction and fix check
 
-임시 DB(포트 5473, `health_browser`)에 실제 API(3973)와 Vite(5273)를 띄웠다. 헤드리스 Chrome을 CDP로 움직였다. 디버깅 포트는 9373이 Windows 예약 범위(9367~9466)에 들어 있어 9673을 썼다.
+A real API (3973) and Vite (5273) were started on a temporary DB (port 5473, `health_browser`). Headless Chrome was driven over CDP. For the debugging port, 9373 is in the Windows reserved range (9367 to 9466), so 9673 was used.
 
-시나리오는 다음과 같다.
+The scenario is as follows.
 
-1. 2026-03-1x 날짜에서 네 카드에 값을 넣는다. 수면 23:00~07:00, 체중 70.5, 담배 3, 하루 체크 메모를 넣는다.
-2. 브라우저가 PUT 요청을 1.5초 붙잡는 상태에서 네 카드의 "저장"을 마우스 이벤트로 누른다.
-3. 바로 "다음 날"과 "이전 날"을 누르고 3초 뒤 화면과 API 값을 본다.
+1. On a date of 2026-03-1x, put values in four cards. Sleep 23:00 to 07:00, weight 70.5, cigarettes 3, and a daily check memo.
+2. With the browser holding the PUT requests for 1.5 seconds, press "저장" (save) of the four cards with mouse events.
+3. Right away press "다음 날" (next day) and "이전 날" (previous day), and after 3 seconds look at the screen and the API values.
 
-| 단계                                               | 수면      | 신체      | 술·담배   | 하루 체크 |
-| -------------------------------------------------- | --------- | --------- | --------- | --------- |
-| 고치기 전, 1440×900: API에 저장된 값               | 있음      | 있음      | 있음      | 있음      |
-| 고치기 전, 1440×900: 돌아온 화면                   | 빈 폼     | 빈 폼     | 빈 폼     | 빈 폼     |
-| 고친 뒤, 1440×900 / 390×844 / 320×700: 돌아온 화면 | 저장된 값 | 저장된 값 | 저장된 값 | 저장된 값 |
+| Step                                                                      | Sleep       | Body        | Alcohol/tobacco | Daily check |
+| ------------------------------------------------------------------------- | ----------- | ----------- | --------------- | ----------- |
+| Before the fix, 1440×900: values saved in the API                         | Present     | Present     | Present         | Present     |
+| Before the fix, 1440×900: the screen after coming back                    | Empty form  | Empty form  | Empty form      | Empty form  |
+| After the fix, 1440×900 / 390×844 / 320×700: the screen after coming back | Saved value | Saved value | Saved value     | Saved value |
 
-- 고치기 전에는 돌아온 신체 빈 폼에서 메모 "메모만"을 저장했더니 API의 체중이 `70.5`에서 `null`로 바뀌었다. 이슈에서 코드로 추론했던 덮어쓰기를 실제로 확인했다.
-- 고친 뒤 세 폭 모두 가로 넘침과 콘솔 오류가 없었다.
-- 식단 카드는 브라우저에서 확인하지 않았다. 음식 검색과 입력 단계가 많아 화면 테스트로 대신했다.
-- 확인 뒤 임시 DB, API, Vite, Chrome을 모두 껐다.
+- Before the fix, when the memo "메모만" (memo only) was saved from the empty body form after coming back, the weight in the API changed from `70.5` to `null`. The overwrite that had been inferred from code in the issue was confirmed in practice.
+- After the fix, at all three widths there was no horizontal overflow and no console errors.
+- The meal card was not checked in the browser. There are many steps of food search and input, so screen tests stood in.
+- After the check, the temporary DB, API, Vite, and Chrome were all shut down.
 
-### 테스트
+### Tests
 
-- `frontend/src/pending-writes.test.ts`(새로 5개)
-  - 기다릴 것이 없으면 바로 끝난다.
-  - 같은 날 저장이 끝날 때까지 기다리고, 저장 결과는 그대로 넘긴다.
-  - 실패한 저장도 기다림을 끝내고, 실패는 호출한 쪽에 그대로 간다.
-  - 다른 날·다른 기록의 저장은 기다리지 않는다. 앞부분 경로는 모든 날을 기다린다.
-  - 기다리는 중에 시작된 저장도 기다린다.
-- 카드마다 "저장 중에 같은 날 카드를 다시 만들면, 저장이 끝날 때까지 읽지 않고 끝난 뒤 저장된 값을 보인다"를 하나씩 넣었다. 수면, 신체, 술·담배, 하루 체크, 식단 카드다. 다섯 개 모두 고치기 전 코드에서 실패하고 고친 뒤 통과하는 것을 확인했다.
-- 이슈에 적힌 테스트 빈틈을 채웠다.
-  - 삭제 실패: 신체, 술·담배, 하루 체크 카드에서 이유가 토스트로 나오고 기록과 대화상자가 남는다. 수면은 이미 있었다.
-  - 옛 실패 응답: 신체 기간별 변화에서 늦게 온 옛 실패가 저장 뒤 받은 새 변화량을 덮지 않는다.
-  - 포커스: 신체 카드에서 "수정"을 누르면 포커스가 카드 제목으로 간다. 수면은 이미 있었다.
-- `frontend/src/meals.test.tsx`의 "기록 전에 시작된 읽기가 화면을 되돌리지 않는다" 테스트를 고쳤다. 이 테스트는 요청 순서대로 응답을 주는데, 읽기가 한 차례 기다린 뒤 나가면서 순서가 바뀌었다. 읽기와 쓰기에 따로 응답을 주게 바꿨다. 검사하는 내용은 같다.
+- `frontend/src/pending-writes.test.ts` (5 new)
+  - If there is nothing to wait for, it ends right away.
+  - It waits until the save of the same day ends, and passes the save result on as it is.
+  - A failed save also ends the waiting, and the failure goes to the caller as it is.
+  - It does not wait for saves of other days or other records. A prefix path waits for all days.
+  - It also waits for a save that started while waiting.
+- One test per card: "if a card of the same day is created again during a save, it does not read until the save ends and shows the saved value after it ends". These are the sleep, body, alcohol and tobacco, daily check, and meal cards. It was confirmed that all five fail on the code before the fix and pass after.
+- Filled in the test gaps noted in the issue.
+  - Delete failure: On the body, alcohol and tobacco, and daily check cards, the reason appears as a toast and the record and dialog stay. Sleep already had it.
+  - Old failure response: In the body period change, a late old failure does not overwrite the new amount of change received after the save.
+  - Focus: Pressing "수정" (edit) on the body card moves focus to the card title. Sleep already had it.
+- The test "기록 전에 시작된 읽기가 화면을 되돌리지 않는다" (a read that started before recording does not turn the screen back) in `frontend/src/meals.test.tsx` was fixed. This test gives responses in request order, but the read went out after waiting one round, so the order changed. It was changed to give responses to reads and writes separately. What it checks is the same.
 
-### 명령
+### Commands
 
-- `TEST_DATABASE_URL= npm run check`: 통과
-  - 프런트 338개 통과, 2개 건너뜀. 백엔드 83개 통과, DB 테스트 75개 건너뜀. 스킬 4개 통과.
-  - 이 셸의 `TEST_DATABASE_URL`이 다른 프로젝트 DB(`study_test`)를 가리켜 비우고 실행했다. 이 변경은 프런트만 바꿔 DB 테스트와 관계없다.
-- `npm run knip`: 통과
+- `TEST_DATABASE_URL= npm run check`: passed
+  - Frontend 338 passed, 2 skipped. Backend 83 passed, 75 DB tests skipped. Skill checks 4 passed.
+  - The `TEST_DATABASE_URL` of this shell pointed to the DB of another project (`study_test`), so it was run with it emptied. This change changed only the frontend, so it is unrelated to the DB tests.
+- `npm run knip`: passed
 
-## 한계
+## Limits
 
-- 같은 브라우저 탭 안의 요청만 기다린다. 다른 탭에서 저장 중인 값은 기다리지 않는다.
-- 저장이 응답 없이 오래 걸리면 돌아온 카드도 그동안 "불러오는 중"에 머문다. 요청 시간 제한은 이 변경에 없다.
-- 늦게 온 "다시 시도" 응답이 새 응답을 덮는 문제는 #92에서 다룬다.
-- 하루 기록 밖의 읽기는 기다리지 않는다. 데이터를 덮어쓸 위험은 없다.
-  - 식단 카드의 최근 음식 목록(`/api/foods/recent`)에는 기록 중인 음식이 아직 빠져 있을 수 있다.
-  - 저장 중에 개요 화면(`/api/report`)으로 가면 그 저장이 빠진 보고서가 보일 수 있다.
+- It waits only for requests inside the same browser tab. It does not wait for a value being saved in another tab.
+- If a save takes a long time with no response, the card that came back also stays in "불러오는 중" in the meantime. There is no request time limit in this change.
+- The problem of a late "다시 시도" (retry) response overwriting a new response is handled in #92.
+- Reads outside the daily record are not waited for. There is no risk of overwriting data.
+  - The recent foods list of the meal card (`/api/foods/recent`) may still be missing the food being recorded.
+  - If the user goes to the overview screen (`/api/report`) during a save, a report missing that save may be shown.
 
-## 1차 리뷰 — 2026-11-06
+## First review — 2026-11-06
 
-별도 읽기 전용 리뷰를 실행했다. 반드시 고칠 것은 없었고, 다음을 반영했다.
+A separate read-only review was run. Nothing had to be fixed, and the following was applied.
 
-- **테스트 사이 상태:** 진행 중 요청 목록이 테스트 파일 동안 남는다. 한 테스트가 저장을 끝내기 전에 실패하면, 같은 날짜를 쓰는 다음 테스트들이 계속 "불러오는 중"에 머물러 함께 실패한다. 테스트용 `forgetPendingWrites()`를 만들고 `frontend/src/test/setup.ts`의 `afterEach`에서 비운다.
-- **설명 바로잡기:** 신체 기간별 변화가 90일 범위가 아니라 모든 신체 저장을 기다린다고 코드 주석과 문서를 고쳤다. 진행 중인 요청이 없으면 바로 읽는다는 점도 `writesSettled` 주석과 문서에 적었다.
-- **한계 추가:** 최근 음식 목록과 개요 보고서는 기다리지 않는다는 점을 한계에 적었다.
+- **State between tests:** The list of requests in progress remains for the whole test file. If one test fails before finishing a save, the following tests that use the same date stay in "불러오는 중" and also fail together. A test-only `forgetPendingWrites()` was made and is emptied in `afterEach` of `frontend/src/test/setup.ts`.
+- **Correcting the description:** The code comment and the document were fixed to say that the body period change waits for all body saves, not just the 90-day range. The point that it reads right away if there is no request in progress was also written in the `writesSettled` comment and the document.
+- **Limits added:** Wrote in the limits that the recent foods list and the overview report are not waited for.
 
-## 2차 리뷰 — 2026-11-06
+## Second review — 2026-11-06
 
-1차 반영 내용과 전체 diff를 별도 읽기 전용 리뷰로 다시 봤다. 반드시 고칠 것은 없었고, 작은 지적 두 가지를 반영했다. 리뷰는 여기서 끝낸다.
+The first round of fixes and the whole diff were reviewed again by a separate read-only review. Nothing had to be fixed, and two small points were applied. Reviews end here.
 
-- **기다리는 중 다시 떠나기:** 돌아온 카드가 저장을 기다리는 동안 또 다른 날로 가면, 사라진 카드가 저장이 끝난 뒤에도 읽기 요청을 보냈다. 화면에는 영향이 없지만 쓸모없는 요청이다. 다섯 카드 모두 기다린 뒤 카드가 남아 있는지 확인하고, 없으면 읽지 않는다. `frontend/src/sleep.test.tsx`에 테스트를 더했다.
-- **비운 뒤 늦게 끝난 요청:** `forgetPendingWrites()` 뒤 늦게 끝난 옛 요청이 새 요청의 기다림을 끝내지 않는 테스트를 `frontend/src/pending-writes.test.ts`에 더했다(6개).
-- 반영 뒤 `TEST_DATABASE_URL= npm run check`: 통과(프런트 340개 통과, 2개 건너뜀. 백엔드 83개 통과, DB 테스트 75개 건너뜀. 스킬 4개 통과). `npm run knip`: 통과.
+- **Leaving again while waiting:** If, while the card that came back is waiting for a save, the user goes to yet another day, the card that disappeared still sent a read request after the save ended. It has no effect on the screen, but it is a useless request. All five cards check after waiting whether the card still exists, and do not read if it does not. A test was added to `frontend/src/sleep.test.tsx`.
+- **A request that finished late after being emptied:** Added to `frontend/src/pending-writes.test.ts` a test that an old request that finished late after `forgetPendingWrites()` does not end the waiting of a new request (6 tests).
+- After applying, `TEST_DATABASE_URL= npm run check`: passed (frontend 340 passed, 2 skipped. Backend 83 passed, 75 DB tests skipped. Skill checks 4 passed). `npm run knip`: passed.

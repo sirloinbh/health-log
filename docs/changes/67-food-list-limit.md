@@ -1,121 +1,121 @@
-# #67 음식 목록과 검색의 100개 제한 풀기
+# #67 Remove the 100-item limit of the food list and search
 
-- 이슈: [#67](https://github.com/sirloinbh/health-log/issues/67)
-- 브랜치: `feat/67-food-list-limit`
+- Issue: [#67](https://github.com/sirloinbh/health-log/issues/67)
+- Branch: `feat/67-food-list-limit`
 
-## 목적
+## Purpose
 
-음식 목록과 검색은 `LIMIT 100`으로 잘렸고, 잘렸다는 안내도 없었다. #33으로 음식이 95개가 되어 #31, #32 조사 데이터를 넣으면 일부 음식은 어떤 화면에서도 찾을 수 없게 된다.
+The food list and search were cut off by `LIMIT 100`, and there was no notice that they were cut. With #33 the foods became 95, and adding the #31 and #32 research data would make some foods impossible to find on any screen.
 
-## 변경 — 2026-11-05
+## Change — 2026-11-05
 
 - **API** `backend/src/foods.ts`: `GET /api/foods?q=&offset=`
-  - 응답은 `{ foods, nextOffset }`이다. 한 번에 100개(`foodPageSize`)를 주고, 다음 페이지가 있으면 `nextOffset`에 그 시작 위치를, 마지막 페이지면 `null`을 준다.
-  - 101개를 읽어 다음 페이지가 있는지 판단한다. 전체 개수는 세지 않는다.
-  - 정렬은 `name, brand NULLS FIRST, id`다. 이름과 브랜드 조합은 이미 중복될 수 없지만, 그 규칙이 바뀌어도 페이지가 겹치거나 빠지지 않게 `id`를 붙였다.
-  - `offset`은 7자리 이하 0 이상의 정수만 받는다. 음수, 소수, 빈 값, 반복 파라미터는 400 `목록 위치가 올바르지 않습니다`로 거부한다.
-- **화면 공통** `frontend/src/food-search.ts`: 음식 검색 훅 `useFoodSearch`
-  - `search`는 첫 페이지를 읽고, `loadMore`는 다음 페이지를 목록 아래에 붙인다.
-  - 가장 최근 요청만 목록을 바꾼다. 새 검색은 진행 중인 다음 페이지를 버리고, 검색 중에는 다음 페이지를 요청하지 않는다.
-  - 첫 페이지 뒤에 음식이 추가되어 다음 페이지에 이미 보인 음식이 다시 오면, 같은 음식은 한 번만 보인다.
-  - 다음 페이지 요청이 실패하면 이미 보인 목록을 유지하고, 버튼을 다시 누를 수 있다.
-  - `nextOffset`이 없는 응답은 마지막 페이지로 본다.
-- **버튼** `frontend/src/more-foods-button.tsx`: `결과 더 보기`. 다음 페이지가 있을 때만 보이고, 읽는 동안과 검색하는 동안에는 누를 수 없다(1차 리뷰 뒤 `aria-disabled`로 바꿈, 아래 참고).
-- **음식 화면** `frontend/src/foods.tsx`: 목록 아래에 `음식 N개 표시 중. 더 있습니다.`와 버튼을 보인다. 실패한 검색이 이전 목록을 유지하는 동작은 그대로다.
-- **식사 입력** `frontend/src/meals.tsx`, **조합 대화상자** `frontend/src/combos.tsx`: 상태 문구가 `검색 결과 N건 표시 중, 결과가 더 있습니다`로 바뀌고, 결과 아래에 버튼이 생긴다. 마지막 페이지에서는 예전처럼 `검색 결과 N건`이다.
+  - The response is `{ foods, nextOffset }`. It gives 100 at a time (`foodPageSize`), and gives the start position of the next page in `nextOffset` if there is one, or `null` for the last page.
+  - It reads 101 to decide whether there is a next page. It does not count the total.
+  - The sort is `name, brand NULLS FIRST, id`. A combination of name and brand cannot already be duplicated, but `id` was added so that pages do not overlap or skip even if that rule changes.
+  - `offset` accepts only an integer of at most 7 digits and 0 or more. Negative numbers, decimals, empty values, and repeated parameters are rejected with 400 `목록 위치가 올바르지 않습니다` (the list position is not valid).
+- **Screen common** `frontend/src/food-search.ts`: the food search hook `useFoodSearch`
+  - `search` reads the first page, and `loadMore` attaches the next page below the list.
+  - Only the latest request changes the list. A new search discards a next page in progress, and a next page is not requested during a search.
+  - If a food is added after the first page and a food already shown comes again in the next page, the same food is shown only once.
+  - If the next page request fails, the list already shown is kept, and the button can be pressed again.
+  - A response with no `nextOffset` is treated as the last page.
+- **Button** `frontend/src/more-foods-button.tsx`: `결과 더 보기` (show more results). It shows only when there is a next page, and cannot be pressed while reading or searching (changed to `aria-disabled` after the first review, see below).
+- **Food screen** `frontend/src/foods.tsx`: Below the list, it shows `음식 N개 표시 중. 더 있습니다.` (showing N foods. There are more.) and the button. The behavior where a failed search keeps the previous list is as before.
+- **Meal entry** `frontend/src/meals.tsx`, **combo dialog** `frontend/src/combos.tsx`: The status text becomes `검색 결과 N건 표시 중, 결과가 더 있습니다` (showing N search results, there are more results), and a button appears below the results. On the last page it is `검색 결과 N건` (N search results) as before.
 
-## 검증
+## Verification
 
-- 테스트
-  - `backend/test/foods.test.ts`: 잘못된 `offset` 6가지와 반복 파라미터 거부를 검사한다. 101개를 읽어 `nextOffset`을 정하는지도 검사한다.
-  - `backend/test/foods.integration.test.ts`: 이름이 같은 음식(브랜드 있음과 없음)을 포함해 150개를 넣는다. 그 뒤 페이지를 따라가 2페이지 만에 150개가 한 번씩 나오는지 확인한다. 검색어 없이 따라간 개수가 `foods` 전체 행 수와 같은지도 확인한다.
-  - `frontend/src/food-search.test.ts`(새 파일, 9개): 주소 형식, 상태 문구, 다음 페이지 추가, 중복 제거, `nextOffset` 없는 응답, 실패 뒤 재시도, 새 검색과 다음 페이지 겹침, 검색 중 다음 페이지 무시, 실패한 검색의 목록 유지 여부를 검사한다.
-  - `frontend/src/foods.test.tsx`, `meals.test.tsx`, `combos.test.tsx`: 각 화면에서 안내 문구, 버튼, `offset=100` 요청, 추가된 결과, 마지막 페이지의 버튼 사라짐을 검사한다. 음식 화면은 다음 페이지 실패 뒤 목록과 버튼이 남는지도 검사한다.
-- 임시 PostgreSQL 17 클러스터(`initdb`, 포트 5467)에서 `health_test`에 마이그레이션 7개를 두 번 적용했다. 두 번째 적용도 오류가 없었다.
-- `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5467/health_test npm run test -w backend`: 123개 통과, 0개 건너뜀.
-- 같은 `TEST_DATABASE_URL`로 `npm run check`: 통과(종료 코드 0).
-  - 포맷, 린트, 타입 검사, 빌드: 통과.
-  - 백엔드: 123개 통과, 0개 건너뜀.
-  - 프론트엔드: 33개 파일에서 260개 통과, 2개 건너뜀. 건너뛴 2개는 다크 전용 앱 조건 테스트로, 이 변경과 관계없다.
-  - 스킬 검사: 4개 통과.
+- Tests
+  - `backend/test/foods.test.ts`: Checks 6 kinds of wrong `offset` and rejection of a repeated parameter. It also checks that `nextOffset` is decided by reading 101.
+  - `backend/test/foods.integration.test.ts`: Inserts 150 foods, including foods with the same name (with and without a brand). Then it follows the pages and checks that all 150 appear once each in 2 pages. It also checks that the count followed without a search term equals the total number of rows in `foods`.
+  - `frontend/src/food-search.test.ts` (new file, 9 tests): Checks the address format, status text, appending the next page, removing duplicates, a response without `nextOffset`, retry after failure, a new search overlapping the next page, ignoring the next page during a search, and whether the list of a failed search is kept.
+  - `frontend/src/foods.test.tsx`, `meals.test.tsx`, `combos.test.tsx`: On each screen, check the notice text, the button, the `offset=100` request, the added results, and the button disappearing on the last page. The food screen also checks that the list and button remain after a next page failure.
+- On a temporary PostgreSQL 17 cluster (`initdb`, port 5467), the 7 migrations were applied twice to `health_test`. The second time had no errors either.
+- `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5467/health_test npm run test -w backend`: 123 passed, 0 skipped.
+- `npm run check` with the same `TEST_DATABASE_URL`: passed (exit code 0).
+  - Formatting, lint, type check, build: passed.
+  - Backend: 123 passed, 0 skipped.
+  - Frontend: 260 passed in 33 files, 2 skipped. The 2 skipped are condition tests for the dark-only app, unrelated to this change.
+  - Skill checks: 4 passed.
 
-### 브라우저 확인
+### Browser check
 
-임시 DB를 복사한 `health_browser`에 테스트 음식 150개를 더 넣어 음식이 245개가 되게 했다. 실제 API(3993), Vite(5203), 헤드리스 Chrome을 CDP로 움직였다. 검색어는 키 입력으로 넣고 버튼은 마우스 이벤트로 눌렀다.
+150 more test foods were put into `health_browser`, a copy of the temporary DB, making 245 foods. A real API (3993), Vite (5203), and headless Chrome were driven over CDP. The search term was entered by key input and buttons were pressed with mouse events.
 
-| 항목                                                                    | 390×844 | 1440×900 |
-| ----------------------------------------------------------------------- | ------- | -------- |
-| 음식 화면: 100개 → 200개 → 245개, 안내 문구, 마지막에 버튼 사라짐       | 통과    | 통과     |
-| 음식 화면: 245개 이름이 모두 한 번씩                                    | 통과    | 통과     |
-| 음식 화면: 다음 페이지 500 응답 뒤 목록 100개 유지, 다시 눌러 150개     | 통과    | 통과     |
-| 식사 입력: `테스트` 검색 100건 안내 → 150건, 2페이지 음식을 실제로 기록 | 통과    | 통과     |
-| 조합 대화상자: 100건 안내 → 150건, 대화상자가 화면 안에 있음            | 통과    | 통과     |
-| 가로 넘침, 콘솔 오류                                                    | 없음    | 없음     |
+| Item                                                                                                  | 390×844 | 1440×900 |
+| ----------------------------------------------------------------------------------------------------- | ------- | -------- |
+| Food screen: 100 → 200 → 245, the notice text, the button disappearing at the end                     | Pass    | Pass     |
+| Food screen: all 245 names once each                                                                  | Pass    | Pass     |
+| Food screen: after a 500 response for the next page, the list of 100 stays, press again to get 150    | Pass    | Pass     |
+| Meal entry: `테스트` (test) search shows 100 results notice → 150, a food on page 2 actually recorded | Pass    | Pass     |
+| Combo dialog: 100 results notice → 150, the dialog is inside the screen                               | Pass    | Pass     |
+| Horizontal overflow, console errors                                                                   | None    | None     |
 
-## 1차 리뷰 — 2026-11-05
+## First review — 2026-11-05
 
-독립 리뷰에서 높음 지적은 없었다. 페이지 계산, 정렬, 요청 순서 처리, `offset` 검증은 맞다고 봤다. 중간 1건과 낮음 4건이 나왔다.
+The independent review had no high points. It judged the page calculation, the sort, the request order handling, and the `offset` validation to be correct. 1 medium and 4 low points came up.
 
-- **중간: "결과 더 보기"를 누를 때마다 키보드 포커스가 빠진다.** 버튼이 읽는 동안 `disabled`가 되어 Chrome이 포커스를 `body`로 옮겼다. 마지막 페이지에서는 버튼이 사라져 같은 일이 생겼다.
-  - 반영: 버튼은 `aria-disabled`로 바꾸고, 읽는 동안 누르면 무시한다.
-  - 반영: 마지막 페이지가 오면 포커스를 상태 문구로 옮긴다. 상태 문구는 `tabIndex=-1`로 포커스를 받는다.
-  - 반영: 음식 화면의 상태 문구는 마지막 페이지에서도 `음식 N개`로 남는다. 포커스를 받을 곳이 남고, 바뀐 개수도 읽어 준다.
-  - 반영: 훅의 `loadMore`는 읽는 중이면 다시 요청하지 않고, 마지막 페이지였는지를 돌려준다.
-- **낮음: 통합 테스트의 페이지 경계가 같은 이름 사이에 오지 않았다.** 정렬의 `brand`, `id`를 지워도 통과했다.
-  - 반영: 짝을 하나 밀었다. 100번째와 101번째 음식이 같은 이름(브랜드 없음, 있음)이 되게 하고, 이를 `offset=99`로 직접 확인한다.
-- **낮음: 식사 입력에서 다음 페이지가 다른 칸의 안내까지 지웠다.**
-  - 반영: 훅에 `onMoreStart`, `onMoreError`를 따로 두었다.
-  - 반영: 다음 페이지의 시작과 실패는 버튼 아래의 별도 안내 칸만 쓴다. 긴 목록 위가 아니라 누른 버튼 옆에 오류가 보인다.
-- **낮음: 음식 화면에서 다음 페이지가 성공하면 앞서 실패한 검색의 안내가 지워졌다.** 그러면 이전 검색어의 목록이 새 검색어의 결과처럼 보인다.
-  - 반영: 다음 페이지는 검색 안내를 건드리지 않고, 자기 안내 칸만 쓴다.
-- **낮음: `docs/next-steps/README.md`가 병합 전에 #67을 "끝남"으로 적었다.**
-  - 그대로 둔다. 이 PR은 리뷰와 CI 뒤 바로 병합하고, 이 문서는 병합된 `main`에서 읽힌다.
-- **별도 이슈로 보지 않은 것:** 저장 뒤 첫 페이지로 돌아가는 동작과 페이지 사이에 추가된 음식이 빠질 수 있는 점은 아래 제한에 이미 적었다. 커서 방식 페이지 나눔은 API 설계 변경이라, 음식이 실제로 많아져 문제가 될 때 다룬다.
+- **Medium: Each time "결과 더 보기" is pressed, keyboard focus is lost.** The button became `disabled` while reading, so Chrome moved focus to `body`. On the last page the button disappeared and the same thing happened.
+  - Applied: The button was changed to `aria-disabled`, and a press while reading is ignored.
+  - Applied: When the last page arrives, focus moves to the status text. The status text receives focus with `tabIndex=-1`.
+  - Applied: The status text of the food screen remains as `음식 N개` (N foods) even on the last page. A place to receive focus remains, and the changed count is read out.
+  - Applied: `loadMore` of the hook does not request again while reading, and returns whether it was the last page.
+- **Low: The page boundary of the integration test did not fall between foods with the same name.** It passed even if `brand` and `id` of the sort were removed.
+  - Applied: One pair was pushed. The 100th and 101st foods are made to have the same name (without a brand, with a brand), and this is checked directly with `offset=99`.
+- **Low: In meal entry, the next page also cleared the notice of another field.**
+  - Applied: `onMoreStart` and `onMoreError` were set up separately in the hook.
+  - Applied: The start and failure of the next page use only a separate notice field below the button. The error is shown next to the pressed button, not above a long list.
+- **Low: On the food screen, when the next page succeeded, the notice of a search that had failed earlier was cleared.** Then the list of the previous search term looks like the result of the new search term.
+  - Applied: The next page does not touch the search notice and uses only its own notice field.
+- **Low: `docs/next-steps/README.md` wrote #67 as "done" before merging.**
+  - Left as it is. This PR is merged right after review and CI, and this document is read on the merged `main`.
+- **Not treated as a separate issue:** Returning to the first page after saving, and that a food added between pages may be missed, are already written in the limits below. Cursor-style paging is an API design change, so it will be handled when foods actually become many enough to be a problem.
 
-### 1차 반영 검증
+### First round verification
 
-- 테스트
-  - `food-search.test.ts`: 다음 페이지가 검색 콜백 대신 자기 콜백을 쓰고 마지막 여부를 돌려주는지 검사하는 테스트를 더했다. 읽는 중 두 번 눌러도 요청이 한 번인지 검사하는 테스트도 더했다. 이 파일은 11개가 됐다.
-  - `foods.test.tsx`: 마지막 페이지 뒤 포커스가 `음식 2개`로 가는지 검사한다. 읽는 동안 버튼이 `aria-disabled`이고 `disabled`는 아니며, 포커스를 지키고 추가로 누른 것은 무시하는지 검사한다. 다음 페이지가 실패한 검색의 안내를 남기는지도 검사한다.
-  - `meals.test.tsx`: 마지막 페이지 뒤 포커스가 상태 문구로 가는지 검사한다. 다음 페이지의 성공과 실패가 바로 기록 칸의 안내를 지우지 않고, 실패 안내가 버튼 아래에 나오는지도 검사한다.
-- `npm run check`(같은 임시 DB): 통과.
-  - 백엔드: 123개 통과, 0개 건너뜀.
-  - 프론트엔드: 33개 파일에서 265개 통과, 2개 건너뜀.
-  - 스킬 검사: 4개 통과.
-- 브라우저 확인: 같은 환경에서 위 표의 38개 항목을 다시 돌려 모두 통과했다. 이번에는 키보드로도 확인했다(390×844, 1440×900).
-  - 버튼에 포커스를 두고 Enter를 누르면, 읽는 동안 포커스가 버튼에 남고 `aria-disabled="true"`가 된다.
-  - 2페이지가 온 뒤에도 포커스가 버튼에 있다.
-  - 마지막 페이지 뒤에는 포커스가 `음식 245개` 문구로 간다. Shift+Tab을 누르면 마지막 음식의 `수정` 버튼으로 간다.
-  - 콘솔 오류는 없었다.
+- Tests
+  - `food-search.test.ts`: Added a test that checks that the next page uses its own callback instead of the search callback and returns whether it was the last. Also added a test that checks that pressing twice while reading makes only one request. This file now has 11 tests.
+  - `foods.test.tsx`: Checks that focus after the last page goes to `음식 2개`. Checks that while reading, the button is `aria-disabled` and not `disabled`, keeps focus, and ignores extra presses. Also checks that the next page leaves the notice of a failed search.
+  - `meals.test.tsx`: Checks that focus after the last page goes to the status text. Also checks that the success and failure of the next page do not clear the notice of the direct entry field, and that the failure notice appears below the button.
+- `npm run check` (same temporary DB): passed.
+  - Backend: 123 passed, 0 skipped.
+  - Frontend: 265 passed in 33 files, 2 skipped.
+  - Skill checks: 4 passed.
+- Browser check: In the same environment, the 38 items of the table above were run again and all passed. This time it was also checked by keyboard (390×844, 1440×900).
+  - With focus on the button, pressing Enter keeps focus on the button while reading and gives `aria-disabled="true"`.
+  - After page 2 arrives, focus is still on the button.
+  - After the last page, focus goes to the `음식 245개` text. Pressing Shift+Tab goes to the `수정` (edit) button of the last food.
+  - There were no console errors.
 
-## 2차 리뷰 — 2026-11-05
+## Second review — 2026-11-05
 
-1차 지적 4건이 모두 바르게 고쳐졌다고 확인됐다. 높음·중간 지적은 없었고, 낮음 3건을 모두 반영했다. 리뷰는 2회까지라 더 하지 않는다.
+It was confirmed that all 4 points of the first round were fixed correctly. There were no high or medium points, and all 3 low points were applied. Reviews are limited to two rounds, so no more are done.
 
-- **낮음: 마지막 페이지를 기다리는 동안 다른 칸으로 옮긴 포커스를 빼앗는다.**
-  - 반영: 마지막 페이지가 왔을 때 포커스가 아직 버튼에 있거나 `body`로 빠진 경우에만 상태 문구로 옮긴다.
-  - 테스트: `foods.test.tsx`에서 기다리는 동안 검색 칸으로 옮긴 포커스가 그대로인지 검사한다.
-- **낮음: 상태 문구에 포커스 표시가 없다.**
-  - 반영: 세 화면의 상태 문구에 `focus-visible` 링을 붙였다.
-- **낮음: 제한 항목이 이름 변경으로 음식이 빠질 수 있는 경우를 빠뜨렸다.**
-  - 반영: 아래 제한에 적었다.
+- **Low: While waiting for the last page, focus that was moved to another field is taken away.**
+  - Applied: When the last page arrives, focus moves to the status text only if it is still on the button or has fallen to `body`.
+  - Test: In `foods.test.tsx`, it checks that focus moved to the search field while waiting stays as it is.
+- **Low: The status text has no focus indicator.**
+  - Applied: Added a `focus-visible` ring to the status text of the three screens.
+- **Low: The limits item missed the case where foods can drop out because of a rename.**
+  - Applied: Wrote it in the limits below.
 
-### 2차 반영 검증
+### Second round verification
 
-- `npm run check`(같은 임시 DB): 통과.
-  - 백엔드: 123개 통과, 0개 건너뜀.
-  - 프론트엔드: 33개 파일에서 266개 통과, 2개 건너뜀.
-  - 스킬 검사: 4개 통과.
-- 브라우저 확인: 같은 환경에서 38개 항목과 키보드 확인을 다시 돌렸다. 38개 항목이 모두 통과했다. 키보드 확인도 390×844, 1440×900에서 모두 통과했다. 마지막 페이지 뒤 포커스는 `음식 245개`로 가고, Shift+Tab을 누르면 마지막 음식의 `수정`으로 간다.
+- `npm run check` (same temporary DB): passed.
+  - Backend: 123 passed, 0 skipped.
+  - Frontend: 266 passed in 33 files, 2 skipped.
+  - Skill checks: 4 passed.
+- Browser check: In the same environment, the 38 items and the keyboard check were run again. All 38 items passed. The keyboard check also passed at 390×844 and 1440×900. After the last page, focus goes to `음식 245개`, and Shift+Tab goes to `수정` of the last food.
 
-## CI 수정 — 2026-11-05
+## CI fix — 2026-11-05
 
-- 2차 반영 커밋의 CI `ci / verify`가 `npm run knip`에서 실패했다. `backend/src/foods.ts`의 `foodPageSize`를 내보내기만 하고 다른 곳에서 쓰지 않았기 때문이다. 로컬 `npm run check`에는 knip이 없어 잡히지 않았다.
-- 고친 내용: `foodPageSize`를 파일 안 상수로 바꿨다.
-- 확인: 로컬 `npm run knip`이 통과했다. 같은 임시 DB로 돌린 `npm run check`도 통과했다(백엔드 123개, 프론트엔드 266개 통과, 2개 건너뜀).
+- The CI `ci / verify` of the second round commit failed at `npm run knip`. This is because `foodPageSize` of `backend/src/foods.ts` was only exported and not used elsewhere. The local `npm run check` has no knip, so it was not caught.
+- What was fixed: `foodPageSize` was changed to a constant inside the file.
+- Verification: the local `npm run knip` passed. `npm run check` run on the same temporary DB also passed (backend 123, frontend 266 passed, 2 skipped).
 
-## 제한·후속
+## Limits and follow-ups
 
-- 음식을 저장하면 목록을 첫 페이지부터 다시 읽는다. 여러 페이지를 펼친 뒤 저장하면 처음 100개로 돌아간다.
-- 페이지 사이에 음식이 추가되면 그 음식이 앞 페이지 범위에 들어가 이번 목록에 보이지 않을 수 있다. 다시 검색하면 보인다. 삭제 API는 없지만, 다른 탭에서 음식 이름을 바꾸면 그 음식이 앞 페이지로 옮겨 가거나 검색어에서 빠질 수 있다. 그러면 뒤 음식들이 한 칸씩 당겨져 하나가 이번 목록에서 빠질 수 있다. 커서 방식 페이지 나눔으로 풀 수 있지만 API 설계 변경이라 이 PR에서 하지 않는다.
-- 다크 모드와 실제 휴대폰, Firefox, Safari는 확인하지 않았다.
+- When a food is saved, the list is read again from the first page. If several pages were expanded and then saved, it goes back to the first 100.
+- If a food is added between pages, that food falls into the range of an earlier page and may not be seen in this list. It is seen if searched again. There is no delete API, but if a food name is changed in another tab, that food can move to an earlier page or drop out of the search term. Then the later foods shift forward by one, and one can drop out of this list. It could be solved with cursor-style paging, but it is an API design change, so it is not done in this PR.
+- Dark mode, a real phone, Firefox, and Safari were not checked.

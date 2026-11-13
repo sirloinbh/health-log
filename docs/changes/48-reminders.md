@@ -1,99 +1,99 @@
-# #48 병원 예약과 약 복용 종료 알림
+# #48 Reminders for clinic appointments and the end of medication
 
-- 이슈: [#48](https://github.com/sirloinbh/health-log/issues/48)
-- 브랜치: `feat/48-reminders`
+- Issue: [#48](https://github.com/sirloinbh/health-log/issues/48)
+- Branch: `feat/48-reminders`
 
-## 목적
+## Purpose
 
-#39의 다음 예약일과 #40의 약 종료일은 해당 화면을 직접 열어 봐야 알 수 있다. 날짜가 가까워지면 앱 안에서 먼저 보여 줘 놓치지 않게 한다.
+The next appointment date of #39 and the medicine end date of #40 can only be known by opening those screens directly. When a date gets close, show it first inside the app so it is not missed.
 
-## 정한 것
+## Decisions
 
-사용자 확인 없이 기본안으로 정했다. [이슈 댓글](https://github.com/sirloinbh/health-log/issues/48#issuecomment-6718651227)에 같은 내용을 남겼다.
+Decided with the default plan without asking the user. The same content was left in an [issue comment](https://github.com/sirloinbh/health-log/issues/48#issuecomment-6718651227).
 
-- **알림 수단:** 앱 화면 안에만 표시한다. 외부 서비스(푸시, 메일)는 쓰지 않는다. 휴대폰 푸시는 서버 배포 뒤 별도 이슈로 다룬다.
-- **보여 주는 곳:** 대시보드 맨 위, 그리고 **오늘 날짜**의 하루 기록에 "다가오는 일정" 카드를 둔다. 다른 날짜의 하루 기록에는 넣지 않는다. 일정은 실제 오늘을 기준으로 세기 때문이다.
-- **대상**
-  - 병원 방문의 다음 예약일(`next_visit_on`). 시술이 있었던 방문이면 "지난번 시술: …"을 함께 보인다. 시술 시기는 이 예약일로 다룬다. 시술에는 따로 날짜 칸이 없다.
-  - 약의 종료일(`end_on`). 종료일이 없는 약은 대상이 아니다.
-- **알림 시작 기준일:** 7일 전부터 표시한다. 서비스의 오늘(Asia/Seoul)부터 7일 뒤까지, 양 끝을 포함한다. 화면에는 "오늘", "내일", "N일 뒤"로 나눠 보인다. 날짜가 지난 일정은 보이지 않는다.
-- **완료·숨김:** "완료" 버튼 하나로 처리한다.
-  - 처리 기록은 그 날짜와 함께 저장한다. 그래서 예약일이나 종료일을 다른 날로 바꾸면 새 날짜로 다시 알린다.
-  - 다른 화면에서 날짜가 바뀐 뒤 예전 날짜로 완료를 보내면 API는 404 "알림을 찾을 수 없습니다"를 돌려준다. 카드는 목록을 다시 읽은 뒤 "다른 화면에서 날짜가 바뀌었거나 지워진 일정이라 목록을 새로 불러왔습니다"라고 알린다.
-  - 되돌리기 버튼은 두지 않는다. 원래 기록은 병원·약 화면에 그대로 남는다.
-  - 방문이나 약 기록을 지우면 완료 기록도 함께 지워진다(`ON DELETE CASCADE`).
-- **민감 정보:** 알림 API는 요청 내용을 로그에 남기지 않는다. 거부 메시지는 입력한 값을 되풀이하지 않는다. 테스트와 문서에는 "가상"을 붙인 지어낸 값만 쓴다.
+- **Reminder means:** Shown only inside the app screen. External services (push, mail) are not used. Phone push is handled as a separate issue after the server is deployed.
+- **Where it is shown:** A "다가오는 일정" (upcoming schedule) card is placed at the very top of the dashboard and in the daily record of **today's date**. It is not put in the daily record of other dates, because the schedule is counted from the real today.
+- **Targets**
+  - The next appointment date of a clinic visit (`next_visit_on`). For a visit that had a procedure, "지난번 시술: …" (last procedure: …) is shown together. The timing of a procedure is handled by this appointment date. A procedure has no date field of its own.
+  - The end date of a medicine (`end_on`). A medicine with no end date is not a target.
+- **Starting day of reminders:** Shown from 7 days before. From the service's today (Asia/Seoul) to 7 days later, both ends included. The screen divides them into "오늘" (today), "내일" (tomorrow), and "N일 뒤" (in N days). A schedule whose date has passed is not shown.
+- **Done and hiding:** Handled with one "완료" (done) button.
+  - The handled record is saved together with that date. So if the appointment date or end date is changed to another day, it is announced again with the new date.
+  - If, after the date was changed on another screen, a done is sent with the old date, the API returns 404 "알림을 찾을 수 없습니다" (the reminder cannot be found). After reading the list again, the card says "다른 화면에서 날짜가 바뀌었거나 지워진 일정이라 목록을 새로 불러왔습니다" (the schedule had its date changed or was deleted on another screen, so the list was reloaded).
+  - There is no undo button. The original record stays as it is on the clinic and medicine screens.
+  - If a visit or medicine record is deleted, its done record is deleted too (`ON DELETE CASCADE`).
+- **Sensitive information:** The reminder API does not leave the content of requests in logs. Rejection messages do not repeat the entered value. Tests and documents use only made-up values marked "가상" (fictional).
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
 - **DB** `database/migrations/017_reminders_done.sql`: `reminders_done`
-  - 방문 ID 또는 약 ID 중 정확히 하나, 그리고 완료한 날짜(`due_on`)를 둔다.
-  - 같은 대상의 같은 날짜는 한 번만 저장된다.
+  - It has exactly one of the visit ID or medicine ID, and the date it was done (`due_on`).
+  - The same date of the same target is saved only once.
 - **API** `backend/src/reminders.ts`, `backend/src/app.ts`
-  - `GET /api/reminders`: `{ today, until, leadDays: 7, reminders }`. 날짜순, 같은 날은 방문 다음 약 순서다. 각 항목에 `daysLeft`(오늘 0)를 둔다.
-  - `POST /api/reminders/done` `{ kind: 'visit' | 'medication', id, dueOn }`: 204. 두 번 보내도 같다. 대상이 없거나 날짜가 지금 기록과 다르면 404다.
-- **화면**
-  - `frontend/src/reminders.tsx`: "다가오는 일정" 카드.
-    - 각 일정에 언제, 날짜, 무엇, 기록 화면 링크, "완료" 버튼을 보인다.
-    - 완료 중에는, 404 뒤 다시 읽는 동안까지 포함해 모든 완료 버튼이 `aria-disabled`가 된다(#98).
-    - 버튼 이름은 "… 알림 완료"이고, 처리 중에는 "… 알림 완료 처리 중"이다. 알림만 숨긴다는 것과 처리 중임을 화면 읽기 프로그램도 알 수 있다.
-    - 완료한 버튼이 사라지면 포커스를 카드 제목으로 옮긴다(#65). "다시 시도"도 같다.
-    - 읽기 전에 병원·약 저장이 끝나기를 기다린다(#71).
-  - `frontend/src/reminder-text.ts`: 타입과 문구(`whenText`, `reminderTitle`, `reminderDetail`).
-  - `frontend/src/report.tsx`: 대시보드 머리말 아래에 카드를 둔다. 서비스의 오늘을 key로 써서 자정이 지나면 다시 읽는다.
-  - `frontend/src/daily.tsx`: 오늘 날짜일 때만 카드 목록 맨 앞에 둔다. 오늘은 서버가 마지막으로 준 날짜를 쓴다. 그래서 서버 확인이 한 번 실패해도 카드가 사라지지 않는다.
-- **테스트**
-  - `backend/test/reminders.integration.test.ts`(1985년 11~12월)
-    - 오늘·내일·7일 뒤는 나오고, 8일 뒤·지난 날·날짜 없음은 빠진다.
-    - 오늘을 바꾸면 범위가 따라 움직인다.
-    - 완료한 일정은 다시 나오지 않고, 두 번 보내도 같다.
-    - 날짜를 바꾸면 다시 나오고, 예전 날짜로는 완료할 수 없다. 원래 날짜로 되돌리면 그 완료가 유지된다.
-    - 지운 기록은 완료할 수 없고, 지우면 완료 기록도 지워진다. 방문 ID를 약으로 보내도 404다.
-  - `backend/test/reminders.test.ts`: 잘못된 요청은 DB에 닿기 전에 400이다. 월말과 연말을 넘어도 범위 끝 날짜가 맞다.
+  - `GET /api/reminders`: `{ today, until, leadDays: 7, reminders }`. In date order, and on the same day, visits come before medicines. Each item has `daysLeft` (0 for today).
+  - `POST /api/reminders/done` `{ kind: 'visit' | 'medication', id, dueOn }`: 204. Sending twice gives the same result. If the target does not exist or the date differs from the current record, it is 404.
+- **Screen**
+  - `frontend/src/reminders.tsx`: the "다가오는 일정" card.
+    - Each schedule shows when, the date, what, a link to the record screen, and a "완료" button.
+    - While a done is in progress, including while reading again after a 404, all the done buttons are `aria-disabled` (#98).
+    - The button name is "… 알림 완료" (… reminder done), and while processing it is "… 알림 완료 처리 중" (… reminder done, processing). A screen reader can also tell that it only hides the reminder and that it is processing.
+    - When the button that was done disappears, focus moves to the card title (#65). "다시 시도" (retry) is the same.
+    - Before reading, it waits for clinic and medicine saves to finish (#71).
+  - `frontend/src/reminder-text.ts`: types and text (`whenText`, `reminderTitle`, `reminderDetail`).
+  - `frontend/src/report.tsx`: places the card below the dashboard heading. The service's today is used as the key, so it reads again after midnight.
+  - `frontend/src/daily.tsx`: placed at the front of the card list only when the date is today. Today uses the date the server gave last. So the card does not disappear even if one server check fails.
+- **Tests**
+  - `backend/test/reminders.integration.test.ts` (November to December 1985)
+    - Today, tomorrow, and 7 days later appear, and 8 days later, past days, and no date are left out.
+    - If today is changed, the range moves along.
+    - A schedule marked done does not appear again, and sending twice gives the same result.
+    - If the date is changed it appears again, and it cannot be marked done with the old date. If the date is set back to the original, that done is kept.
+    - A deleted record cannot be marked done, and deleting it deletes the done record. Even if a visit ID is sent as a medicine, it is 404.
+  - `backend/test/reminders.test.ts`: A wrong request is 400 before reaching the DB. The end date of the range is right even across the end of a month and the end of a year.
   - `frontend/src/reminders.test.tsx`
-    - 문구, 목록 표시, 빈 목록 안내를 확인한다.
-    - 완료 중 중복 전송을 막고, 보낸 내용, 목록에서 빠짐, 포커스 이동을 확인한다.
-    - 404면 다시 읽은 뒤 알리고, 다시 읽는 동안 다른 완료를 보내지 않는다. 다른 실패면 일정이 남는다. 처리 중에는 버튼 이름이 바뀐다.
-    - 알림만 불러오지 못해도 대시보드의 나머지는 그대로다.
-    - 불러오기 실패 뒤 다시 시도와 포커스 이동, 저장 대기를 확인한다.
-    - 대시보드에 카드가 나온다.
-  - `frontend/src/daily.test.tsx`: 오늘 하루 기록에만 카드가 있고, 다른 날에는 알림을 요청하지 않는다. 서버 확인이 한 번 실패해도 카드가 남는다.
-  - 기존 대시보드·하루 기록·앱 테스트의 가짜 응답에 `/api/reminders`를 더했다.
+    - Checks the text, the list display, and the notice for an empty list.
+    - Checks that a duplicate send during done is blocked, what is sent, removal from the list, and the focus move.
+    - On 404, it announces after reading again, and does not send another done while reading again. On other failures, the schedule stays. During processing, the button name changes.
+    - Even if only the reminders cannot be loaded, the rest of the dashboard stays as it is.
+    - Checks retry and focus move after a load failure, and waiting for saves.
+    - The card appears on the dashboard.
+  - `frontend/src/daily.test.tsx`: The card is only in today's daily record, and for other days reminders are not requested. Even if one server check fails, the card stays.
+  - `/api/reminders` was added to the fake responses of the existing dashboard, daily record, and app tests.
 
-## 확인
+## Verification
 
-- `TEST_DATABASE_URL=<임시 PG17 health_test> npm run check`: 통과(백엔드 263개, 건너뜀 0. 프런트 498개 통과, 2개 건너뜀. 스킬 4개).
-- `npm run knip`: 통과.
-- 실제 브라우저(headless Chrome 156, 폭 320·390·1440, 임시 DB `health_browser`, 오늘 2026-11-08)
-  - 가짜 기록으로 확인했다: 오늘 예약(시술 있음), 내일 종료되는 약, 7일 뒤 예약, 8일 뒤 예약.
-  - 대시보드에 앞의 셋만 오늘·내일·7일 뒤 순서로 나왔다. 8일 뒤 예약은 나오지 않았다. 가로 넘침은 없었다.
-  - 약의 "완료"를 키보드(Enter)로 눌렀다. 완료 안내가 나오고, 포커스가 카드 제목으로 갔으며, 일정이 빠졌다. 새로고침 뒤에도 다시 나오지 않았다.
-  - 오늘의 하루 기록에는 카드가 맨 앞에 나왔다. 어제 날짜에는 카드가 없었다. 콘솔 오류는 0건이었다.
-  - 확인 뒤 가짜 기록을 지우고 DB, 서버, Chrome을 모두 껐다.
-- 확인하지 못한 것: 실제 화면 읽기 프로그램, Firefox, Safari.
+- `TEST_DATABASE_URL=<temporary PG17 health_test> npm run check`: passed (backend 263, 0 skipped. Frontend 498 passed, 2 skipped. Skill checks 4).
+- `npm run knip`: passed.
+- A real browser (headless Chrome 156, widths 320, 390, 1440, temporary DB `health_browser`, today 2026-11-08)
+  - It was checked with fake records: an appointment today (with a procedure), a medicine ending tomorrow, an appointment 7 days later, and an appointment 8 days later.
+  - Only the first three appeared on the dashboard, in the order today, tomorrow, 7 days later. The appointment 8 days later did not appear. There was no horizontal overflow.
+  - "완료" of the medicine was pressed with the keyboard (Enter). The done notice appeared, focus went to the card title, and the schedule was removed. It did not appear again after a refresh.
+  - In today's daily record, the card appeared at the front. In yesterday's date, there was no card. Console errors were 0.
+  - After the check, the fake records were deleted and the DB, server, and Chrome were all shut down.
+- Not checked: a real screen reader, Firefox, Safari.
 
-## 리뷰
+## Review
 
-### 1차 (독립 읽기 전용 리뷰)
+### First (independent read-only review)
 
-- **[중] 같은 날 정렬:** 종류를 알파벳순으로 비교해 약이 방문보다 먼저 나왔다. 문서대로 방문이 먼저 오게 고쳤다. 먼저 저장한 약이 같은 날 방문 뒤에 오는지 통합 테스트에 넣었다.
-- **[낮음] 늦게 온 목록이 완료한 일정을 되살림:** 404 뒤 다시 읽는 중에 다른 일정을 완료하면, 늦게 온 목록이 그 일정을 다시 보였다. 처음에는 완료한 일정을 기억해 목록에서 빼도록 고쳤다. 2차 리뷰 반영 때 404 뒤 다시 읽기가 끝날 때까지 완료 버튼을 잠그도록 바꾸면서, 이 경합이 생길 수 없게 되어 그 기억은 뺐다. 테스트는 다시 읽는 동안 다른 완료가 보내지지 않는지 확인한다.
-- **[낮음] 테스트 주석:** "방문 ID는 약 ID가 아니다"라는 주석이 테스트가 실제로 증명하는 것보다 컸다. 확인하는 내용("종류가 표를 고른다: 방문 ID를 약으로 보내면 그날 끝나는 약이 없다")에 맞게 고쳤다.
-- **[아주 낮음] 겹치는 인덱스:** `UNIQUE (medication_id, due_on)`가 이미 같은 역할을 해서 `reminders_done_medication_id_idx`를 뺐다. 017은 아직 병합 전이라 파일을 고쳤고, 임시 DB는 새로 만들어 다시 적용했다.
-- 반영 뒤 `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과(백엔드 263개, 건너뜀 0. 프런트 499개 통과, 2개 건너뜀. 스킬 4개). `npm run knip`: 통과.
+- **[medium] Sorting on the same day:** Kinds were compared alphabetically, so medicines came before visits. It was fixed so that visits come first, as in the document. An integration test checks that a medicine saved earlier comes after a visit on the same day.
+- **[low] A late list brought back a schedule that was done:** If another schedule was marked done while reading again after a 404, the late list showed that schedule again. At first it was fixed by remembering schedules that were done and removing them from the list. When the second review was applied, the done buttons were changed to be locked until the re-read after a 404 finishes, so this race can no longer happen, and that memory was removed. A test checks that no other done is sent while reading again.
+- **[low] Test comment:** The comment "a visit ID is not a medicine ID" claimed more than the test actually proves. It was fixed to match what is checked ("the kind chooses the table: if a visit ID is sent as a medicine, no medicine ends that day").
+- **[very low] Overlapping index:** `UNIQUE (medication_id, due_on)` already plays the same role, so `reminders_done_medication_id_idx` was removed. 017 was not yet merged, so the file was fixed, and the temporary DB was created anew and applied again.
+- After applying, `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed (backend 263, 0 skipped. Frontend 499 passed, 2 skipped. Skill checks 4). `npm run knip`: passed.
 
-### 2차 (독립 읽기 전용 리뷰)
+### Second (independent read-only review)
 
-막아야 할 문제는 없었다. 아래를 반영했다.
+There was no problem that had to be blocked. The following was applied.
 
-- **[중] 하루 기록 카드가 깜빡임:** 서버 확인이 한 번 실패하면 오늘 날짜를 잃어 카드가 사라졌다 다시 생겼다. 그 사이 포커스도 잃었다. 대시보드처럼 서버가 마지막으로 준 오늘을 쓰도록 고쳤고, 테스트를 넣었다.
-- **[낮음~중] 404 뒤 안내와 포커스:** "알림을 찾을 수 없습니다"는 다시 읽은 목록과 맞지 않았다. 또 포커스 이동이 알림 읽기를 끊을 수 있었다. 이제 다시 읽기가 끝난 뒤 상태 안내("…목록을 새로 불러왔습니다")를 보이고, 그때 포커스를 옮긴다. 다시 읽는 동안 완료 버튼은 잠긴다.
-- **[낮음] 처리 중이 들리지 않음, [낮음] 이름이 헷갈림:** 버튼 이름을 "… 알림 완료"로 바꾸고, 처리 중에는 "… 알림 완료 처리 중"이 되게 했다.
-- **[낮음] 빠진 테스트:** 알림만 실패해도 대시보드 나머지가 남는 장면, 하루 기록에서 서버 확인이 실패하는 장면을 넣었다.
-- **반영하지 않음**
-  - 표시 범위 밖 날짜의 완료 허용[아주 낮음]: 해가 없고 미리 숨기는 용도로 쓸 수 있어 그대로 둔다.
-  - 날짜 칸 인덱스[아주 낮음]: 사용자 한 명 규모에서는 필요 없다. 기록이 늘면 015·016에 부분 인덱스를 더한다.
-- 반영 뒤 확인
-  - `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과. 백엔드 263개(건너뜀 0), 프런트 502개(2개 건너뜀), 스킬 4개.
-  - `npm run knip`: 통과.
-  - 실제 브라우저(폭 320·390·1440)에서 다시 확인했다. 결과는 위와 같다: 키보드 완료, 포커스 이동, 새로고침 뒤 숨김 유지, 오늘에만 카드, 넘침 없음, 콘솔 오류 0건. 확인 뒤 DB, 서버, Chrome을 껐다.
+- **[medium] The daily record card flickered:** If one server check failed, today's date was lost and the card disappeared and came back. Focus was lost in between too. It was fixed to use the last today the server gave, as the dashboard does, and a test was added.
+- **[low to medium] The notice and focus after a 404:** "알림을 찾을 수 없습니다" did not match the list read again. Also, the focus move could interrupt reading the reminders. Now after the re-read finishes, a status notice ("…목록을 새로 불러왔습니다" = …the list was reloaded) is shown, and focus moves then. While reading again, the done buttons are locked.
+- **[low] Processing was not audible, [low] The name was confusing:** The button name was changed to "… 알림 완료", and while processing it becomes "… 알림 완료 처리 중".
+- **[low] Missing tests:** Added the scene where the rest of the dashboard stays even if only the reminders fail, and the scene where the server check fails in the daily record.
+- **Not applied**
+  - Allowing done for a date outside the display range [very low]: It is harmless and can be used to hide in advance, so it is left as it is.
+  - An index on the date column [very low]: Not needed at the scale of one user. If records grow, a partial index is added to 015 and 016.
+- Checks after applying
+  - `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed. Backend 263 (0 skipped), frontend 502 (2 skipped), skill checks 4.
+  - `npm run knip`: passed.
+  - It was checked again in a real browser (widths 320, 390, 1440). The results are as above: keyboard done, focus move, staying hidden after a refresh, the card only on today, no overflow, console errors 0. After the check, the DB, server, and Chrome were shut down.

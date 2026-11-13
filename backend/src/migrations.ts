@@ -77,28 +77,42 @@ export async function migrationStatus(db: Db, files: Migration[]) {
 // only and stops, leaving earlier files recorded.
 export async function migrate(db: Db, files: Migration[]) {
   await db.query('SELECT pg_advisory_lock($1)', [lockKey]);
+  let applied: string[];
   try {
-    await ensureHistory(db);
-    const { pending, errors } = await migrationStatus(db, files);
-    if (errors.length) throw new Error(errors.join('\n'));
-    for (const file of pending) {
-      await db.query('BEGIN');
-      try {
-        await db.query(file.sql);
-        await db.query('INSERT INTO schema_migrations(name, checksum) VALUES($1, $2)', [
-          file.name,
-          file.checksum,
-        ]);
-        await db.query('COMMIT');
-      } catch (e) {
-        await db.query('ROLLBACK').catch(() => undefined);
-        throw new Error(`${file.name} failed to apply: ${(e as Error).message}`, { cause: e });
-      }
-    }
-    return pending.map((file) => file.name);
-  } finally {
-    await db.query('SELECT pg_advisory_unlock($1)', [lockKey]);
+    applied = await applyPending(db, files);
+  } catch (e) {
+    // A lost connection fails the unlock too (the server drops the lock with the session);
+    // keep the original error, which names the file and the cause (central #414).
+    await unlock(db).catch(() => undefined);
+    throw e;
   }
+  await unlock(db);
+  return applied;
+}
+
+async function applyPending(db: Db, files: Migration[]) {
+  await ensureHistory(db);
+  const { pending, errors } = await migrationStatus(db, files);
+  if (errors.length) throw new Error(errors.join('\n'));
+  for (const file of pending) {
+    await db.query('BEGIN');
+    try {
+      await db.query(file.sql);
+      await db.query('INSERT INTO schema_migrations(name, checksum) VALUES($1, $2)', [
+        file.name,
+        file.checksum,
+      ]);
+      await db.query('COMMIT');
+    } catch (e) {
+      await db.query('ROLLBACK').catch(() => undefined);
+      throw new Error(`${file.name} failed to apply: ${(e as Error).message}`, { cause: e });
+    }
+  }
+  return pending.map((file) => file.name);
+}
+
+function unlock(db: Db) {
+  return db.query('SELECT pg_advisory_unlock($1)', [lockKey]);
 }
 
 function ensureHistory(db: Db) {

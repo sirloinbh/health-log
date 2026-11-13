@@ -5,7 +5,13 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { checksum, type Migration, planMigrations, readMigrations } from '../src/migrations.js';
+import {
+  checksum,
+  migrate,
+  type Migration,
+  planMigrations,
+  readMigrations,
+} from '../src/migrations.js';
 
 // Rules of the shared runner without a database (project-standards docs/conventions/database.md).
 const repoMigrations = fileURLToPath(new URL('../../database/migrations/', import.meta.url));
@@ -80,4 +86,45 @@ test('planMigrations reports changed, missing and out-of-order files', () => {
     'The applied migration file is missing: 005_e.sql',
     'New file numbered before the already applied 005_e.sql: 004_d.sql',
   ]);
+});
+
+// A fake connection that answers the runner's queries; `fail` decides which query throws.
+function fakeDb(fail: (sql: string) => Error | undefined) {
+  const queries: string[] = [];
+  const db = {
+    query: async (sql: string) => {
+      queries.push(sql);
+      const error = fail(sql);
+      if (error) throw error;
+      return { rows: sql.includes('to_regclass') ? [{ found: false }] : [] };
+    },
+  };
+  return { db: db as unknown as Parameters<typeof migrate>[0], queries };
+}
+
+test('migrate keeps the failing file and cause when the connection is lost', async () => {
+  let lost = false;
+  const lostError = () => new Error('Connection terminated unexpectedly');
+  const { db } = fakeDb((sql) => {
+    if (lost) return lostError();
+    if (sql === '-- 002_b.sql') {
+      lost = true;
+      return lostError();
+    }
+    return undefined;
+  });
+  await assert.rejects(
+    migrate(db, [file('001_a.sql'), file('002_b.sql')]),
+    (e: Error) => e.message === '002_b.sql failed to apply: Connection terminated unexpectedly',
+  );
+});
+
+test('migrate unlocks after success and reports an unlock failure', async () => {
+  const ok = fakeDb(() => undefined);
+  assert.deepEqual(await migrate(ok.db, [file('001_a.sql')]), ['001_a.sql']);
+  assert.match(ok.queries.at(-1) ?? '', /pg_advisory_unlock/);
+  const unlockFails = fakeDb((sql) =>
+    sql.includes('pg_advisory_unlock') ? new Error('unlock failed') : undefined,
+  );
+  await assert.rejects(migrate(unlockFails.db, [file('001_a.sql')]), /unlock failed/);
 });

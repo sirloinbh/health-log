@@ -1,84 +1,84 @@
-# #138 대시보드 기간 이동 중에도 누른 버튼에 포커스 남기기
+# #138 Keep focus on the pressed button while the dashboard period changes
 
-- 이슈: [#138](https://github.com/sirloinbh/health-log/issues/138) (상위 #86)
-- 브랜치: `fix/138-dashboard-nav-focus`
+- Issue: [#138](https://github.com/sirloinbh/health-log/issues/138) (parent #86)
+- Branch: `fix/138-dashboard-nav-focus`
 
-## 목적
+## Purpose
 
-대시보드에서 이전·다음이나 주간·월간을 누르면 새 리포트를 받는 동안 기간 이동 줄이 사라졌다. 그래서 누른 버튼의 포커스가 `<body>`로 떨어졌다. PR #133 1차 리뷰에서 찾았고 main에서도 같았다(#128과 같은 종류).
+On the dashboard, when Previous, Next, or weekly or monthly was pressed, the period navigation row disappeared while the new report was received. So the focus of the pressed button fell to `<body>`. It was found in the first review of PR #133 and was the same on main (the same kind as #128).
 
-## 정한 것
+## Decisions
 
-- **이전 결과를 흐리게 둔다.** 새 리포트가 올 때까지 이전 리포트를 그대로 두고 흐리게(`opacity-50`) 표시한다.
-  - 리포트 영역에는 `aria-busy`만 붙인다. 1차 리뷰 반영 전에는 불러오는 동안만 이름 있는 영역(`role="region"`)으로 두었다.
-  - 이동 줄과 누른 버튼은 그대로라 포커스가 남는다.
-  - 기간 표시(`aria-live`)는 계속 붙어 있으므로, 새 기간이 오면 글자가 바뀌며 읽힌다.
-- **버튼은 요청한 기간을 기준으로 움직인다.** 화면의 리포트는 불러오는 동안 이전 기간일 수 있다. 그래서 이전·다음과 범위 끝 판정은 주소의 날짜가 든 기간(`periodSpan`)으로 계산한다.
-  - 서버의 기간 계산(`backend/src/day-records.ts`의 `periodsOf`, 월요일 ~ 일요일)과 같다.
-  - 답이 오기 전에 두 번 누르면 두 기간을 움직인다.
-- **"이번 주" 버튼:** 화면에 있는 기간을 기준으로 보인다. 그래서 이번 주를 불러오는 동안에는 버튼이 남아 포커스를 지킨다. 이번 주가 화면에 오면 버튼이 사라지고, 포커스는 기간 표시로 옮긴다(#128의 "이번 주로 이동"과 같다).
-- **이동한 기간을 불러오지 못하면:** 이동 줄이 사라진다. 이때 포커스가 페이지로 떨어졌으면 "다시 시도"로 옮긴다.
-- **기간 이동 중 버튼 이름:** 주간에서 월간으로 바꾸는 동안 기간 표시는 잠시 이전 주를 보인다. 버튼은 이미 "이전 달"·"다음 달"처럼 누르면 일어날 일을 말한다.
-- 첫 리포트를 받기 전, 실패 뒤, 범위 밖 주소에서는 지금처럼 리포트가 없다. 뼈대 표시, 오류, 범위 안내가 그대로 나온다.
-- 통계의 "지난주/지난달" 말은 화면에 있는 리포트의 기간을 따른다. 그래서 주간에서 월간으로 바꾸는 동안 주간 수치에 "지난달"이 붙지 않는다.
+- **Keep the previous result, dimmed.** Until the new report arrives, the previous report is left as it is and shown dimmed (`opacity-50`).
+  - Only `aria-busy` is put on the report area. Before the first-review changes, it was made a named region (`role="region"`) only while loading.
+  - The navigation row and the pressed button stay, so focus stays.
+  - The period label (`aria-live`) stays attached, so when the new period arrives, the text changes and is read out.
+- **Buttons move based on the requested period.** The report on screen can be of the previous period while loading. So Previous, Next, and the range-end check are computed with the period that contains the date of the address (`periodSpan`).
+  - This is the same as the server's period calculation (`periodsOf` in `backend/src/day-records.ts`, Monday to Sunday).
+  - Pressing twice before the answer arrives moves two periods.
+- **"이번 주" (This week) button:** it is shown based on the period on screen. So while this week is loading, the button stays and keeps focus. When this week arrives on screen, the button disappears and focus moves to the period label (same as "이번 주로 이동" (go to this week) in #128).
+- **If the period moved to cannot be loaded:** the navigation row disappears. If focus fell to the page at that time, it moves to "다시 시도" (Try again).
+- **Button names during a period change:** while changing from weekly to monthly, the period label briefly shows the previous week. The buttons already say what will happen when pressed, such as "이전 달" (Previous month) and "다음 달" (Next month).
+- Before the first report is received, after a failure, and on an out-of-range address, there is no report as now. The skeleton, the error, and the range notice appear as they do.
+- The "지난주/지난달" (last week / last month) wording of the statistics follows the period of the report on screen. So while changing from weekly to monthly, "지난달" is not attached to weekly numbers.
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
 - `frontend/src/report.tsx`
-  - 기간이 바뀌어도 리포트를 비우지 않는다.
-  - `loading` 상태, 흐린 영역과 `aria-busy`
-  - 범위 밖 주소에서는 리포트를 비운다.
-  - 이동 버튼은 `periodSpan` 기준으로 움직인다. "이번 주" 뒤에는 기간 표시로 포커스를 옮긴다.
+  - The report is not emptied when the period changes.
+  - The `loading` state, the dimmed area, and `aria-busy`
+  - On an out-of-range address, the report is emptied.
+  - The navigation buttons move based on `periodSpan`. After "이번 주", focus moves to the period label.
 - `frontend/src/report-text.ts`: `periodSpan(period, date)`
-- `docs/next-steps/README.md`: "진행 중"을 지금 상태로 고쳤다. agent2는 recent-foods 테스트 경합, agent3은 배정 없음이다. 최근 끝난 #48, #126, #127, #131, #134를 적었다.
+- `docs/next-steps/README.md`: "In progress" was updated to the current state. agent2 is on the recent-foods test race, and agent3 has no assignment. The recently finished #48, #126, #127, #131, and #134 were written in.
 
-## 검증
+## Verification
 
-- 회귀 테스트(`frontend/src/report.test.tsx`)
-  - 3개를 더했다.
-    - 이전 주와 월간을 누른 뒤 응답 전·후 포커스, 이동 줄, `aria-busy`
-    - 답 전에 두 번 누르기
-    - "이번 주" 뒤 포커스
-  - 셋 다 main의 `report.tsx`에서 실패하는 것을 확인했다.
-- `frontend/src/report-text.test.ts`: `periodSpan` 1개를 더했다(월요일 시작, 해 넘는 주, 윤년 2월, 2099년 12월).
-- `npm run check`(DB 없이): 통과(프론트엔드 538개 통과·2개 건너뜀, 백엔드 135개 통과·DB 통합 123개 건너뜀), `npm run knip`: 통과.
+- Regression tests (`frontend/src/report.test.tsx`)
+  - Added 3.
+    - Focus before and after the response, the navigation row, and `aria-busy` after pressing Previous week and monthly
+    - Pressing twice before the answer
+    - Focus after "이번 주"
+  - All three were confirmed to fail on `report.tsx` of main.
+- `frontend/src/report-text.test.ts`: added 1 `periodSpan` test (Monday start, a week that crosses a year, February of a leap year, December 2099).
+- `npm run check` (without a DB): passed (frontend 538 passed, 2 skipped; backend 135 passed, 123 DB integration skipped), `npm run knip`: passed.
 
-### 브라우저 확인
+### Browser check
 
-임시 PostgreSQL 17(5471), 실제 API(127.0.0.1:3971), Vite(5271), 헤드리스 Chrome(9671)으로 확인했다. 리포트 응답은 페이지 안에서 0.8초 늦췄다. 390×844와 1440×900의 결과가 같았다.
+Checked with a temporary PostgreSQL 17 (5471), the real API (127.0.0.1:3971), Vite (5271), and headless Chrome (9671). The report response was delayed by 0.8 seconds inside the page. The results at 390×844 and 1440×900 were the same.
 
-| 확인                      | 결과                                                                                  |
-| ------------------------- | ------------------------------------------------------------------------------------- |
-| "이전 주" 누른 뒤 응답 전 | 포커스 "이전 주", 이동 줄 그대로, 리포트 영역 `aria-busy`, 기간 표시는 이전 주 그대로 |
-| 응답 뒤                   | 포커스 "이전 주", 기간 `10월 26일 ~ 11월 1일`                                         |
-| 응답 전에 "이전 주" 두 번 | `10월 12일 ~ 10월 18일`(두 주 이동), 포커스 그대로                                    |
-| "월간" 누른 뒤 응답 전·후 | 포커스 "월간", 응답 전 `aria-busy`, 뒤 `10월 1일 ~ 10월 31일`                         |
-| "이번 달" 누른 뒤         | 버튼이 사라지고 포커스가 기간 표시(`P`)로 감, `11월 1일 ~ 11월 30일`                  |
-| 불러오는 동안 화면        | 이전 리포트가 흐리게 남음(390 스크린숏 확인)                                          |
-| 가로 넘침                 | 없음                                                                                  |
+| Check                                                         | Result                                                                                                               |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Before the response after pressing "이전 주" (Previous week)  | Focus "이전 주", the navigation row unchanged, the report area `aria-busy`, the period label still the previous week |
+| After the response                                            | Focus "이전 주", period `10월 26일 ~ 11월 1일`                                                                       |
+| Pressing "이전 주" twice before the response                  | `10월 12일 ~ 10월 18일` (two weeks moved), focus unchanged                                                           |
+| Before and after the response after pressing "월간" (Monthly) | Focus "월간", `aria-busy` before, and `10월 1일 ~ 10월 31일` after                                                   |
+| After pressing "이번 달" (This month)                         | The button disappears and focus goes to the period label (`P`), `11월 1일 ~ 11월 30일`                               |
+| Screen while loading                                          | The previous report stays dimmed (checked in the 390 screenshot)                                                     |
+| Horizontal overflow                                           | none                                                                                                                 |
 
-- 확인 뒤 Chrome, Vite, API, 임시 DB를 모두 껐다.
+- After checking, Chrome, Vite, the API, and the temporary DB were all shut down.
 
-## 변경 — 2026-11-08 (1차 리뷰 반영)
+## Change — 2026-11-08 (first review applied)
 
-1차 리뷰(작성 문맥과 분리된 읽기 전용 리뷰)는 핵심 수정이 동작한다고 확인했다. 확인한 것은 이전·다음과 주간·월간의 포커스, `periodSpan`과 서버 계산이 같다는 것, `loading`이 멈추지 않는다는 것이다. 다음을 찾았다.
+The first review (a read-only review separate from the authoring context) confirmed that the core fix works. What it confirmed: focus of Previous, Next, and weekly or monthly, that `periodSpan` equals the server calculation, and that `loading` does not stall. It found the following.
 
-- **반영 1(중간)** "이번 주" 버튼이 주소의 기간을 기준으로 보여서, 누르는 즉시 사라졌다. 그래서 불러오는 동안 포커스가 `<body>`에 있었다. 이제 화면의 기간을 기준으로 보인다.
-- **반영 2(중간)** "이번 주"(또는 "이번 주로 이동")의 요청이 실패해도 "도착하면 포커스" 표시가 남았다. 그 뒤 다른 리포트가 오면 묻지 않고 포커스를 옮길 수 있었다. 버튼을 눌러도 포커스가 가지 않는 Safari에서 그렇다. 이제 실패하면 그 표시를 지운다.
-- **반영 3(낮음)** 이동한 기간을 불러오지 못하면 이동 줄이 사라져 포커스가 떨어졌다. 이제 "다시 시도"로 옮긴다.
-- **반영 4(낮음)** 불러오는 동안에만 생기던 `role="region"`과 이름을 뺐다. 랜드마크 목록에 나타났다 사라지지 않게 `aria-busy`만 둔다.
-- **반영 5(낮음)** 테스트가 이전 리포트의 통계가 실제로 `aria-busy` 영역 안에 있는지 확인한다.
-- **설명(낮음)** 주간→월간 중 버튼 이름이 먼저 바뀌는 것은 위 "정한 것"에 적었다.
-- 테스트: 3개를 더했다(리포트 화면 26개). 셋 다 반영 전 코드에서 실패하는 것을 확인했다.
-  - "이번 주"를 불러오는 동안의 포커스
-  - 이동 실패 뒤 "다시 시도" 포커스
-  - 실패한 "이번 주" 뒤 다른 리포트가 포커스를 옮기지 않음
+- **Applied 1 (medium)** The "이번 주" button was shown based on the period of the address, so it disappeared as soon as it was pressed. So while loading, focus was on `<body>`. Now it is shown based on the period on screen.
+- **Applied 2 (medium)** Even when the request of "이번 주" (or "이번 주로 이동") failed, the "focus when it arrives" mark stayed. After that, when another report arrived, focus could be moved without asking. This happens in Safari, where pressing a button does not give it focus. Now the mark is cleared on failure.
+- **Applied 3 (low)** When the period moved to could not be loaded, the navigation row disappeared and focus fell. Now it moves to "다시 시도".
+- **Applied 4 (low)** The `role="region"` and its name that appeared only while loading were removed. Only `aria-busy` is kept so that it does not appear and disappear in the landmark list.
+- **Applied 5 (low)** The test checks that the statistics of the previous report are really inside the `aria-busy` area.
+- **Explained (low)** That the button names change first during weekly → monthly is written under "Decisions" above.
+- Tests: added 3 (26 on the report screen). All three were confirmed to fail on the code before the changes.
+  - Focus while "이번 주" is loading
+  - Focus on "다시 시도" after a failed move
+  - After a failed "이번 주", another report does not move focus
 
-## 변경 — 2026-11-08 (2차 리뷰 반영)
+## Change — 2026-11-08 (second review applied)
 
-2차 리뷰(마지막)는 1차 반영이 맞고 막는 문제나 중간 문제가 없다고 확인했다. 확인한 것은 `focusRetry`가 도는 시점, `loading`, "이번 주"가 반복되지 않음, README 진행 중 줄, 테스트다. 낮은 지적 둘을 반영했다.
+The second review (the last) confirmed the first-review changes are correct and that there are no blocking or medium problems. What it confirmed: when `focusRetry` runs, `loading`, that "이번 주" does not repeat, the in-progress line of the README, and the tests. Two low remarks were applied.
 
-- **반영 1(낮음)** 이미 눌린 "주간"처럼 기간과 날짜가 그대로인 이동도 "이동했다" 표시를 남겼다. 불러오기가 뒤따르지 않으니 표시가 다음 다른 불러오기까지 남았다. 이제 같은 기간·날짜로의 이동은 아무것도 하지 않는다.
-- **반영 2(낮음)** "이번 주"를 누르고 답이 오기 전에 "이전 주"를 누르면, "도착하면 포커스" 표시가 이전 주 리포트에 적용됐다. 이제 다른 이동은 그 표시를 지운다. 표시는 "이번 주"와 "이번 주로 이동"만 남긴다.
-- 낮음 3(주간→월간 중 "이번 달"이 잠깐 보일 수 있음)은 화면의 기간 기준으로 보이는 결과라 그대로 둔다. 눌러도 오늘 날짜를 한 번 물을 뿐이다.
-- 규칙에 따라 3차 리뷰는 하지 않는다.
+- **Applied 1 (low)** A move that leaves the period and date unchanged, like the already pressed "주간" (Weekly), also left a "moved" mark. No load follows, so the mark stayed until the next different load. Now a move to the same period and date does nothing.
+- **Applied 2 (low)** If "이전 주" was pressed after pressing "이번 주" and before the answer arrived, the "focus when it arrives" mark was applied to the previous week's report. Now another move clears that mark. The mark is kept only for "이번 주" and "이번 주로 이동".
+- Low item 3 (during weekly → monthly, "이번 달" (This month) may show briefly) is the result of showing based on the period on screen, so it is left as it is. Pressing it only asks for today's date once.
+- By the rule, there is no third review.

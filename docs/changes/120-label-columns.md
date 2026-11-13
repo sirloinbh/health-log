@@ -1,129 +1,131 @@
-# #120 영양성분 표 붙여넣기의 두 칸 표와 남은 표 모양
+# #120 Two-column tables and the remaining table shapes in nutrition label paste
 
-- 이슈: [#120](https://github.com/sirloinbh/health-log/issues/120)
-- 브랜치: `feat/120-label-columns`
+- Issue: [#120](https://github.com/sirloinbh/health-log/issues/120)
+- Branch: `feat/120-label-columns`
 
-## 목적
+## Purpose
 
-#35의 영양성분 표 붙여넣기에서 남은 표 모양을 읽는다. 아직 **틀린 값**이 나오던 두 칸 표를 먼저 고친다. 첫 칸에 크기가 없고 둘째 칸에 크기가 있는 표다.
+Read the table shapes left over from the nutrition label paste in #35. First fix the two-column table that still gave **wrong values**: a table where the first column has no size and the second column has a size.
 
-## 정한 것
+Korean label words that the parser matches on are kept as they are, with a gloss on first use. Main ones: "총 내용량당" (per total amount), "1회 제공량당" (per serving), "1회 제공량" (serving size), "총 내용량" (total amount), "열량" (calories), "당류" (sugars), "나트륨" (sodium), "단백질" (protein).
 
-이슈에서 판단을 맡긴 항목은 아래처럼 정했다. 이슈 댓글에도 남겼다.
+## Decisions
 
-- **두 칸 표:** 값은 늘 첫 칸에서 읽으므로, 기준량도 머리줄의 첫 칸 것을 쓴다.
-  - 첫 칸이 크기 없는 "총 내용량당"이면 "총 내용량 300g"의 크기를 쓴다.
-  - 총 내용량 크기도 없으면 기준량을 모르는 것으로 본다.
-- **크기 없는 "1회 제공량당":** 같은 표에서 가장 가까운 "1회 제공량 30g"의 크기를 빌린다. 앞이든 뒤든 상관없다. 총 내용량 크기는 빌리지 않는다. 1회 제공량이 아니기 때문이다.
-- **기준량 없이 값만 읽은 경우:** 아무 칸도 바꾸지 않는다. 읽은 값은 목록으로 보여 주고, 1회 제공량을 확인해 직접 넣으라고 안내한다.
-  - 기준량을 모르는 값을 다른 출처의 1회 제공량 옆에 넣으면 두 출처가 섞이기 때문이다(예: 공식 자료의 120g 옆에 어느 양인지 모를 310kcal).
-  - #35에서는 이 경우 찾은 칸만 바꿨다.
+The items the issue left to judgment were decided as follows. They were also left as an issue comment.
 
-## 변경 — 2026-11-08
+- **Two-column table:** values are always read from the first column, so the basis amount also comes from the first column of the header row.
+  - If the first column is "총 내용량당" with no size, the size of "총 내용량 300g" is used.
+  - If there is no total amount size either, the basis amount is treated as unknown.
+- **"1회 제공량당" with no size:** the size is borrowed from the nearest "1회 제공량 30g" in the same table, whether it comes before or after. The total amount size is not borrowed, because it is not a serving size.
+- **When values are read without a basis amount:** no field is changed. The values read are shown as a list, and the user is told to check the serving size and enter it by hand.
+  - Putting values of unknown basis next to a serving size from another source would mix two sources (for example 310 kcal of unknown amount next to 120g from an official source).
+  - In #35, only the fields that were found were changed in this case.
+
+## Change — 2026-11-08
 
 - **`frontend/src/nutrition-label.ts`**
-  - 기준량 후보에 종류(`per`·`serving`·`total`)를 붙였다. 크기 없는 "총 내용량당"도 후보로 읽는다.
-  - 머리줄에 기준량이 여럿이면 같은 줄의 첫 후보를 기준량으로 쓴다.
-  - 크기 없는 "1회 제공량당"은 가까운 "1회 제공량 N"의 크기를 빌린다.
-  - 2021년 표기 형식을 읽는다: 총 내용량과 열량이 "총 내용량당" 머리 위에 오는 형식이다.
-    - 이때는 "총 내용량 N" 줄부터 표로 읽는다.
-    - 표를 끊는 "다음 기준량"은 고른 기준량의 줄 뒤에서만 찾는다.
-  - 이름과 값 사이의 칸 구분 막대(`|`), 줄바꿈, 앞에 오는 비율(`15%`)을 건너뛴다.
-  - 값만 있는 줄(`300mg`)도 표 줄로 본다.
-- **`frontend/src/foods.tsx`:** 기준량 없이 값만 읽으면 아무 칸도 바꾸지 않고, `alert`로 "1회 제공량을 찾지 못해 아무 칸도 바꾸지 않았습니다"와 읽은 값 목록을 보인다. 그 뒤로 쓰이지 않게 된 분기도 정리했다.
+  - Basis candidates now have a kind (`per`, `serving`, `total`). A "총 내용량당" with no size is also read as a candidate.
+  - When a header row has several basis amounts, the first candidate of the same row is used as the basis amount.
+  - A "1회 제공량당" with no size borrows the size of the nearby "1회 제공량 N".
+  - It reads the 2021 notation format: total amount and calories come above the "총 내용량당" header.
+    - In this case the table is read from the "총 내용량 N" line.
+    - The "next basis amount" that ends a table is looked for only after the line of the chosen basis amount.
+  - It skips the column separator bar (`|`) between name and value, line breaks, and a leading ratio (`15%`).
+  - A line with only a value (`300mg`) is also treated as a table line.
+- **`frontend/src/foods.tsx`:** when values are read without a basis amount, no field is changed, and `alert` shows "1회 제공량을 찾지 못해 아무 칸도 바꾸지 않았습니다" (the serving size was not found, so no field was changed) and the list of values read. A branch that is no longer used after that was cleaned up too.
 
-## 변경 — 2026-11-08 (1차 리뷰 반영)
+## Change — 2026-11-08 (first review applied)
 
-PR #121의 1차 리뷰(작성 문맥과 분리된 읽기 전용 리뷰)는 새 해석기와 main 해석기에 같은 입력 약 40개를 넣어 비교했다. 이 PR의 변경 때문에 새로 **틀린 값**이 나오는 경로 4개를 찾았다. 아래 "틀린 값이 남은 경우는 없다"는 첫 기록은 사실이 아니었다.
+The first review of PR #121 (a read-only review separate from the authoring context) fed about 40 identical inputs to the new parser and to the main parser and compared them. It found 4 paths that newly give **wrong values** because of this PR's change. The first note below that "no case of a wrong value remains" was not true.
 
-- **반영 1(높음)** 칸 막대를 몇 개든 건너뛰어, 첫 칸이 빈 행(`당류 | 5g`, `당류 | | 5g`)에서 둘째 칸 값을 첫 칸 기준량으로 읽었다.
-  - 이제 막대가 있는 행은 칸으로 나눠 이름과 첫 칸 값만 남긴다(`firstColumn`).
-  - 칸 수는 머리줄의 칸 수로 센다. 칸 수가 머리줄과 같으면 이름과 첫 값이 한 칸에 있는 것이고, 하나 많으면 이름이 따로 있는 것이다. 맞지 않으면 값을 믿지 않는다.
-  - 값 사이의 막대 건너뛰기는 없앴다.
-- **반영 2(높음)** "같은 줄의 첫 후보" 규칙이 한 줄로 붙여넣은 글에도 적용돼, `1회 제공량 1개(30g) 총 내용량 60g 100g당 열량 500kcal`를 30g 기준으로 읽었다.
-  - 이제 머리 사이에 구분자(공백·탭·`|`·`/`)만 있을 때만 한 머리줄로 본다(`headRow`). 다음 머리의 앞말("총 내용량(", "1회 제공량(", "1개(" 같은 1+한글 1~3자)는 허용한다.
-  - 줄바꿈은 구분자가 아니다.
-- **반영 3(중간~높음)** 크기 빌리기가 표 밖까지 닿아, 상품평("1회 제공량 30g 정도 먹어요")이나 다른 상품에서 크기를 빌렸다.
-  - 이제 표가 실제로 잘린 범위 안에서만 빌린다. 범위는 머리말부터 표 끝까지이고, 머리말이 없으면 표 바로 위로 이어진 표 줄부터다.
-  - 표를 끊은 "(1회 제공량 50g)"은 포함한다.
-- **반영 4(중간)** "총 내용량당"의 크기를 문서 전체의 첫 "총 내용량 N"에서 가져와, 머리말 위 묶음 전체(500g)를 썼다. 이제 머리말 뒤에서 그 머리에 가장 가까운 "총 내용량 N"을 쓴다. 2021년 형식의 시작줄도 같은 것으로 정한다.
-- **반영 5(낮음)** "1회 섭취참고량 30g"이 "1회 제공량당"에 크기를 빌려 줬다. 이제 "제공량"에서만 빌린다. 결정 댓글과 같다.
-- **반영 6(낮음, 예전부터 있던 문제)** 머리 두 개가 위아래 줄에 있고 칸을 한 줄씩 복사한 표(`100g당\n1회 제공량(30g)당\n열량\n250kcal\n75kcal`)는 어느 값이 어느 칸인지 알 수 없다. 이제 기준량을 없다고 본다. 화면은 칸을 바꾸지 않고 읽은 값만 보여 준다.
-- 고치는 중에 회귀 두 개를 프로브로 찾아 고쳤다. 머리 사이 구분자 패턴의 `\s`가 줄바꿈을 받아 윗줄 "1회 제공량 30g"까지 한 머리줄로 묶은 것과, 그 결과 행 칸 수가 맞지 않아 값을 버린 것이다.
-- 테스트: `frontend/src/nutrition-label.test.ts`에 리뷰 재현 입력으로 5개를 더했다(32개).
-- 리뷰의 프로브(약 40개)와 PR #119 두 리뷰의 프로브(약 40개)를 모두 다시 돌렸다.
-  - 그때 돌린 프로브는 모두 맞는 값이거나 빈 칸이었다. 리뷰 1, 2, 3, 4번 입력은 맞거나 빈 칸이 됐다.
-  - "main보다 나빠진 경우는 없었다"고 적었지만 2차 리뷰가 이 반영으로 생긴 틀린 값 경로 2개를 찾았다(아래 2차 리뷰 반영 1, 2).
-- 검사: DB 없이 `npm run check` 통과(프론트엔드 483개 통과·2개 건너뜀, 백엔드 133개 통과·DB 통합 118개 건너뜀), `npm run knip` 통과.
+- **Applied 1 (high)** Column bars were skipped however many there were, so for a row whose first column is empty (`당류 | 5g`, `당류 | | 5g`) the second column value was read as the first-column basis amount.
+  - Now a row with bars is split into columns, and only the name and the first-column value are kept (`firstColumn`).
+  - The number of columns is counted with the number of columns of the header row. If the count equals the header's, name and first value are in one column; if it is one more, the name is in its own column. If it does not match, the value is not trusted.
+  - Skipping bars between values was removed.
+- **Applied 2 (high)** The "first candidate of the same row" rule also applied to text pasted on one line, so `1회 제공량 1개(30g) 총 내용량 60g 100g당 열량 500kcal` was read with a 30g basis.
+  - Now heads are treated as one header row only when there are only separators (space, tab, `|`, `/`) between them (`headRow`). A lead-in word of the next head ("총 내용량(", "1회 제공량(", "1개(", that is 1 plus 1 to 3 Hangul characters) is allowed.
+  - A line break is not a separator.
+- **Applied 3 (medium to high)** Size borrowing reached outside the table, so it borrowed sizes from a product review ("1회 제공량 30g 정도 먹어요", about 30g a serving) or from another product.
+  - Now it borrows only within the range where the table was actually cut. The range runs from the heading to the end of the table, and if there is no heading, from the table lines that continue right above the table.
+  - The "(1회 제공량 50g)" that ended the table is included.
+- **Applied 4 (medium)** The size of "총 내용량당" was taken from the first "총 내용량 N" of the whole document, so it used the whole bundle above the heading (500g). Now it uses the "총 내용량 N" nearest to that head after the heading. The start line of the 2021 format is decided by the same value.
+- **Applied 5 (low)** "1회 섭취참고량 30g" (reference intake per serving) lent its size to "1회 제공량당". Now it borrows only from "제공량". This matches the decision comment.
+- **Applied 6 (low, an old problem)** A table with two heads on upper and lower lines and the columns copied one line at a time (`100g당\n1회 제공량(30g)당\n열량\n250kcal\n75kcal`) cannot tell which value belongs to which column. Now the basis amount is treated as absent. The screen changes no field and only shows the values read.
+- While fixing, two regressions were found with probes and fixed. One was that the `\s` of the separator pattern between heads accepted a line break and tied even the upper line "1회 제공량 30g" into one header row. The other was that, as a result, the row's column count did not match and the value was thrown away.
+- Tests: added 5 to `frontend/src/nutrition-label.test.ts` with the inputs that reproduce the review (32 tests).
+- All of the review's probes (about 40) and the probes of the two reviews of PR #119 (about 40) were run again.
+  - The probes run then were all correct values or empty fields. The inputs of review items 1, 2, 3, and 4 became correct or empty.
+  - It was written that "no case got worse than main", but the second review found 2 wrong-value paths created by this fix (second review, applied 1 and 2 below).
+- Check: `npm run check` without a DB passed (frontend 483 passed, 2 skipped; backend 133 passed, 118 DB integration skipped), `npm run knip` passed.
 
-## 변경 — 2026-11-08 (2차 리뷰 반영)
+## Change — 2026-11-08 (second review applied)
 
-2차 리뷰(마지막)는 1차 반영 4개가 막혔다고 확인했다(테스트 74개 통과). 그러나 1차 반영이 새로 만든 **틀린 값** 경로 2개와, 예전부터 있던 두 칸 표의 틀린 값 2개를 찾았다. 넷 다 이 PR의 두 칸 표 범위라 여기서 고쳤다.
+The second review (the last) confirmed that the 4 first-review fixes hold (74 tests passed). But it found 2 **wrong-value** paths newly created by the first-review fixes, and 2 wrong values in the two-column table that had existed before. All four are within the two-column table scope of this PR, so they were fixed here.
 
-- **반영 1(높음, 이 PR이 만듦)** 표를 끊은 다음 상품의 "영양정보 1회 제공량 50g"에서 크기를 빌렸다. 이제 표를 끊은 크기 표기는 그 뒤에 값이 이어지지 않을 때만 빌린다. 표 끝의 각주 "(1회 제공량 50g)"은 계속 빌린다.
-- **반영 2(중간, 이 PR이 만듦)** 머리말이 없을 때 표 위로 이어진 "표 줄"을 넓게 잡아, 위에 붙은 후기("1회 제공량 40g씩 먹어요")에서 크기를 빌렸다. 이제 머리말이 없으면 바로 위 한 줄이 크기만 적힌 줄("1회 제공량 30g", "(1회 제공량 1개(30g))")일 때만 빌린다.
-- **반영 3(높음, 예전부터)** 웹 표를 복사하면 칸이 탭으로 나뉘는데, 탭을 공백으로 바꿔 빈 첫 칸("당류 5g")에 둘째 칸 값이 들어갔다.
-  - 이제 탭을 칸 막대로 바꿔 막대 표와 같이 칸 단위로 읽는다.
-  - 혼자 있는 비율 칸("300mg 15%")은 값 칸으로 세지 않는다.
-- **반영 4(높음, 예전부터)** 막대 머리줄의 첫 칸 머리를 알아보지 못하면(`총 내용량 500ml | 100ml당`, `1병 | 100ml당`) 둘째 칸 기준량에 첫 칸 값을 짝지었다.
-  - 이제 고른 머리가 첫 값 칸이 아니면 기준량을 없다고 본다.
-  - 머리줄 첫 칸이 이름 칸(비어 있거나 구분·항목·영양성분·영양정보·성분)이면 그 다음 칸이 첫 값 칸이다.
-  - 같은 수정으로 "구분 | 100g당 | …" 표도 칸이 밀리지 않고 맞게 읽힌다.
-- **함께 고친 것(리뷰 5번 일부)** 줄 양 끝에 막대가 있는 행(Markdown 표 모양)은 양 끝 막대를 칸으로 세지 않는다.
-- **분리** 리뷰 5번 나머지와 6번은 [#122](https://github.com/sirloinbh/health-log/issues/122)(P4, #83 아래)로 나눴다.
-  - 6번의 `1회 제공량 30g (100g당)`은 main에서도 같은 틀린 값이다.
-  - 나머지는 Markdown `|---|` 줄, 칸 수가 머리줄과 다른 행, 2021년 쿠팡 머리줄이다. 지금은 빈 칸으로 끝난다.
-- 리뷰 프로브(main과 나란히 비교)와 앞선 프로브를 모두 다시 돌렸다.
-  - 리뷰 1~4번 입력은 이제 기준량 없음이다. 칸을 바꾸지 않는다.
-  - 1차 반영 때보다 결과가 바뀐 4개 중 3개는 맞던 값이 기준량 없음으로 바뀌었다(애매한 머리줄과 각주). 틀린 값이 된 것은 없다.
-  - 1개(탭 표의 비율 칸)는 회귀라서 위 반영 3에서 고쳤다.
-- 테스트: `frontend/src/nutrition-label.test.ts`에 5개를 더했다(37개). 다음 상품 크기·각주, 바로 위 크기 줄, 탭 표의 빈 첫 칸과 비율 칸, 알아보지 못한 첫 칸 머리, 이름 칸과 Markdown 양 끝 막대를 확인한다.
-- 검사: DB 없이 `npm run check` 통과(프론트엔드 488개 통과·2개 건너뜀, 백엔드 133개 통과·DB 통합 118개 건너뜀), `npm run knip` 통과.
+- **Applied 1 (high, created by this PR)** It borrowed a size from "영양정보 1회 제공량 50g" (nutrition information, serving 50g) of the next product that ended the table. Now a size notation that ended the table is borrowed only if no values follow it. The footnote "(1회 제공량 50g)" at the end of a table is still borrowed.
+- **Applied 2 (medium, created by this PR)** When there was no heading, the "table lines" continuing above the table were taken too broadly, and it borrowed a size from a review stuck above it ("1회 제공량 40g씩 먹어요", I eat 40g servings). Now, with no heading, it borrows only when the single line right above is a line with only a size ("1회 제공량 30g", "(1회 제공량 1개(30g))").
+- **Applied 3 (high, old)** When a web table is copied, columns are split by tabs, but tabs were turned into spaces, so the second column value went into an empty first column ("당류 5g").
+  - Now tabs are turned into column bars and read column by column, like a bar table.
+  - A ratio column on its own ("300mg 15%") is not counted as a value column.
+- **Applied 4 (high, old)** When the first column head of a bar header row was not recognized (`총 내용량 500ml | 100ml당`, `1병 | 100ml당`), the first column value was paired with the second column basis amount.
+  - Now, if the chosen head is not the first value column, the basis amount is treated as absent.
+  - If the first column of the header row is a name column (empty, or 구분, 항목, 영양성분, 영양정보, 성분), the next column is the first value column.
+  - The same fix also makes a table like "구분 | 100g당 | …" read correctly without shifting columns.
+- **Fixed along with it (part of review item 5)** A row with bars at both ends of the line (Markdown table shape) does not count the end bars as columns.
+- **Split off** The rest of review item 5 and item 6 were split into [#122](https://github.com/sirloinbh/health-log/issues/122) (P4, under #83).
+  - Item 6, `1회 제공량 30g (100g당)`, gives the same wrong value on main.
+  - The rest are the Markdown `|---|` line, rows whose column count differs from the header row, and the 2021 Coupang header row. For now they end as empty fields.
+- The review's probes (compared side by side with main) and the earlier probes were all run again.
+  - The inputs of review items 1 to 4 are now "no basis amount". No field is changed.
+  - Of the 4 whose result changed from the first-review state, 3 changed from a correct value to "no basis amount" (ambiguous header rows and footnotes). None became a wrong value.
+  - 1 (the ratio column of a tab table) was a regression, fixed in applied 3 above.
+- Tests: added 5 to `frontend/src/nutrition-label.test.ts` (37 tests). They check the next product's size and footnote, a size line right above, the empty first column and ratio column of a tab table, an unrecognized first column head, and the name column and Markdown end bars.
+- Check: `npm run check` without a DB passed (frontend 488 passed, 2 skipped; backend 133 passed, 118 DB integration skipped), `npm run knip` passed.
 
-### 리뷰 반영 뒤 브라우저 다시 확인
+### Browser re-check after the review changes
 
-2차 리뷰 반영 뒤 같은 방법(임시 DB, 실제 API 127.0.0.1:3971, Vite 5271, 헤드리스 Chrome 9671)으로 음식 추가 대화상자에서 다시 확인했다.
+After the second-review changes, it was checked again in the "Add food" dialog by the same method (temporary DB, real API 127.0.0.1:3971, Vite 5271, headless Chrome 9671).
 
-| 붙여넣은 표                                                         | 결과                             | 390×844 | 1440×900 |
-| ------------------------------------------------------------------- | -------------------------------- | ------- | -------- |
-| `총 내용량당 \| 100g당` 두 칸 표                                    | 300g, 900kcal, 600mg             | 통과    | 통과     |
-| 크기 없는 "1회 제공량당"과 위의 "1회 제공량 30g", 막대·비율 먼저 행 | 30g, 150kcal, 90mg, 2배 안내     | 통과    | 통과     |
-| 탭으로 나뉜 두 칸 표, `당류\t\t5g`(빈 첫 칸)                        | 100g, 250kcal, 300mg, 당류 빈 칸 | 통과    | 통과     |
-| `열량 310kcal 단백질 12g`(기준량 없음)                              | 칸은 그대로, 경고와 읽은 값 목록 | 통과    | 통과     |
-| 대화상자 가로 넘침                                                  | 없음                             | 통과    | 통과     |
+| Pasted table                                                                            | Result                                                  | 390×844 | 1440×900 |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------- | -------- |
+| Two-column table `총 내용량당 \| 100g당`                                                | 300g, 900kcal, 600mg                                    | passed  | passed   |
+| "1회 제공량당" with no size, "1회 제공량 30g" above it, rows with bars and ratios first | 30g, 150kcal, 90mg, a notice about 2x                   | passed  | passed   |
+| Two-column table split by tabs, `당류\t\t5g` (empty first column)                       | 100g, 250kcal, 300mg, sugars left empty                 | passed  | passed   |
+| `열량 310kcal 단백질 12g` (no basis amount)                                             | Fields unchanged, a warning and the list of values read | passed  | passed   |
+| Horizontal overflow of the dialog                                                       | none                                                    | passed  | passed   |
 
-- 확인 뒤 Chrome, Vite, API, 임시 DB를 모두 껐다.
+- After checking, Chrome, Vite, the API, and the temporary DB were all shut down.
 
-## 검증
+## Verification
 
-- 테스트
-  - `frontend/src/nutrition-label.test.ts`: 4개를 더했다(27개).
-    - 두 칸 표: 크기 없는 첫 칸, 총 내용량도 없는 경우, 첫 칸에 크기가 있는 경우
-    - "1회 제공량당" 크기 빌리기: 앞, 뒤, 총 내용량은 빌리지 않음
-    - 막대·줄바꿈·비율 앞 값, 2021년 형식
+- Tests
+  - `frontend/src/nutrition-label.test.ts`: added 4 (27 tests).
+    - Two-column table: first column without a size, no total amount either, a size in the first column
+    - Borrowing the size for "1회 제공량당": before, after, and the total amount is not borrowed
+    - Values with bars, line breaks, and a ratio before them, and the 2021 format
   - `frontend/src/foods.test.tsx`
-    - "기준량 없는 값은 아무 칸도 바꾸지 않고 보여 준다"로 바꿨다(#35의 "그대로 둔다" 테스트를 대체).
-    - "기준량만 읽고 값이 없으면" 테스트의 입력을 바꿨다. 이전 입력(`나트륨 15% 300mg`)은 이제 읽히는 모양이라 그 경우를 보여 주지 못한다.
-- PR #119 두 리뷰의 재현 입력 약 40개를 새 해석기로 다시 돌렸다.
-  - 모두 맞는 값이거나 빈 칸이었다.
-  - #35에서 빈 칸이던 파이프 표, 줄바꿈 표, % 먼저 표, 크기 없는 "1회 제공량당" 두 칸 표가 이제 맞는 값을 읽는다.
-  - 틀린 값이 남은 경우는 없다(1·2차 리뷰에서 이 PR이 만든 틀린 값 경로가 나와 고쳤다. 위 리뷰 반영 절 참고).
-  - 중간에 2021년 형식에서 열량이 빠지는 회귀를 이 재실행으로 찾아 고쳤다.
-- `npm run check`(DB 없이, 서버 변경 없음): 통과.
-  - 백엔드: 133개 통과, 118개 건너뜀(DB 통합 테스트)
-  - 프론트엔드: 478개 통과, 2개 건너뜀(다크 전용 조건으로 무관)
-  - 스킬 검사: 4개 통과
-- `npm run knip`: 통과.
+    - Changed to "values without a basis amount are shown and no field is changed" (replacing the "leave as is" test of #35).
+    - Changed the input of the "when only the basis amount is read and there are no values" test. The earlier input (`나트륨 15% 300mg`) is now a readable shape and no longer shows that case.
+- About 40 reproduction inputs from the two reviews of PR #119 were run again with the new parser.
+  - All were correct values or empty fields.
+  - The pipe table, the line-break table, the percent-first table, and the two-column table with a size-less "1회 제공량당", which were empty fields in #35, now read correct values.
+  - No case of a wrong value remains (the first and second reviews found wrong-value paths created by this PR and they were fixed; see the review sections above).
+  - Along the way, a regression where calories dropped out of the 2021 format was found by this rerun and fixed.
+- `npm run check` (without a DB, no server change): passed.
+  - Backend: 133 passed, 118 skipped (DB integration tests)
+  - Frontend: 478 passed, 2 skipped (dark-only conditions, unrelated)
+  - Skills check: 4 passed
+- `npm run knip`: passed.
 
-### 브라우저 확인
+### Browser check
 
-임시 PostgreSQL 17(5471)에 실제 API(127.0.0.1:3971)와 Vite(5271)를 띄우고 헤드리스 Chrome(9671)으로 음식 추가 대화상자를 열었다.
+The real API (127.0.0.1:3971) and Vite (5271) were started on a temporary PostgreSQL 17 (5471), and the "Add food" dialog was opened with headless Chrome (9671).
 
-| 붙여넣은 표                                                                                     | 결과                                                      | 390×844 | 1440×900 |
-| ----------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ------- | -------- |
-| `총 내용량당 \| 100g당`, `총 내용량 300g`, `열량 900kcal \| 300kcal`, 나트륨 두 칸              | 1회 제공량 300g, 칼로리 900, 나트륨 600                   | 통과    | 통과     |
-| `1회 제공량 30g`, `1회 제공량당 \| 총 내용량당`, `열량 \| 150kcal \| …`, `나트륨 15% 90mg \| …` | 30g, 150, 90, 총 내용량 2배 안내                          | 통과    | 통과     |
-| `열량 310kcal 단백질 12g`(기준량 없음)                                                          | 칸은 그대로, 경고와 "읽은 값: 칼로리 310kcal, 단백질 12g" | 통과    | 통과     |
-| 대화상자 가로 넘침                                                                              | 없음                                                      | 통과    | 통과     |
+| Pasted table                                                                                    | Result                                                                                                             | 390×844 | 1440×900 |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------- | -------- |
+| `총 내용량당 \| 100g당`, `총 내용량 300g`, `열량 900kcal \| 300kcal`, two columns of sodium     | Serving size 300g, calories 900, sodium 600                                                                        | passed  | passed   |
+| `1회 제공량 30g`, `1회 제공량당 \| 총 내용량당`, `열량 \| 150kcal \| …`, `나트륨 15% 90mg \| …` | 30g, 150, 90, a notice about 2x the total amount                                                                   | passed  | passed   |
+| `열량 310kcal 단백질 12g` (no basis amount)                                                     | Fields unchanged, a warning and "읽은 값: 칼로리 310kcal, 단백질 12g" (values read: calories 310kcal, protein 12g) | passed  | passed   |
+| Horizontal overflow of the dialog                                                               | none                                                                                                               | passed  | passed   |
 
-- 확인 뒤 Chrome, Vite, API, 임시 DB를 모두 껐다.
+- After checking, Chrome, Vite, the API, and the temporary DB were all shut down.

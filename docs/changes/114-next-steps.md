@@ -1,93 +1,93 @@
-# #114 다음 작업 문서 정리, npm audit 분석, 다크 모드·320px 점검
+# #114 Tidy the next-steps document, analyze npm audit, check dark mode and 320px
 
-- 이슈: [#114](https://github.com/sirloinbh/health-log/issues/114)
-- 브랜치: `docs/114-next-steps`
+- Issue: [#114](https://github.com/sirloinbh/health-log/issues/114)
+- Branch: `docs/114-next-steps`
 
-## 목적
+## Purpose
 
-다음 작업 문서(`docs/next-steps/README.md`)를 현재 상태에 맞게 고친다. "아직 정리하지 못한 것"에 남아 있던 `npm audit`를 분석한다. #43 이후 새로 생긴 화면을 다크 모드와 좁은 폭(320px)에서 점검한다.
+Update the next-steps document (`docs/next-steps/README.md`) to match the current state. Analyze `npm audit`, which was left under "Not yet sorted out". Check the screens added since #43 in dark mode and at a narrow width (320px).
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
 `docs/next-steps/README.md`
 
-- #31, #32(음식 데이터)와 #104, #107(목표 후속)이 끝났다고 반영했다.
-- "진행 중" 절을 더했다.
-  - agent2: #34 조사, 그 뒤 #35
-  - agent3: #39, #40, 이어서 #48
-  - agent1: 이 문서(1차 리뷰 반영 때 뺐다. 병합되면 #114가 닫히기 때문)
-- `npm audit` 항목을 아래 분석 결과와 후속 이슈 #115로 바꿨다.
-- 최종 갱신일은 오늘(2026-11-08)이라 그대로다.
+- Reflected that #31 and #32 (food data) and #104 and #107 (goal follow-ups) are done.
+- Added an "In progress" section.
+  - agent2: research #34, then #35
+  - agent3: #39, #40, then #48
+  - agent1: this document (removed in the first-review changes, because #114 closes when it is merged)
+- Replaced the `npm audit` item with the analysis result below and the follow-up issue #115.
+- The last-updated date is today (2026-11-08), so it stays.
 
-## npm audit 분석
+## npm audit analysis
 
-`main`(c40895c)의 잠금 파일로 `npm audit --json`과 `npm audit --omit=dev`를 실행했다. 설치·업데이트·`npm audit fix`는 실행하지 않았다.
+`npm audit --json` and `npm audit --omit=dev` were run with the lock file of `main` (c40895c). No install, update, or `npm audit fix` was run.
 
-- **결과:** moderate 12건, low·high·critical 0건(의존성 615개 중 운영 177개).
-- **원인은 한 건:** [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) "minimatch has potential denial of service via globparts amplification".
-  - 취약 범위는 minimatch 7.0.0 이상 11.0.1 미만이고, 첫 수정 버전은 11.0.1이다. 이 리포는 minimatch@10.2.6을 쓴다.
-  - 나머지 11건은 이 패키지를 거쳐 표시된 것이다. `@eslint/config-array`, `@eslint/js`, `@sirloinbh/eslint-config`, `@typescript-eslint/*` 5개, `eslint`, `eslint-plugin-jsx-a11y-x`, `typescript-eslint`가 해당한다.
-- **경로:** `npm ls minimatch --all`로 확인했다. `eslint`, `@eslint/config-array`, `typescript-eslint`의 `@typescript-eslint/typescript-estree`, `eslint-plugin-jsx-a11y-x` → minimatch@10.2.6이다. 모두 개발 의존성이다.
-- **운영 영향:** 없다.
-  - `npm audit --omit=dev`는 0건이다.
-  - 공격하려면 공격자가 glob 패턴을 정할 수 있어야 한다. 여기서는 개발자 PC와 CI에서 이 리포의 ESLint·TypeScript 설정에 적힌 패턴만 들어간다.
-- **지금 고칠 방법:** 없다.
-  - 2026-11-08 기준 상위 패키지 최신판이 모두 `minimatch ^10`을 요구한다.
+- **Result:** 12 moderate, 0 low, high, or critical (out of 615 dependencies, 177 of them production).
+- **One root cause:** [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) "minimatch has potential denial of service via globparts amplification".
+  - The vulnerable range is minimatch 7.0.0 or later and below 11.0.1, and the first fixed version is 11.0.1. This repository uses minimatch@10.2.6.
+  - The other 11 are reported through this package. They are `@eslint/config-array`, `@eslint/js`, `@sirloinbh/eslint-config`, 5 `@typescript-eslint/*` packages, `eslint`, `eslint-plugin-jsx-a11y-x`, and `typescript-eslint`.
+- **Paths:** checked with `npm ls minimatch --all`. `eslint`, `@eslint/config-array`, `@typescript-eslint/typescript-estree` of `typescript-eslint`, and `eslint-plugin-jsx-a11y-x` all go to minimatch@10.2.6. All are development dependencies.
+- **Production impact:** none.
+  - `npm audit --omit=dev` shows 0.
+  - An attack needs the attacker to choose the glob pattern. Here, only the patterns written in this repository's ESLint and TypeScript settings go in, on developer PCs and in CI.
+- **Ways to fix it now:** none.
+  - As of 2026-11-08, the latest versions of all parent packages require `minimatch ^10`.
     - eslint 10.14.0 `^10.2.6`
     - @eslint/config-array 0.23.5 `^10.2.4`
     - @typescript-eslint/typescript-estree 8.72.1 `^10.2.2`
     - eslint-plugin-jsx-a11y-x 0.2.0 `^10.2.5`
-  - 10.x에는 수정 버전이 없다(마지막 10.2.6).
-  - `npm audit fix --force`는 eslint-plugin-jsx-a11y-x를 0.1.1로 내리라고 제안한다. 0.1.1은 minimatch `^3.1.2`를 써서 이 경로 하나는 빠진다. 하지만 eslint·@eslint/config-array·typescript-eslint 경로가 남아 경고는 그대로이고, 플러그인 규칙만 바뀔 수 있다.
-  - `overrides`로 minimatch 11을 강제하는 것은 상위가 검증하지 않은 메이저 변경이라 권하지 않는다.
-- **후속:** [#115](https://github.com/sirloinbh/health-log/issues/115)(P4, 사용자)를 [#88](https://github.com/sirloinbh/health-log/issues/88) 아래에 연결했다. 상위 패키지가 `minimatch >=11.0.1`을 받아들이면 사용자가 업데이트한다. 확인 명령과 업데이트 명령 예시는 이슈에 적었다.
+  - There is no fixed version in 10.x (the last is 10.2.6).
+  - `npm audit fix --force` suggests downgrading eslint-plugin-jsx-a11y-x to 0.1.1. 0.1.1 uses minimatch `^3.1.2`, so this one path goes away. But the paths through eslint, @eslint/config-array, and typescript-eslint remain, so the warnings stay, and only the plugin rules may change.
+  - Forcing minimatch 11 with `overrides` is a major change the parent packages have not verified, so it is not recommended.
+- **Follow-up:** [#115](https://github.com/sirloinbh/health-log/issues/115) (P4, user) was linked under [#88](https://github.com/sirloinbh/health-log/issues/88). When the parent packages accept `minimatch >=11.0.1`, the user updates. The check command and an example update command are written in the issue.
 
-## 다크 모드·320px 화면 점검
+## Dark mode and 320px screen check
 
-코드를 바꾸지 않았다. 문제가 없어 결과만 기록한다.
+No code was changed. No problems were found, so only the result is recorded.
 
-- 임시 PostgreSQL 17(5471, `health_test`, 마이그레이션 014까지)에 실제 API(127.0.0.1:3971)와 Vite(5271)를 띄웠다.
-- 헤드리스 Chrome(디버깅 9671)에서 CDP `Emulation.setEmulatedMedia`로 `prefers-color-scheme: dark`를 켰다. 저장된 테마 선택이 없어 시스템 설정을 따른다.
-- 확인용으로 11-06에 정크푸드 표시가 된 간식 1개를 API로 넣었다.
+- The real API (127.0.0.1:3971) and Vite (5271) were started on a temporary PostgreSQL 17 (5471, `health_test`, migrations up to 014).
+- In headless Chrome (debugging 9671), `prefers-color-scheme: dark` was turned on with CDP `Emulation.setEmulatedMedia`. There is no saved theme choice, so it follows the system setting.
+- For checking, one snack marked as junk food was put in on 11-06 through the API.
 
-| 화면                                                                        | 320 다크 | 390 다크 | 1440 다크 | 320 라이트 |
-| --------------------------------------------------------------------------- | -------- | -------- | --------- | ---------- |
-| 설정의 목표 카드(#45, #107)                                                 | 통과     | 통과     | 통과      | 통과       |
-| 하루 기록의 목표 달성 카드(#45, #104)와 식단 카드의 정크푸드 집계·표시(#38) | 통과     | 통과     | 통과      | 통과       |
-| 범위 밖 날짜 `/daily/2100-01-01`의 범위 안내(#50)                           | 통과     | 통과     | 통과      | —          |
-| 범위 끝 날짜 `/daily/2099-12-31`(#50)                                       | 통과     | 통과     | 통과      | —          |
+| Screen                                                                                                        | 320 dark | 390 dark | 1440 dark | 320 light |
+| ------------------------------------------------------------------------------------------------------------- | -------- | -------- | --------- | --------- |
+| Goal card in settings (#45, #107)                                                                             | passed   | passed   | passed    | passed    |
+| Goal achievement card in the daily record (#45, #104) and the junk food count and mark on the meal card (#38) | passed   | passed   | passed    | passed    |
+| Range notice for the out-of-range date `/daily/2100-01-01` (#50)                                              | passed   | passed   | passed    | —         |
+| End-of-range date `/daily/2099-12-31` (#50)                                                                   | passed   | passed   | passed    | —         |
 
-- **가로 넘침:** 문서 너비가 화면 폭과 같았다. 화면 오른쪽 밖으로 나가는 요소도 없었다. 모든 칸에서 그랬다(1440은 스크롤 막대를 뺀 1425).
-- **글자 대비:** 하루 기록 화면의 배지 6개와 판정 줄의 회색 글자를 실제 계산값으로 쟀다. 모두 WCAG AA 4.5:1 이상이었다.
-  - 다크: 배지 8.71~17.18, 회색 판정 줄 6.94
-  - 라이트: 가장 낮은 것이 "달성" 배지 4.95, 회색 판정 줄 4.74
-- **#104를 320 라이트에서:** 식단 카드의 "바로 기록"으로 1,300kcal를 더했다. 버튼을 누르지 않아도 목표 카드 칼로리가 2,870kcal에서 4,170kcal로 바로 바뀌었다.
-- 다크 모드 화면도 눈으로 확인했다(320 목표 카드, 정크푸드 배지). 글자가 배경에 묻히거나 테두리가 사라진 곳은 없었다.
-- 확인 뒤 Chrome, Vite, API, 임시 DB를 모두 껐다.
+- **Horizontal overflow:** the document width equaled the screen width. No element went outside the right edge of the screen. This held in every column (1440 was 1425, without the scroll bar).
+- **Text contrast:** the 6 badges on the daily record screen and the gray text of the judgment line were measured with actual computed values. All were at or above WCAG AA 4.5:1.
+  - Dark: badges 8.71 to 17.18, gray judgment line 6.94
+  - Light: the lowest is the "달성" (achieved) badge at 4.95, gray judgment line 4.74
+- **#104 at 320 light:** 1,300 kcal was added with "바로 기록" (record directly) on the meal card. Without pressing a button, the calories on the goal card changed right away from 2,870 kcal to 4,170 kcal.
+- The dark mode screens were also checked by eye (the 320 goal card, the junk food badge). Nowhere did text blend into the background or a border disappear.
+- After checking, Chrome, Vite, the API, and the temporary DB were all shut down.
 
-## 변경 — 2026-11-08 (1차 리뷰 반영)
+## Change — 2026-11-08 (first review applied)
 
-PR #116의 1차 리뷰(작성 문맥과 분리된 읽기 전용 리뷰)는 `npm audit`, `npm ls`, `npm view`, 이슈 상태, 하위 이슈 연결, 링크를 직접 다시 확인했다. 사실 오류는 없었고 낮음 4개가 나왔다. 모두 반영했다.
+The first review of PR #116 (a read-only review separate from the authoring context) re-checked `npm audit`, `npm ls`, `npm view`, issue states, sub-issue links, and links directly. There were no factual errors, and 4 low items came up. All were applied.
 
-- `npm audit fix --force` 문장에 이유를 더했다. 0.1.1은 minimatch `^3.1.2`라 그 경로 하나는 빠지지만 나머지 경로가 남는다. #115 본문도 같이 고쳤다.
-- @eslint/config-array에 버전(0.23.5)을 적었다. #115의 확인 명령에 `npm view @eslint/config-array dependencies.minimatch`를 더했다.
-- README의 "#40 약(진행 중)"을 "(둘 다 진행 중)"으로 고쳤다. 진행 중 표시가 #40에만 붙은 것처럼 읽혔다.
-- README "진행 중"의 agent1 줄을 뺐다. 이 PR이 병합되면 #114가 닫혀 맞지 않게 된다. 분석 기록 링크는 `npm audit` 항목으로 옮겼다.
+- Added the reason to the `npm audit fix --force` sentence. 0.1.1 is minimatch `^3.1.2`, so that one path goes away but the other paths remain. The body of #115 was fixed too.
+- Wrote the version (0.23.5) for @eslint/config-array. Added `npm view @eslint/config-array dependencies.minimatch` to the check command in #115.
+- Changed "#40 medication (in progress)" in the README to "(both in progress)". The in-progress mark read as if it applied only to #40.
+- Removed the agent1 line under "In progress" in the README. When this PR is merged, #114 closes and the line would no longer be true. The link to the analysis record was moved to the `npm audit` item.
 
-## 변경 — 2026-11-08 (2차 리뷰 반영)
+## Change — 2026-11-08 (second review applied)
 
-2차 리뷰(마지막)는 1차 반영 4건이 맞다고 확인했다. `npm view`로 0.1.1의 minimatch `^3.1.2`와 @eslint/config-array 0.23.5도 다시 봤다. 낮음 2개가 나왔고 모두 반영했다.
+The second review (the last) confirmed the 4 first-review changes are correct. It also re-checked with `npm view` that 0.1.1 has minimatch `^3.1.2` and that @eslint/config-array is 0.23.5. It found 2 low items, and both were applied.
 
-- 첫 변경 절의 "agent1: 이 문서" 줄에, 1차 리뷰 때 README에서 뺐다는 것을 덧붙였다.
-- #115 본문의 @eslint/config-array에도 버전 0.23.5를 적었다.
+- Added to the "agent1: this document" line of the first Change section that it was removed from the README in the first review.
+- Wrote version 0.23.5 for @eslint/config-array in the body of #115 as well.
 
-## 변경 — 2026-11-08 (병합 직전 main 다시 병합)
+## Change — 2026-11-08 (main merged again just before merging)
 
-CI가 통과한 뒤 main에 #39 병원·시술(PR #113)이 병합됐다. `origin/main`을 병합했고 충돌은 없었다. README에서 #39를 끝남으로 옮기고, agent3의 진행 중 작업을 #40, 이어서 #48로 고쳤다.
+After CI passed, #39 clinic visits (PR #113) was merged into main. `origin/main` was merged, with no conflicts. In the README, #39 was moved to done, and agent3's in-progress work was changed to #40, then #48.
 
-## 검증
+## Verification
 
-- `npm run format:check`: 통과.
-- 문서 링크: 새로 쓴 상대 링크 `../changes/114-next-steps.md`가 있는 파일을 가리키는지 확인했다.
-- README의 이슈 상태는 `gh issue view`로 대조했다. #32 닫힘, #34·#35·#39·#40·#48 열림.
-- 앱 코드는 바꾸지 않아 앱 테스트를 더하지 않았다.
+- `npm run format:check`: passed.
+- Document links: checked that the newly written relative link `../changes/114-next-steps.md` points to an existing file.
+- The issue states in the README were checked against `gh issue view`. #32 closed; #34, #35, #39, #40, and #48 open.
+- App code was not changed, so no app tests were added.

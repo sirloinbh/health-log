@@ -1,86 +1,86 @@
-# #137 최근 음식 통합 테스트의 경합 막기
+# #137 Prevent the race in the recent foods integration test
 
-- 이슈: [#137](https://github.com/sirloinbh/health-log/issues/137)
-- 브랜치: `fix/137-recent-foods-race`
+- Issue: [#137](https://github.com/sirloinbh/health-log/issues/137)
+- Branch: `fix/137-recent-foods-race`
 
-## 목적
+## Purpose
 
-`backend/test/recent-foods.integration.test.ts`가 읽는 `GET /api/foods/recent`는 DB 전체의 "최근 10개" 목록이다. `tsx --test`는 테스트 파일을 동시에 돌린다. 그래서 이 파일이 기록한 뒤 읽기 전에 다른 파일이 서로 다른 음식을 여러 개 기록하면, 이 파일의 음식이 목록 밖으로 밀려 실패할 수 있었다. #134 변경 기록의 "남은 위험"에 적혀 있던 문제다. 앱 코드와 화면 동작(전역 최근 10개)은 바꾸지 않는다.
+`GET /api/foods/recent`, which `backend/test/recent-foods.integration.test.ts` reads, is the "latest 10" list of the whole DB. `tsx --test` runs test files at the same time. So if, after this file records, another file records several different foods before it reads, the foods of this file can be pushed out of the list and it can fail. This is the problem written under "remaining risk" in the change record of #134. The app code and the screen behavior (global latest 10) are not changed.
 
-## 재현
+## Reproduction
 
-- 다른 프로세스가 저장소 음식 20개로 식사 기록을 쉬지 않고 넣고, 주기적으로 지우게 했다(날짜 1983-07-07). 그 상태에서 이 파일만 3번 돌렸다.
-- 고치기 전(`origin/main` 6ce385a): **3번 모두 실패.** 매번 3개 중 2개가 실패했다.
-  - "each food shows once…": 이 파일의 음식이 목록에 하나도 없다(`actual: []`).
-  - "a food removed from the store no longer shows": 남긴 음식이 목록에 없다.
-- "typed-in food takes none of the ten places"는 목록이 10개인지만 봐서 통과했다. 그 10개가 이 파일의 음식인지는 확인하지 못했다.
+- Another process was made to keep inserting meal records with 20 foods from the store and to delete them periodically (date 1983-07-07). In that state only this file was run 3 times.
+- Before the fix (`origin/main` 6ce385a): **it failed all 3 times.** Each time 2 of 3 failed.
+  - "each food shows once…": none of this file's foods is in the list (`actual: []`).
+  - "a food removed from the store no longer shows": the food that was kept is not in the list.
+- "typed-in food takes none of the ten places" passed because it only checked that the list had 10 items. It could not confirm that those 10 were this file's foods.
 
-## 정한 것
+## Decisions
 
-- **테스트만 고친다.** #134(PR #136)처럼 연결 하나의 `REPEATABLE READ` 트랜잭션 안에서 한다. 다만 #134는 읽기만 했고, 이번에는 기록(API의 `POST /api/meals`)과 읽기를 모두 그 안에서 한다. 끝나면 `ROLLBACK`한다.
-  - 스냅숏은 트랜잭션의 첫 문장 때 정해진다. 그 뒤 다른 파일이 커밋한 기록은 보이지 않는다.
-  - 이 트랜잭션에서 넣는 기록은 스냅숏보다 뒤에 시퀀스 값을 받는다. 그래서 스냅숏이 보는 어떤 기록보다 id가 크다. 목록은 `max(id)` 순서라 이 파일의 음식이 늘 맨 앞에 온다.
-- **API의 트랜잭션은 SAVEPOINT로 바꾼다.** 식사 기록 API는 `pool.connect()` 뒤 `BEGIN`/`COMMIT`을 쓴다. 테스트용 풀은 같은 연결을 돌려준다. 그리고 `BEGIN`으로 시작하는 문장(`snapshotRead` 포함)은 `SAVEPOINT`로, `COMMIT`은 `RELEASE SAVEPOINT`로, `ROLLBACK`은 `ROLLBACK TO SAVEPOINT` 뒤 `RELEASE SAVEPOINT`로 바꾼다(1차 리뷰 뒤 넓힘). 앱의 기록 경로는 그대로 실행된다.
-  - `BEGIN`의 옵션은 버려진다. 격리 수준은 스냅숏의 것을 쓰고 `READ ONLY`는 지켜지지 않는다. 읽기 전용 경로에서 쓰기를 하는 실수는 이 helper 안에서는 드러나지 않는다.
-  - 이 처리는 `backend/test/helpers.ts`의 `inSnapshot`으로 묶었다. 연결이 하나라 요청은 하나씩 보내야 한다. 이 파일은 모든 요청을 차례로 기다린다.
-- **확인을 엄격하게 바꿨다.** 이제 목록 맨 앞이 이 파일의 음식이라고 보장된다. 그래서 이 파일 음식만 골라 보던 확인을 순서까지 직접 비교하게 했다.
-  - 처음 3개가 기대한 순서인지 본다.
-  - 10개 테스트는 10개가 정확히 이 파일이 기록한 음식인지, 최근 순서인지 본다.
-  - 지운 음식 테스트는 남긴 음식이 맨 앞인지 본다.
-- **직렬 실행이나 재시도는 쓰지 않았다.**
-- 함께 고친 것: 기록은 모두 롤백되므로 `after()`의 정리는 뺐다. `before()`의 정리는 옛 버전이 남긴 데이터를 지우려고 남겼다.
+- **Only the test is fixed.** As in #134 (PR #136), it is done inside a `REPEATABLE READ` transaction on one connection. But #134 only read, and this time both recording (the API's `POST /api/meals`) and reading are done inside it. It does `ROLLBACK` at the end.
+  - The snapshot is fixed at the first statement of the transaction. Records that another file commits after that are not visible.
+  - Records inserted in this transaction get a sequence value after the snapshot. So their ids are larger than any record the snapshot sees. The list is in `max(id)` order, so this file's foods are always at the front.
+- **The API's transaction is changed to SAVEPOINT.** The meal record API uses `BEGIN`/`COMMIT` after `pool.connect()`. The test pool returns the same connection. A statement that starts with `BEGIN` (including `snapshotRead`) is changed to `SAVEPOINT`, `COMMIT` to `RELEASE SAVEPOINT`, and `ROLLBACK` to `ROLLBACK TO SAVEPOINT` followed by `RELEASE SAVEPOINT` (widened after the first review). The app's recording path runs as it is.
+  - The options of `BEGIN` are dropped. The isolation level is that of the snapshot, and `READ ONLY` is not enforced. A mistake of writing on a read-only path is not exposed inside this helper.
+  - This handling was put together as `inSnapshot` in `backend/test/helpers.ts`. There is one connection, so requests must be sent one at a time. This file waits for every request in turn.
+- **The checks were made strict.** Now it is guaranteed that the front of the list is this file's foods. So checks that picked out only this file's foods now compare the order directly.
+  - It checks that the first 3 are in the expected order.
+  - The 10-item test checks that the 10 are exactly the foods this file recorded, in recent order.
+  - The deleted-food test checks that the food that was kept is at the front.
+- **Serial execution and retries were not used.**
+- Fixed along with it: all records are rolled back, so the cleanup in `after()` was removed. The cleanup in `before()` was kept to delete data left by an old version.
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
-| 파일                                            | 내용                                                                                                     |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `backend/test/helpers.ts`                       | `inSnapshot`: 한 연결의 `REPEATABLE READ` 트랜잭션, 앱 트랜잭션은 SAVEPOINT로, 끝나면 롤백하고 연결 반환 |
-| `backend/test/recent-foods.integration.test.ts` | 세 테스트를 `inSnapshot` 안에서 실행하고, 확인을 목록 맨 앞 기준으로 엄격하게 바꿈                       |
+| File                                            | Content                                                                                                                                                  |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backend/test/helpers.ts`                       | `inSnapshot`: a `REPEATABLE READ` transaction on one connection, the app's transactions as SAVEPOINT, rolled back at the end and the connection returned |
+| `backend/test/recent-foods.integration.test.ts` | Runs the three tests inside `inSnapshot`, and makes the checks strict based on the front of the list                                                     |
 
-## 확인
+## Check
 
-- **경합 상태 재현(위와 같은 방법):**
-  - 고치기 전: 3번 모두 실패
-  - 고친 뒤: 3번 모두 통과(3개 통과, 실패 0). 기록 프로세스는 이 동안 12만 건 넘게 넣고 지웠다.
-- 경합 없이 돌려도 통과했다.
-- 테스트가 끝난 뒤 `recent-test-` 음식이 DB에 남지 않았다(롤백 확인).
-- **`npm run check` 5회 연속:** `TEST_DATABASE_URL=<임시 PG17 health_test>`로 돌렸다. 5회 모두 통과했다. 매번 백엔드 263개 통과(실패 0, 건너뜀 0), 프런트 526개 통과(2개 건너뜀).
-  - 그 전에 한 번 돌린 5회 묶음에서는 2~5회째가 실패했다. 실행 중에 쓴 이 변경 기록 파일의 서식 검사(`prettier --check`) 때문이었고, 테스트 실패는 아니었다. 서식을 고친 뒤 5회를 처음부터 다시 돌렸다.
-- 5회 뒤에도 `recent-test-` 음식이 DB에 남지 않았다.
-- `origin/main`(7e24e08)을 병합한 뒤 `npm run check`: 통과(백엔드 263개 통과·건너뜀 0, 프런트 534개 통과·2개 건너뜀). `npm run knip`: 통과.
+- **Reproducing the race (same method as above):**
+  - Before the fix: failed all 3 times
+  - After the fix: passed all 3 times (3 passed, 0 failed). The recording process inserted and deleted more than 120,000 records meanwhile.
+- It also passed when run without the race.
+- After the tests ended, no `recent-test-` foods were left in the DB (rollback confirmed).
+- **`npm run check` 5 times in a row:** run with `TEST_DATABASE_URL=<temporary PG17 health_test>`. It passed all 5 times. Each time backend 263 passed (0 failed, 0 skipped), frontend 526 passed (2 skipped).
+  - In a batch of 5 run once before that, runs 2 to 5 failed. This was because of the format check (`prettier --check`) of this change record file that was written during the run, not a test failure. After fixing the format, the 5 runs were redone from the start.
+- After the 5 runs too, no `recent-test-` foods were left in the DB.
+- After merging `origin/main` (7e24e08), `npm run check`: passed (backend 263 passed, 0 skipped, frontend 534 passed, 2 skipped). `npm run knip`: passed.
 
-## 리뷰
+## Review
 
-### 1차 (독립 읽기 전용 리뷰)
+### First (independent read-only review)
 
-- **[중간] `BEGIN …` 형태를 SAVEPOINT로 바꾸지 못함:** 처음 버전은 정확히 `'BEGIN'`인 문장만 바꿨다.
-  - 하루 기록 읽기 API는 `snapshotRead`(`BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY`)로 시작한다. 이런 API를 `inSnapshot` 안에서 부르면 SAVEPOINT 없이 `COMMIT`만 바뀌어 바깥 트랜잭션이 깨진다.
-  - `BEGIN`·`START`로 시작하는 문장은 모두 SAVEPOINT로 바꾸도록 고쳤다.
-  - SAVEPOINT마다 이름을 따로 붙이고 열린 순서대로 닫는다. 남은 SAVEPOINT를 대신 닫는 일이 없다.
-  - 짝이 없는 `COMMIT`·`ROLLBACK`은 오류로 알린다.
-  - 앱의 `ROLLBACK`은 `ROLLBACK TO SAVEPOINT` 뒤 `RELEASE SAVEPOINT`로 바꾼다.
-- **[낮음] 끊긴 연결이 풀로 돌아감:** 끝의 `ROLLBACK`이 실패하면 `release(error)`로 넘겨 풀이 그 연결을 버리게 했다.
-- **[낮음] 문서 오류:** 이 파일은 이미 `origin/main`에서 `testDatabaseSkip`을 쓰고 있었다. 바꿨다고 적은 문장을 지웠다. #134/#136 번호 표기도 맞췄다.
-- **새 테스트 `backend/test/snapshot.integration.test.ts`:** `inSnapshot` 안에서 아래를 차례로 실행하고, 모두 정상인지 본다.
-  1. 하루 읽기(`snapshotRead`). 아직 열린 SAVEPOINT가 없을 때다.
-  2. 식사 기록(`BEGIN`/`COMMIT`)
-  3. 없는 음식 기록(404, `ROLLBACK`)
-  4. 다시 읽기, 다시 기록, 다시 읽기
-  - 끝난 뒤 그날 기록이 DB에 남지 않는지도 본다.
-  - 처음 helper로 돌리면 1단계가 500으로 실패한다. 처음에는 읽기를 404 뒤에 두었는데, 그때는 404가 남긴 같은 이름의 SAVEPOINT가 문제를 가려 처음 helper로도 통과했다. 그래서 읽기를 맨 앞으로 옮겼다.
-- **알려 둘 것(고치지 않음):** 스냅숏 트랜잭션은 각 테스트가 끝날 때까지 `meal_entries`에 ROW EXCLUSIVE 잠금을 잡고 있다.
-  - 그동안 combos·meal-copy 테스트의 `CREATE/DROP TRIGGER`는 기다리고, 그 뒤의 다른 기록도 줄을 선다.
-  - 테스트 하나가 1초 안쪽이라 지연만 생기고 교착이나 실패는 없다(리뷰 확인).
-- 리뷰가 문제없다고 확인한 것: 스냅숏 안에서 이 파일의 기록 id가 늘 가장 크다는 전제, 직렬화 오류나 교착이 생기지 않는 점, 세 테스트 확인의 정확성.
-- 1차 리뷰 반영 뒤 `npm run check`: 통과(백엔드 264개 통과·건너뜀 0, 프런트 534개 통과·2개 건너뜀). `npm run knip`: 통과.
+- **[medium] The `BEGIN …` form was not changed to SAVEPOINT:** the first version changed only a statement that was exactly `'BEGIN'`.
+  - The daily record read API starts with `snapshotRead` (`BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY`). If such an API is called inside `inSnapshot`, only `COMMIT` is changed without a SAVEPOINT, and the outer transaction breaks.
+  - It was fixed to change every statement that starts with `BEGIN` or `START` to SAVEPOINT.
+  - Each SAVEPOINT gets its own name and is closed in the order it was opened. It never closes a remaining SAVEPOINT on someone else's behalf.
+  - A `COMMIT` or `ROLLBACK` with no match is reported as an error.
+  - The app's `ROLLBACK` is changed to `ROLLBACK TO SAVEPOINT` followed by `RELEASE SAVEPOINT`.
+- **[low] A broken connection returned to the pool:** if the final `ROLLBACK` fails, it is passed as `release(error)` so the pool discards that connection.
+- **[low] Document error:** this file already used `testDatabaseSkip` on `origin/main`. The sentence that said it was changed was removed. The #134/#136 numbering was also corrected.
+- **New test `backend/test/snapshot.integration.test.ts`:** inside `inSnapshot` it runs the following in order and checks that all are normal.
+  1. A daily read (`snapshotRead`), when no SAVEPOINT is open yet.
+  2. A meal record (`BEGIN`/`COMMIT`)
+  3. Recording a food that does not exist (404, `ROLLBACK`)
+  4. Read again, record again, read again
+  - It also checks that no record of that day is left in the DB after it ends.
+  - Run with the first helper, step 1 fails with 500. At first the read was placed after the 404, but then a SAVEPOINT with the same name left by the 404 hid the problem and it passed even with the first helper. So the read was moved to the front.
+- **To be aware of (not fixed):** the snapshot transaction holds a ROW EXCLUSIVE lock on `meal_entries` until each test ends.
+  - Meanwhile the `CREATE/DROP TRIGGER` of the combos and meal-copy tests waits, and other records after that also queue.
+  - One test takes under a second, so there is only a delay and no deadlock or failure (confirmed by the review).
+- What the review confirmed has no problem: the premise that this file's record ids are always the largest inside the snapshot, that no serialization error or deadlock happens, and that the checks of the three tests are exact.
+- After the first-review changes, `npm run check`: passed (backend 264 passed, 0 skipped, frontend 534 passed, 2 skipped). `npm run knip`: passed.
 
-### 2차 (독립 읽기 전용 리뷰)
+### Second (independent read-only review)
 
-- 막는 문제는 없었다. 낮은 등급 두 가지를 고쳤다.
-  - **helper의 오류가 앱의 원래 오류를 가릴 수 있음:** 짝 없는 `COMMIT`·`ROLLBACK`에서 helper가 바로 예외를 던졌다. 앱의 `query('ROLLBACK').catch(...)`가 잡지 못하고 원래 오류를 덮을 수 있었다. `query`를 async로 바꿔, 이런 실수도 실패한 쿼리처럼 거부된 promise로 돌아가게 했다.
-  - **실패한 BEGIN이 이름을 남김:** `SAVEPOINT`가 성공한 뒤에만 열린 목록에 넣게 했다.
-- `READ ONLY`가 지켜지지 않는 점은 helper 주석과 이 기록에 적었다.
-- 2차 리뷰 반영 뒤:
-  - `npm run check`: 통과(백엔드 264개 통과·건너뜀 0, 프런트 534개 통과·2개 건너뜀)
-  - `npm run knip`: 통과
-  - 같은 경합 재현을 3번 돌렸다. 기록 프로세스가 6만 8천 건을 넣는 동안 3번 모두 통과했다(4개 통과, 실패 0).
+- There was no blocking problem. Two low-severity items were fixed.
+  - **An error from the helper could hide the app's original error:** for an unmatched `COMMIT` or `ROLLBACK`, the helper threw an exception right away. The app's `query('ROLLBACK').catch(...)` could not catch it and the original error could be overwritten. `query` was made async so that such a mistake also comes back as a rejected promise, like a failed query.
+  - **A failed BEGIN left its name:** the name is now put into the open list only after `SAVEPOINT` has succeeded.
+- That `READ ONLY` is not enforced was written in the helper comment and in this record.
+- After the second-review changes:
+  - `npm run check`: passed (backend 264 passed, 0 skipped, frontend 534 passed, 2 skipped)
+  - `npm run knip`: passed
+  - The same race reproduction was run 3 times. While the recording process inserted 68,000 records, it passed all 3 times (4 passed, 0 failed).

@@ -1,93 +1,93 @@
-# #128 #129 #130 대시보드 다시 시도 포커스, 기간의 연도, 기간 이동 범위
+# #128 #129 #130 Dashboard retry focus, year in the period, period navigation range
 
-- 이슈: [#128](https://github.com/sirloinbh/health-log/issues/128), [#129](https://github.com/sirloinbh/health-log/issues/129), [#130](https://github.com/sirloinbh/health-log/issues/130)
-- 브랜치: `fix/128-dashboard-range`
+- Issues: [#128](https://github.com/sirloinbh/health-log/issues/128), [#129](https://github.com/sirloinbh/health-log/issues/129), [#130](https://github.com/sirloinbh/health-log/issues/130)
+- Branch: `fix/128-dashboard-range`
 
-## 목적
+## Purpose
 
-대시보드(변화 리포트)의 작은 문제 셋을 한 PR로 고친다. 데이터와 서버는 바꾸지 않는다.
+Fix three small problems of the dashboard (the change report) in one PR. Data and the server are not changed.
 
-## 정한 것
+## Decisions
 
-- **#128 포커스:** 다시 시도가 진행되는 동안 버튼을 남겨 두고 `aria-disabled`로 표시한다. 그동안 포커스는 버튼에 그대로 있다.
-  - 성공하면 리포트의 기간 표시("11월 2일 ~ 11월 8일")로 포커스를 옮긴다.
-  - 다시 실패하면 포커스는 버튼에 그대로 있다.
-  - 목표 설정(#65)은 다시 시도를 누르는 즉시 영역 제목으로 옮긴다. 리포트는 요청하는 동안 보여 줄 제목이 없어, 버튼을 남기는 쪽을 골랐다.
-- **#129 연도:** 기간이 해를 넘거나 서버의 오늘과 다른 해면 연도를 붙인다. 형식은 하루 기록 화면("2000년 1월 1일")에 맞췄다.
-  - 해를 넘는 기간: `1999년 12월 27일 ~ 2000년 1월 2일`
-  - 다른 해의 기간: `2025년 11월 1일 ~ 11월 30일`. 끝 날짜는 같은 해라 연도를 다시 쓰지 않는다.
-  - 서버의 오늘을 아직 모르면 연도를 붙인다.
-  - 막대 그래프의 날짜("12/27")와 표는 그대로 둔다. 같은 화면의 기간 표시가 연도를 알려 주기 때문이다.
-- **#130 범위:** 하루 기록 화면(#50)과 같은 범위(2000-01-01 ~ 2099-12-31)를 쓴다.
-  - 2000-01-01이 든 주·달에서는 "이전", 2099-12-31이 든 주·달에서는 "다음"을 누를 수 없다.
-    - 하루 기록 화면처럼 `aria-disabled`와 범위 안내를 쓰고, 포커스는 떨어지지 않는다.
-    - 1999-12-27에 시작하는 주는 2000-01-01을 품으므로 보여 준다.
-  - 범위 밖 `date` 주소(`?date=1999-06-01`)는 리포트를 부르지 않는다. "2000-01-01부터 2099-12-31까지 기록할 수 있습니다: 1999-06-01"을 보이고 "이번 주로 이동"(또는 "이번 달로 이동") 버튼을 둔다. 하루 기록 화면과 같은 방식이다.
-  - API는 이번에 바꾸지 않았다. 범위 밖 날짜에도 계속 답한다(이슈 범위).
+- **#128 focus:** while a retry is in progress, the button is kept and marked with `aria-disabled`. Focus stays on the button meanwhile.
+  - On success, focus moves to the period label of the report ("11월 2일 ~ 11월 8일", Nov 2 to Nov 8).
+  - If it fails again, focus stays on the button.
+  - Goal settings (#65) move focus to the area title as soon as retry is pressed. The report has no title to show while it requests, so keeping the button was chosen.
+- **#129 year:** a year is added when the period crosses a year or is in a different year from the server's today. The format follows the daily record screen ("2000년 1월 1일", January 1, 2000).
+  - Period that crosses a year: `1999년 12월 27일 ~ 2000년 1월 2일`
+  - Period in another year: `2025년 11월 1일 ~ 11월 30일`. The end date is in the same year, so the year is not written again.
+  - If the server's today is not known yet, the year is added.
+  - The dates of the bar chart ("12/27") and the table are left as they are, because the period label on the same screen shows the year.
+- **#130 range:** it uses the same range as the daily record screen (#50), 2000-01-01 to 2099-12-31.
+  - In the week or month that contains 2000-01-01, "이전" (Previous) cannot be pressed, and in the week or month that contains 2099-12-31, "다음" (Next) cannot be pressed.
+    - Like the daily record screen, it uses `aria-disabled` and a range notice, and focus does not drop.
+    - The week that starts on 1999-12-27 contains 2000-01-01, so it is shown.
+  - A `date` address out of range (`?date=1999-06-01`) does not call the report. It shows "2000-01-01부터 2099-12-31까지 기록할 수 있습니다: 1999-06-01" (records can be made from 2000-01-01 to 2099-12-31: 1999-06-01) and has a "이번 주로 이동" (go to this week) button (or "이번 달로 이동", go to this month). This is the same as the daily record screen.
+  - The API was not changed this time. It still answers for dates out of range (the scope of the issue).
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
-- `frontend/src/report-text.ts`: `spanLabel(span, today)`가 위 기준으로 연도를 붙인다.
+- `frontend/src/report-text.ts`: `spanLabel(span, today)` adds the year by the rule above.
 - `frontend/src/report.tsx`
-  - 다시 시도: `retry`, 진행 중 `aria-disabled`, 성공 뒤 기간 표시로 포커스(`tabIndex={-1}`)
-  - 이전·다음: `earliestDate`·`latestDate`에서 `aria-disabled`와 `dailyRangeText` 설명
-  - 범위 밖 `date` 안내와 "이번 주로 이동"
-- 테스트
-  - `frontend/src/report-text.test.ts`: 연도 표시 1개를 더했다. 올해 표시 테스트에도 오늘을 넘기게 바꿨다.
-  - `frontend/src/report.test.tsx`: 3개를 더하고 1개를 넓혔다.
-    - 다시 시도 성공 뒤 기간 표시에 포커스
-    - 다시 실패하면 버튼에 포커스
-    - 범위 양 끝의 주·달 버튼
-    - 범위 밖 주소
-- 휴대폰 폭에서 연도가 붙은 기간 표시가 날짜 중간("2000년 1월 / 2일")에서 줄바꿈되던 것을 막았다. 날짜 안의 공백은 줄바꿈 없는 공백으로 바꾸고 `break-keep`을 붙여, "~"에서만 줄이 바뀐다.
+  - Retry: `retry`, `aria-disabled` while in progress, focus to the period label after success (`tabIndex={-1}`)
+  - Previous and Next: `aria-disabled` and the `dailyRangeText` description at `earliestDate` and `latestDate`
+  - The notice for an out-of-range `date` and "이번 주로 이동"
+- Tests
+  - `frontend/src/report-text.test.ts`: added 1 year display test. The test for the current-year display was also changed to pass today.
+  - `frontend/src/report.test.tsx`: added 3 and widened 1.
+    - Focus on the period label after a successful retry
+    - Focus on the button if it fails again
+    - The week and month buttons at both ends of the range
+    - Out-of-range address
+- At phone widths, the period label with a year was breaking in the middle of a date ("2000년 1월 / 2일"). This was prevented. Spaces inside a date were changed to non-breaking spaces and `break-keep` was added, so the line breaks only at "~".
 
-## 검증
+## Verification
 
-- `npm run check`(DB 없이): 통과(프론트엔드 511개 통과·2개 건너뜀, 백엔드 135개 통과·DB 통합 123개 건너뜀), `npm run knip`: 통과.
-- 브라우저: 임시 PostgreSQL 17(5471), 실제 API(127.0.0.1:3971), Vite(5271), 헤드리스 Chrome(9671). 390×844와 1440×900에서 같은 결과였다.
+- `npm run check` (without a DB): passed (frontend 511 passed, 2 skipped; backend 135 passed, 123 DB integration skipped), `npm run knip`: passed.
+- Browser: temporary PostgreSQL 17 (5471), real API (127.0.0.1:3971), Vite (5271), headless Chrome (9671). The results were the same at 390×844 and 1440×900.
 
-| 확인                                     | 결과                                                           |
-| ---------------------------------------- | -------------------------------------------------------------- |
-| `?period=week&date=2000-01-01` 기간 표시 | `1999년 12월 27일 ~ 2000년 1월 2일`                            |
-| 그 주의 "이전 주"                        | `aria-disabled`, 눌러도 주소 그대로, 포커스는 버튼에 남음      |
-| `?period=month&date=2025-11-01`          | `2025년 11월 1일 ~ 11월 30일`                                  |
-| `?period=week&date=2099-12-31`           | `2099년 12월 28일 ~ 2100년 1월 3일`, "다음 주" `aria-disabled` |
-| `?period=week&date=1999-06-01`           | 범위 안내 오류와 "이번 주로 이동"                              |
-| 리포트 요청 실패 → 다시 시도 성공        | 포커스가 기간 표시(`P`, "11월 2일 ~ 11월 8일")로 감            |
-| 가로 넘침                                | 없음                                                           |
+| Check                                          | Result                                                                              |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Period label of `?period=week&date=2000-01-01` | `1999년 12월 27일 ~ 2000년 1월 2일`                                                 |
+| "이전 주" (Previous week) of that week         | `aria-disabled`, the address stays the same when pressed, focus stays on the button |
+| `?period=month&date=2025-11-01`                | `2025년 11월 1일 ~ 11월 30일`                                                       |
+| `?period=week&date=2099-12-31`                 | `2099년 12월 28일 ~ 2100년 1월 3일`, "다음 주" (Next week) is `aria-disabled`       |
+| `?period=week&date=1999-06-01`                 | Range notice error and "이번 주로 이동"                                             |
+| Report request fails → retry succeeds          | Focus goes to the period label (`P`, "11월 2일 ~ 11월 8일")                         |
+| Horizontal overflow                            | none                                                                                |
 
-- 390 폭에서 처음에는 기간 표시가 날짜 중간에서 줄바꿈돼 위처럼 고쳤다. 고친 뒤에는 "1999년 12월 27일 ~" / "2000년 1월 2일" 두 줄이다.
-- 확인 뒤 Chrome, Vite, API, 임시 DB를 모두 껐다.
+- At width 390, the period label first broke in the middle of a date, so it was fixed as above. After the fix it is two lines, "1999년 12월 27일 ~" and "2000년 1월 2일".
+- After checking, Chrome, Vite, the API, and the temporary DB were all shut down.
 
-## 변경 — 2026-11-08 (1차 리뷰 반영)
+## Change — 2026-11-08 (first review applied)
 
-1차 리뷰(작성 문맥과 분리된 읽기 전용 리뷰)가 찾은 것과 처리다.
+What the first review (a read-only review separate from the authoring context) found and how it was handled.
 
-- **반영 1(높음)** 2000년 둘째 주(2000-01-03 ~ 01-09)에서 "이전 주"를 누르면 `date=1999-12-27`을 물어 범위 밖 안내가 떴다. 그 주는 2000-01-01을 품는데도 그랬다.
-  - 이제 이전 기간의 첫날이 범위보다 앞이면 `2000-01-01`로 묻는다.
-  - 다른 기간은 지금처럼 이전 기간의 첫날로 묻는다. 월간으로 바꿀 때 고르는 달이 달라지지 않는다.
-  - 위 "정한 것"의 "1999-12-27에 시작하는 주는 보여 준다"는 이 반영으로 이전 버튼에서도 맞게 됐다.
-- **반영 2(중간)** 요청이 진행되는 동안 주소가 범위 밖 날짜로 바뀌면, 늦게 온 이전 답이 범위 안내 옆에 그대로 그려졌다. 남아 있던 오류 안내도 함께 보였다.
-  - 이제 범위 밖이나 날짜를 모를 때도 요청 번호를 올리고 안내를 지운다.
-- **반영 3(낮음)** 다시 시도 중에 기간을 바꾸면, 다음 기간의 다시 시도 버튼이 이전 요청이 끝날 때까지 `aria-disabled`로 남았다. 이제 기간이 바뀌면 다시 시도 상태를 끝낸다.
-- **반영 4(낮음)** 다시 시도를 누른 뒤 다른 곳으로 포커스를 옮겼는데도, 성공하면 기간 표시로 포커스를 가져왔다. 이제 버튼이 사라져 포커스가 페이지로 떨어진 경우에만 옮긴다.
-- **남김(범위 밖, main에서도 같음)** 이전·다음이나 주간·월간을 누르면, 새 리포트를 받는 동안 기간 이동 줄이 사라져 포커스가 `<body>`로 떨어진다. #128과 같은 종류지만 다시 시도가 아닌 기간 이동이라 이 PR에서는 고치지 않는다. main 세션에 알려 후속 처리를 맡긴다.
-- 테스트: 2개를 더했다(리포트 화면 18개). 2000년 둘째 주에서 이전 주, 진행 중인 답과 범위 밖 주소다.
+- **Applied 1 (high)** In the second week of 2000 (2000-01-03 to 01-09), pressing "이전 주" asked for `date=1999-12-27` and the out-of-range notice appeared, even though that week contains 2000-01-01.
+  - Now, if the first day of the previous period is before the range, it asks for `2000-01-01`.
+  - Other periods still ask for the first day of the previous period as now. The month chosen when switching to monthly does not change.
+  - "The week that starts on 1999-12-27 is shown" in "Decisions" above is now also true for the Previous button because of this change.
+- **Applied 2 (medium)** If the address changed to an out-of-range date while a request was in progress, the late earlier answer was still drawn next to the range notice. An error notice that was left over also showed together.
+  - Now the request number is raised and the notice is cleared even when the date is out of range or unknown.
+- **Applied 3 (low)** If the period was changed during a retry, the retry button of the next period stayed `aria-disabled` until the earlier request finished. Now the retry state ends when the period changes.
+- **Applied 4 (low)** Even when focus was moved elsewhere after pressing retry, success still brought focus to the period label. Now it moves focus only when the button disappeared and focus fell to the page.
+- **Left (out of scope, same on main)** When Previous, Next, or weekly or monthly is pressed, the period navigation row disappears while the new report is received, and focus falls to `<body>`. It is the same kind of problem as #128, but it is a period change, not a retry, so it is not fixed in this PR. The main session was told to handle it as a follow-up.
+- Tests: added 2 (18 on the report screen). Previous week in the second week of 2000, and an answer in progress with an out-of-range address.
 
-## 변경 — 2026-11-08 (2차 리뷰 반영)
+## Change — 2026-11-08 (second review applied)
 
-2차 리뷰(마지막)는 1차 반영이 맞다고 확인했다(이전 기간 맞춤, 요청 번호, 2099 끝, 일반 주·달, 자정 넘김, 서버 확인 실패). 다음을 찾았다.
+The second review (the last) confirmed the first-review changes are correct (previous period adjustment, request number, the 2099 end, ordinary weeks and months, crossing midnight, and server check failure). It found the following.
 
-- **반영 1(중간~낮음, 1차 반영이 만듦)** 오래된 다시 시도가 새 다시 시도를 끝냈다.
-  - 재현: 주간 다시 시도가 진행 중일 때 월간으로 바꾸고, 월간도 실패해 다시 시도를 누른다. 그 사이 주간의 늦은 답이 오면 월간 다시 시도 버튼이 사라지고 포커스가 `<body>`로 떨어졌다.
-  - 이제 `load`가 성공·실패·지난 요청(`'ok' | 'failed' | 'stale'`)을 나눠 돌려준다. 지난 요청에 대한 다시 시도는 상태를 건드리지 않는다.
-- **반영 2(낮음)** 범위 밖 주소의 "이번 주로 이동"을 누르면 버튼이 안내와 함께 사라져 포커스가 `<body>`로 떨어졌다. 이제 새 리포트가 오면 기간 표시로 포커스를 옮긴다.
-- **반영 3(낮음)** 테스트 하나의 `waitFor`가 늘 통과하던 줄을 지웠다. 1차 반영 3·4번(기간을 바꾸면 다시 시도 상태 끝, 사용자가 옮긴 포커스는 그대로)도 테스트로 덮었다.
-- 테스트: 리포트 화면 20개.
-  - 새 회귀 테스트 2개는 반영 전 코드에서 실패하는 것을 확인했다.
-  - 오래된 다시 시도 테스트, 이동 버튼 포커스 테스트가 그 둘이다.
-- 브라우저: 반영 뒤 같은 방법으로 390×844, 1440×900을 다시 확인했다. 두 크기 모두 위 표의 결과가 같았다. 더한 확인은 아래와 같다.
-  - `?period=week&date=2000-01-05`(2000년 1월 3일 ~ 1월 9일)에서 "이전 주"를 누르면 `date=2000-01-01`로 가고, `1999년 12월 27일 ~ 2000년 1월 2일`을 보인다. 오류 안내는 없다.
-  - 범위 밖 주소에서 "이번 주로 이동"을 누르면 포커스가 기간 표시(`P`)로 간다.
-- 확인 뒤 Chrome, Vite, API, 임시 DB를 모두 껐다.
-- 규칙에 따라 3차 리뷰는 하지 않는다.
+- **Applied 1 (medium to low, created by the first-review changes)** An old retry ended a new retry.
+  - Reproduction: while a weekly retry is in progress, switch to monthly, the monthly one also fails, and press retry. If the late answer of the weekly one arrives in between, the monthly retry button disappears and focus falls to `<body>`.
+  - Now `load` returns success, failure, or a stale request (`'ok' | 'failed' | 'stale'`) separately. A retry for a stale request does not touch the state.
+- **Applied 2 (low)** Pressing "이번 주로 이동" on an out-of-range address made the button disappear together with the notice, and focus fell to `<body>`. Now focus moves to the period label when the new report arrives.
+- **Applied 3 (low)** A line of one test whose `waitFor` always passed was removed. Items 3 and 4 of the first-review changes (changing the period ends the retry state, focus moved by the user stays) are also covered by tests.
+- Tests: 20 on the report screen.
+  - The 2 new regression tests were confirmed to fail on the code before the changes.
+  - They are the old retry test and the navigation button focus test.
+- Browser: after the changes it was checked again at 390×844 and 1440×900 by the same method. Both sizes gave the same results as the table above. The added checks are as follows.
+  - On `?period=week&date=2000-01-05` (January 3 to January 9, 2000), pressing "이전 주" goes to `date=2000-01-01` and shows `1999년 12월 27일 ~ 2000년 1월 2일`. There is no error notice.
+  - Pressing "이번 주로 이동" on an out-of-range address moves focus to the period label (`P`).
+- After checking, Chrome, Vite, the API, and the temporary DB were all shut down.
+- By the rule, there is no third review.

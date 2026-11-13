@@ -1,86 +1,86 @@
-# #104 목표 달성 카드가 다른 카드의 저장 뒤 저절로 다시 판정하기
+# #104 Make the goal achievement card judge again by itself after another card saves
 
-- 이슈: [#104](https://github.com/sirloinbh/health-log/issues/104)
-- 브랜치: `feat/104-goal-card-refresh`
+- Issue: [#104](https://github.com/sirloinbh/health-log/issues/104)
+- Branch: `feat/104-goal-card-refresh`
 
-## 목적
+## Purpose
 
-#45의 "목표 달성" 카드는 같은 페이지의 다른 카드가 저장해도 다시 읽지 않았다. 식사를 더해 칼로리가 상한을 넘어도 "다시 판정"을 누르기 전까지 "달성"이 그대로 보였다. PR #103의 1차 리뷰에서 나와 분리한 이슈다.
+The "goal achievement" card from #45 did not read again when another card on the same page saved. Even if a meal was added and calories went over the upper limit, "achieved" stayed on screen until "Judge again" was pressed. This issue came up in the first review of PR #103 and was split out.
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
-- **`frontend/src/pending-writes.ts`:** `onWriteSettled(listener)`를 더했다.
-  - `trackWrite`로 등록한 쓰기가 끝나면, 성공이든 실패든 그 경로로 알린다.
-  - 알림은 대기 목록에서 지운 뒤에 보낸다. 그래서 알림을 받고 바로 읽어도 그 쓰기를 기다리지 않는다.
-  - 실패도 알리는 이유: 다시 읽는 비용은 요청 하나이고, 무엇이 서버에 닿았는지 짐작할 필요가 없다.
-  - 돌려받은 함수를 부르면 알림을 멈춘다.
-- **`frontend/src/goals.tsx`의 `GoalsCard`**
-  - 판정에 쓰는 경로의 쓰기가 끝나면 다시 읽는다. 경로는 그 날의 식사·수면·하루 체크, 그 주(월~일) 7일의 술 기록, 목표다.
-  - 술 기록은 #45의 `/api/habits/` 전체 대신 그 주 7일로 좁혔다. 다른 주의 술 기록이나 다른 날의 식사, 음식 편집으로는 다시 읽지 않는다.
-  - 읽기가 겹치면 마지막 읽기의 답만 보인다. 저장 두 번이 읽기 두 번을 시작했을 때, 늦게 온 앞 읽기의 답이 새 판정을 덮지 않는다.
-  - 다시 읽는 동안 이전 판정을 그대로 보인다.
-  - 카드가 사라지면 알림을 멈춘다.
-  - "다시 판정" 버튼은 남겨 두었다. 다른 탭에서 바꾼 기록처럼 이 페이지 밖의 변경을 위한 것이다.
-- **수면 목표 입력 배치(#45 후속)**
-  - 브라우저 확인 중 PC(1440×900)에서 문제를 찾았다. 반쪽 너비 카드에서 "하루 수면 시간 (시간)" 라벨이 두 줄로 꺾여, 시간 칸이 분 칸보다 아래에 놓였다.
-  - 시간 칸의 보이는 라벨을 분 칸처럼 "시간" 한 단어로 줄였다.
-  - 칸에는 `aria-label="하루 수면 시간 (시간)"`을 주어 접근 가능한 이름은 그대로다.
+- **`frontend/src/pending-writes.ts`:** added `onWriteSettled(listener)`.
+  - When a write registered with `trackWrite` finishes, successfully or not, the listener is told its path.
+  - The notification is sent after the write is removed from the pending list. So a read started right after the notification does not wait for that write.
+  - Why failures are announced too: re-reading costs one request, and there is no need to guess what reached the server.
+  - Calling the returned function stops the notifications.
+- **`GoalsCard` in `frontend/src/goals.tsx`**
+  - It reads again when a write to a path used for the judgment finishes. The paths are the meals, sleep, and daily checks of that day, the alcohol records of the 7 days of that week (Monday to Sunday), and the goals.
+  - Alcohol records were narrowed from all of `/api/habits/` in #45 to the 7 days of that week. It does not read again for alcohol records of other weeks, meals of other days, or food edits.
+  - When reads overlap, only the answer of the last read is shown. When two saves start two reads, the late answer of the earlier read does not overwrite the new judgment.
+  - While reading again, it keeps showing the previous judgment.
+  - When the card disappears, it stops listening.
+  - The "Judge again" button was kept. It is for changes made outside this page, such as records changed in another tab.
+- **Placement of the sleep goal inputs (follow-up to #45)**
+  - While checking in the browser, a problem was found on PC (1440×900). In the half-width card, the label "하루 수면 시간 (시간)" (sleep hours per day (hours)) wrapped to two lines, so the hours field sat lower than the minutes field.
+  - The visible label of the hours field was shortened to the single word "시간" (hours), like the minutes field.
+  - The field has `aria-label="하루 수면 시간 (시간)"`, so the accessible name is unchanged.
 
-## 변경 — 2026-11-08 (1차 리뷰 반영)
+## Change — 2026-11-08 (first review applied)
 
-PR #109의 1차 리뷰(작성 문맥과 분리된 읽기 전용 리뷰)는 고칠 결함 없이 낮음 등급 3개를 남겼다.
+The first review of PR #109 (a read-only review separate from the authoring context) left 3 low-severity items and no defect to fix.
 
-- **반영 1** 저장할 때마다 목표 카드 버튼 안의 `role="status"` "다시 판정하는 중"이 나타나, 다른 카드에서 일하는 동안 화면 낭독기가 읽을 수 있었다. 이제 스피너와 `aria-busy`는 "다시 판정"을 눌렀을 때만 보인다. 저장으로 시작한 읽기는 조용히 한다.
-- **반영 2** "다시 읽어야 하는 저장" 테스트가 4번째 읽기가 나오면 바로 통과해, 그 뒤 더 읽어도 잡지 못했다. 잠깐 기다린 뒤 정확히 4번인지 다시 확인한다.
-- **그대로 3** 리스너 하나가 동기적으로 예외를 던지면 뒤 리스너가 불리지 않는다. 지금 리스너는 비동기 `load` 하나뿐이라 일어나지 않아 고치지 않았다.
-- 자동 다시 읽기가 실패하면 목표 카드에 오류 안내가 뜨는 것은 그대로 두었다. 이전 판정이 맞지 않을 수 있다는 것을 알리는 편이 낫다고 보았다.
-- 테스트: `frontend/src/goals.test.tsx`에 "저장으로 시작한 읽기는 조용하고, 버튼으로 시작한 읽기만 알린다"를 더했다.
-- 검사: 프론트엔드만 바뀌어 임시 DB 없이 `npm run check`를 실행했고 통과했다.
-  - 백엔드: 111개 통과, 96개 건너뜀(DB 통합 테스트). 이 PR은 백엔드를 바꾸지 않는다.
-  - 프론트엔드: 401개 통과, 2개 건너뜀(다크 전용 조건).
-  - `npm run knip`: 통과.
+- **Applied 1** On every save, the `role="status"` "다시 판정하는 중" (judging again) inside the goal card button appeared, so a screen reader could read it while the user was working in another card. Now the spinner and `aria-busy` show only when "Judge again" was pressed. A read started by a save is quiet.
+- **Applied 2** The test "a save that must read again" passed as soon as the 4th read appeared, so it could not catch more reads after that. It now waits a moment and checks again that there were exactly 4.
+- **Left as is 3** If one listener throws synchronously, later listeners are not called. Today's only listener is the single asynchronous `load`, so this does not happen, and it was not fixed.
+- That an error message appears on the goal card when the automatic re-read fails was left as it is. It was judged better to tell the user that the previous judgment may be wrong.
+- Test: added "a read started by a save is quiet, and only a read started by the button announces" to `frontend/src/goals.test.tsx`.
+- Check: only the frontend changed, so `npm run check` was run without a temporary DB and passed.
+  - Backend: 111 passed, 96 skipped (DB integration tests). This PR does not change the backend.
+  - Frontend: 401 passed, 2 skipped (dark-only conditions).
+  - `npm run knip`: passed.
 
-## 변경 — 2026-11-08 (2차 리뷰 반영)
+## Change — 2026-11-08 (second review applied)
 
-2차 리뷰는 1차 반영(`asked` 상태)이 맞다고 확인했다. 병합을 막을 결함은 없었고 낮음 2개와 범위 밖 참고 1개가 나왔다. 리뷰는 이번이 마지막이다.
+The second review confirmed the first-review change (the `asked` state) is correct. There was no defect that blocks merging; it found 2 low items and 1 out-of-scope note. This is the last review.
 
-- **반영 1** 저장으로 시작한 조용한 읽기 중에 "다시 판정"을 누르면 무시됐다. 이제 조용한 읽기를 새 읽기로 대체하고 스피너로 알린다. 늦게 온 조용한 읽기의 답은 버린다. 이미 사람이 요청한 읽기가 진행 중일 때만 누름을 무시한다.
-- **반영 2** 1차에서 더한 테스트가 늘 참인 `toBeEnabled()`로 기다렸다. 첫 응답과 다른 판정을 주고, 화면에 "미달"이 보일 때까지 기다리게 바꿨다.
-- **참고 3(이 PR에서 고치지 않음)** 버튼 안 `role="status"` 스피너는 버튼 이름에 섞이거나 일부 낭독기에서 알림이 되지 않을 수 있다. #45 이전부터 여러 카드의 저장 버튼이 같은 구조라 이 PR에서 바꾸지 않았다.
-- 테스트: `frontend/src/goals.test.tsx`에 "조용한 읽기 중 버튼을 누르면 새로 읽고 알린다"를 더했다.
-- 검사: DB 없이 `npm run check` 통과(백엔드 111개 통과·DB 테스트 96개 건너뜀, 프론트엔드 402개 통과·2개 무관 건너뜀), `npm run knip` 통과.
+- **Applied 1** Pressing "Judge again" during a quiet read started by a save was ignored. Now the quiet read is replaced by a new read and the spinner announces it. The answer of the late quiet read is discarded. The press is ignored only when a read the person asked for is already in progress.
+- **Applied 2** The test added in the first review waited on an always-true `toBeEnabled()`. It was changed to give a judgment different from the first response and wait until "미달" (missed) shows on screen.
+- **Note 3 (not fixed in this PR)** The `role="status"` spinner inside a button can get mixed into the button name, or may not be announced by some screen readers. The save buttons of several cards have had the same structure since before #45, so this PR did not change it.
+- Test: added "pressing the button during a quiet read reads again and announces" to `frontend/src/goals.test.tsx`.
+- Check: `npm run check` without a DB passed (backend 111 passed, 96 DB tests skipped; frontend 402 passed, 2 unrelated skipped), `npm run knip` passed.
 
-## 검증
+## Verification
 
-- 테스트
-  - `frontend/src/pending-writes.test.ts`: 성공·실패한 쓰기를 모두 알리는지, 알릴 때 같은 경로의 읽기가 이미 기다리지 않는지, 알림을 멈춘 뒤에는 오지 않는지 확인한다.
-  - `frontend/src/goals.test.tsx`(4개 추가)
-    - 같은 날 식사를 저장하면 버튼 없이 "달성"이 "미달"로 바뀐다.
-    - 다른 날 식사·수면, 다른 주의 술(11-01, 11-09), 음식 편집으로는 다시 읽지 않는다. 같은 주의 술(11-08), 그 날 하루 체크, 목표는 다시 읽는다.
-    - 겹친 읽기에서 늦게 온 앞 읽기의 답이 보이지 않는다.
-    - 사라진 카드는 다시 읽지 않는다.
-- 임시 PostgreSQL 17 클러스터(포트 5471, `health_test`)로 `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5471/health_test npm run check`: 통과.
-  - 백엔드: 212개 통과, 0개 건너뜀.
-  - 프론트엔드: 400개 통과, 2개 건너뜀. 건너뛴 2개는 다크 전용 앱 조건 테스트로, 이 변경과 관계없다.
-  - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과.
+- Tests
+  - `frontend/src/pending-writes.test.ts`: checks that both successful and failed writes are announced, that a read of the same path is not already waiting when it is announced, and that nothing arrives after the notifications are stopped.
+  - `frontend/src/goals.test.tsx` (4 added)
+    - Saving a meal on the same day changes "달성" (achieved) to "미달" (missed) without a button.
+    - It does not read again for a meal or sleep on another day, alcohol in another week (11-01, 11-09), or a food edit. It does read again for alcohol in the same week (11-08), the daily check of that day, and goals.
+    - In overlapping reads, the late answer of the earlier read is not shown.
+    - A card that disappeared does not read again.
+- `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5471/health_test npm run check` with a temporary PostgreSQL 17 cluster (port 5471, `health_test`): passed.
+  - Backend: 212 passed, 0 skipped.
+  - Frontend: 400 passed, 2 skipped. The 2 skipped are dark-only app condition tests and are unrelated to this change.
+  - Skills check: 4 passed.
+- `npm run knip`: passed.
 
-### 브라우저 확인
+### Browser check
 
-임시 DB에 실제 API(127.0.0.1:3971)와 Vite(5271)를 띄우고 헤드리스 Chrome(디버깅 9671)을 CDP로 움직였다. 데이터는 Node 스크립트로 API에 UTF-8 JSON을 보내 넣었다. 11-01부터 목표 4개, 11-06에 점심 950kcal, 수면, 직접 체크를 넣었다.
+The real API (127.0.0.1:3971) and Vite (5271) were started on a temporary DB, and headless Chrome (debugging 9671) was driven over CDP. Data was put in by sending UTF-8 JSON to the API from a Node script. From 11-01 there were 4 goals, and on 11-06 a lunch of 950 kcal, sleep, and a direct check.
 
-| 항목                                                                                                                                                           | 390×844 | 1440×900 |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
-| 11-06 식단 카드의 "바로 기록"으로 1,300kcal를 더하면, 버튼 없이 목표 카드가 "달성 950kcal"에서 "미달 2,250kcal"로 바뀜                                         | 통과    | —        |
-| 11-07(식사 없음)에 1,300kcal를 더하면 "기록 없음"에서 "달성 1,300kcal"로 바뀜                                                                                  | —       | 통과     |
-| #45 수면 목표 시간·분 입력: 기존 7시간 0분이 채워짐, 분에 `1O` 입력 시 거부, 7시간 10분을 11-06부터 저장 → 현재 목표·폼 갱신, 포커스가 수면 카드 제목으로 이동 | 통과    | —        |
-| 저장 뒤 11-06 수면 판정이 새 목표(7시간 10분 이상)로 "달성"                                                                                                    | 통과    | —        |
-| 수면 목표의 시간·분·시작일 칸 높이가 같음(고친 뒤). 고치기 전 1440에서는 시간 칸이 아래로 밀렸음                                                               | 통과    | 통과     |
+| Item                                                                                                                                                                                                                           | 390×844 | 1440×900 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- | -------- |
+| Adding 1,300 kcal with "바로 기록" (record directly) on the 11-06 meal card changed the goal card from "달성 950kcal" (achieved) to "미달 2,250kcal" (missed) without a button                                                 | passed  | —        |
+| Adding 1,300 kcal on 11-07 (no meals) changed "기록 없음" (no record) to "달성 1,300kcal" (achieved)                                                                                                                           | —       | passed   |
+| #45 sleep goal hours and minutes inputs: the existing 7 hours 0 minutes were filled in, `1O` in minutes was rejected, 7 hours 10 minutes saved from 11-06 → current goal and form updated, focus moved to the sleep card title | passed  | —        |
+| After saving, the 11-06 sleep judgment became "달성" (achieved) with the new goal (7 hours 10 minutes or more)                                                                                                                 | passed  | —        |
+| The hours, minutes, and start-date fields of the sleep goal have the same height (after the fix). Before the fix at 1440 the hours field was pushed down                                                                       | passed  | passed   |
 
-- 각 변경은 두 너비 중 한쪽에서만 눌러 봤고, 다른 너비는 배치만 확인했다.
-- 확인 뒤 Chrome, Vite, API, 임시 DB를 모두 껐다.
+- Each change was tried by clicking at only one of the two widths, and at the other width only the layout was checked.
+- After checking, Chrome, Vite, the API, and the temporary DB were all shut down.
 
-## 제한·후속
+## Limits and follow-up
 
-- 다른 탭이나 다른 기기에서 바꾼 기록은 알 수 없다. 그때는 "다시 판정"을 누른다.
-- 설정 화면 금주 "지금 목표"의 기준 차이는 #107에서 다룬다.
+- Records changed in another tab or on another device cannot be known. In that case press "Judge again".
+- The difference in the basis of the sobriety "current goal" on the settings screen is handled in #107.

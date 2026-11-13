@@ -1,71 +1,71 @@
-# #126 하루 기록 카드와 목표 설정의 저장 실패 뒤 포커스 지키기
+# #126 Keep focus after a save fails on the daily record cards and goal settings
 
-- 이슈: [#126](https://github.com/sirloinbh/health-log/issues/126)
-- 브랜치: `fix/126-card-save-focus`
+- Issue: [#126](https://github.com/sirloinbh/health-log/issues/126)
+- Branch: `fix/126-card-save-focus`
 
-## 목적
+## Purpose
 
-하루 기록 카드와 목표 설정에서 저장을 누르면 저장 버튼이 `disabled`가 되어 포커스를 잃고, 포커스가 `<body>`로 갔다. 저장이 실패해 안내가 나와도 포커스가 `<body>`에 남았다. 키보드 사용자는 페이지 맨 앞부터 다시 Tab으로 들어와야 했다. 음식·조합 대화상자는 #98에서 같은 문제를 고쳤다.
+On the daily record cards and goal settings, pressing Save made the save button `disabled`, so it lost focus and focus went to `<body>`. Even when the save failed and a message appeared, focus stayed on `<body>`. A keyboard user had to Tab in again from the start of the page. The food and combo dialogs had the same problem fixed in #98.
 
-## 정한 것
+## Decisions
 
-- **공통 버튼 `BusyButton`(`frontend/src/busy-button.tsx`):**
-  - 저장 중에는 `disabled` 대신 `aria-disabled`와 흐린 모양으로 둔다. 포커스는 버튼에 남는다.
-  - 저장 중에 누르면 무시하고, submit 버튼이면 폼 제출도 막는다.
-  - #98은 화면마다 같은 코드를 썼지만, 이번에는 여섯 곳이라 한 컴포넌트로 묶었다.
-  - `disabled`는 아예 쓸 수 없는 버튼(음식이 없는 조합)에만 남는다.
-- **저장 함수의 중복 방지:** 칸에서 Enter를 누르면 버튼을 거치지 않고 폼이 제출된다. 그래서 각 저장 함수도 저장 중이면 아무것도 하지 않는다.
-- **저장 실패 뒤:** 포커스는 누른 버튼에 그대로 있다. 실패 이유는 카드 안의 안내(`role="alert"`)가 읽어 준다. Enter로 저장했다면 포커스는 그 칸에 남는다.
-- **같은 실패의 재안내:** 저장할 때마다 이전 안내를 먼저 지운다. 같은 이유로 두 번 실패해도 안내가 새로 나타나 다시 읽힌다(#98과 같다). 식단 카드의 추가 함수는 이미 이렇게 하고 있었다.
-- **저장 성공 뒤:** 바뀌지 않았다. 카드 제목으로 포커스를 옮긴다(#65 방식).
-- **범위 밖:**
-  - 식단 카드의 "검색", "조합에서 고르기"는 저장이 아니라 읽기라 이번에 바꾸지 않았다. 이 둘도 읽는 동안 `disabled`가 된다.
-  - 하루 체크의 지킴·잠 버튼은 저장 중 `disabled`로 둔다. 저장을 누를 때 포커스가 이 버튼들에 있지 않기 때문이다.
+- **Shared button `BusyButton` (`frontend/src/busy-button.tsx`):**
+  - While saving, it uses `aria-disabled` and a dimmed look instead of `disabled`. Focus stays on the button.
+  - A press during saving is ignored, and for a submit button the form submission is blocked too.
+  - #98 used the same code on each screen, but this time there are six places, so it was put into one component.
+  - `disabled` stays only for buttons that cannot be used at all (a combo with no foods).
+- **Duplicate prevention in the save functions:** pressing Enter in a field submits the form without going through the button. So each save function also does nothing while saving.
+- **After a save fails:** focus stays on the button that was pressed. The reason for the failure is read out by the message inside the card (`role="alert"`). If the save was done with Enter, focus stays in that field.
+- **Announcing the same failure again:** on each save, the previous message is cleared first. Even if it fails twice for the same reason, the message appears anew and is read again (same as #98). The add function of the meal card already did this.
+- **After a save succeeds:** unchanged. Focus moves to the card title (the #65 way).
+- **Out of scope:**
+  - "검색" (Search) and "조합에서 고르기" (Pick from combos) on the meal card are reads, not saves, so they were not changed this time. These two also become `disabled` while reading.
+  - The "지킴" (kept) and "잠" (sleep) buttons of the daily check are left `disabled` while saving, because focus is not on these buttons when Save is pressed.
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
-| 파일                                                             | 내용                                                                                                                         |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `frontend/src/busy-button.tsx`                                   | 새 공통 버튼                                                                                                                 |
-| `frontend/src/sleep.tsx`, `body.tsx`, `habits.tsx`, `checks.tsx` | 저장·취소 버튼을 `BusyButton`으로 바꾸고, `submit`에 저장 중 무시와 안내 지우기를 넣음                                       |
-| `frontend/src/goals.tsx`                                         | 저장·"시작일부터 목표 끄기" 버튼, `submit`과 `save`에 같은 처리                                                              |
-| `frontend/src/meals.tsx`                                         | 검색 결과·최근 음식의 "추가", 조합 "기록", "복사", "바로 기록"을 `BusyButton`으로 바꾸고, 각 추가 함수에 추가 중 무시를 넣음 |
-| `frontend/src/save-focus.test.tsx`                               | 여섯 폼의 실패 시나리오, 저장 중 폼 제출, `BusyButton` 단위 테스트                                                           |
-| `frontend/src/*.test.tsx`                                        | 저장 중 `toBeDisabled()` 확인을 `aria-disabled` 확인으로 바꿈                                                                |
+| File                                                             | Content                                                                                                                                                                                                   |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `frontend/src/busy-button.tsx`                                   | New shared button                                                                                                                                                                                         |
+| `frontend/src/sleep.tsx`, `body.tsx`, `habits.tsx`, `checks.tsx` | Save and cancel buttons changed to `BusyButton`, and `submit` got ignoring while saving and clearing the message                                                                                          |
+| `frontend/src/goals.tsx`                                         | The Save and "시작일부터 목표 끄기" (turn the goal off from the start date) buttons, and the same handling in `submit` and `save`                                                                         |
+| `frontend/src/meals.tsx`                                         | "추가" (Add) of search results and recent foods, "기록" (Record) of a combo, "복사" (Copy), and "바로 기록" (Record directly) changed to `BusyButton`, and each add function ignores a press while adding |
+| `frontend/src/save-focus.test.tsx`                               | Failure scenarios of six forms, form submission while saving, and `BusyButton` unit tests                                                                                                                 |
+| `frontend/src/*.test.tsx`                                        | Changed the `toBeDisabled()` check during saving to an `aria-disabled` check                                                                                                                              |
 
-## 검증
+## Verification
 
-### 자동 테스트
+### Automated tests
 
-- `save-focus.test.tsx`는 수면, 신체, 술·담배, 하루 체크, 식단 바로 기록, 목표 설정의 여섯 폼마다 같은 순서로 확인한다.
-  1. 저장 버튼에 포커스를 두고 누른다.
-  2. 저장 중에 버튼이 `aria-disabled`이고, 활성 상태이며, 포커스를 가진다.
-  3. 다시 눌러도 요청이 1번만 간다.
-  4. 500으로 실패하면 안내가 나오고 포커스가 버튼에 남는다.
-  5. 다시 저장하면 안내가 사라졌다가 같은 실패로 다시 나타난다.
-- 고치기 전 코드(`origin/main`)로 돌려 실행하면 이 파일의 테스트 13개 중 12개가 실패했다. 버튼 단위 테스트만 통과했다.
-- `npm run check`가 통과했다. `origin/main`을 병합한 뒤 프런트엔드 테스트 523개 중 521개 통과, 2개 건너뜀. `npm run knip`도 통과했다.
+- `save-focus.test.tsx` checks the same sequence for each of the six forms: sleep, body, alcohol and tobacco, daily check, meal direct record, and goal settings.
+  1. Put focus on the Save button and press it.
+  2. While saving, the button is `aria-disabled`, enabled, and has focus.
+  3. Pressing again sends only 1 request.
+  4. When it fails with 500, the message appears and focus stays on the button.
+  5. Saving again makes the message disappear and then appear again with the same failure.
+- Run against the code before the fix (`origin/main`), 12 of the 13 tests in this file failed. Only the button unit test passed.
+- `npm run check` passed. After merging `origin/main`, 521 of 523 frontend tests passed, 2 skipped. `npm run knip` also passed.
 
-### 브라우저 — 2026-11-08
+### Browser — 2026-11-08
 
-임시 PostgreSQL 17(5472, `health_test`), API 3972, Vite 5272, 헤드리스 Chrome 9672에서 확인했다. DevTools 프로토콜로 저장 요청을 1.2초 늦춘 뒤 500으로 실패시켰다. 폭 1440px과 390px에서 결과가 같았다.
+Checked on a temporary PostgreSQL 17 (5472, `health_test`), API 3972, Vite 5272, and headless Chrome 9672. The save request was delayed by 1.2 seconds with the DevTools protocol and then failed with 500. The results were the same at widths 1440px and 390px.
 
-| 폼             | 저장 중 포커스                          | 실패 뒤 포커스  | 저장 중 다시 Enter | 성공 뒤 포커스         |
-| -------------- | --------------------------------------- | --------------- | ------------------ | ---------------------- |
-| 수면           | 저장 (`aria-disabled`, `disabled` 아님) | 저장, 안내 표시 | 요청 1번           | 카드 제목              |
-| 신체           | 저장                                    | 저장            | 요청 1번           | 카드 제목              |
-| 술·담배        | 저장                                    | 저장            | 요청 1번           | 카드 제목              |
-| 하루 체크      | 저장                                    | 저장            | 요청 1번           | 카드 제목              |
-| 식단 바로 기록 | 바로 기록                               | 바로 기록       | 요청 1번           | 바로 기록(이전과 같음) |
-| 목표(칼로리)   | 저장                                    | 저장            | 요청 1번           | 카드 제목              |
+| Form                | Focus while saving                     | Focus after failure | Enter again while saving | Focus after success          |
+| ------------------- | -------------------------------------- | ------------------- | ------------------------ | ---------------------------- |
+| Sleep               | Save (`aria-disabled`, not `disabled`) | Save, message shown | 1 request                | Card title                   |
+| Body                | Save                                   | Save                | 1 request                | Card title                   |
+| Alcohol and tobacco | Save                                   | Save                | 1 request                | Card title                   |
+| Daily check         | Save                                   | Save                | 1 request                | Card title                   |
+| Meal direct record  | "바로 기록" (Record directly)          | "바로 기록"         | 1 request                | "바로 기록" (same as before) |
+| Goal (calories)     | Save                                   | Save                | 1 request                | Card title                   |
 
-고치기 전에는 같은 절차에서 실패 뒤 포커스가 모두 `<body>`였다(#126 재현).
+Before the fix, the same procedure left focus on `<body>` after every failure (the #126 reproduction).
 
-안내를 먼저 지우는 처리는 이 브라우저 확인 뒤에 더했고, 자동 테스트로 확인했다.
+The handling that clears the message first was added after this browser check, and was checked with automated tests.
 
-## 리뷰 반영 — 2026-11-08
+## Review changes — 2026-11-08
 
-- 1차 리뷰에서 결함은 나오지 않았다.
-- 저장 중 폼 제출(칸에서 Enter) 테스트를 수면 하나에서 여섯 폼 모두로 넓혔다.
-- jsdom은 `disabled`가 된 버튼에서도 포커스를 빼지 않는다. 그래서 실제로 문제를 잡는 검사는 "저장 중에도 버튼이 활성"이라는 점을 테스트 주석에 적었다.
-- 남겨 둔 것: 저장 중인 버튼에도 hover 스타일이 적용된다. #98 대화상자와 같은 모양이라 바꾸지 않았다.
+- The first review found no defects.
+- The test for form submission while saving (Enter in a field) was widened from sleep only to all six forms.
+- jsdom does not take focus away from a button that became `disabled`. So the check that actually catches the problem is "the button is enabled while saving", and this was written in a test comment.
+- Left as it is: the hover style still applies to a button that is saving. It has the same look as the #98 dialog, so it was not changed.

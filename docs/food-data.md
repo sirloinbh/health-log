@@ -1,49 +1,49 @@
-# 영양성분 데이터 작성 규칙
+# Nutrition data writing rules
 
-음식 영양성분은 나중에 다시 검증할 수 있어야 한다. 이 규칙은 조사 이슈(#31, #32, #33)와 직접 입력에 모두 적용한다.
+Food nutrition values must be verifiable later. These rules apply to the research issues (#31, #32, #33) and to manual entry.
 
-## 값
+## Values
 
-- 영양성분은 **1회 제공량 기준**으로 저장한다. 제품 표기가 100g 기준이면 1회 제공량을 `100`, `g`로 적는다.
-- 식약처 식품영양성분 DB처럼 100g(또는 100mL)당 값과 총 내용량을 함께 주는 자료는 **총 내용량으로 환산**해 저장한다. 총 내용량이 없으면 100g(100mL)로 저장한다. 출처와 대조할 때는 환산값을 100당 값으로 되돌려 비교한다.
-- 음식 이름은 사람들이 검색하는 말로 적을 수 있다. 공식 이름과 다르면 출처 페이지에서 확인한다. 예: `돈가스(돈까스)`, `닭가슴살(삶은것)`.
-- 같은 음식의 자료가 여러 개면 **실제 분석값 → 수집값 → 산출값, 총 내용량이 기준량과 다른 자료, 외식 → 가정식 → 급식, 최신 생성일** 순서로 고른다. 산출값은 출처도 참고치로 안내하므로 분석 자료가 없을 때만 쓴다. 총 내용량이 `100g`이거나 `-`이면 1인분 정보가 없는 것으로 본다.
-- 후보를 찾을 때는 출처의 다른 표기까지 찾는다. 띄어쓰기와 이름 순서가 달라 정확히 일치하는 이름으로는 빠진다. 예: `짜장면`은 `자장면`, `참치김밥`은 `김밥_참치`, `제육볶음`은 `돼지고기볶음(제육볶음)`.
-- 칼로리는 kcal, 탄수화물·단백질·지방·당류는 g, 나트륨은 mg이다.
-- **모르는 값은 NULL로 둔다. 0으로 적지 않는다.** 0은 실제로 0일 때만 쓴다. "1g 미만"처럼 범위로만 표기된 값도 NULL이다.
-- 포장 제품(#32)은 이름 끝에 총 내용량을 적고(`갈비탕 400g`), 1회 제공량에는 영양성분 표기의 기준량을 적는다. 둘이 같으면 총 내용량 기준 표기이고, 1회 제공량이 더 작으면 일부 중량 기준 표기다.
-- 숫자는 소수 둘째 자리까지 저장한다. 화면과 API는 더 세밀한 값을 거부한다.
-- 확인 날짜는 미래일 수 없다.
-- 같은 메뉴의 크기가 다르면 이름으로 구분한다. 예: `와퍼`, `와퍼 주니어`.
-- 음식은 이름과 브랜드의 조합으로 구분하며 중복 등록할 수 없다.
+- Store nutrition **per serving**. If the product label is per 100g, write the serving as `100`, `g`.
+- For sources such as the Ministry of Food and Drug Safety (MFDS) food nutrition DB, which give values per 100g (or 100mL) together with the total content, **convert to the total content** and store that. If there is no total content, store it as 100g (100mL). When you compare with the source, convert back to a per-100 value first.
+- A food name may be written in the words people search for. If it differs from the official name, confirm it on the source page. For example `돈가스(돈까스)` (pork cutlet) and `닭가슴살(삶은것)` (chicken breast, boiled).
+- If there are several records for the same food, choose in this order: **measured analysis value → collected value → calculated value, records whose total content differs from the reference amount, eating out → home cooking → institutional meals, newest creation date**. The source itself calls calculated values reference values, so use them only when there is no analysis record. A total content of `100g` or `-` means there is no per-portion information.
+- When you look for candidates, also look for the other spellings in the source. Spacing and word order differ, so the exactly matching name misses them. For example `짜장면` (jajangmyeon) is `자장면`, `참치김밥` (tuna gimbap) is `김밥_참치`, and `제육볶음` (stir-fried pork) is `돼지고기볶음(제육볶음)`.
+- Calories are in kcal, carbs, protein, fat, and sugars in g, and sodium in mg.
+- **Leave an unknown value as NULL. Do not write 0.** Use 0 only when it really is 0. A value given only as a range, such as "less than 1g", is also NULL.
+- For a packaged product (#32), write the total content at the end of the name (`갈비탕 400g`, galbitang, beef rib soup), and write the reference amount of the nutrition label as the serving. If the two are the same, the label is per total content, and if the serving is smaller, the label is per part of the weight.
+- Store numbers to two decimal places. The screen and the API reject finer values.
+- The checked date cannot be in the future.
+- If the same menu item comes in different sizes, tell them apart by name. For example `와퍼` (Whopper) and `와퍼 주니어` (Whopper Junior).
+- Foods are told apart by the combination of name and brand, and cannot be registered twice.
 
-## 출처
+## Sources
 
-| `source_type` | 뜻                      | 출처 주소 | 확인 날짜 |
-| ------------- | ----------------------- | --------- | --------- |
-| `official`    | 제조사·브랜드 공식 자료 | 필수      | 필수      |
-| `public`      | 공공 식품 영양성분 자료 | 필수      | 필수      |
-| `label`       | 제품 포장의 표기        | 선택      | 필수      |
-| `estimate`    | 추정값                  | 선택      | 선택      |
-| `manual`      | 직접 입력 (출처 미상)   | 선택      | 선택      |
+| `source_type` | Meaning                                 | Source URL | Checked date |
+| ------------- | --------------------------------------- | ---------- | ------------ |
+| `official`    | Official data of the maker or the brand | Required   | Required     |
+| `public`      | Public food nutrition data              | Required   | Required     |
+| `label`       | What is printed on the product package  | Optional   | Required     |
+| `estimate`    | An estimate                             | Optional   | Optional     |
+| `manual`      | Manual entry (source unknown)           | Optional   | Optional     |
 
-- 추정값을 `official`로 적지 않는다.
-- 쇼핑몰이나 블로그에 옮겨 적힌 수치는 `official`이 아니다. 원본을 찾지 못하면 `estimate`로 적는다. 제조사가 직접 운영하는 공식몰(예: CJ제일제당의 CJ더마켓, #32)의 제품 표기는 `official`이다.
-- 프랜차이즈 공식 표(#31)는 대개 포화지방만 있고 총지방과 탄수화물이 없다. 포화지방을 `fat`에 넣지 않는다. 없는 값은 NULL로 둔다.
-- 표가 이미지로만 공개되면 확대해 읽고, 따로 한 번 더 읽어 맞춰 본다. 표에 함께 적힌 1일 기준치 비율(단백질 55g, 나트륨 2,000mg)과도 대조한다. 출처 주소는 그 이미지 주소로 적는다. 방법과 결과는 [#31 기록](changes/31-franchise-foods.md)에 있다.
+- Do not write an estimate as `official`.
+- Numbers copied onto a shopping site or a blog are not `official`. If you cannot find the original, write `estimate`. The product label on an official shop run directly by the maker (for example CJ CheilJedang CJ The Market, #32) is `official`.
+- The official tables of franchises (#31) usually have only saturated fat and no total fat or carbs. Do not put saturated fat in `fat`. Leave a missing value as NULL.
+- If a table is published only as an image, enlarge it and read it, then read it once more separately to match. Also compare with the daily value percentages written in the table (protein 55g, sodium 2,000mg). Write the URL of that image as the source URL. The method and the result are in the [#31 record](changes/31-franchise-foods.md).
 
-## 조사 데이터 넣기
+## Adding research data
 
-조사 데이터는 `database/migrations/NNN_foods_<이름>.sql` 마이그레이션으로 넣는다. 아래 형식은 재실행해도 이름과 브랜드가 같은 음식을 중복으로 만들지 않고, **조사의 확인 날짜가 기존 값의 확인 날짜보다 새로울 때만** 값을 바꾼다.
+Add research data with a `database/migrations/NNN_foods_<name>.sql` migration. The form below does not create a duplicate food with the same name and brand when it runs again, and it changes the values **only when the checked date of the research is newer than the checked date of the existing values**.
 
-화면에서 고친 값이 재실행 뒤 어떻게 되는지는 고친 내용에 따라 다르다.
+What happens to a value fixed on the screen after a rerun depends on what was fixed.
 
-| 화면에서 고친 내용                  | 같은 조사를 재실행하면            |
-| ----------------------------------- | --------------------------------- |
-| 확인 날짜를 그대로 두거나 더 새롭게 | 고친 값 유지                      |
-| 확인 날짜를 지움                    | 고친 값 유지                      |
-| 확인 날짜를 조사보다 과거로 바꿈    | 조사값으로 덮어씀                 |
-| 이름이나 브랜드를 바꿈              | 조사값이 새 음식으로 하나 더 생김 |
+| What was fixed on the screen                      | When the same research is run again           |
+| ------------------------------------------------- | --------------------------------------------- |
+| Checked date left as it is or made newer          | The fixed value stays                         |
+| Checked date cleared                              | The fixed value stays                         |
+| Checked date changed to earlier than the research | Overwritten with the research value           |
+| Name or brand changed                             | One more food appears from the research value |
 
 ```sql
 INSERT INTO foods (name, brand, category, serving_size, serving_unit, calories, carbs, protein, fat, sugars, sodium, source_type, source_url, checked_on, is_junk)
@@ -66,28 +66,28 @@ ON CONFLICT (name, COALESCE(brand, '')) DO UPDATE SET
 WHERE EXCLUDED.checked_on > foods.checked_on;
 ```
 
-- **정크푸드 표시(`is_junk`, #38)는 처음 넣을 때만 정한다.** 프랜차이즈 패스트푸드 메뉴(햄버거·피자·치킨 프랜차이즈 등)는 `true`, 그 밖의 음식은 `false`로 넣는다. `DO UPDATE SET`에는 넣지 않는다. 그래서 사용자가 화면에서 바꾼 표시는 새 조사로 갱신돼도 유지된다. 식사 기록은 기록할 때의 표시를 따로 가지므로, 표시를 바꿔도 지난 기록의 집계는 바뀌지 않는다.
-- 위 예시는 `backend/test/foods.integration.test.ts`가 그대로 실행해 검사한다. 형식을 바꾸면 테스트도 함께 확인한다.
-- **조사 데이터에는 출처 종류와 관계없이 확인 날짜를 적는다.** 날짜가 없으면 나중에 새 조사로 갱신할 수 없다.
-- **날짜 없는 음식은 조사 데이터로 바뀌지 않는다.** 화면에서 직접 입력한 값을 지키기 위해서다. 조사값으로 바꾸려면 아래 정정 방식을 쓴다.
-- **같은 날짜로 값을 정정할 때는 위 형식을 쓰지 않는다.** 날짜가 같으면 오류 없이 무시되어 틀린 값이 남는다. 아래처럼 `UPDATE` 마이그레이션으로 고치고, 틀린 값이 그대로일 때만 바뀌도록 조건을 건다. 그래야 재실행해도 이후에 고친 값이 유지된다.
+- **The junk food flag (`is_junk`, #38) is set only on the first insert.** Franchise fast food menu items (burger, pizza, and chicken franchises and so on) go in as `true`, and other foods as `false`. Do not put it in `DO UPDATE SET`. That way a flag the user changed on the screen stays when a new research updates the food. A meal record keeps its own flag from when it was recorded, so changing the flag does not change the totals of past records.
+- `backend/test/foods.integration.test.ts` runs the example above as it is and checks it. If you change the form, check the test too.
+- **Write a checked date in research data whatever the source type is.** Without a date, a later research cannot update it.
+- **A food with no date is not changed by research data.** This protects values entered by hand on the screen. To change it to the research value, use the correction method below.
+- **Do not use the form above to correct a value with the same date.** With the same date the row is ignored without an error, and the wrong value stays. Correct it with an `UPDATE` migration as below, with a condition so that it changes only when the wrong value is still there. That way a value fixed later is kept when it runs again.
 
   ```sql
   UPDATE foods SET calories = 510, updated_at = now()
   WHERE name = U&'\C608\C2DC' AND brand = U&'\BE0C\B79C\B4DC' AND calories = 500;
   ```
 
-- SQL의 한글은 `U&'\C608\C2DC'`(예시)처럼 코드값 앞에 백슬래시 하나를 붙여 쓴다.
+- Write Korean in SQL as `U&'\C608\C2DC'` (the example word 예시, "example"), with one backslash before each code value.
 
-기존 DB에 적용할 때는 **날짜가 더 이른 같은 이름의 음식이 조사값으로 바뀐다.** 사용자 데이터가 있으면 적용 전에 이름이 겹치는 음식을 확인한다. 이미 등록된 식사 기록의 값은 바뀌지 않는다.
+When you apply it to an existing DB, **a food of the same name with an earlier date is changed to the research value.** If there is user data, check the foods whose names overlap before you apply it. The values of meal records that are already registered do not change.
 
-## 식약처 DB 조회
+## Looking up the MFDS DB
 
-- 상세 페이지(출처 주소): `https://various.foodsafetykorea.go.kr/nutrient/general/food/detail.do?searchFoodCd=<식품코드>&searchRegionCd=ZZ&searchMonthCd=AVG`
-- 목록은 같은 경로의 `listJson.do`에 `searchText`, `dbGrpCm=D`(음식) 또는 `dbGrpCm=R`(원재료), `searchDetailMode=all`, `searchOper=AND`, `searchOrderby=CAL`, `pagenum`, `pagesize`, `searchPageCnt`를 준다. `searchOrderby`가 없으면 오류 없이 빈 결과가 온다.
-- 공개 페이지를 읽을 때는 요청 사이에 간격을 둔다. 많이 받아야 하면 공공데이터포털 Open API(`FoodNtrCpntDbInfo03`) 키를 쓰는 편이 안정적이다.
-- Windows `curl`은 인자의 한글을 깨뜨려 보낼 수 있다. Node `fetch`를 쓴다.
+- Detail page (source URL): `https://various.foodsafetykorea.go.kr/nutrient/general/food/detail.do?searchFoodCd=<food code>&searchRegionCd=ZZ&searchMonthCd=AVG`
+- For the list, give `listJson.do` on the same path `searchText`, `dbGrpCm=D` (food) or `dbGrpCm=R` (raw material), `searchDetailMode=all`, `searchOper=AND`, `searchOrderby=CAL`, `pagenum`, `pagesize`, and `searchPageCnt`. Without `searchOrderby`, an empty result comes back with no error.
+- When you read the public pages, leave a gap between requests. If you must fetch a lot, it is more stable to use a key for the Open API of the public data portal (`FoodNtrCpntDbInfo03`).
+- Windows `curl` can garble Korean in its arguments. Use Node `fetch`.
 
-## 검증
+## Verification
 
-조사 이슈는 각 이슈의 완료 기준대로 표본을 출처와 다시 대조하고 결과를 변경 기록에 남긴다.
+For a research issue, compare a sample with the source again as the done criteria of that issue say, and record the result in the change record.

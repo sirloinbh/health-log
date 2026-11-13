@@ -1,16 +1,16 @@
-# 식단·수면·건강 기록 고유 지침
+# Meal, sleep, and health log project instructions
 
-이 파일은 health-log에만 해당하는 규칙이다. 공통 지침은 [AGENTS.md](AGENTS.md)이며, 중앙 표준(`sirloinbh/project-standards`) 동기화 후에는 중앙 관리 파일이 된다. 두 파일이 다르면 이 파일이 우선한다.
+This file holds the rules that apply only to health-log. The shared instructions are in [AGENTS.md](AGENTS.md), which becomes a centrally managed file after the sync from the central standards (`sirloinbh/project-standards`). If the two files differ, this file wins.
 
-## 작업 절차 (공통 절차에 더해)
+## Work steps (in addition to the shared steps)
 
-- **PR을 올린 뒤 자동 코드 리뷰를 최대 2회 거친다.** 리뷰에서 보완점이 나오면 추가 커밋으로 반영하고, 1차 보완 후에는 2차 리뷰를 한 번 더 받는다. 2차 보완 커밋 뒤에는 더 리뷰하지 않는다. 보완점이 없으면 바로 다음 단계로 간다. 이 PR에서 고치기에 큰 수정은 새 이슈카드로 분리한다. 상세 절차는 health-log-implementation 스킬을 따른다.
-- **그 뒤 최종 head의 필수 CI 검사가 모두 통과하면 에이전트(주 에이전트·로컬 워커)가 묻지 않고 PR을 병합한다.** 래퍼로 `pr merge <url> --merge --match-head-commit <확인한 head SHA>`(병합 커밋)를 실행하고 연결 이슈(`Closes #N`)가 닫혔는지 확인한다. 연속 PR은 순서대로 병합하며, 앞 PR 병합 후 다음 브랜치에 `origin/main`을 병합해 충돌을 풀고 관련 테스트를 다시 실행한 뒤 일반 푸시하고 CI 통과 후 병합한다. 실패·실행 중 검사 상태의 병합, `--admin` 등 브랜치 보호 우회, 리뷰 대신 자기 PR 승인, `main` 직접 푸시·커밋, force push는 금지한다. 현재 `main` 병합은 배포를 실행하지 않는다(CI는 검증·Docker 빌드만 수행).
+- **After you open a PR, go through automated code review at most 2 times.** If the review finds something to fix, apply it in an extra commit, and take a second review once after the first fixes. After the second fix commit, do no more reviews. If there is nothing to fix, go straight to the next step. Split a change that is too large to fix in this PR into a new issue card. Follow the health-log-implementation skill for the detailed steps.
+- **After that, when every required CI check on the final head passes, the agent (the main agent or a local worker) merges the PR without asking.** Run `pr merge <url> --merge --match-head-commit <the head SHA you checked>` (a merge commit) with the wrapper, and check that the linked issue (`Closes #N`) is closed. Merge stacked PRs in order: after the earlier PR is merged, merge `origin/main` into the next branch to resolve conflicts, run the related tests again, push normally, and merge after CI passes. It is forbidden to merge while a check fails or is running, to bypass branch protection with `--admin` or the like, to approve your own PR instead of a review, to push or commit to `main` directly, and to force push. A `main` merge does not run a deploy now (CI only verifies and builds Docker).
 
-## 고유 스킬
+## Project skills
 
-- [health-log-implementation](skills/health-log-implementation/SKILL.md), [health-log-testing](skills/health-log-testing/SKILL.md), [health-log-foundation](skills/health-log-foundation/SKILL.md): 이 프로젝트의 리뷰·병합 절차가 들어 있어 공통 스킬(std-*)이 들어온 뒤에도 유지한다.
+- [health-log-implementation](skills/health-log-implementation/SKILL.md), [health-log-testing](skills/health-log-testing/SKILL.md), [health-log-foundation](skills/health-log-foundation/SKILL.md): they hold the review and merge steps of this project, so they are kept after the shared skills (std-*) arrive.
 
-## 서비스 규칙
+## Service rules
 
-- **외부 접속:** 지정한 IP(회사, 집)에서만 접속을 허용한다. 실제 경계는 공유 서버 방화벽의 `allowed_cidrs`다. DB와 API 포트는 서버 밖으로 내지 않는다. 방화벽에 포트를 열 때는 `allowed_cidrs`만 쓰고, 전체 공개나 넓은 대역을 허용하지 않는다. 실제 IP는 이 저장소에 쓰지 않는다. 자세한 내용은 [외부 접속 보호](docs/access-protection.md)에 있다.
+- **External access:** allow access only from the IPs we name (office, home). The real boundary is `allowed_cidrs` in the firewall of the shared server. Do not expose the DB and API ports outside the server. When you open a port in the firewall, use only `allowed_cidrs`, and do not allow everyone or a wide range. Do not write the real IPs in this repository. The details are in [Protecting external access](docs/access-protection.md).

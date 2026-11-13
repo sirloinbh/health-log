@@ -1,105 +1,105 @@
-# #30 식사 기록과 하루 영양 합계
+# #30 Meal records and daily nutrition totals
 
-- 이슈: [#30](https://github.com/sirloinbh/health-log/issues/30)
-- 브랜치: `feat/30-meal-records`
+- Issue: [#30](https://github.com/sirloinbh/health-log/issues/30)
+- Branch: `feat/30-meal-records`
 
-## 목적
+## Purpose
 
-끼니별로 먹은 음식과 양을 기록하면 하루 칼로리와 영양성분 합계가 나오게 한다. 정크푸드 집계(#38)가 이 기록을 쓴다.
+Record the foods and amounts eaten at each meal, and show the day's calorie and nutrient totals. The junk food count (#38) uses these records.
 
-## 변경 — 2026-11-01
+## Change — 2026-11-01
 
-- **DB:** `database/migrations/004_meal_entries.sql`. 기록할 때 음식의 이름, 브랜드, 제공량, 영양성분을 1회분 값으로 복사한다. 그래서 음식을 나중에 고쳐도 과거 합계가 바뀌지 않는다.
-- **API:** `backend/src/meals.ts`. `GET /api/meals/:date`, `POST /api/meals/:date`, `DELETE /api/meals/:date/entries/:id`. 모두 그날의 기록과 합계 전체를 한 쿼리로 돌려준다. 변경과 응답 읽기는 한 트랜잭션이다. 요청 횟수 제한은 다른 API와 같다.
-- **계산:** 수량 곱하기와 합산은 DB의 `numeric`으로 해서 부동소수 오차가 없다. 항목마다 소수 둘째 자리로 반올림하고, 합계는 반올림한 항목을 더한다. 그래서 화면의 항목을 더한 값과 합계가 같다.
-- **값 없음:** 값을 모르는 영양성분은 0으로 세지 않는다. 합계에 영양소별로 빠진 항목 수를 함께 돌려주고, 화면에 "일부가 빠진 합계"로 표시한다.
-- **화면:** `frontend/src/meals.tsx`. 하루 기록의 식단 칸을 합계, 끼니별 목록, 추가 영역으로 바꿨다. 처음 불러오기에 실패하면 추가 영역을 숨긴다. 이후 다시 읽기에 실패하면 알림과 다시 시도 버튼을 보여 준다.
-- **정리:** 경로의 날짜 판정을 `backend/src/dates.ts`의 `parseDate`로 모아 수면 API와 함께 쓴다.
-- **문서:** `docs/next-steps/README.md`를 갱신했다.
+- **DB:** `database/migrations/004_meal_entries.sql`. When a meal is recorded, the food's name, brand, serving size, and nutrients are copied in as per-serving values. So editing a food later does not change past totals.
+- **API:** `backend/src/meals.ts`. `GET /api/meals/:date`, `POST /api/meals/:date`, `DELETE /api/meals/:date/entries/:id`. Each returns the whole day's entries and totals from one query. The change and the read of the response run in one transaction. The request rate limit is the same as the other APIs.
+- **Calculation:** Multiplying by the quantity and summing are done with the DB's `numeric`, so there is no floating-point error. Each entry is rounded to two decimal places, and the total is the sum of the rounded entries. So the total equals the sum of the entries shown on screen.
+- **Missing values:** A nutrient whose value is unknown is not counted as 0. The totals also return, per nutrient, how many entries are missing it, and the screen shows "a total with some entries missing".
+- **Screen:** `frontend/src/meals.tsx`. The meal section of the daily record now has the totals, a list per meal, and an add area. If the first load fails, the add area is hidden. If a later reload fails, an alert and a retry button are shown.
+- **Cleanup:** The date check for paths is moved into `parseDate` in `backend/src/dates.ts` and shared with the sleep API.
+- **Docs:** Updated `docs/next-steps/README.md`.
 
-## 정한 것
+## Decisions
 
-이슈에 없던 규칙이고, 사용자 확인 없이 #30 댓글에 기록하고 진행했다.
+These rules were not in the issue. They were recorded in a comment on #30 and applied without asking the user.
 
-- **수량 단위:** 1회 제공량의 배수다. 1.5는 1회 제공량의 1.5배다. 그램으로 직접 입력하지 않는다.
-- **끼니:** 아침, 점심, 저녁, 간식 네 가지다. 선택 상자 대신 한 번에 누를 수 있는 버튼으로 뒀다.
-- **빠른 입력:** 저장소에 없는 음식은 이름과 1회 칼로리만 적는다. 음식 저장소에는 추가하지 않고 그날 기록에만 남는다.
-- **수정 없음:** 잘못 적은 기록은 지우고 다시 넣는다. 이슈의 범위가 조회·저장·삭제이기 때문이다.
+- **Quantity unit:** A multiple of one serving. 1.5 means 1.5 servings. Grams are not entered directly.
+- **Meals:** Four: breakfast, lunch, dinner, snack. They are buttons that can be pressed in one step, instead of a select box.
+- **Quick entry:** For a food that is not in the food store, only the name and calories per serving are entered. It is not added to the food store and stays only in that day's record.
+- **No editing:** A wrong entry is deleted and entered again, because the issue's scope is read, save, and delete.
 
-## 한계
+## Limits
 
-- 응답을 잃어버린 요청을 다시 보내면 같은 음식이 두 번 기록될 수 있다. 중복 방지 키는 두지 않았다. 사용자가 한 명이고 잘못 들어간 기록은 지울 수 있다.
-- 화면에서 수량 칸에 숫자로 읽히지 않는 값(`1,5`)을 거르는 검사는 jsdom에서 재현할 수 없어 테스트가 없다.
+- If a request whose response was lost is sent again, the same food can be recorded twice. There is no idempotency key. There is one user, and a wrong entry can be deleted.
+- The screen check that rejects a value in the quantity field that does not read as a number (`1,5`) cannot be reproduced in jsdom, so it has no test.
 
-## 1차 리뷰 보완 — 2026-11-01
+## First review fixes — 2026-11-01
 
-독립 리뷰의 지적을 이 PR에서 고쳤다.
+The points from the independent review were fixed in this PR.
 
-- **합계와 목록의 불일치:** 항목은 반올림하고 합계는 반올림 전 값을 더해 125+125+125가 374.99로 나왔다. 두 쿼리로 나뉘어 동시 요청 때 서로 다른 시점을 보기도 했다. 한 쿼리에서 반올림한 항목을 더한다.
-- **저장됐는데 실패로 보이는 문제:** 저장 뒤 읽기가 실패하면 500이지만 기록은 남아, 다시 시도하면 두 번 기록됐다. 한 트랜잭션으로 묶었다.
-- **삭제 취소의 포커스:** 취소해도 카드 제목으로 갔다. `returnFocusRef`를 빼서 취소하면 삭제 버튼으로 돌아가고, 삭제가 끝난 뒤에만 카드 제목으로 옮긴다.
-- **늦은 응답의 덮어쓰기:** 기록 요청 중 삭제하면 먼저 읽은 응답이 삭제를 되돌려 보였다. 기록하는 동안 삭제 버튼을 막았다.
-- **삭제 404 뒤 읽기 실패:** 삭제했다고 알리면서 항목이 남고 다시 시도 버튼이 없었다. 성공 문구를 내지 않고 다시 시도 버튼을 보여 준다.
-- **검색 실패:** 이전 결과가 이번 결과처럼 남았다. 지운다.
-- **화면 규칙:** 기록 버튼에 공통 `Spinner`를 넣었다. 기다리는 동안 입력한 글자를 지우지 않는다. 브랜드만 다른 음식을 구분하도록 버튼 이름에 브랜드를 넣었다.
-- **배치:** 식단 카드를 두 칸에 걸치지 않게 했다. 두 칸 배치는 PC에서 화면 순서와 키보드 순서가 달라지기 때문이다.
-- **테스트 도우미의 간헐 실패:** 리뷰 뒤 전체 실행에서 백엔드 테스트가 `bad port`로 가끔 실패했다. 이 PC의 임시 포트 범위가 1024부터라 `fetch`가 막는 포트를 받을 때가 있었다. `listenForFetch`가 그 포트를 피한다.
-- **테스트 공백:** 브랜드와 `foodId` 복사, 입력 상한, 음식 삭제 뒤 기록 유지, 기록 순서, 검색 경쟁, 다음 시도의 오류 지움을 더했다.
+- **Total and list disagreeing:** Entries were rounded but the total added the unrounded values, so 125+125+125 gave 374.99. The two queries could also see different points in time under concurrent requests. The total is now the sum of the rounded entries in one query.
+- **Saved but shown as failed:** If the read after saving failed, the response was 500 but the entry stayed, so retrying recorded it twice. Both are now in one transaction.
+- **Focus after cancelling a delete:** Cancelling moved focus to the card title. `returnFocusRef` was removed, so cancelling returns to the delete button, and focus moves to the card title only after the delete finishes.
+- **Late response overwriting:** If an entry was deleted while a record request was in flight, the response read earlier made the delete look undone. The delete button is blocked while recording.
+- **Read failure after a delete 404:** The screen said the delete succeeded while the entry remained and there was no retry button. It now shows no success message and shows a retry button.
+- **Search failure:** The previous results stayed as if they were this result. They are now cleared.
+- **Screen rules:** Added the shared `Spinner` to the record button. Typed text is not cleared while waiting. The brand is in the button name so foods that differ only by brand can be told apart.
+- **Layout:** The meal card no longer spans two columns, because a two-column layout makes the screen order and keyboard order differ on PC.
+- **Intermittent test helper failure:** After the review, backend tests sometimes failed with `bad port` in a full run. This PC's ephemeral port range starts at 1024, so `fetch` sometimes received a port it blocks. `listenForFetch` avoids those ports.
+- **Test gaps:** Added tests for brand and `foodId` copying, input limits, entries surviving a food delete, entry order, search races, and clearing the error on the next attempt.
 
-## 2차 리뷰 보완 — 2026-11-02
+## Second review fixes — 2026-11-02
 
-독립 리뷰의 지적을 이 PR에서 고쳤다. 차단 지적은 없었다.
+The points from the independent review were fixed in this PR. There were no blocking points.
 
-- **오류 위치:** 알림이 수량 칸 아래 한 곳뿐이라, 검색 결과가 길면 아래쪽 "바로 기록"의 오류가 화면 밖에 나타날 수 있었다. 검색 결과용과 직접 입력용으로 나눠 각자의 버튼 가까이에 보여 주고, 결과 목록은 높이를 제한해 스크롤한다.
-- **늦은 다시 읽기:** 다시 시도 중에 기록하면, 먼저 시작한 읽기 응답이 새 기록을 화면에서 지울 수 있었다. 변경 응답을 세어 그 전에 시작한 읽기 응답을 버린다.
-- **다른 날로 옮긴 뒤의 안내:** 성공하면 아무 말이 없었고, 응답을 잃어도 "기록하지 못했습니다"라고 단정했다. 성공도 날짜와 함께 알리고, 응답을 못 받으면 "기록했는지 확인하지 못했습니다"로 안내한다.
-- **삭제 확인 문구:** 브랜드를 넣었다.
-- **다시 시도의 포커스:** 누른 버튼이 사라져 포커스를 잃었다. 카드 제목으로 옮긴다. `sleep.tsx`도 같은 구조인데 이 PR의 범위가 아니라 고치지 않았다.
-- **검색 안내:** 검색 버튼에 `Spinner`와 `aria-busy`를 넣었다. 항상 있는 상태 영역에 건수와 "결과 없음"을 알린다.
-- **테스트 공백:** 검색한 음식의 기록 실패, 삭제 뒤 읽기 실패의 롤백을 더했다. 쓰지 않는 `EntryRow.entry_date` 타입을 뺐다.
+- **Error placement:** There was a single alert below the quantity field, so with a long search result list, the error of "record directly" at the bottom could appear off screen. It is now split for search results and direct entry, each shown near its own button, and the result list has a limited height and scrolls.
+- **Late reload:** If an entry was recorded during a retry, a read response that started earlier could erase the new entry from the screen. Change responses are counted, and a read response that started before them is discarded.
+- **Message after moving to another day:** Success said nothing, and when the response was lost the screen asserted "could not record" (기록하지 못했습니다). Success is now reported together with the date, and when no response arrives it says "could not confirm whether it was recorded" (기록했는지 확인하지 못했습니다).
+- **Delete confirmation text:** Added the brand.
+- **Focus on retry:** The button that was pressed disappeared, so focus was lost. Focus moves to the card title. `sleep.tsx` has the same structure, but it is outside this PR's scope, so it was not fixed.
+- **Search announcements:** Added `Spinner` and `aria-busy` to the search button. The count and "no results" are announced in an always-present status region.
+- **Test gaps:** Added a record failure for a searched food and the rollback after a read failure following a delete. Removed the unused `EntryRow.entry_date` type.
 
-## 검증
+## Checks
 
-- 추가한 테스트: `backend/test/meals.test.ts`, `backend/test/meals.integration.test.ts`, `frontend/src/meals.test.tsx`, `frontend/src/daily.test.tsx`(지난 날짜의 늦은 응답)
-- 완료 기준 대응:
-  - 1.5인분 반영: 통합 테스트 `1.5 servings count exactly in calories and every nutrient`
-  - 음식 수정 뒤 과거 합계 유지: 통합 테스트 `editing a food later leaves past days as they were`
-  - 일부 누락 안내: 통합 테스트 `an unknown nutrient is counted as missing, and a known zero is not`, 화면 테스트 `the totals say when an unknown value leaves them incomplete`
+- Added tests: `backend/test/meals.test.ts`, `backend/test/meals.integration.test.ts`, `frontend/src/meals.test.tsx`, `frontend/src/daily.test.tsx` (late response for a past date)
+- Mapping to the completion criteria:
+  - 1.5 servings counted: integration test `1.5 servings count exactly in calories and every nutrient`
+  - Past totals kept after editing a food: integration test `editing a food later leaves past days as they were`
+  - Note for partly missing values: integration test `an unknown nutrient is counted as missing, and a known zero is not`, screen test `the totals say when an unknown value leaves them incomplete`
 
-- `npm run check`(임시 DB 사용): 통과. 백엔드 78개 통과, 건너뜀 0개. 프런트엔드 148개 통과, 2개 건너뜀(다크 전용 앱용 조건, 이 변경과 무관). 스킬 검사 4개 통과
-- `npm run knip`, `npm run standards:check`: 통과
-- 2차 리뷰 보완 뒤(2026-11-02): `npm run check`, `npm run knip`, `npm run standards:check` 통과. 백엔드 79개 통과, 건너뜀 0개. 프런트엔드 157개 통과, 2개 건너뜀. 스킬 검사 4개 통과
+- `npm run check` (with a temporary DB): passed. Backend 78 passed, 0 skipped. Frontend 148 passed, 2 skipped (a condition for the dark-only app, unrelated to this change). Skill checks 4 passed
+- `npm run knip`, `npm run standards:check`: passed
+- After the second review fixes (2026-11-02): `npm run check`, `npm run knip`, `npm run standards:check` passed. Backend 79 passed, 0 skipped. Frontend 157 passed, 2 skipped. Skill checks 4 passed
 
-### DB 통합 테스트
+### DB integration tests
 
-이 PC의 DB 계정은 `health_test`를 만들 수 없어, `initdb`로 임시 폴더에 PostgreSQL 17 클러스터를 따로 띄워 `health_test`를 만들었다. 기존 DB는 건드리지 않았다. 마이그레이션 4개를 적용했고 `004` 재실행도 통과했다.
+The DB account on this PC cannot create `health_test`, so a separate PostgreSQL 17 cluster was started in a temporary folder with `initdb` and `health_test` was created there. The existing DB was not touched. The 4 migrations were applied, and re-running `004` also passed.
 
-### 브라우저 확인
+### Browser check
 
-헤드리스 Chrome을 CDP로 움직였다. API는 실제 서버, DB는 위 임시 클러스터다. 입력은 키보드가 아니라 값을 넣고 입력 이벤트를 발생시키는 방식이다.
+Headless Chrome was driven over CDP. The API was the real server, and the DB was the temporary cluster above. Input was done by setting the value and dispatching an input event, not by keyboard.
 
-| 항목                                  | 390×844 | 1440×900 |
-| ------------------------------------- | ------- | -------- |
-| 기록 없는 날의 안내                   | 통과    | 통과     |
-| 검색한 음식을 점심에 1.5회분 기록     | 통과    | 통과     |
-| 합계 185.18kcal, 단백질 15g           | 통과    | 통과     |
-| 일부 누락 안내                        | 통과    | 통과     |
-| 이름과 칼로리만으로 기록              | 통과    | 통과     |
-| 음식을 고친 뒤 새로고침해도 합계 유지 | 통과    | 통과     |
-| 삭제 확인, 합계 갱신, 포커스 이동     | 통과    | 통과     |
-| 다른 날에 기록이 보이지 않음          | 통과    | 통과     |
-| 가로 넘침, 콘솔 오류                  | 없음    | 없음     |
+| Item                                            | 390×844 | 1440×900 |
+| ----------------------------------------------- | ------- | -------- |
+| Message for a day with no entries               | Pass    | Pass     |
+| Record a searched food as 1.5 servings at lunch | Pass    | Pass     |
+| Total 185.18kcal, protein 15g                   | Pass    | Pass     |
+| Note for partly missing values                  | Pass    | Pass     |
+| Record with only a name and calories            | Pass    | Pass     |
+| Total kept after editing a food and reloading   | Pass    | Pass     |
+| Delete confirmation, total update, focus move   | Pass    | Pass     |
+| Entries not visible on another day              | Pass    | Pass     |
+| Horizontal overflow, console errors             | None    | None     |
 
-3회 반복해 모두 통과했다. 처음 두 번의 실행에서 나온 실패는 확인 스크립트의 문제였다. 하나는 고른 날짜가 앞선 크기에서 기록을 넣은 날의 다음 날이었고, 다른 하나는 임시 DB를 비우는 명령의 한글이 깨져 음식이 남아 있었다.
+It was repeated 3 times and all passed. The failures in the first two runs were problems in the check script. One was that the chosen date was the day after the day the entries were put in at the earlier size, and the other was that the command to empty the temporary DB had garbled Korean text, so a food remained.
 
-2차 리뷰 보완 뒤 위 표를 다시 실행해 모두 통과했다. 음식 15개를 검색한 상태에서 다음도 확인했다(390×844, 1440×900).
+After the second review fixes, the table above was run again and all passed. With 15 foods searched, the following were also checked (390×844, 1440×900).
 
-| 항목                                              | 결과 |
-| ------------------------------------------------- | ---- |
-| 결과 목록 높이 제한(320px)과 스크롤               | 통과 |
-| 건수 안내 "검색 결과 15건"                        | 통과 |
-| "바로 기록" 오류가 그 폼 안에 있고 화면 안에 보임 | 통과 |
-| 목록 첫 줄과 끝 줄의 "추가" 오류가 화면 안에 보임 | 통과 |
-| 가로 넘침, 콘솔 오류                              | 없음 |
+| Item                                                                  | Result |
+| --------------------------------------------------------------------- | ------ |
+| Result list height limit (320px) and scrolling                        | Pass   |
+| Count message "15 search results" (검색 결과 15건)                    | Pass   |
+| The "record directly" error is inside that form and visible on screen | Pass   |
+| The "add" error on the first and last list rows is visible on screen  | Pass   |
+| Horizontal overflow, console errors                                   | None   |
 
-실제 휴대폰, 다크 모드, 화면 읽기 프로그램은 확인하지 않았다.
+A real phone, dark mode, and a screen reader were not checked.

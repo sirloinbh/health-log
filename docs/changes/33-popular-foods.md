@@ -1,81 +1,83 @@
-# #33 대중적인 음식 영양성분 조사·등록
+# #33 Research and register nutrition facts of popular foods
 
-- 이슈: [#33](https://github.com/sirloinbh/health-log/issues/33)
-- 브랜치: `feat/33-popular-foods`
+- Issue: [#33](https://github.com/sirloinbh/health-log/issues/33)
+- Branch: `feat/33-popular-foods`
 
-## 목적
+## Purpose
 
-식사를 기록할 때 음식을 매번 입력하지 않도록, 자주 먹는 음식의 영양성분을 공식 자료로 미리 등록한다. 사용자가 개인 목록 대신 대중적인 음식을 조사해 넣기로 결정했다(2026-10-31).
+So that foods do not have to be typed in every time a meal is recorded, register the nutrition facts of commonly eaten foods in advance from official data. The user decided to research and add popular foods instead of a personal list (2026-10-31).
 
-## 변경 — 2026-11-02
+## Change — 2026-11-02
 
-- **데이터:** `database/migrations/005_foods_popular.sql`에 95개를 넣었다. 음식 73개, 원재료·음료·주류 22개다.
-- **출처:** 전부 [식약처 식품영양성분 DB](https://various.foodsafetykorea.go.kr/nutrient/)다. 음식마다 상세 페이지 주소를 `source_url`로 저장해 값을 바로 대조할 수 있다. 공공데이터포털은 이 DB의 Open API를 "이용허락범위 제한 없음"으로 표시한다. 값은 키 없이 공개 상세 페이지에서 읽었고, 그 페이지 자체에는 별도 표시가 없다.
-- **규칙 문서:** `docs/food-data.md`에 총 내용량 환산, 자료 고르는 기준, 이름 규칙, 조회 방법을 추가했다.
-- **테스트:** `backend/test/foods.integration.test.ts`에 출처, 분류, 대표 음식 환산값, 흔한 이름 검색을 검사하는 테스트를 추가했다.
+- **Data:** `database/migrations/005_foods_popular.sql` inserts 95 items: 73 dishes and 22 raw ingredients, drinks, and alcohol.
+- **Source:** All from the [MFDS Food Nutrient DB](https://various.foodsafetykorea.go.kr/nutrient/) (식약처 식품영양성분 DB). The detail page URL of each food is stored as `source_url`, so values can be compared directly. The Public Data Portal marks this DB's Open API as "no restriction on the scope of use". The values were read from the public detail pages without a key, and those pages themselves carry no separate notice.
+- **Rules document:** Added to `docs/food-data.md` the conversion to total content, the criteria for choosing data, the naming rules, and how to query.
+- **Tests:** Added to `backend/test/foods.integration.test.ts` tests that check the source, the category, converted values for representative foods, and search by common names.
 
-### 고른 기준
+### Selection criteria
 
-전국 대표 평균이고 제조사가 없는 `품목대표` 자료만 썼다. 같은 음식의 자료가 여러 개면 아래 순서로 골랐다.
+Only `품목대표` (item representative) data, which is a nationwide representative average with no manufacturer, was used. When one food had several data entries, they were chosen in this order.
 
-1. 실제 분석값 → 수집값 → 계산으로 낸 산출값
-2. 총 내용량이 기준량과 다른 자료. 총 내용량이 `100g`이거나 `-`이면 1인분 정보가 없는 것으로 본다
-3. 외식 → 가정식 → 산업체 급식 → 학교 급식
-4. 최신 생성일
-5. 그래도 여러 개면 열량 중앙값 (피자, 핫도그, 아메리카노)
+1. Actual analyzed value → collected value → calculated value
+2. Data whose total content differs from the reference amount. If the total content is `100g` or `-`, it is treated as having no per-serving information
+3. Eating out → home cooking → industrial catering → school meals
+4. Latest creation date
+5. If there are still several, the median energy (pizza, hot dog, americano)
 
-출처의 이름 표기가 달라도 같은 음식이면 후보로 삼았다. 예: `자장면`, `돼지고기볶음(제육볶음)`, `김밥_참치`, `볶음밥_김치`, `닭튀김_양념`.
+Even when the name in the source was written differently, it was taken as a candidate if it was the same food. Examples: `자장면`, `돼지고기볶음(제육볶음)`, `김밥_참치`, `볶음밥_김치`, `닭튀김_양념`.
 
-처음에는 외식을 분석값보다 앞세웠다. 1차 리뷰에서 라면 나트륨이 분석 자료의 약 1/4(342mg, 분석 1,557mg)로 저장되고 비빔밥 1회가 100g으로 잡히는 문제가 드러나 기준을 바꿨다. 2차 리뷰에서 표기가 다른 자료를 놓친 것이 드러나 산출값 10개를 교체하고 못 찾았다고 한 음식 4개를 추가했다. 그 결과 분석값 70개, 산출값 3개, 원재료 22개다.
+At first eating out was put ahead of analyzed values. The first review showed that the sodium of ramen was stored at about 1/4 of the analyzed data (342mg versus 1,557mg analyzed) and that one serving of bibimbap was taken as 100g, so the criteria were changed. The second review showed that data with a different name were missed, so 10 calculated values were replaced and 4 foods that had been called not found were added. As a result there are 70 analyzed values, 3 calculated values, and 22 raw ingredients.
 
-### 환산과 이름
+### Conversion and names
 
-- 자료는 100g(또는 100mL)당 값이다. 자료의 총 내용량으로 환산해 소수 둘째 자리까지 저장했다. 김치찌개는 100g당 61kcal, 총 내용량 400g이므로 `400g`, `244kcal`이다.
-- 이름은 사람들이 검색하는 말로 정리했다. 출처의 공식 이름은 `source_url` 페이지에 있다. 예: `닭고기, 가슴, 삶은것` → `닭가슴살(삶은것)`, `탄산 음료, 콜라` → `콜라`, `돈가스` → `돈가스(돈까스)`.
+- The data is per 100g (or 100mL). It was converted using the total content of the data and stored to two decimal places. Kimchi stew is 61kcal per 100g with a total content of 400g, so it is `400g`, `244kcal`.
+- Names were arranged in the words people search for. The official name of the source is on the `source_url` page. Examples: `닭고기, 가슴, 삶은것` (chicken, breast, boiled) → `닭가슴살(삶은것)`, `탄산 음료, 콜라` (carbonated drink, cola) → `콜라`, `돈가스` → `돈가스(돈까스)`.
 
-### 등록 목록
+### Registered list
 
-- **밥:** 쌀밥, 현미밥, 잡곡밥, 비빔밥, 볶음밥, 김치볶음밥, 제육덮밥, 오므라이스, 카레라이스, 김밥, 참치김밥
-- **면:** 라면, 짜장면(자장면), 짬뽕, 칼국수, 잔치국수, 물냉면, 비빔냉면, 우동(일식), 쫄면, 스파게티(토마토소스)
-- **국·찌개:** 김치찌개, 된장찌개, 순두부찌개(김치), 부대찌개, 미역국, 갈비탕, 설렁탕, 삼계탕, 육개장, 떡국, 만두국(만둣국), 콩나물국, 감자탕, 추어탕, 황태해장국
-- **고기·튀김:** 소불고기, 제육볶음, 삼겹살구이, 돼지갈비구이(간장), 돼지갈비찜, 소갈비구이(양념), 닭볶음(닭갈비), 닭찜, 찜닭(안동찜닭), 돈가스(돈까스), 탕수육, 닭튀김(치킨), 양념치킨, 족발
-- **분식·외식:** 떡볶이, 순대, 군만두, 김치만두, 고기만두, 오징어튀김, 핫도그, 피자, 샌드위치, 햄버거, 토스트(식빵), 아메리카노
-- **반찬:** 배추김치, 깍두기, 달걀말이(계란말이), 달걀찜(계란찜), 달걀후라이(계란후라이), 두부조림, 잡채, 고등어구이, 오징어볶음, 멸치볶음, 시금치나물
-- **원재료·음료:** 바나나, 사과, 귤, 우유, 요구르트(액상), 플레인 요거트(요구르트), 달걀(계란), 생것, 삶은 달걀(계란), 닭가슴살(삶은것), 두부, 고구마(찐것), 감자(찐것), 토마토, 콜라, 사이다, 오렌지주스, 체다치즈, 볶은아몬드, 우유식빵
-- **주류:** 맥주, 소주(17.8%), 막걸리
+The food names are kept in Korean because they are the data values stored in the DB.
 
-## 검증
+- **Rice:** 쌀밥, 현미밥, 잡곡밥, 비빔밥, 볶음밥, 김치볶음밥, 제육덮밥, 오므라이스, 카레라이스, 김밥, 참치김밥
+- **Noodles:** 라면, 짜장면(자장면), 짬뽕, 칼국수, 잔치국수, 물냉면, 비빔냉면, 우동(일식), 쫄면, 스파게티(토마토소스)
+- **Soups and stews:** 김치찌개, 된장찌개, 순두부찌개(김치), 부대찌개, 미역국, 갈비탕, 설렁탕, 삼계탕, 육개장, 떡국, 만두국(만둣국), 콩나물국, 감자탕, 추어탕, 황태해장국
+- **Meat and fried food:** 소불고기, 제육볶음, 삼겹살구이, 돼지갈비구이(간장), 돼지갈비찜, 소갈비구이(양념), 닭볶음(닭갈비), 닭찜, 찜닭(안동찜닭), 돈가스(돈까스), 탕수육, 닭튀김(치킨), 양념치킨, 족발
+- **Snack-bar and eating-out food:** 떡볶이, 순대, 군만두, 김치만두, 고기만두, 오징어튀김, 핫도그, 피자, 샌드위치, 햄버거, 토스트(식빵), 아메리카노
+- **Side dishes:** 배추김치, 깍두기, 달걀말이(계란말이), 달걀찜(계란찜), 달걀후라이(계란후라이), 두부조림, 잡채, 고등어구이, 오징어볶음, 멸치볶음, 시금치나물
+- **Raw ingredients and drinks:** 바나나, 사과, 귤, 우유, 요구르트(액상), 플레인 요거트(요구르트), 달걀(계란), 생것, 삶은 달걀(계란), 닭가슴살(삶은것), 두부, 고구마(찐것), 감자(찐것), 토마토, 콜라, 사이다, 오렌지주스, 체다치즈, 볶은아몬드, 우유식빵
+- **Alcohol:** 맥주, 소주(17.8%), 막걸리
 
-- 마이그레이션: 임시 PostgreSQL 클러스터(포트 55901, `health_test`)에 전체를 2회 적용했다. 오류 없이 95개, 이름 중복 없음. 기존 로컬 DB는 건드리지 않았다.
-- 출처 대조: 저장된 95개 전부를 상세 페이지와 다시 비교해 제공량과 6개 영양성분의 차이가 0건이었다.
-- 전체 `npm run check` 결과는 PR에 적는다.
-- 화면 변경은 없어 브라우저 확인은 하지 않았다.
+## Checks
 
-## 1차 리뷰 보완 — 2026-11-02
+- Migration: The whole set was applied twice to a temporary PostgreSQL cluster (port 55901, `health_test`). 95 items with no errors and no duplicate names. The existing local DB was not touched.
+- Source comparison: All 95 stored items were compared again with the detail pages, and there were 0 differences in serving size and the 6 nutrients.
+- The full `npm run check` result is written in the PR.
+- There is no screen change, so no browser check was done.
 
-- **선택 기준:** 위처럼 분석값을 먼저 고르도록 바꿔 전부 다시 골랐다.
-- **잘못된 분류:** 분류가 없는 자료 4개에 다음 항목 이름(`품목대표/상용제품`)이 저장되던 파서 오류를 고쳤다. 이제 NULL이다.
-- **검색:** `닭가슴살`, `계란`, `치킨`, `콜라`, `돈까스` 등 흔한 말로 찾히도록 이름을 정리했다.
-- **뺀 음식:** `제육(돼지고기 수육)`은 급식 산출값뿐이고 `제육` 검색에서 제육볶음과 헷갈려 뺐다.
-- **테스트:** 개수를 정확히 고정하면 #31, #32 데이터로 깨지므로 하한으로 바꿨다.
-- **분리:** 목록 100개 제한은 [#67](https://github.com/sirloinbh/health-log/issues/67)로 분리했다.
+## First review fixes — 2026-11-02
 
-## 2차 리뷰 보완 — 2026-11-02
+- **Selection criteria:** Changed to choose analyzed values first as above, and everything was chosen again.
+- **Wrong category:** Fixed a parser bug where the next item's name (`품목대표/상용제품`) was stored as the category for 4 data entries that have no category. It is now NULL.
+- **Search:** Names were arranged so that common words such as `닭가슴살` (chicken breast), `계란` (egg), `치킨` (fried chicken), `콜라` (cola), and `돈까스` (pork cutlet) find them.
+- **Foods left out:** `제육(돼지고기 수육)` has only a school-meal calculated value and was confused with 제육볶음 in a `제육` search, so it was left out.
+- **Tests:** Fixing the exact count would break with the #31 and #32 data, so it was changed to a lower bound.
+- **Split off:** The list limit of 100 was split into [#67](https://github.com/sirloinbh/health-log/issues/67).
 
-지적 8건을 모두 이 PR에서 고쳤다. 리뷰는 2회까지이므로 3차 리뷰는 하지 않는다.
+## Second review fixes — 2026-11-02
 
-- **놓친 분석 자료:** 산출값 13개 중 10개에 표기가 다른 분석 자료가 있어 교체했다. 교체한 자료는 상세 페이지에서 이름, 품목대표 여부, 분석값 여부를 직접 확인했다.
-- **못 찾은 음식:** 김치볶음밥, 제육덮밥, 참치김밥, 양념치킨을 추가했다.
-- **찜닭:** 일반 `닭찜`은 탄수화물이 300g에 1.8g이라 찜닭으로 찾으면 크게 적게 기록된다. `닭찜`과 `찜닭(안동찜닭)`으로 나눴다.
-- **문서:** 총 내용량 판단 기준과 목록 조회에 필요한 `searchOrderby`를 적고, 틀린 설명을 고쳤다.
-- **테스트:** 짜장면, 제육볶음 값을 고정하고, 흔한 말 검색은 기대하는 음식이 나오는지 확인한다.
+All 8 points were fixed in this PR. Reviews are limited to two rounds, so there is no third review.
 
-## 제한·후속
+- **Missed analyzed data:** 10 of the 13 calculated values had analyzed data under a different name, so they were replaced. For the replaced data, the name, item representative status, and analyzed status were checked directly on the detail pages.
+- **Foods not found:** Added 김치볶음밥, 제육덮밥, 참치김밥, and 양념치킨.
+- **Jjimdak:** The general `닭찜` has 1.8g of carbohydrate per 300g, so searching for jjimdak would record far too little. It was split into `닭찜` and `찜닭(안동찜닭)`.
+- **Docs:** Wrote the criteria for judging total content and the `searchOrderby` needed to list items, and fixed wrong statements.
+- **Tests:** Fixed the values of 짜장면 and 제육볶음, and the common-word searches check that the expected foods come up.
 
-- **산출값 3개는 참고값이다.** 탕수육, 오징어튀김, 토스트(식빵)는 같은 음식의 분석 자료가 없다. 출처도 산출값을 참고치로 안내한다. 화면에서는 분석값과 구분되지 않는다.
-- **숫자는 자료에 적힌 그대로다.** 틀려 보여도 고치지 않았다. 김밥의 당류 0처럼 실제 0이 아니라 미측정일 수 있는 값이 있고, 설렁탕 500g의 나트륨 110mg처럼 낮아 보이는 값도 있지만 자료만으로는 판단할 수 없다.
-- **1회 양이 1인분이 아닌 음식:** 피자는 558g, 1,440kcal로 한 판에 가깝다. 찜닭은 1500g, 1,365kcal로 여러 인분이다. 추어탕 1000g도 많은 편이다. 쌀밥, 돈가스, 배추김치, 달걀말이, 돼지갈비구이(간장)는 자료의 총 내용량이 100g이다(쌀밥 한 공기는 수량 2 정도). 오징어튀김 77mL는 학교 급식 분량이다. 화면에 제공량이 보이므로 수량으로 조절한다.
-- **세부 종류를 대표로 쓴 음식:** 스파게티는 토마토소스, 우동은 일식, 달걀찜은 새우젓을 넣은 자료, 고등어구이는 석쇠구이 자료다. 다른 조리법과 값이 다를 수 있다.
-- **단위:** 산출값 자료는 고체도 mL를 쓴다(탕수육 343mL 등). 원재료의 콜라, 사이다, 오렌지주스, 맥주, 소주, 막걸리, 우유, 요구르트(액상)는 액체지만 자료대로 100g 기준이다.
-- **못 찾은 음식:** 보쌈은 돼지고기 수육 자료가 급식 산출값뿐이라 넣지 않았다. 추정값으로 넣지 않았다.
-- **기존 DB 적용 시:** 같은 이름(브랜드 없음)으로 확인 날짜가 2026-11-02보다 이른 음식이 있으면 이 값으로 바뀐다. 날짜 없는 음식은 유지된다. 지금까지 만든 사용자 데이터가 있다면 적용 전에 이름이 겹치는 음식을 확인한다. 이미 등록된 식사 기록의 값은 바뀌지 않는다.
+## Limits and follow-ups
+
+- **The 3 calculated values are reference values.** 탕수육, 오징어튀김, and 토스트(식빵) have no analyzed data for the same food. The source also treats calculated values as reference. On screen they are not distinguished from analyzed values.
+- **Numbers are as written in the data.** Values that look wrong were not corrected. Some values may be unmeasured rather than a real 0, such as the sugars 0 of gimbap, and some look low, such as the sodium 110mg of 설렁탕 500g, but this cannot be judged from the data alone.
+- **Foods whose one serving is not one portion:** Pizza is 558g, 1,440kcal, close to a whole pie. Jjimdak is 1500g, 1,365kcal, several portions. Chueotang 1000g is also large. For 쌀밥, 돈가스, 배추김치, 달걀말이, and 돼지갈비구이(간장), the total content in the data is 100g (a bowl of rice is about quantity 2). Fried squid 77mL is a school-meal amount. The serving size is visible on screen, so adjust it with the quantity.
+- **Foods where a sub-type represents the dish:** Spaghetti is tomato sauce, udon is Japanese style, steamed egg is the data with salted shrimp, and grilled mackerel is the broiled data. Values may differ from other cooking methods.
+- **Units:** Calculated-value data uses mL even for solids (탕수육 343mL and so on). Among the raw ingredients, cola, cider, orange juice, beer, soju, makgeolli, milk, and liquid yogurt are liquids but are per 100g, as in the data.
+- **Foods not found:** Bossam was not added because the only pork boiled-meat data is a school-meal calculated value. It was not added as an estimate.
+- **When applied to an existing DB:** If a food with the same name (no brand) has a check date earlier than 2026-11-02, it is replaced with these values. Foods without a date are kept. If there is user data made so far, check foods with overlapping names before applying. The values of meal records already registered do not change.

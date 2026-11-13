@@ -1,109 +1,109 @@
-# #92 하루 기록 카드의 메모 길이 기준, NUL 문자, 늦은 다시 불러오기 맞추기
+# #92 Align the memo length unit, the NUL character, and late reloads of the daily record cards
 
-- 이슈: [#92](https://github.com/sirloinbh/health-log/issues/92)
-- 브랜치: `fix/92-memo-nul-retry`
+- Issue: [#92](https://github.com/sirloinbh/health-log/issues/92)
+- Branch: `fix/92-memo-nul-retry`
 
-## 목적
+## Purpose
 
-PR #91 리뷰에서 하루 기록 카드 여러 곳에 걸친 문제 세 가지가 나왔다.
+Three problems that span several daily record cards came up in the review of PR #91.
 
-- 메모 길이를 화면, 서버, DB가 서로 다른 단위로 센다.
-- 메모에 NUL 문자(U+0000)가 들어가면 400이 아니라 500이 된다.
-- 느린 "다시 시도" 응답이 새 응답을 덮어쓸 수 있다.
+- The screen, server, and DB count the memo length in different units.
+- If the NUL character (U+0000) gets into a memo, it becomes 500 instead of 400.
+- A slow "다시 시도" (retry) response can overwrite a new response.
 
-## 정한 것
+## Decisions
 
-사용자 확인 없이 정했다. 이슈 댓글에 같은 내용을 남겼다.
+Decided without asking the user. The same content was left as an issue comment.
 
-- **길이 기준:** 글자(유니코드 코드 포인트) 수로 센다. PostgreSQL `char_length`와 같은 단위라, 이모지 하나는 1자다. 화면과 서버 모두 `charCount`로 같은 방식을 쓴다.
-- **NUL 문자:** 칸마다 따로 막지 않고, 모든 요청의 본문과 쿼리 문자열을 한 곳(`rejectNul`)에서 400과 한국어 메시지로 거부한다. 새 글자 칸이 생겨도 빠질 수 없다.
-- **늦은 다시 불러오기:** 장치를 더하지 않았다. 아래 "확인한 것"처럼 지금 화면에서는 두 번째 다시 불러오기를 시작할 수 없어, 옛 응답이 새 응답보다 늦게 올 일이 없다. 대신 이 성질을 지키는 화면 테스트를 넣었다.
+- **Length criterion:** Counted in characters (Unicode code points). It is the same unit as PostgreSQL `char_length`, so one emoji is 1 character. Both the screen and the server use the same method with `charCount`.
+- **NUL character:** It is not blocked field by field. The body and query string of every request are rejected in one place (`rejectNul`) with 400 and a Korean message. Even if a new text field is created, it cannot be missed.
+- **Late reload:** No mechanism was added. As in "What was checked" below, on the current screen a second reload cannot be started, so an old response cannot come later than a new one. Instead, screen tests that protect this property were put in.
 
-## 확인한 것
+## What was checked
 
-- **zod `.max()`는 이미 글자 수로 센다.** zod 4에서 `z.string().max(2)`는 이모지 2개(UTF-16 4단위)를 받는다. 그래서 하루 체크·신체 메모의 서버 쪽 길이는 원래 맞았다. 이슈에 적힌 "zod `.max`는 UTF-16 단위"는 이 버전에서는 사실이 아니었다.
-- **실제로 어긋난 곳은 두 군데였다.**
-  - 하루 체크 메모 칸의 `maxLength={200}`: 브라우저는 UTF-16 단위로 세서, 이모지 201개를 붙여 넣으면 칸에 100개만 남고 그대로 저장됐다(브라우저로 확인).
-  - 서버에서 `.length`로 직접 센 칸: 조합 이름(DB는 `char_length` 50)은 이모지 26개부터 거부됐다.
-- **다시 불러오기가 겹치지 않는 이유**
-  - "다시 시도"를 누르면 `load()`가 첫 `await` 전에 알림을 지워, 같은 렌더에서 버튼이 사라진다. 두 번 눌러도 요청은 한 번이다.
-  - 삭제 뒤 다시 읽는 동안에는 폼 대신 "불러오는 중"이 보여, 그 사이에 저장할 수 없다.
-  - 날짜를 옮겼다 돌아온 카드는 #71의 장치로 진행 중인 저장이 끝난 뒤 읽는다.
-  - 신체 카드의 "변화 다시 불러오기"는 원래부터 최신 요청만 반영한다.
+- **zod `.max()` already counts in characters.** In zod 4, `z.string().max(2)` accepts 2 emoji (4 UTF-16 units). So the server-side length of the daily check and body memos was right from the start. The statement in the issue that "zod `.max` is in UTF-16 units" was not true in this version.
+- **The places that actually disagreed were two.**
+  - `maxLength={200}` of the daily check memo field: the browser counts in UTF-16 units, so pasting 201 emoji left only 100 in the field and it was saved as it was (confirmed in the browser).
+  - The fields the server counted directly with `.length`: the combo name (the DB has `char_length` 50) was rejected from 26 emoji.
+- **Why reloads do not overlap**
+  - When "다시 시도" is pressed, `load()` clears the notice before the first `await`, and the button disappears in the same render. Even if pressed twice, there is one request.
+  - While reading again after a delete, "불러오는 중" is shown instead of the form, so a save cannot be made in between.
+  - A card that came back after moving the date reads after the saves in progress finish, by the mechanism of #71.
+  - "변화 다시 불러오기" (reload change) of the body card has always reflected only the latest request.
 
-## 변경 — 2026-11-06
+## Change — 2026-11-06
 
-- **새 파일** `backend/src/text.ts`
-  - `charCount(value)`: 글자 수. `[...value].length`.
-  - `rejectNul`: 요청 본문(키 포함)과 쿼리 문자열 어디든 NUL이 있으면 400 "쓸 수 없는 문자(NUL)가 들어 있습니다".
-- **API** `backend/src/app.ts`: JSON 파싱 바로 뒤에 `rejectNul`을 건다.
+- **New file** `backend/src/text.ts`
+  - `charCount(value)`: the character count. `[...value].length`.
+  - `rejectNul`: If a NUL is anywhere in the request body (including keys) or the query string, 400 "쓸 수 없는 문자(NUL)가 들어 있습니다" (a character that cannot be used (NUL) is included).
+- **API** `backend/src/app.ts`: `rejectNul` is attached right after the JSON parsing.
 - **API** `backend/src/checks.ts`, `body.ts`, `combos.ts`
-  - 하루 체크 메모(200자), 신체 메모(500자), 조합 이름(50자)을 `charCount`로 센다.
-  - 하루 체크의 메모 전용 NUL 검사는 `rejectNul`로 옮겨 지웠다.
-- **화면** `frontend/src/checks.tsx`, `frontend/src/check-text.ts`
-  - 메모 칸의 `maxLength`를 지웠다. 저장할 때 `charCount`로 200자를 넘는지 확인한다.
-  - `charCount`를 `check-text.ts`에 두었다.
+  - The daily check memo (200 characters), the body memo (500 characters), and the combo name (50 characters) are counted with `charCount`.
+  - The memo-only NUL check of the daily check was moved to `rejectNul` and removed.
+- **Screen** `frontend/src/checks.tsx`, `frontend/src/check-text.ts`
+  - Removed `maxLength` of the memo field. When saving, it checks with `charCount` whether it exceeds 200 characters.
+  - `charCount` was put in `check-text.ts`.
 
-## 검증
+## Verification
 
-### 브라우저
+### Browser
 
-임시 DB(포트 5473, `health_browser`)에 실제 API(3973)와 Vite(5273)를 띄웠다. 헤드리스 Chrome(디버깅 포트 9673)을 CDP로 움직였다. 하루 체크 메모 칸에 이모지 201개를 한 번에 넣고(`Input.insertText`, 붙여넣기와 같음) 저장했다.
+A real API (3973) and Vite (5273) were started on a temporary DB (port 5473, `health_browser`). Headless Chrome (debugging port 9673) was driven over CDP. 201 emoji were put into the daily check memo field at once (`Input.insertText`, the same as pasting) and saved.
 
-| 단계                    | 고치기 전(1440×900)           | 고친 뒤(320×700, 390×844, 1440×900) |
-| ----------------------- | ----------------------------- | ----------------------------------- |
-| 201개 넣은 뒤 칸의 글자 | 100개(나머지는 조용히 사라짐) | 201개                               |
-| 저장                    | 100개가 그대로 저장됨         | "메모는 200자 이하로 입력해 주세요" |
-| 하나 지우고 저장        | (해당 없음)                   | 200개가 그대로 저장됨               |
+| Step                                         | Before the fix (1440×900)          | After the fix (320×700, 390×844, 1440×900)                                     |
+| -------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------ |
+| Characters in the field after putting in 201 | 100 (the rest silently disappears) | 201                                                                            |
+| Save                                         | 100 saved as they are              | "메모는 200자 이하로 입력해 주세요" (enter the memo as 200 characters or less) |
+| Remove one and save                          | (not applicable)                   | 200 saved as they are                                                          |
 
-- 고친 뒤 세 폭 모두 가로 넘침과 콘솔 오류가 없었다.
-- 확인 뒤 임시 DB, API, Vite, Chrome을 모두 껐다.
+- After the fix, at all three widths there was no horizontal overflow and no console errors.
+- After the check, the temporary DB, API, Vite, and Chrome were all shut down.
 
-### 테스트
+### Tests
 
-- `backend/test/text.test.ts`(새로 3개, 1차 리뷰 뒤 4개)
-  - 이모지 하나가 1자로 세어진다.
-  - NUL이 신체·하루 체크 메모, 음식·조합·식사 이름, 술 종류, 본문의 키, 검색 쿼리(`?q=%00`) 어디에 있어도 400으로 거부되고 DB에 닿지 않는다.
-  - 이모지 201개 하루 체크 메모, 501개 신체 메모, 51개 조합 이름이 거부된다.
-- `backend/test/text.integration.test.ts`(새로 2개, 날짜 1985-06-10, `testDatabaseSkip` 사용)
-  - 이모지 200개 하루 체크 메모와 500개 신체 메모가 그대로 저장된다.
-  - 이모지 50개 조합 이름이 그대로 저장된다.
-- 고치기 전 코드에서는 NUL 테스트와 조합 이름 50개 테스트가 실패했다. 메모 테스트는 위 "확인한 것"대로 고치기 전에도 통과했다.
+- `backend/test/text.test.ts` (3 new, 4 after the first review)
+  - One emoji is counted as 1 character.
+  - A NUL anywhere in the body and daily check memos, in food, combo, and meal names, in the alcohol type, in a key of the body, and in the search query (`?q=%00`) is rejected with 400 and does not reach the DB.
+  - A daily check memo of 201 emoji, a body memo of 501, and a combo name of 51 are rejected.
+- `backend/test/text.integration.test.ts` (2 new, date 1985-06-10, using `testDatabaseSkip`)
+  - A daily check memo of 200 emoji and a body memo of 500 are saved as they are.
+  - A combo name of 50 emoji is saved as it is.
+- On the code before the fix, the NUL tests and the combo name 50 test failed. The memo tests passed even before the fix, as in "What was checked" above.
 - `frontend/src/checks.test.tsx`
-  - 메모 칸에 `maxLength`가 없다(기존 테스트를 바꿈).
-  - 이모지 201개는 보내기 전에 거부되고, 200개는 그대로 보내진다.
-- `frontend/src/check-text.test.ts`: 이모지 200개가 200자로 세어진다.
-- `frontend/src/body.test.tsx`, `habits.test.tsx`, `checks.test.tsx`: "다시 시도"를 두 번 눌러도 요청이 한 번만 나간다.
+  - The memo field has no `maxLength` (an existing test was changed).
+  - 201 emoji are rejected before sending, and 200 are sent as they are.
+- `frontend/src/check-text.test.ts`: 200 emoji are counted as 200 characters.
+- `frontend/src/body.test.tsx`, `habits.test.tsx`, `checks.test.tsx`: Even if "다시 시도" is pressed twice, only one request goes out.
 
-### 명령
+### Commands
 
-- `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과
-  - 프런트 360개 통과, 2개 건너뜀. 백엔드 180개 통과, 0개 건너뜀(DB 통합 테스트 포함). 스킬 4개 통과.
-- `npm run knip`: 통과
+- `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed
+  - Frontend 360 passed, 2 skipped. Backend 180 passed, 0 skipped (including DB integration tests). Skill checks 4 passed.
+- `npm run knip`: passed
 
-## 한계
+## Limits
 
-- 음식·식사의 글자 칸(음식 이름, 브랜드, 분류, 단위, 출처 주소, 검색어, 식사 음식 이름)은 아직 `.length`(UTF-16)로 센다. DB에 길이 제약이 없어 거부되는 것은 이모지가 많은 경우뿐이고, 화면 안내와 어긋나는 쪽은 더 엄격한 방향이다. `foods.ts`·`meals.ts`는 #38(정크푸드 집계) 작업과 겹쳐 이번에 바꾸지 않았다. #38이 끝난 뒤 [#101](https://github.com/sirloinbh/health-log/issues/101)에서 같은 `charCount`로 맞춘다.
-- 신체 메모 칸은 화면에 길이 안내가 없다. 서버 제한(500자)에 걸리면 서버 메시지가 나온다.
+- The text fields of foods and meals (food name, brand, category, unit, source URL, search term, meal food name) are still counted with `.length` (UTF-16). The DB has no length constraint, so what is rejected is only the case of many emoji, and where it disagrees with the screen notice, it is in the stricter direction. `foods.ts` and `meals.ts` overlap with the #38 (junk food count) work, so they were not changed this time. After #38 is done, they are aligned with the same `charCount` in [#101](https://github.com/sirloinbh/health-log/issues/101).
+- The body memo field has no length notice on the screen. If it hits the server limit (500 characters), the server message appears.
 
-## 1차 리뷰 — 2026-11-08
+## First review — 2026-11-08
 
-`origin/main`(#38 포함)을 병합한 뒤 별도 읽기 전용 리뷰를 실행했다. 병합 충돌은 없었고, #38은 글자 칸을 더하지 않아(#101 범위 그대로) 이 PR과 겹치지 않았다. 반드시 고칠 것은 없었고, 다음을 반영했다.
+After merging `origin/main` (including #38), a separate read-only review was run. There were no merge conflicts, and #38 added no text fields (the scope of #101 stays as it is), so it did not overlap with this PR. Nothing had to be fixed, and the following was applied.
 
-- **깊게 중첩된 본문이 500이 되던 문제(고칠 것):** `hasNul`이 중첩 한 단계마다 자신을 불러, 크기 제한 안의 5 000단계 배열(약 10 KB)에서 호출 스택이 넘쳐 500이 났다. `rejectNul`은 요청 횟수 제한보다 먼저 돌아 반복해서 보낼 수도 있었다. 재귀 대신 명시적 스택으로 한 번씩만 훑게 바꿨고, 긴 배열도 펼치지 않고 하나씩 넣는다. 10 000단계 배열과 6만 개 문자열 배열 끝의 NUL이 400으로 거부되는 테스트를 더했다. 리뷰 전 코드에서는 이 테스트가 500으로 실패한다.
-- **수면 카드 테스트:** "다시 시도"를 두 번 눌러도 요청이 한 번이라는 테스트를 수면 카드에도 더했다(나머지 세 카드는 처음부터 있었다).
-- **설명 보태기**
-  - 경로의 값(`/api/foods/%00`, 날짜)은 `rejectNul`이 보지 않는다. 이미 `parseId`·`parseDate`가 400으로 거부한다.
-  - `rejectNul`은 요청 횟수 제한보다 먼저 돈다. DB에 닿지 않고 본문 크기만큼만 일하므로 그대로 둔다.
-- **반영하지 않은 것:** 하루 체크 메모 칸의 실시간 글자 수 표시는 선택 사항이라 두었다. 지금은 저장할 때 안내한다. `charCount`가 프런트와 백엔드에 따로 있는 것은 패키지가 달라서다.
-- 반영 뒤 `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과(백엔드 190개, 건너뜀 0. 프런트 370개 통과, 2개 건너뜀. 스킬 4개). `npm run knip`: 통과.
+- **A deeply nested body became 500 (to fix):** `hasNul` called itself at every nesting level, so with a 5,000-level array (about 10 KB) within the size limit, the call stack overflowed and it gave 500. `rejectNul` runs before the request rate limit, so it could also be sent repeatedly. Instead of recursion, it was changed to walk once with an explicit stack, and long arrays are also pushed one by one without being expanded. Tests were added that a 10,000-level array and a NUL at the end of an array of 60,000 strings are rejected with 400. On the code before the review, this test fails with 500.
+- **Sleep card test:** A test that even pressing "다시 시도" twice gives one request was also added to the sleep card (the other three cards had it from the start).
+- **Added explanations**
+  - Values in the path (`/api/foods/%00`, a date) are not looked at by `rejectNul`. `parseId` and `parseDate` already reject them with 400.
+  - `rejectNul` runs before the request rate limit. It does not reach the DB and works only in proportion to the body size, so it was left.
+- **Not applied:** A live character count display in the daily check memo field is optional, so it was left. For now it tells the user when saving. `charCount` exists separately in the frontend and backend because the packages are different.
+- After applying, `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed (backend 190, 0 skipped. Frontend 370 passed, 2 skipped. Skill checks 4). `npm run knip`: passed.
 
-## 2차 리뷰 — 2026-11-08
+## Second review — 2026-11-08
 
-1차 반영과 전체 diff를 별도 읽기 전용 리뷰로 다시 봤다. 반드시 고칠 것과 고치면 좋을 것은 없었다. 리뷰는 여기서 끝낸다.
+The first round of fixes and the whole diff were reviewed again by a separate read-only review. There was nothing that must be fixed and nothing that should be fixed. Reviews end here.
 
-- 확인된 것: 256kb 바로 아래의 가장 나쁜 본문(13만 단계 배열, 키 3만 개 객체 등)도 30ms 안팎으로 끝나 본문 크기에 비례한다. `__proto__` 키와 쿼리의 프로토타입 없는 객체에 든 NUL도 잡힌다.
-- 작은 지적 세 가지를 반영했다.
-  - "다시 시도 두 번" 테스트 네 개가 마지막 응답을 끝까지 기다린다. 테스트가 끝난 뒤 카드가 바뀌지 않는다.
-  - NUL 없는 10 000단계 본문은 `rejectNul`을 지나 경로의 규칙(메모 형식)이 답하는 것을 확인한다.
-  - 위 테스트 수를 고쳤다.
+- What was confirmed: even the worst bodies just under 256kb (an array of 130,000 levels, an object with 30,000 keys, and so on) finish in about 30ms, in proportion to the body size. A NUL in a `__proto__` key and in a prototype-less object of the query is also caught.
+- Three small points were applied.
+  - The four "press retry twice" tests wait for the last response to the end. The card does not change after the test ends.
+  - It is checked that a 10,000-level body without NUL passes `rejectNul` and is answered by the path's rule (memo format).
+  - Fixed the number of tests above.

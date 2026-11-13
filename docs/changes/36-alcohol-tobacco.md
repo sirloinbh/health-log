@@ -1,149 +1,149 @@
-# #36 술·담배 기록과 기간별 합계
+# #36 Alcohol and tobacco records with period totals
 
-- 이슈: [#36](https://github.com/sirloinbh/health-log/issues/36)
-- 브랜치: `feat/36-alcohol-tobacco`
+- Issue: [#36](https://github.com/sirloinbh/health-log/issues/36)
+- Branch: `feat/36-alcohol-tobacco`
 
-## 목적
+## Purpose
 
-술과 담배는 식사 기록으로 잡히지 않는다. 날짜별로 기록하고, 그 날이 든 주와 달의 합계를 하루 기록 화면에서 본다.
+Alcohol and tobacco are not captured by meal records. Record them by date, and see the totals of the week and month that contain that day on the daily record screen.
 
-## 정한 것
+## Decisions
 
-이슈의 추천안을 따랐고 사용자 확인 없이 정했다. 이슈 댓글에 같은 내용을 남겼다.
+The recommendation in the issue was followed and decided without asking the user. The same content was left as an issue comment.
 
-- **담배:** 하루 개비 수(0~200, 정수). 비우면 기록하지 않은 것이고, 0은 피우지 않은 것이다.
-- **술:** 하루에 마신 술을 종류·양·단위로 여러 줄 적는다.
-  - 종류: 소주, 맥주, 와인, 막걸리, 양주, 기타.
-  - 단위: 잔, 병, 캔.
-  - 양: 0 초과 99 이하, 소수 둘째 자리까지.
-  - 같은 종류와 단위는 하루에 한 줄만 쓴다. 하루 최대 20줄이다.
-- **기록하지 않은 날과 0의 구분:** 술은 "기록 안 함 / 안 마심 / 마심" 중에서 고른다. 담배와 술은 따로 기록할 수 있다.
-- **칼로리:** 술 칼로리는 계산하지 않는다. 식사 합계와도 섞지 않는다.
-- **기간:** 주는 월요일~일요일, 달은 1일~말일이다. 날짜는 서비스 시간대(Asia/Seoul)의 달력 날짜 그대로 쓴다.
-- **합계:**
-  - 담배는 기록한 날 수와 개비 합계를 보인다.
-  - 술은 기록한 날 수, 마신 날 수, 종류·단위별 양의 합계를 보인다.
-  - 잔과 병은 서로 바꿀 수 없어서 합치지 않는다.
-  - 기록한 날이 없는 기간은 0이 아니라 "기록 없음"으로 보인다.
+- **Tobacco:** Cigarettes per day (0 to 200, an integer). Empty means not recorded, and 0 means did not smoke.
+- **Alcohol:** The alcohol drunk in a day is entered as several lines of type, amount, and unit.
+  - Types: soju (소주), beer (맥주), wine (와인), makgeolli (막걸리), spirits (양주), other (기타).
+  - Units: glass (잔), bottle (병), can (캔).
+  - Amount: more than 0 and up to 99, to two decimal places.
+  - The same type and unit can be used on only one line per day. At most 20 lines per day.
+- **Telling a day not recorded from 0:** For alcohol, choose among "not recorded / did not drink / drank" (기록 안 함 / 안 마심 / 마심). Tobacco and alcohol can be recorded separately.
+- **Calories:** Alcohol calories are not calculated. They are not mixed into the meal totals either.
+- **Periods:** A week is Monday to Sunday, and a month is the 1st to the last day. Dates are used as calendar dates in the service time zone (Asia/Seoul).
+- **Totals:**
+  - For tobacco, the number of days recorded and the total cigarettes are shown.
+  - For alcohol, the number of days recorded, the number of days drunk, and the total amount per type and unit are shown.
+  - Glasses and bottles cannot be converted into each other, so they are not added together.
+  - A period with no recorded day shows "no record" (기록 없음), not 0.
 
-## 변경 — 2026-11-05
+## Change — 2026-11-05
 
 - **DB** `database/migrations/008_habit_records.sql`
-  - `habit_days` 테이블: 날짜, 담배 개비, 술 기록 여부. 둘 다 비어 있는 행은 DB가 거부한다.
-  - `habit_drinks` 테이블: 날짜별 술 목록. 종류, 단위, 양 범위, 같은 종류·단위의 중복을 DB도 강제한다. 날짜 행을 지우면 함께 지워진다.
-  - 술 목록은 술을 기록한 날에만 붙는다. `(record_date, drinks_recorded)` 복합 외래 키와 `CHECK (drinks_recorded)`로 DB가 강제한다(1차 리뷰 뒤 추가).
+  - `habit_days` table: date, cigarettes, and whether alcohol was recorded. The DB rejects a row where both are empty.
+  - `habit_drinks` table: the alcohol list per date. The DB also enforces the type, unit, amount range, and no duplicate of the same type and unit. When the date row is deleted, they are deleted with it.
+  - The alcohol list is attached only to days when alcohol was recorded. The DB enforces this with the composite foreign key `(record_date, drinks_recorded)` and `CHECK (drinks_recorded)` (added after the first review).
 - **API** `backend/src/habits.ts`, `backend/src/app.ts`
-  - `GET /api/habits/:date`: 그 날 기록과 주·달 합계를 한 번에 준다.
-  - `PUT /api/habits/:date`: 하루를 통째로 바꾼다. 날짜 행, 술 목록 교체, 합계 다시 읽기가 한 트랜잭션이다. 같은 날의 저장은 advisory lock으로 차례를 지킨다(2차 리뷰 뒤 추가).
-  - `DELETE /api/habits/:date`: 기록이 없으면 404다.
-  - 다른 라우터처럼 요청 횟수 제한을 건다. 오류 메시지는 한국어다.
-- **화면** `frontend/src/habits.tsx`, `frontend/src/habit-text.ts`, `frontend/src/daily.tsx`
-  - 하루 기록의 "술·담배" 자리를 실제 카드로 바꿨다.
-  - 입력: 담배 개비, 술 기록 상태 세 가지, 마신 술 목록(추가·빼기). 새 줄은 아직 쓰지 않은 종류로, 여섯 종류를 다 쓰면 아직 쓰지 않은 종류·단위 짝으로 시작한다.
-  - 저장 전 검사: 숫자 형식, 정수, 담배 200개비 이하, 0보다 크고 99 이하인 양, 소수 둘째 자리, 같은 종류·단위 중복, 아무것도 기록하지 않은 경우.
-  - 보기: 저장한 값, 수정, 확인을 거치는 삭제. 아래에 "이 주", "이 달" 합계를 보인다.
-  - 좁은 화면에서는 술의 양, 단위, 빼기 버튼이 한 묶음으로 줄을 바꾼다.
+  - `GET /api/habits/:date`: Returns that day's record and the week and month totals at once.
+  - `PUT /api/habits/:date`: Replaces the whole day. The date row, the replacement of the alcohol list, and the re-read of totals are in one transaction. Saves for the same day take turns with an advisory lock (added after the second review).
+  - `DELETE /api/habits/:date`: 404 if there is no record.
+  - A request rate limit is applied like the other routers. Error messages are in Korean.
+- **Screen** `frontend/src/habits.tsx`, `frontend/src/habit-text.ts`, `frontend/src/daily.tsx`
+  - Replaced the "술·담배" (alcohol and tobacco) placeholder in the daily record with a real card.
+  - Input: cigarettes, three alcohol record states, and the list of alcohol drunk (add and remove). A new line starts with a type not yet used, and when all six types are used, it starts with a type and unit pair not yet used.
+  - Checks before saving: number format, integer, cigarettes at most 200, an amount more than 0 and up to 99, two decimal places, duplicate of the same type and unit, and the case where nothing is recorded.
+  - View: the saved values, edit, and delete through a confirmation. Below, the "이 주" (this week) and "이 달" (this month) totals are shown.
+  - On a narrow screen, the alcohol amount, unit, and remove button wrap together as one group.
 
-## 검증
+## Checks
 
-- 테스트
-  - `backend/test/habits.test.ts`: 입력 검사 전부와 거부된 요청이 DB에 닿지 않는지 검사한다. 없는 날짜, 기록 없는 날 삭제의 404도 검사한다.
-    - 주·달 계산: 일요일, 월요일, 해를 넘는 주, 윤년 2월을 검사한다.
-    - 서버 시간대(`TZ`)를 Asia/Seoul, America/Los_Angeles, Pacific/Kiritimati, UTC로 바꿔도 같은 기간이 나오는지 검사한다.
+- Tests
+  - `backend/test/habits.test.ts`: Checks all input validation and that a rejected request does not reach the DB. It also checks the 404 for a date that does not exist and for deleting a day with no record.
+    - Week and month calculation: checks Sunday, Monday, a week that crosses a year, and February of a leap year.
+    - Checks that the same periods come out even when the server time zone (`TZ`) is changed to Asia/Seoul, America/Los_Angeles, Pacific/Kiritimati, and UTC.
   - `backend/test/habits.integration.test.ts`
-    - 기록 없는 날은 합계가 "모름"으로 나온다.
-    - 담배 0·술 안 마심이 기록 없음과 구분된다. 담배만, 술만 기록한 날도 각각 확인한다.
-    - 다시 저장하면 술 목록이 교체되고 순서가 지켜진다.
-    - 주 경계(1990-04-01 일요일 / 04-02 월요일)와 달 경계(04-30 / 05-01)에서 합계가 끊긴다.
-    - 삭제하면 술 목록도 지워진다.
-    - 저장 도중 두 번째 술에서 실패하면 이전 기록이 그대로 남는다.
-    - DB 제약을 확인한다.
-  - `frontend/src/habit-text.test.ts`: 표시 문구, 기록 안 함과 0의 문구 차이, 기간 문구를 검사한다.
-  - `frontend/src/habits.test.tsx`(처음 15개, 1차 리뷰 뒤 20개): 빈 날, 0과 안 마심 저장, 술 여러 줄과 빈 담배 칸, 줄 빼기를 검사한다. 저장 전 거부 8가지와 Select로 만든 중복, 일곱째 줄의 종류·단위 짝, 수정 시 기존 값 채움과 포커스 이동, 취소, 확인 뒤 삭제와 합계 다시 읽기, 서버 거부, 불러오기 실패 뒤 다시 시도도 검사한다.
-  - `frontend/src/daily.test.tsx`: 하루 기록 화면 테스트의 가짜 서버가 새 카드의 요청에도 답하게 했다.
-- 임시 PostgreSQL 17 클러스터(포트 5467)에서 `health_test`에 마이그레이션 8개를 두 번 적용했다. 두 번째도 오류가 없었다.
-- `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5467/health_test npm run check`: 통과.
-  - 백엔드: 138개 통과, 0개 건너뜀.
-  - 프론트엔드: 285개 통과, 2개 건너뜀. 건너뛴 2개는 다크 전용 앱 조건 테스트로, 이 변경과 관계없다.
-  - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과.
+    - A day with no record gives totals as "unknown".
+    - Tobacco 0 and "did not drink" are told apart from no record. A day with only tobacco and a day with only alcohol are also checked.
+    - Saving again replaces the alcohol list and keeps the order.
+    - Totals break at the week boundary (1990-04-01 Sunday / 04-02 Monday) and the month boundary (04-30 / 05-01).
+    - Deleting also deletes the alcohol list.
+    - If saving fails at the second alcohol line, the previous record stays as it was.
+    - Checks the DB constraints.
+  - `frontend/src/habit-text.test.ts`: Checks the display text, the difference between the text for not recorded and 0, and the period text.
+  - `frontend/src/habits.test.tsx` (15 at first, 20 after the first review): Checks an empty day, saving 0 and "did not drink", several alcohol lines with an empty tobacco field, and removing a line. It also checks the 8 rejections before saving and a duplicate made with the Select, the type and unit pair of the seventh line, filling existing values and moving focus when editing, cancelling, delete after confirmation with the re-read of totals, a server rejection, and retry after a load failure.
+  - `frontend/src/daily.test.tsx`: The fake server in the daily record screen test now also answers the requests of the new card.
+- On a temporary PostgreSQL 17 cluster (port 5467), the 8 migrations were applied twice to `health_test`. The second time had no errors either.
+- `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5467/health_test npm run check`: passed.
+  - Backend: 138 passed, 0 skipped.
+  - Frontend: 285 passed, 2 skipped. The 2 skipped are condition tests for the dark-only app, unrelated to this change.
+  - Skill checks: 4 passed.
+- `npm run knip`: passed.
 
-### 브라우저 확인
+### Browser check
 
-임시 DB에 실제 API(3993)와 Vite(5203)를 띄우고 헤드리스 Chrome을 CDP로 움직였다. 숫자는 키 입력으로 넣고, 선택 칸은 마우스로 열어 골랐다.
+A real API (3993) and Vite (5203) were started on the temporary DB, and headless Chrome was driven over CDP. Numbers were typed by key input, and select fields were opened with the mouse and chosen.
 
-| 항목                                                                          | 320×700 | 390×844 | 1440×900 |
-| ----------------------------------------------------------------------------- | ------- | ------- | -------- |
-| 빈 날의 "기록 없음", 새 술 줄이 맥주로 시작                                   | 통과    | 통과    | 통과     |
-| 같은 소주·병 두 줄은 저장 전에 거부                                           | 통과    | 통과    | 통과     |
-| 담배 3, 소주 1.5병·1잔 저장 뒤 보기, 새로고침 뒤 유지                         | 통과    | 통과    | 통과     |
-| 같은 주의 다른 날에 0·안 마심 저장 → 이 주 "3개비 (2일)", "마신 날 1일 / 2일" | 통과    | 통과    | 통과     |
-| 확인 대화상자로 삭제 뒤 이 주 합계가 1일로 돌아감                             | 통과    | 통과    | 통과     |
-| 수정 시 기존 값 채움, 가로 넘침 없음, 콘솔 오류 없음                          | 통과    | 통과    | 통과     |
+| Item                                                                                                                                       | 320×700 | 390×844 | 1440×900 |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ------- | ------- | -------- |
+| "기록 없음" (no record) on an empty day, a new alcohol line starts with beer                                                               | Pass    | Pass    | Pass     |
+| Two lines of the same soju and bottle are rejected before saving                                                                           | Pass    | Pass    | Pass     |
+| View after saving tobacco 3 and soju 1.5 bottles and 1 glass, kept after reload                                                            | Pass    | Pass    | Pass     |
+| Saving 0 and "did not drink" on another day of the same week gives this week "3개비 (2일)" and "마신 날 1일 / 2일" (days drunk 1 / 2 days) | Pass    | Pass    | Pass     |
+| After deleting through the confirmation dialog, this week's total goes back to 1 day                                                       | Pass    | Pass    | Pass     |
+| Existing values filled when editing, no horizontal overflow, no console errors                                                             | Pass    | Pass    | Pass     |
 
-## 1차 리뷰 — 2026-11-05
+## First review — 2026-11-05
 
-독립 리뷰에서 높음·중간 지적은 없었다. 기간 계산, 합계 SQL, 트랜잭션, 마이그레이션, React 상태, 접근성은 맞다고 봤다. 낮음 8건이 나왔다.
+The independent review had no high or medium points. It judged the period calculation, the totals SQL, the transactions, the migration, the React state, and accessibility to be correct. 8 low points came up.
 
-- **중복 검사 테스트 없음:** 같은 종류·단위를 막는 화면 검사에 테스트가 없었다.
-  - 반영: Radix Select를 키보드로 바꿔 소주·병을 두 번 만들고, 요청 없이 거부되는지 검사한다.
-- **여러 줄인 날의 집계 테스트 없음:** 술이 여러 줄인 날이 "마신 날" 하루로 세지는지 검사하는 테스트가 없었다.
-  - 반영: 세 줄인 날과 안 마신 날로 `drinkingDays: 1`을 검사한다.
-- **`newDraft` 주석이 동작보다 과함:**
-  - 반영: 여섯 종류를 모두 쓰면 아직 안 쓴 종류·단위 짝을 고른다.
-  - 반영: 18짝을 넘는 마지막 줄만 겹칠 수 있다고 주석을 고쳤다.
-  - 반영: 일곱째 줄이 소주·잔으로 시작하는지 검사한다.
-- **폼이 서버 한도 일부를 검사하지 않음:**
-  - 반영: 담배 200개비, 술 99, 소수 둘째 자리를 저장 전에 검사한다.
-  - 반영: 세 경우를 `test.each`에 더했다.
-- **작은 정리:**
-  - 반영: 백엔드는 `foods.ts`의 `hasTwoDecimalsAtMost`를 다시 쓴다.
-  - 반영: 테스트 사이 빈 줄을 맞췄다.
-- **GET 응답이 두 시점을 섞을 수 있음:** 리뷰는 별도 이슈를 권했지만, 작게 고칠 수 있어 이 PR에 넣었다.
-  - 반영: GET은 `REPEATABLE READ READ ONLY` 트랜잭션 하나에서 기록과 두 합계를 읽는다.
-- **기록하지 않은 날에 술 줄이 붙을 수 있음:** 리뷰는 별도 이슈를 권했지만, 아직 병합 전인 마이그레이션이라 이 PR에서 고쳤다.
-  - 반영: 복합 외래 키와 `ON UPDATE CASCADE`, 자식의 `CHECK (drinks_recorded)`를 더했다.
-  - 반영: 술이 남은 날을 "기록 안 함"으로 바꾸면 DB가 거부한다.
-  - 반영: `PUT`은 이 순서에 맞게 술 목록을 먼저 지운 뒤 날짜 행을 바꾼다.
-  - 테스트: 술을 기록했다가 담배만 다시 저장하는 경우를 통합 테스트에 더했다.
-  - 테스트: DB가 두 경우를 거부하는지 확인한다.
-- **백업 복원 목록:** 이미 아래 제한에 적었고 PR #68에서 처리한다.
+- **No test for the duplicate check:** The screen check that blocks the same type and unit had no test.
+  - Applied: The Radix Select is operated by keyboard to make soju and bottle twice, and it is checked that it is rejected with no request.
+- **No test for aggregating a day with several lines:** There was no test that a day with several alcohol lines counts as one "day drunk".
+  - Applied: `drinkingDays: 1` is checked with a day of three lines and a day of not drinking.
+- **The `newDraft` comment claimed more than the behavior:**
+  - Applied: When all six types are used, it picks a type and unit pair not yet used.
+  - Applied: The comment was fixed to say that only the last line beyond 18 pairs can overlap.
+  - Applied: It is checked that the seventh line starts with soju and glass.
+- **The form did not check some server limits:**
+  - Applied: 200 cigarettes, alcohol 99, and two decimal places are checked before saving.
+  - Applied: Three cases were added to `test.each`.
+- **Small cleanups:**
+  - Applied: The backend reuses `hasTwoDecimalsAtMost` of `foods.ts`.
+  - Applied: Blank lines between tests were aligned.
+- **A GET response could mix two points in time:** The review recommended a separate issue, but it could be fixed in a small way, so it was put in this PR.
+  - Applied: GET reads the record and both totals in a single `REPEATABLE READ READ ONLY` transaction.
+- **An alcohol line could be attached to a day not recorded:** The review recommended a separate issue, but because the migration was not yet merged, it was fixed in this PR.
+  - Applied: Added the composite foreign key with `ON UPDATE CASCADE`, and the child's `CHECK (drinks_recorded)`.
+  - Applied: Changing a day that still has alcohol to "not recorded" is rejected by the DB.
+  - Applied: To match this order, `PUT` deletes the alcohol list first and then changes the date row.
+  - Test: Added to the integration test the case of recording alcohol and then saving only tobacco again.
+  - Test: It is checked that the DB rejects both cases.
+- **Backup restore list:** Already written in the limits below and handled in PR #68.
 
-### 1차 반영 검증
+### First round verification
 
-- 바뀐 마이그레이션은 임시 DB의 두 테이블을 지우고 8개 파일 전체를 두 번 다시 적용했다. 오류는 없었다.
-- `npm run check`(같은 임시 DB): 통과.
-  - 백엔드: 139개 통과, 0개 건너뜀.
-  - 프론트엔드: 290개 통과, 2개 건너뜀.
-  - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과.
-- 브라우저: API를 새 코드로 다시 띄우고 세 화면 크기의 항목을 다시 돌려 모두 통과했다.
+- For the changed migration, the two tables in the temporary DB were dropped and all 8 files were applied again twice. There were no errors.
+- `npm run check` (same temporary DB): passed.
+  - Backend: 139 passed, 0 skipped.
+  - Frontend: 290 passed, 2 skipped.
+  - Skill checks: 4 passed.
+- `npm run knip`: passed.
+- Browser: The API was started again with the new code and the items at the three screen sizes were run again, and all passed.
 
-## 2차 리뷰 — 2026-11-05
+## Second review — 2026-11-05
 
-1차 반영이 바르게 됐다고 확인됐다. 복합 외래 키는 네 가지 전환(없음→술, 술→술, 술→기록 안 함, 기록 안 함→술)에서 모두 맞게 동작한다. 읽기 트랜잭션 정리, Radix Select 테스트, 폼과 서버 문구 일치도 확인됐다. 병합을 막는 결함은 없었고, 중간 1건과 낮음 3건이 나왔다. 리뷰는 2회까지라 더 하지 않는다.
+It was confirmed that the first round of fixes was done correctly. The composite foreign key works correctly in all four transitions (none to alcohol, alcohol to alcohol, alcohol to not recorded, not recorded to alcohol). The cleanup of the read transaction, the Radix Select test, and the match between the form text and the server text were also confirmed. There was no defect that blocks merging, and 1 medium and 3 low points came up. Reviews are limited to two rounds, so no more are done.
 
-- **중간: 같은 날을 동시에 저장하면 잘못된 409가 난다.** 1차 반영에서 술 목록 삭제를 날짜 행 갱신보다 앞에 두었다. 그 결과 두 저장이 행 잠금 없이 함께 지우고, 둘 다 position 0에 넣다가 하나가 기본 키 충돌로 "이미 등록된 항목입니다"를 받았다. 데이터는 망가지지 않았다.
-  - 반영: 저장 트랜잭션 첫 문장에서 그 날짜의 `pg_advisory_xact_lock`을 잡는다.
-  - 테스트: 담배만 있던 날과 술이 있던 날에서 두 저장을 동시에 다섯 번씩 보낸다. 둘 다 200이고 한쪽 값이 통째로 남는지 확인한다.
-  - 확인: 잠금을 빼고 돌리면 이 테스트가 409로 실패했고, 넣으면 통과했다.
-- **낮음: `UNIQUE (record_date, drinks_recorded)`가 기본 키와 겹친다.** 외래 키의 대상이라 필요하다. 처음 두 저장이 동시에 들어올 때의 충돌 가능성은 위 잠금으로 함께 막힌다.
-- **낮음: 이전 판 008을 적용한 로컬 DB:** `CREATE TABLE IF NOT EXISTS`라서, 이전 판을 적용한 DB는 새 제약 없이 표를 유지한다. 008은 `main`에 들어간 적이 없어 로컬 DB만 해당한다.
-  - 대처: 그런 DB는 `habit_drinks`, `habit_days`를 지우고 다시 적용한다. 이 작업의 임시 DB도 그렇게 했다.
-- **낮음: 이 문서의 "변경" 항목이 1차 반영 전 내용이었다.**
-  - 반영: 새 줄 기본값, 저장 전 검사, 테스트 수를 고쳤다.
+- **Medium: Saving the same day concurrently gives a wrong 409.** In the first round of fixes, deleting the alcohol list was put before updating the date row. As a result, two saves deleted at the same time without a row lock, both inserted at position 0, and one got "이미 등록된 항목입니다" (this item is already registered) because of a primary key conflict. The data was not corrupted.
+  - Applied: The first statement of the save transaction takes `pg_advisory_xact_lock` for that date.
+  - Test: For a day that had only tobacco and a day that had alcohol, two saves are sent at the same time five times each. It checks that both return 200 and that one side's values remain whole.
+  - Confirmed: Without the lock this test failed with 409, and with it the test passed.
+- **Low: `UNIQUE (record_date, drinks_recorded)` overlaps with the primary key.** It is needed because it is the target of the foreign key. The possibility of a conflict when the first two saves come in at the same time is also prevented by the lock above.
+- **Low: A local DB that applied the earlier version of 008:** Because it is `CREATE TABLE IF NOT EXISTS`, a DB that applied the earlier version keeps the tables without the new constraints. 008 never entered `main`, so only local DBs are affected.
+  - Handling: For such a DB, drop `habit_drinks` and `habit_days` and apply again. The temporary DB of this work was handled that way too.
+- **Low: The "Change" section of this document was the content from before the first round of fixes.**
+  - Applied: Fixed the new line default, the checks before saving, and the number of tests.
 
-### 2차 반영 검증
+### Second round verification
 
-- `npm run check`(같은 임시 DB): 통과.
-  - 백엔드: 140개 통과, 0개 건너뜀.
-  - 프론트엔드: 290개 통과, 2개 건너뜀.
-  - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과.
+- `npm run check` (same temporary DB): passed.
+  - Backend: 140 passed, 0 skipped.
+  - Frontend: 290 passed, 2 skipped.
+  - Skill checks: 4 passed.
+- `npm run knip`: passed.
 
-## 제한·후속
+## Limits and follow-ups
 
-- 술 칼로리와 알코올 양(g)은 계산하지 않는다.
-- 합계는 하루 화면의 주·달만 보인다. 기간을 골라 보는 화면은 #43 변화 리포트에서 다룬다.
-- 다크 모드와 실제 휴대폰, Firefox, Safari는 확인하지 않았다.
-- PR #68의 백업 복원 행 수 비교 목록에 `habit_days`, `habit_drinks`를 더해야 한다. `meal_combos`, `meal_combo_items`도 아직 빠져 있다.
+- Alcohol calories and the alcohol amount (g) are not calculated.
+- Totals are shown only for the week and month on the daily screen. A screen to view a chosen period is handled in the #43 change report.
+- Dark mode, a real phone, Firefox, and Safari were not checked.
+- `habit_days` and `habit_drinks` must be added to the row count comparison list of backup restore in PR #68. `meal_combos` and `meal_combo_items` are also still missing.

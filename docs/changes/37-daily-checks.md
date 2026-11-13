@@ -1,137 +1,137 @@
-# #37 식단 지킴·수면 만족 하루 체크
+# #37 Daily checks for diet adherence and sleep satisfaction
 
-- 이슈: [#37](https://github.com/sirloinbh/health-log/issues/37)
-- 브랜치: `feat/37-daily-checks`
+- Issue: [#37](https://github.com/sirloinbh/health-log/issues/37)
+- Branch: `feat/37-daily-checks`
 
-## 목적
+## Purpose
 
-수치만으로는 그날 계획대로 지냈는지 한눈에 알 수 없다. 식단을 지켰는지, 잠을 잘 잤는지를 하루 단위로 체크한다. 그 날이 든 주와 달의 달성률도 본다.
+Numbers alone do not show at a glance whether the day went as planned. Check by day whether the diet was kept and whether sleep was good. Also see the achievement rates of the week and month that contain that day.
 
-## 정한 것
+## Decisions
 
-이슈의 추천안을 따랐고 사용자 확인 없이 정했다. 이슈 댓글에 같은 내용을 남겼다.
+The recommendation in the issue was followed and decided without asking the user. The same content was left as an issue comment.
 
-- **판정:** 사용자가 직접 예·아니오로 체크한다. 자동 판정은 목표 기능(#45)이 생기면 검토한다.
-- **질문:** "식단을 지켰나요?"(지킴 / 못 지킴), "잠을 잘 잤나요?"(잘 잠 / 못 잠).
-  - 각 질문은 "체크 안 함"을 고를 수 있다.
-  - 체크하지 않은 질문은 "아니오"로 세지 않는다.
-- **메모:** 200자까지 쓸 수 있다. 메모만 있는 날도 저장된다. 길이를 세는 단위는 #92에서 정한다.
-- **달성률:** 분모는 그 질문에 답한 날 수다. 기간은 #36과 같다(주는 월~일, 달은 1일~말일, Asia/Seoul 달력 날짜).
-  - 답한 날이 없는 기간은 0%가 아니라 "기록 없음"이다.
-  - 퍼센트는 반올림한다.
+- **Judgment:** The user checks yes or no directly. Automatic judgment will be considered when the goals feature (#45) exists.
+- **Questions:** "식단을 지켰나요?" (Did you keep your diet?) (kept / not kept), "잠을 잘 잤나요?" (Did you sleep well?) (slept well / did not).
+  - Each question can be left as "체크 안 함" (not checked).
+  - A question that is not checked is not counted as "no".
+- **Memo:** Up to 200 characters. A day with only a memo is also saved. The unit for counting length is decided in #92.
+- **Achievement rate:** The denominator is the number of days on which that question was answered. The periods are the same as #36 (week Monday to Sunday, month 1st to the last day, Asia/Seoul calendar dates).
+  - A period with no answered day is "기록 없음" (no record), not 0%.
+  - The percentage is rounded.
 
-## 변경 — 2026-11-05
+## Change — 2026-11-05
 
-- **DB** `database/migrations/009_day_checks.sql`: `day_checks`(날짜, 식단 지킴, 수면 만족, 메모)를 만든다.
-  - 두 체크는 `NULL`이면 체크하지 않은 것이다.
-  - 아무 값도 없는 행과 빈 메모, 200자를 넘는 메모는 DB가 거부한다.
+- **DB** `database/migrations/009_day_checks.sql`: Creates `day_checks` (date, diet kept, sleep satisfied, memo).
+  - For the two checks, `NULL` means not checked.
+  - The DB rejects a row with no values, an empty memo, and a memo over 200 characters.
 - **API** `backend/src/checks.ts`, `backend/src/app.ts`
-  - `GET /api/checks/:date`: 그 날 체크와 주·달 달성률(답한 날 수와 "예"의 수)을 한 스냅샷에서 준다.
-  - `PUT /api/checks/:date`: 하루를 통째로 바꾸고, 같은 트랜잭션에서 달성률을 다시 읽어 답한다.
-  - `DELETE /api/checks/:date`: 기록이 없으면 404다.
-  - 요청 횟수 제한을 건다. 오류 메시지는 한국어다.
-- **공통** `backend/src/day-records.ts`: #36의 트랜잭션 함수와 주·달 계산을 옮겨 두 기능이 함께 쓴다. `habits.ts`는 동작 변화 없이 이 파일을 쓰게 바꿨다. 기간 계산 테스트도 `backend/test/day-records.test.ts`로 옮겼다.
-- **화면** `frontend/src/checks.tsx`, `frontend/src/check-text.ts`, `frontend/src/daily.tsx`
-  - 하루 기록의 "하루 체크" 자리를 실제 카드로 바꿨다.
-  - 질문마다 세 버튼(`aria-pressed`)과 메모 칸이 있다. 보기, 수정, 확인을 거치는 삭제가 된다.
-  - "이 주", "이 달" 달성률을 `1/2일 지킴 (50%)`처럼 보인다.
+  - `GET /api/checks/:date`: Gives that day's checks and the week and month achievement rates (the number of answered days and the number of "yes") from one snapshot.
+  - `PUT /api/checks/:date`: Replaces the whole day, and in the same transaction reads the achievement rates again and returns them.
+  - `DELETE /api/checks/:date`: 404 if there is no record.
+  - A request rate limit is applied. Error messages are in Korean.
+- **Shared** `backend/src/day-records.ts`: The transaction function and the week and month calculation of #36 were moved here so both features share them. `habits.ts` was changed to use this file with no behavior change. The period calculation tests were also moved to `backend/test/day-records.test.ts`.
+- **Screen** `frontend/src/checks.tsx`, `frontend/src/check-text.ts`, `frontend/src/daily.tsx`
+  - Replaced the "하루 체크" (daily check) placeholder in the daily record with a real card.
+  - Each question has three buttons (`aria-pressed`) and a memo field. It supports view, edit, and delete through a confirmation.
+  - The "이 주" (this week) and "이 달" (this month) achievement rates are shown like `1/2일 지킴 (50%)` (kept 1 of 2 days (50%)).
 
-## 검증
+## Checks
 
-- 테스트
+- Tests
   - `backend/test/checks.test.ts`
-    - 예·아니오가 아닌 값(`'true'`, `1`, `0`, `'yes'`)을 거부한다.
-    - 메모 200자 제한, NUL 문자(U+0000, 1차 리뷰 뒤 추가), 빈 요청을 거부한다.
-    - 없는 날짜와 기록 없는 날 삭제의 404를 검사한다.
-    - 거부된 요청은 DB에 닿지 않는다.
+    - Rejects values that are not yes or no (`'true'`, `1`, `0`, `'yes'`).
+    - Rejects the 200-character memo limit, the NUL character (U+0000, added after the first review), and an empty request.
+    - Checks the 404 for a date that does not exist and for deleting a day with no record.
+    - A rejected request does not reach the DB.
   - `backend/test/checks.integration.test.ts`
-    - 체크하지 않은 날은 집계하지 않는다.
-    - 한 질문만 답한 날은 그 질문의 분모에만 들어가고, 메모만 있는 날은 어느 분모에도 들어가지 않는다.
-    - 다시 저장하면 비운 칸도 지워진다.
-    - 주 경계(1990-04-01 일 / 04-02 월)와 달 경계(04-30 / 05-01)에서 끊긴다.
-    - 삭제와 두 번째 삭제의 404를 검사한다.
-    - DB 제약을 검사한다.
-  - `backend/test/day-records.test.ts`: #36에서 옮긴 기간 계산 테스트 2개다.
-  - `frontend/src/check-text.test.ts`: 체크 안 함·예·아니오 문구, 달성률 문구, 답한 날이 없을 때 "기록 없음", 반올림을 검사한다.
-  - `frontend/src/checks.test.tsx`(처음 9개, 1차 리뷰 뒤 12개, 2차 리뷰 뒤 13개)
-    - 빈 날의 기본값을 검사한다.
-    - 한 질문만 답하면 다른 질문은 `null`로 보낸다.
-    - "아니오" 두 개와 메모를 저장하면 메모의 앞뒤 공백을 지운다.
-    - 아무것도 없으면 보내기 전에 거부한다.
-    - 수정 시 기존 답을 채우고, 답을 "체크 안 함"으로 되돌릴 수 있고, 포커스가 옮겨 간다.
-    - 취소, 확인 뒤 삭제와 달성률 다시 읽기, 서버 거부, 불러오기 실패 뒤 다시 시도를 검사한다.
-  - `frontend/src/daily.test.tsx`: 가짜 서버가 새 카드의 요청에도 답하게 했다.
-- 임시 PostgreSQL 17 클러스터(포트 5467)에서 `health_test`에 마이그레이션 9개를 두 번 적용했다. 두 번째도 오류가 없었다.
-- `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5467/health_test npm run check`: 통과.
-  - 백엔드: 151개 통과, 0개 건너뜀.
-  - 프론트엔드: 301개 통과, 2개 건너뜀. 건너뛴 2개는 다크 전용 앱 조건 테스트로, 이 변경과 관계없다.
-  - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과.
+    - A day that is not checked is not counted.
+    - A day with only one question answered goes only into the denominator of that question, and a day with only a memo goes into no denominator.
+    - Saving again also clears the fields that were emptied.
+    - Totals break at the week boundary (1990-04-01 Sunday / 04-02 Monday) and the month boundary (04-30 / 05-01).
+    - Checks delete and the 404 of a second delete.
+    - Checks the DB constraints.
+  - `backend/test/day-records.test.ts`: The 2 period calculation tests moved from #36.
+  - `frontend/src/check-text.test.ts`: Checks the text for not checked, yes, and no, the achievement rate text, "기록 없음" when there is no answered day, and rounding.
+  - `frontend/src/checks.test.tsx` (9 at first, 12 after the first review, 13 after the second review)
+    - Checks the defaults for an empty day.
+    - If only one question is answered, the other is sent as `null`.
+    - Saving two "no" answers and a memo trims the whitespace around the memo.
+    - If there is nothing, it is rejected before sending.
+    - When editing, it fills the existing answers, an answer can be set back to "체크 안 함", and focus moves.
+    - Checks cancelling, delete after confirmation with the re-read of achievement rates, a server rejection, and retry after a load failure.
+  - `frontend/src/daily.test.tsx`: The fake server now also answers the requests of the new card.
+- On a temporary PostgreSQL 17 cluster (port 5467), the 9 migrations were applied twice to `health_test`. The second time had no errors either.
+- `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5467/health_test npm run check`: passed.
+  - Backend: 151 passed, 0 skipped.
+  - Frontend: 301 passed, 2 skipped. The 2 skipped are condition tests for the dark-only app, unrelated to this change.
+  - Skill checks: 4 passed.
+- `npm run knip`: passed.
 
-### 브라우저 확인
+### Browser check
 
-임시 DB에 실제 API(3993)와 Vite(5203)를 띄우고 헤드리스 Chrome을 CDP로 움직였다. 버튼은 마우스 이벤트로 누르고, 메모는 키 입력으로 넣었다.
+A real API (3993) and Vite (5203) were started on the temporary DB, and headless Chrome was driven over CDP. Buttons were pressed with mouse events and the memo was entered by key input.
 
-| 항목                                                                                | 320×700 | 390×844 | 1440×900 |
-| ----------------------------------------------------------------------------------- | ------- | ------- | -------- |
-| 빈 날 "기록 없음", 식단만 지킴과 메모를 저장한 뒤 수면은 "체크 안 함"으로 남음      | 통과    | 통과    | 통과     |
-| 같은 주의 세 날(지킴+체크 안 함, 둘 다 아니오, 잠만 잘 잠) → 식단 1/2일, 수면 1/2일 | 통과    | 통과    | 통과     |
-| 수정 시 기존 답 채움, 식단 "아니오"를 "체크 안 함"으로 되돌리면 식단 1/1일          | 통과    | 통과    | 통과     |
-| 확인 대화상자로 삭제한 뒤 달성률 다시 계산                                          | 통과    | 통과    | 통과     |
-| 가로 넘침 없음, 콘솔 오류 없음                                                      | 통과    | 통과    | 통과     |
+| Item                                                                                                                  | 320×700 | 390×844 | 1440×900 |
+| --------------------------------------------------------------------------------------------------------------------- | ------- | ------- | -------- |
+| "기록 없음" (no record) on an empty day; after saving diet kept and a memo, sleep stays as "체크 안 함" (not checked) | Pass    | Pass    | Pass     |
+| Three days of the same week (kept + not checked, both no, only slept well) gives diet 1/2 days, sleep 1/2 days        | Pass    | Pass    | Pass     |
+| Existing answers filled when editing; setting diet "no" back to "체크 안 함" gives diet 1/1 days                      | Pass    | Pass    | Pass     |
+| Rates recalculated after deleting through the confirmation dialog                                                     | Pass    | Pass    | Pass     |
+| No horizontal overflow, no console errors                                                                             | Pass    | Pass    | Pass     |
 
-## 1차 리뷰 — 2026-11-05
+## First review — 2026-11-05
 
-독립 리뷰에서 높음·중간 지적은 없었다. 확인된 것: 집계 SQL(`count(열)`과 `FILTER`), 덮어쓰기 저장, 스냅샷 읽기, 메모 다듬기, 반올림, 마이그레이션, `habits.ts` 옮김 뒤 동작 불변, 접근성, 문서 내용. 낮음 7건이 나왔다.
+The independent review had no high or medium points. What was confirmed: the aggregation SQL (`count(column)` and `FILTER`), the overwrite save, the snapshot read, memo trimming, rounding, the migration, unchanged behavior after moving `habits.ts`, accessibility, and the document content. 7 low points came up.
 
-- **메모 200자 경계 테스트가 없었다.**
-  - 반영: 앞뒤 공백을 붙인 정확히 200자 메모가 다듬어져 저장되는지 통합 테스트로 검사한다. 201자는 400인지 검사한다.
-  - 반영: DB가 200자를 받는지 검사한다.
-- **메모 칸이 제한을 알리지 않았다.**
-  - 반영: "200자까지 쓸 수 있습니다." 안내를 붙이고 `aria-describedby`로 연결했다. 테스트를 더했다.
-- **날짜를 옮긴 뒤 실패한 저장의 알림에 테스트가 없었다.**
-  - 반영: 저장 중에 카드를 닫고 실패시켜 알림 문구를 검사한다.
-- **저장하는 동안 답 버튼과 메모를 바꿀 수 있었다.** 바꾼 값은 이미 보낸 저장에 들어가지 않았다.
-  - 반영: 저장하는 동안 둘 다 막는다. 메모 칸은 2차 리뷰 뒤 `disabled` 대신 `readOnly`로 바꿨다. 실패하면 다시 풀리는지 검사한다.
-- **메모에 NUL 문자가 있으면 500이었다.**
-  - 반영: 하루 체크 메모는 400 "메모에 쓸 수 없는 문자가 있습니다"로 거부한다. 테스트를 더했다.
-  - 신체 메모 등 다른 칸은 [#92](https://github.com/sirloinbh/health-log/issues/92)로 분리했다.
-- **메모 길이 단위(UTF-16과 문자 수)가 다르다.** 신체 기록도 같아 여러 기능에 걸치므로 [#92](https://github.com/sirloinbh/health-log/issues/92)로 분리했다.
-- **느린 "다시 시도" 응답이 새 응답을 덮어쓸 수 있다.** 신체·술담배 카드도 같아 [#92](https://github.com/sirloinbh/health-log/issues/92)로 분리했다.
+- **There was no test for the 200-character memo boundary.**
+  - Applied: An integration test checks that a memo of exactly 200 characters with whitespace around it is trimmed and saved. It checks that 201 characters gives 400.
+  - Applied: It is checked that the DB accepts 200 characters.
+- **The memo field did not tell about the limit.**
+  - Applied: Added the guidance "200자까지 쓸 수 있습니다." (You can write up to 200 characters.) and linked it with `aria-describedby`. A test was added.
+- **The notice for a save that failed after moving to another date had no test.**
+  - Applied: The card is closed during saving and made to fail, and the notice text is checked.
+- **While saving, the answer buttons and the memo could be changed.** The changed values did not go into the save already sent.
+  - Applied: Both are blocked while saving. After the second review, the memo field was changed from `disabled` to `readOnly`. It is checked that they are released again on failure.
+- **A NUL character in the memo gave 500.**
+  - Applied: The daily check memo is rejected with 400 "메모에 쓸 수 없는 문자가 있습니다" (the memo has a character that cannot be used). A test was added.
+  - Other fields such as the body memo were split into [#92](https://github.com/sirloinbh/health-log/issues/92).
+- **The memo length unit (UTF-16 versus character count) differs.** The body record is the same and it spans several features, so it was split into [#92](https://github.com/sirloinbh/health-log/issues/92).
+- **A slow "retry" response can overwrite a new response.** The body and alcohol/tobacco cards are the same, so it was split into [#92](https://github.com/sirloinbh/health-log/issues/92).
 
-### 1차 반영 검증
+### First round verification
 
-- `npm run check`(같은 임시 DB): 통과.
-  - 백엔드: 152개 통과, 0개 건너뜀.
-  - 프론트엔드: 304개 통과, 2개 건너뜀.
-  - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과.
+- `npm run check` (same temporary DB): passed.
+  - Backend: 152 passed, 0 skipped.
+  - Frontend: 304 passed, 2 skipped.
+  - Skill checks: 4 passed.
+- `npm run knip`: passed.
 
-## 2차 리뷰 — 2026-11-05
+## Second review — 2026-11-05
 
-1차 반영 5건이 맞게 됐고, 되돌리면 각 테스트가 실패한다고 확인됐다. `habits.ts`를 옮긴 일도 동작을 바꾸지 않았다. 병합을 막는 결함은 없었고, 낮음 3건을 모두 반영했다. 리뷰는 2회까지라 더 하지 않는다.
+The 5 fixes of the first round were confirmed to be correct, and reverting each makes its test fail. Moving `habits.ts` also did not change behavior. There was no defect that blocks merging, and all 3 low points were applied. Reviews are limited to two rounds, so no more are done.
 
-- **메모에서 Enter로 저장했다가 실패하면 포커스가 `body`로 빠졌다.** 저장 중에 메모 칸이 `disabled`였기 때문이다.
-  - 반영: 메모 칸을 `readOnly`로 바꿨다.
-  - 테스트: 저장 중 메모 칸이 `readonly`인지 검사한다. 되돌리면 이 테스트가 실패한다.
-  - 테스트: 실패 뒤 포커스 테스트도 더했다. 다만 jsdom은 `disabled`가 된 칸의 포커스를 빼지 않아서 이 테스트만으로는 되돌림을 잡지 못한다.
-  - 확인: 실제 Chrome(390×844)에서 메모에 키로 입력하고 Enter를 누른 뒤 서버가 500으로 답하게 했다. 저장 중에도 실패 뒤에도 포커스가 메모 칸에 남았다.
-- **#92 본문의 NUL 표기가 깨져 있었다.**
-  - 반영: `U+0000`으로 고쳤다. `\u0000`이라고 쓰면 GitHub CLI를 거치며 다시 깨져서, 이스케이프 표기 없이 썼다.
-- **위 "검증" 목록에 NUL 테스트가 빠져 있었다.**
-  - 반영: 목록에 더했다.
+- **If saving with Enter in the memo failed, focus fell to `body`.** This was because the memo field was `disabled` during saving.
+  - Applied: The memo field was changed to `readOnly`.
+  - Test: It is checked that the memo field is `readonly` during saving. If reverted, this test fails.
+  - Test: A focus test after failure was also added. However, jsdom does not remove focus from a field that became `disabled`, so this test alone does not catch a revert.
+  - Confirmed: In real Chrome (390×844), a memo was typed by keys and Enter was pressed, and then the server was made to answer 500. Focus stayed on the memo field both during saving and after the failure.
+- **The NUL notation in the #92 body was broken.**
+  - Applied: Fixed to `U+0000`. Writing `\u0000` broke again as it passed through the GitHub CLI, so it was written without escape notation.
+- **The "Checks" list above was missing the NUL test.**
+  - Applied: Added it to the list.
 
-### 2차 반영 검증
+### Second round verification
 
-- `npm run check`(같은 임시 DB): 통과.
-  - 백엔드: 152개 통과, 0개 건너뜀.
-  - 프론트엔드: 305개 통과, 2개 건너뜀.
-  - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과.
+- `npm run check` (same temporary DB): passed.
+  - Backend: 152 passed, 0 skipped.
+  - Frontend: 305 passed, 2 skipped.
+  - Skill checks: 4 passed.
+- `npm run knip`: passed.
 
-## 제한·후속
+## Limits and follow-ups
 
-- 체크 항목은 두 개로 고정이다. 항목을 사용자가 정하는 기능은 범위 밖이다.
-- 자동 판정(식단 목표 칼로리, 수면 시간 등)은 #45 목표 기능에서 다룬다.
-- 다크 모드와 실제 휴대폰, Firefox, Safari는 확인하지 않았다.
-- PR #68의 백업 복원 행 수 비교 목록에 `day_checks`를 더해야 한다.
+- The check items are fixed at two. A feature for the user to define the items is out of scope.
+- Automatic judgment (diet target calories, sleep time, and so on) is handled in the #45 goals feature.
+- Dark mode, a real phone, Firefox, and Safari were not checked.
+- `day_checks` must be added to the row count comparison list of backup restore in PR #68.

@@ -1,111 +1,113 @@
-# #32 비비고 레토르트 식품 영양성분 등록
+# #32 Register nutrition facts for Bibigo retort foods
 
-- 이슈: [#32](https://github.com/sirloinbh/health-log/issues/32)
-- 브랜치: `feat/32-bibigo-foods`
+- Issue: [#32](https://github.com/sirloinbh/health-log/issues/32)
+- Branch: `feat/32-bibigo-foods`
 
-## 목적
+## Purpose
 
-비비고 레토르트 식품을 제품 표기 기준의 공식 영양성분으로 검색해 기록할 수 있게 한다. 같은 제품군도 중량이 달라서, 영양성분이 총 내용량 기준인지 일부 중량 기준인지 구분해 저장한다.
+Let the user search and record Bibigo retort foods using the official nutrition facts on the product label. The same product line comes in different weights, so the data is stored in a way that tells whether the nutrition facts are per total content or per part of the weight.
 
-## 정한 것
+## Decisions
 
-사용자 확인 없이 정했다. 이슈 댓글에 같은 내용을 남겼다.
+Decided without asking the user. The same content was left as an issue comment.
 
-- **범위:** 비비고 브랜드의 상온 보관 레토르트 국·탕·찌개 단품이다.
-  - 목록은 CJ제일제당 공식몰 CJ더마켓의 "국 · 탕 · 찌개" 분류(`ctgrId=004012`, 57개 항목)에서 골랐다.
-  - 묶음·세트·골라담기 상품은 단품과 같은 제품이라 뺐다.
-  - 냉장·냉동 제품(윤주모 시리즈 5종)은 상온 보관 범위 밖이라 뺐다. 윤주모 삼계탕은 상품 후기에 레토르트로 소개되지만 냉장 배송·보관 제품이다.
-  - 죽은 현재 "햇반" 브랜드로 판매돼(`ctgrId=003604`) 비비고 범위 밖이다. 이슈 참고란대로 다른 브랜드는 별도 이슈다.
-- **값:** CJ더마켓 상품 화면의 "영양성분" 버튼이 보여 주는 값을 쓴다. 이 값은 공식 API `/the/api/product/v1/nutritions/<제품코드>`에서 온다. CJ제일제당 공식몰의 표기라 `official`이다.
-  - 메뉴마다 그 상품 화면 주소(`https://www.cjthemarket.com/the/product/product-main?prdCd=<상품번호>`)와 확인 날짜(2026-11-08)를 적었다.
-  - 열량, 탄수화물, 단백질, 지방, 당류, 나트륨을 모두 넣었다.
-  - "4g 미만"처럼 범위로만 표기된 값은 정확한 값이 아니라서 NULL로 두었다. 해당 값은 갈비탕 탄수화물(4g 미만), 저염 사골곰탕 탄수화물(1g 미만), 소고기듬뿍 미역국·시래기듬뿍 장터국 당류(1g 미만)다.
-- **총 내용량과 표기 기준의 구분:** 이름 끝에 총 내용량을 적고(`갈비탕 400g`), 1회 제공량에는 영양성분 표기의 기준량을 적는다.
-  - API는 총 내용량(`totAmt`)과 표기 기준량(`totCalPerAmt`)을 따로 준다.
-  - 둘이 같으면 총 내용량 기준이고, 1회 제공량이 더 작으면 일부 중량 기준이다.
-  - 이번 27종은 모두 총 내용량 기준이다.
-  - 이 규칙은 `docs/food-data.md`에 적었다.
-- **이름:** 상품명에서 앞의 "비비고 "를 빼고 브랜드 칸에 `비비고`를 넣었다. 화면에서는 "비비고 갈비탕 400g"으로 보이고, "갈비탕"으로 검색된다. 분류는 출처대로 `국·탕·찌개`다.
-- **정크푸드:** #38 규칙상 프랜차이즈 패스트푸드가 아니므로 `is_junk = false`로 넣었다. `DO UPDATE SET`에는 넣지 않았다.
-- **마이그레이션 번호:** `014_foods_bibigo.sql`. PR 직전에 main의 최대 번호가 013임을 확인했다.
+- **Scope:** Single shelf-stable retort soups, stews, and hot pots of the Bibigo brand.
+  - The list was picked from the "국 · 탕 · 찌개" (soups, hot soups, stews) category (`ctgrId=004012`, 57 items) of CJ The Market, the official CJ CheilJedang shop.
+  - Bundles, sets, and pick-and-mix products were left out because they are the same products as the single items.
+  - Chilled and frozen products (5 items of the Yunjumo series) were left out because they are outside the shelf-stable scope. Yunjumo Samgyetang is described as a retort in product reviews, but it is shipped and stored chilled.
+  - Porridge is now sold under the "Hetbahn" brand (`ctgrId=003604`), so it is outside the Bibigo scope. As the issue's reference note says, other brands are a separate issue.
+- **Values:** The values are the ones shown by the "영양성분" (nutrition facts) button on the CJ The Market product page. These values come from the official API `/the/api/product/v1/nutritions/<product code>`. It is the label of the CJ CheilJedang official shop, so it is `official`.
+  - For each menu item, the product page URL (`https://www.cjthemarket.com/the/product/product-main?prdCd=<product number>`) and the check date (2026-11-08) are recorded.
+  - Energy, carbohydrate, protein, fat, sugars, and sodium are all filled in.
+  - Values given only as a range, such as "less than 4g" (4g 미만), are not exact, so they are left NULL. These are the carbohydrate of Galbitang (less than 4g), the carbohydrate of Low-sodium Sagol Gomtang (less than 1g), and the sugars of Beef-rich Seaweed Soup and Siraegi-rich Jangteo Soup (less than 1g).
+- **Telling total content from the label basis:** The total content is written at the end of the name (`갈비탕 400g`), and the serving size holds the reference amount of the nutrition label.
+  - The API gives the total content (`totAmt`) and the label reference amount (`totCalPerAmt`) separately.
+  - If the two are equal, the facts are per total content; if the serving size is smaller, they are per part of the weight.
+  - All 27 items this time are per total content.
+  - This rule is written in `docs/food-data.md`.
+- **Names:** The leading "비비고 " (Bibigo) was removed from the product name and `비비고` was put in the brand field. On screen it shows as "비비고 갈비탕 400g", and it is found by searching "갈비탕" (Galbitang). The category is `국·탕·찌개` (soups, hot soups, stews) as in the source.
+- **Junk food:** Under the #38 rule these are not franchise fast food, so they are inserted with `is_junk = false`. It is not in `DO UPDATE SET`.
+- **Migration number:** `014_foods_bibigo.sql`. Right before the PR it was confirmed that main's highest number is 013.
 
-## 출처와 이용 조건
+## Sources and terms of use
 
-- CJ더마켓 robots.txt(2026-11-08 확인): `User-agent: *`에 대해 마이페이지·고객센터·주문·장바구니 경로(`/pc/…`, `/mo/…`)와 임직원 선물세트 경로만 막는다. 상품 화면(`/the/product/…`)은 막지 않는다.
-- 로그인, CAPTCHA, 파일 내려받기가 필요한 경로는 쓰지 않았다. 요청 사이에 2초를 두었다.
-- 상품 화면에는 이미지·글·상세페이지의 저작권 안내가 있다. 이 작업은 영양성분 숫자만 개인 기록용으로 옮겼다. 이미지와 설명문은 저장하지 않았다.
-- **읽는 방법:**
-  1. 헤드리스 Chrome으로 분류 화면을 끝까지 스크롤해 상품 목록을 얻었다.
-  2. 상품 화면 HTML의 구조화 데이터(`sku`, `mpn`, `brand`)로 제품코드를 찾았고, 보관 온도 표시로 상온 제품만 골랐다.
-  3. 제품코드로 영양성분 응답을 받았다.
-  4. 작업용 스크립트가 SQL을 만든다. 이름의 총 내용량과 응답의 총 내용량이 다르거나 단위가 g가 아니면 멈추게 했다.
+- CJ The Market robots.txt (checked 2026-11-08): for `User-agent: *` it blocks only the my-page, customer-service, order, and cart paths (`/pc/…`, `/mo/…`) and the employee gift set path. Product pages (`/the/product/…`) are not blocked.
+- Paths that need login, CAPTCHA, or a file download were not used. A 2-second pause was kept between requests.
+- Product pages carry a copyright notice for images, text, and detail pages. This work copied only the nutrition numbers, for personal records. Images and descriptions were not stored.
+- **How it was read:**
+  1. The category page was scrolled to the end in headless Chrome to get the product list.
+  2. The product codes were found from the structured data (`sku`, `mpn`, `brand`) in the product page HTML, and only shelf-stable products were chosen by the storage temperature mark.
+  3. The nutrition response was fetched by product code.
+  4. A working script generates the SQL. It stops if the total content in the name differs from the total content in the response, or if the unit is not g.
 
-## 등록한 제품 (27종, 모두 상온, 총 내용량 기준)
+## Registered products (27, all shelf-stable, per total content)
+
+The names are kept in Korean because they are the data values stored in the DB. In order: Galbitang 400g, Sagol Gomtang 500g, Sagol Gomtang 300g, Hanwoo Sagol Gomtang 500g, Low-sodium Sagol Gomtang 500g, Yukgaejang 500g, Beef-rich Yukgaejang 460g, Beef Seaweed Soup 500g, Beef-rich Seaweed Soup 460g, Hwangtae-rich Haejangguk 460g, Beef-rich Radish Soup 500g, Chadol Doenjang Stew 460g, Beef-rich Seolleongtang 460g, Seolleongtang 500g, Siraegi Gamjatang 460g, Dogani Gomtang 460g, Kkori Gomtang 460g, Spam Budae Stew 460g, Pork Kimchi Stew 460g, Tofu-rich Kimchi Stew 460g, Tofu-rich Doenjang Stew 460g, Tofu-rich Cheonggukjang Stew 460g, Siraegi-rich Jangteo Soup 500g, Siraegi-rich Doenjang Soup 460g, Namdo-style Chueotang 460g, Dak Gomtang 500g, Nutrition Samgyetang 800g.
 
 갈비탕 400g, 사골곰탕 500g, 사골곰탕 300g, 한우사골곰탕 500g, 저염 사골곰탕 500g, 육개장 500g, 소고기듬뿍 육개장 460g, 소고기 미역국 500g, 소고기듬뿍 미역국 460g, 황태듬뿍해장국 460g, 소고기듬뿍무국 500g, 차돌된장찌개 460g, 소고기듬뿍 설렁탕 460g, 설렁탕 500g, 시래기 감자탕 460g, 도가니곰탕 460g, 꼬리곰탕 460g, 스팸부대찌개 460g, 돼지고기김치찌개 460g, 두부듬뿍 김치찌개 460g, 두부듬뿍 된장찌개 460g, 두부듬뿍 청국장찌개 460g, 시래기듬뿍 장터국 500g, 시래기듬뿍 된장국 460g, 남도식 추어탕 460g, 닭곰탕 500g, 영양삼계탕 800g.
 
-## 찾지 못하거나 뺀 제품
+## Products not found or left out
 
-| 제품                                                  | 이유                               |
-| ----------------------------------------------------- | ---------------------------------- |
-| 비비고 윤주모 삼계탕 850g                             | 냉장 보관 제품(상온 범위 밖)       |
-| 비비고 윤주모 셰프 황태국·감자탕·부대찌개·육개장 200g | 냉동 보관 제품(상온 범위 밖)       |
-| 비비고 윤주모 셰프 부대찌개·육개장 200g               | (참고) 영양성분 응답에 값도 없었다 |
-| 묶음·세트 상품(예: `비비고 갈비탕 400g, 6개`)         | 단품과 같은 제품                   |
+| Product                                                                    | Reason                                              |
+| -------------------------------------------------------------------------- | --------------------------------------------------- |
+| 비비고 윤주모 삼계탕 850g (Bibigo Yunjumo Samgyetang 850g)                  | Chilled product (outside the shelf-stable scope)    |
+| 비비고 윤주모 셰프 황태국·감자탕·부대찌개·육개장 200g (Bibigo Yunjumo Chef Hwangtae soup, Gamjatang, Budae stew, Yukgaejang 200g) | Frozen product (outside the shelf-stable scope)     |
+| 비비고 윤주모 셰프 부대찌개·육개장 200g (Bibigo Yunjumo Chef Budae stew, Yukgaejang 200g) | (Note) the nutrition response also had no values    |
+| Bundle and set products (for example `비비고 갈비탕 400g, 6개`, a 6-pack)   | Same product as the single item                     |
 
-`ctgrId=004012` 목록의 상온 비비고 단품 중 공식 수치를 찾지 못한 제품은 없다. `비비고 순대곱창전골 550g`은 이 분류에서 세트(40239023) 안에만 있고 단품 화면을 확인하지 않아 넣지 않았다.
+Among the shelf-stable single Bibigo items in the `ctgrId=004012` list, there is none for which official numbers could not be found. `비비고 순대곱창전골 550g` (Bibigo Sundae Gopchang Jeongol 550g) is only inside a set (40239023) in this category, and its single-item page was not checked, so it was not included.
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
-- **DB** `database/migrations/014_foods_bibigo.sql`: 27종. docs/food-data.md의 형식(`ON CONFLICT … WHERE EXCLUDED.checked_on > foods.checked_on`)을 따르고, 한글은 `U&` 이스케이프로 썼다.
-- **문서** `docs/food-data.md`: "미만" 표기는 NULL로 둔다. 포장 제품은 이름에 총 내용량을, 1회 제공량에 표기 기준량을 적는다.
+- **DB** `database/migrations/014_foods_bibigo.sql`: 27 items. It follows the format in docs/food-data.md (`ON CONFLICT … WHERE EXCLUDED.checked_on > foods.checked_on`), and Korean text is written with `U&` escapes.
+- **Docs** `docs/food-data.md`: A "less than" mark ("미만") is left as NULL. For packaged products, the total content goes in the name and the label reference amount goes in the serving size.
 
-## 검증
+## Checks
 
-- **무작위 10개 대조**(이슈 완료 기준): 무작위로 고른 10개 제품의 상품 화면과 영양성분 응답을 다시 받았다. 제품코드, 총 내용량, 표기 기준량, 열량, 탄수화물, 단백질, 지방, 당류, 나트륨이 모두 등록값과 같았다.
+- **Random cross-check of 10** (completion criterion of the issue): The product pages and nutrition responses of 10 randomly chosen products were fetched again. Product code, total content, label reference amount, energy, carbohydrate, protein, fat, sugars, and sodium all equaled the registered values.
 
-  | 제품                     | 등록값 (총량/기준량/열량/탄/단/지/당/나트륨) | 다시 받은 값                 | 결과 |
-  | ------------------------ | -------------------------------------------- | ---------------------------- | ---- |
-  | 도가니곰탕 460g          | 460/460/100/0/19/2.4/0/950                   | 460/460/100/0/19/2.4/0/950   | 일치 |
-  | 시래기듬뿍 장터국 500g   | 500/500/120/11/10/3.8/-/1750                 | 500/500/120/11/10/3.8/-/1750 | 일치 |
-  | 두부듬뿍 청국장찌개 460g | 460/460/310/23/25/13/4/1690                  | 460/460/310/23/25/13/4/1690  | 일치 |
-  | 시래기듬뿍 된장국 460g   | 460/460/150/13/13/5/1/1690                   | 460/460/150/13/13/5/1/1690   | 일치 |
-  | 닭곰탕 500g              | 500/500/145/2/21/6/0/1360                    | 500/500/145/2/21/6/0/1360    | 일치 |
-  | 설렁탕 500g              | 500/500/110/2/16/4.1/0/1070                  | 500/500/110/2/16/4.1/0/1070  | 일치 |
-  | 소고기 미역국 500g       | 500/500/115/8/7/6/0/1710                     | 500/500/115/8/7/6/0/1710     | 일치 |
-  | 시래기 감자탕 460g       | 460/460/270/18/31/8/2/1530                   | 460/460/270/18/31/8/2/1530   | 일치 |
-  | 차돌된장찌개 460g        | 460/460/240/19/19/10/4/1830                  | 460/460/240/19/19/10/4/1830  | 일치 |
-  | 소고기듬뿍 육개장 460g   | 460/460/205/11/22/8/4/1740                   | 460/460/205/11/22/8/4/1740   | 일치 |
+  | Product                  | Registered values (total/reference/energy/carb/protein/fat/sugars/sodium) | Values fetched again         | Result |
+  | ------------------------ | ------------------------------------------------------------------------ | ---------------------------- | ------ |
+  | 도가니곰탕 460g          | 460/460/100/0/19/2.4/0/950                                               | 460/460/100/0/19/2.4/0/950   | Match  |
+  | 시래기듬뿍 장터국 500g   | 500/500/120/11/10/3.8/-/1750                                             | 500/500/120/11/10/3.8/-/1750 | Match  |
+  | 두부듬뿍 청국장찌개 460g | 460/460/310/23/25/13/4/1690                                              | 460/460/310/23/25/13/4/1690  | Match  |
+  | 시래기듬뿍 된장국 460g   | 460/460/150/13/13/5/1/1690                                               | 460/460/150/13/13/5/1/1690   | Match  |
+  | 닭곰탕 500g              | 500/500/145/2/21/6/0/1360                                                | 500/500/145/2/21/6/0/1360    | Match  |
+  | 설렁탕 500g              | 500/500/110/2/16/4.1/0/1070                                              | 500/500/110/2/16/4.1/0/1070  | Match  |
+  | 소고기 미역국 500g       | 500/500/115/8/7/6/0/1710                                                 | 500/500/115/8/7/6/0/1710     | Match  |
+  | 시래기 감자탕 460g       | 460/460/270/18/31/8/2/1530                                               | 460/460/270/18/31/8/2/1530   | Match  |
+  | 차돌된장찌개 460g        | 460/460/240/19/19/10/4/1830                                              | 460/460/240/19/19/10/4/1830  | Match  |
+  | 소고기듬뿍 육개장 460g   | 460/460/205/11/22/8/4/1740                                               | 460/460/205/11/22/8/4/1740   | Match  |
 
-  (`-`는 "미만" 표기라 NULL로 둔 값이다.)
+  (`-` is a value left NULL because the source gave a "less than" mark.)
 
-- **열량 일관성:** 출처 값끼리 맞는지도 확인했다. 탄수화물·단백질·지방으로 계산한 열량(4·4·9kcal/g)과 표기 열량의 차이는 다음과 같다.
-  - 탄수화물이 정확한 25종: ±2.4kcal 안. 열이 밀리거나 잘못 옮긴 값이 없다는 근거다.
-  - 탄수화물이 "미만"인 2종은 테스트에서 계산하지 않는다.
-    - 저염 사골곰탕: −5.2kcal. 탄수화물 1g 미만을 넣으면 39.8~43.8kcal이라 표기 45kcal와 반올림 범위에서 맞는다.
-    - 갈비탕: 단백질 13g과 지방 4.8g만으로 95.2kcal이다. 반올림 하한(12.5g, 4.75g)을 넣어도 92.75kcal로, 표기 85kcal(87.5 미만)를 넘는다. 공식 표기 자체가 맞지 않는 것으로 보이며, 값은 출처대로 두었다.
-- 상품 사진에는 포장의 영양성분 표가 보이지 않아, 포장 표기와 직접 대조하지는 못했다.
-- 테스트
-  - `backend/test/bibigo-foods.test.ts`(DB 없이)
-    - 27종이 모두 비비고 브랜드, `official`, 자기 상품 화면 주소, 확인 날짜, `is_junk = false`인지 확인한다.
-    - 이름의 총 내용량과 1회 제공량이 같은지 확인한다.
-    - 탄수화물이 있는 제품은 계산 열량이 표기와 5kcal 안인지 확인한다.
-  - `backend/test/foods.integration.test.ts`: 적용된 DB에 27종이 출처·날짜·값을 갖고 있는지 확인한다. API 검색으로 "갈비탕"을 찾으면 "미만" 탄수화물이 NULL인 그대로 나오는지도 확인한다.
-- 임시 PostgreSQL 17 클러스터(포트 5472, `health_test`): CI처럼 psql로 모두 적용한 뒤 `npm run db:migrate`로 다시 적용했다(001~014). 오류가 없었다.
-- `origin/main`(64e4568)을 병합한 뒤 `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5472/health_test npm run check`: 통과.
-  - 백엔드: 224개 통과, 0개 건너뜀.
-  - 프런트엔드: 395개 통과, 2개 건너뜀. 건너뛴 2개는 이 변경과 관계없는 기존 조건부 테스트다.
-  - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과.
+- **Energy consistency:** It was also checked that the source values agree with each other. The difference between the energy computed from carbohydrate, protein, and fat (4, 4, 9 kcal/g) and the stated energy is as follows.
+  - 25 items with exact carbohydrate: within ±2.4kcal. This is the evidence that no column was shifted or value mistyped.
+  - 2 items whose carbohydrate is a "less than" mark are not computed in the test.
+    - Low-sodium Sagol Gomtang: −5.2kcal. With carbohydrate less than 1g included, it is 39.8 to 43.8kcal, which agrees with the stated 45kcal within the rounding range.
+    - Galbitang: protein 13g and fat 4.8g alone give 95.2kcal. Even with the rounding lower bounds (12.5g, 4.75g) it is 92.75kcal, above the stated 85kcal (below 87.5). The official label itself seems not to add up, and the value was left as in the source.
+- The product photos do not show the nutrition table on the package, so a direct comparison with the package label was not possible.
+- Tests
+  - `backend/test/bibigo-foods.test.ts` (no DB)
+    - Checks that all 27 are the Bibigo brand, `official`, have their own product page URL, the check date, and `is_junk = false`.
+    - Checks that the total content in the name equals the serving size.
+    - For products with carbohydrate, checks that the computed energy is within 5kcal of the stated one.
+  - `backend/test/foods.integration.test.ts`: checks that the 27 items on an applied DB have source, date, and values. It also checks that searching "갈비탕" (Galbitang) through the API returns the "less than" carbohydrate still as NULL.
+- Temporary PostgreSQL 17 cluster (port 5472, `health_test`): everything was applied with psql as CI does, then applied again with `npm run db:migrate` (001 to 014). There were no errors.
+- After merging `origin/main` (64e4568), `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5472/health_test npm run check`: passed.
+  - Backend: 224 passed, 0 skipped.
+  - Frontend: 395 passed, 2 skipped. The 2 skipped are existing conditional tests unrelated to this change.
+  - Skill checks: 4 passed.
+- `npm run knip`: passed.
 
-## 리뷰
+## Review
 
-- **1차:** 꼭 고칠 것은 없었다. 리뷰가 27행 전체를 원본 자료와 따로 대조했고 모두 일치했다. `ctgrId=004012` 목록에서 빠진 상온 단품도 없었다(세트 안의 순대곱창전골 제외). 반영한 것은 다음과 같다.
-  - 통합 테스트가 비비고의 다른 제품(만두·김 등)이 나중에 들어와도 깨지지 않도록 `국·탕·찌개` 분류로 좁혔다(DB로 다시 실행해 통과).
-  - 갈비탕의 열량 차이는 반올림으로 설명되지 않는다고 고쳐 적었다. 공식 표기 자체가 맞지 않는 것으로 보이며, 값은 출처대로 둔다.
-  - 윤주모 시리즈를 뺀 이유를 "상온 보관 범위 밖"으로 고쳤다. 세트 안에만 있는 순대곱창전골은 확인하지 않았다고 적었다.
-  - `docs/food-data.md`에 제조사 공식몰의 표기는 `official`이라는 문장을 더했다.
-  - 그대로 둔 것
-    - 당류·나트륨이 서로 맞바뀌는 경우는 파일 검사로 잡지 못한다. 전수 대조로 대신한다.
-    - "저나트륨"·"소고기듬뿍미역국"(붙여 쓴 이름) 같은 다른 이름으로는 검색되지 않는다. 필요하면 별도 이슈로 다룬다.
-- **2차:** 꼭 고칠 것은 없었다. 등록한 영양삼계탕(상온)과 헷갈리지 않게 "윤주모 삼계탕"으로 적었고, 1차 리뷰 요약의 누락 없음 범위를 분류 목록으로 한정했다.
+- **First:** Nothing had to be fixed. The review compared all 27 rows with the original data separately, and all matched. No shelf-stable single item was missing from the `ctgrId=004012` list (except the Sundae Gopchang Jeongol inside a set). What was applied:
+  - The integration test was narrowed to the `국·탕·찌개` category so it does not break when other Bibigo products (dumplings, seaweed, and so on) come in later (run again with the DB and passed).
+  - Corrected the text to say that the energy difference for Galbitang is not explained by rounding. The official label itself seems not to add up, and the value is kept as in the source.
+  - Corrected the reason for leaving out the Yunjumo series to "outside the shelf-stable scope". Wrote that the Sundae Gopchang Jeongol that exists only inside a set was not checked.
+  - Added a sentence to `docs/food-data.md` that the label of a manufacturer's official shop is `official`.
+  - Left as it was
+    - A swap of sugars and sodium cannot be caught by the file check. Full cross-checking stands in for it.
+    - It is not found by other names such as "저나트륨" (low sodium) or "소고기듬뿍미역국" (the name written without spaces). If needed, it is handled in a separate issue.
+- **Second:** Nothing had to be fixed. To avoid confusion with the registered Nutrition Samgyetang (shelf-stable), it is written as "윤주모 삼계탕" (Yunjumo Samgyetang), and the "nothing missing" range in the first review summary is limited to the category list.

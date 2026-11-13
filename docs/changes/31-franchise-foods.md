@@ -1,137 +1,137 @@
-# #31 햄버거 프랜차이즈 5곳 영양성분 등록
+# #31 Register nutrition facts for 5 burger franchises
 
-- 이슈: [#31](https://github.com/sirloinbh/health-log/issues/31)
-- 브랜치: `feat/31-franchise-foods`
+- Issue: [#31](https://github.com/sirloinbh/health-log/issues/31)
+- Branch: `feat/31-franchise-foods`
 
-## 목적
+## Purpose
 
-맥도날드, 버거킹, 롯데리아, KFC, 맘스터치 메뉴를 추정값이 아니라 각 브랜드가 공개한 공식 영양성분으로 검색해 기록할 수 있게 한다.
+Let the user search and record menu items from McDonald's, Burger King, Lotteria, KFC, and Mom's Touch using the official nutrition facts each brand publishes, not estimates.
 
-## 정한 것
+## Decisions
 
-이슈 추천안을 따랐고 사용자 확인 없이 정했다. 이슈 댓글에 같은 내용을 남겼다.
+The recommendation in the issue was followed and decided without asking the user. The same content was left as an issue comment.
 
-- **범위:** 국내에서 판매 중인 버거 단품, 그리고 세트 구성품인 사이드와 음료다.
-  - 버거: 각 브랜드 메뉴 화면의 버거 단품 전체.
-  - 사이드: 세트에 기본으로 들어가는 감자튀김을 세트 크기별로.
-  - 음료: 세트 탄산음료(콜라·사이다/스프라이트·환타·제로 음료)를 세트 크기별로.
-  - 세트 메뉴 자체, 디저트, 커피, 소스, 병 음료, 아침 메뉴(맥모닝 등)는 넣지 않았다.
-  - KFC의 트위스터(랩)와 올댓치즈독은 출처가 BURGER 구역에 두어 버거로 분류했다.
-- **값:** 공식 자료만 쓴다(`source_type = 'official'`). 메뉴마다 출처 주소와 확인 날짜(2026-11-08)가 있다.
-  - 1회 제공량은 출처의 중량이다. 맥도날드 음료는 출처 표기대로 `ml`이다. KFC·맘스터치는 표 머리글("제공량(g)", "중량(g)")대로 음료도 `g`다. 롯데리아의 "총중량"에는 단위가 없어서, 음료와 감자튀김도 `g`로 둔 것은 이 작업의 가정이다.
-  - 다섯 곳 모두 총지방과 탄수화물을 공개하지 않고 포화지방만 공개한다. 포화지방은 총지방이 아니므로 `fat`과 `carbs`는 NULL(모름)이다. 열량, 당류, 단백질, 나트륨만 넣었다.
-  - 이름은 출처 표기를 따랐다. 맥도날드의 ®·™ 기호는 검색어와 맞추려고 뺐다. 롯데리아는 브랜드 메뉴 목록의 이름을 썼다. 그래서 상품 화면 제목에 붙은 "(버터번)"이 클래식치즈버거와 더블 클래식치즈버거에는 없다.
-- **정크푸드:** #38 규칙대로 모두 `is_junk = true`로 넣고 `DO UPDATE SET`에는 넣지 않았다.
-- **마이그레이션 번호:** `013_foods_franchise.sql`. main에 011까지 있고 012는 agent1(#45, PR #103)이 쓴다. 실행기는 이미 적용된 번호보다 앞선 새 파일을 거부하므로 그 뒤 번호를 쓴다.
-  - **병합 순서:** #103(012)을 먼저 병합하는 것이 좋다. 이 PR이 먼저 들어가 어떤 DB에 013이 적용되면, 그 DB에서는 나중에 온 012가 거부된다. 그때는 #45의 번호를 014로 바꾼다.
+- **Scope:** Single burgers sold in Korea, plus the sides and drinks that come in sets.
+  - Burgers: all single burgers on each brand's menu page.
+  - Sides: the french fries that come with a set by default, per set size.
+  - Drinks: the set soft drinks (cola, cider/Sprite, Fanta, zero drinks), per set size.
+  - Set menus themselves, desserts, coffee, sauces, bottled drinks, and breakfast items (McMorning and so on) were not included.
+  - KFC's Twister (wrap) and All That Cheese Dog are classified as burgers because the source puts them in the BURGER section.
+- **Values:** Only official data is used (`source_type = 'official'`). Each menu item has a source URL and a check date (2026-11-08).
+  - The serving size is the weight in the source. McDonald's drinks use `ml`, as the source states. For KFC and Mom's Touch, drinks also use `g`, following the table headers ("제공량(g)" = serving (g), "중량(g)" = weight (g)). Lotteria's "총중량" (total weight) has no unit, so using `g` for its drinks and fries is an assumption of this work.
+  - None of the five publish total fat and carbohydrate, only saturated fat. Saturated fat is not total fat, so `fat` and `carbs` are NULL (unknown). Only energy, sugars, protein, and sodium are filled in.
+  - Names follow the source. McDonald's ® and ™ marks were removed to match search terms. For Lotteria, the names from the brand's menu list were used. So the "(버터번)" (butter bun) added to the product page title is not in Classic Cheese Burger and Double Classic Cheese Burger.
+- **Junk food:** Following the #38 rule, all are inserted with `is_junk = true`, and it is not in `DO UPDATE SET`.
+- **Migration number:** `013_foods_franchise.sql`. main has up to 011, and 012 is used by agent1 (#45, PR #103). The runner rejects a new file numbered below an already applied one, so a number after it is used.
+  - **Merge order:** Merging #103 (012) first is preferable. If this PR goes in first and 013 is applied to some DB, the later 012 is rejected on that DB. In that case, change #45's number to 014.
 
-## 출처와 읽는 방법
+## Sources and how they were read
 
-2026-11-08에 다섯 사이트의 robots.txt를 확인했다. 로그인, CAPTCHA, 파일 내려받기가 필요한 출처는 쓰지 않았다.
+On 2026-11-08, the robots.txt of the five sites was checked. Sources that need login, CAPTCHA, or a file download were not used.
 
-- 맥도날드, 버거킹: `User-agent: *` / `Allow: /`.
-- KFC, 맘스터치: robots.txt 주소가 사이트의 첫 화면 HTML을 돌려준다. 규칙 파일이 없다.
-- 롯데리아: AI·LLM 크롤러 묶음(`ClaudeBot`, `anthropic-ai` 등)에 `Crawl-delay: 5`, `Allow: /brand/`, `Allow: /products/`, `Disallow: /api/` 등이 있다.
+- McDonald's, Burger King: `User-agent: *` / `Allow: /`.
+- KFC, Mom's Touch: the robots.txt URL returns the site's front page HTML. There is no rules file.
+- Lotteria: for the AI/LLM crawler group (`ClaudeBot`, `anthropic-ai`, and others) it has `Crawl-delay: 5`, `Allow: /brand/`, `Allow: /products/`, `Disallow: /api/`, and so on.
 
-| 브랜드   | 출처                                                                                                                               | 형태                                                | 갱신 표기           | 메뉴 수 |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------- | ------- |
-| 맥도날드 | [영양정보](https://www.mcdonalds.co.kr/kor/menu/information/nutrition)                                                             | 페이지 표(공식 API `/api/v1/kor/product/nutrition`) | 2026.11.07          | 33      |
-| 버거킹   | 메뉴 상세 `https://www.burgerking.co.kr/menu/detail/<메뉴코드>`의 영양성분 팝업                                                    | 팝업 표(공식 API `BKR0347`)                         | 없음                | 37      |
-| 롯데리아 | 상품 소개 `https://www.lotteeatz.com/products/introductions/<상품ID>`                                                              | 상품마다 서버가 그린 표                             | 없음                | 33      |
-| KFC      | 메뉴 상세의 "영양정보표" 팝업 이미지 [info_nutrition.png](https://www.kfckorea.com/nas/kfcimg/info/info_nutrition.png)             | 표 이미지 1장                                       | Ver. 20261103       | 26      |
-| 맘스터치 | 메뉴 상세의 "영양성분" 팝업 이미지 [1793066787-WGNKI.jpg](https://www.momstouch.co.kr/upload_file/delv_guide/1793066787-WGNKI.jpg) | 표 이미지 1장                                       | 배포일자 2026.10.22 | 35      |
+| Brand        | Source                                                                                                                                                                                | Form                                                  | Update mark         | Menu items |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------- | ---------- |
+| McDonald's   | [Nutrition information](https://www.mcdonalds.co.kr/kor/menu/information/nutrition)                                                                                                   | Table on the page (official API `/api/v1/kor/product/nutrition`) | 2026.11.07          | 33         |
+| Burger King  | Nutrition popup on the menu detail page `https://www.burgerking.co.kr/menu/detail/<menu code>`                                                                                        | Table in a popup (official API `BKR0347`)             | None                | 37         |
+| Lotteria     | Product introduction `https://www.lotteeatz.com/products/introductions/<product ID>`                                                                                                  | Table rendered by the server for each product         | None                | 33         |
+| KFC          | "영양정보표" (nutrition table) popup image on the menu detail page [info_nutrition.png](https://www.kfckorea.com/nas/kfcimg/info/info_nutrition.png)                                  | One table image                                       | Ver. 20261103       | 26         |
+| Mom's Touch  | "영양성분" (nutrition facts) popup image on the menu detail page [1793066787-WGNKI.jpg](https://www.momstouch.co.kr/upload_file/delv_guide/1793066787-WGNKI.jpg)                      | One table image                                       | Issued 2026.10.22 ("배포일자") | 35         |
 
-- **맥도날드·버거킹:** 헤드리스 Chrome으로 공식 페이지를 열고, 페이지가 부른 공식 API의 응답과 그려진 표를 읽었다.
-- **롯데리아:** robots.txt는 AI 크롤러에게 `/products/`만 허용하고 `/api/`를 금지하며, 요청 간격 5초를 요구한다. 상품 소개 페이지만 5초 간격으로 받았다.
-- **KFC·맘스터치:** 페이지 안에 보이는 표 이미지만 공개한다. 이미지를 Chrome에서 3~4배로 확대해 구역별로 잘라 읽었다. 오독을 막으려고 세 가지를 확인했다.
-  - **이중 입력:** 다른 에이전트가 같은 확대 이미지를 따로 읽었다. 61행의 중량·열량·당류·단백질·나트륨이 모두 일치했다.
-  - **비율 대조:** 표에 함께 적힌 1일 기준치 비율(단백질 55g, 나트륨 2,000mg)과 옮긴 값이 2.5%p 안에서 맞는지 61행 모두 자동으로 확인했다.
-  - **이름:** 흐릿한 메뉴 이름은 각 브랜드의 메뉴 페이지 글자로 확인했다(칰폴레맵, 올댓, 쿵파오, 휠렛 등).
-- 추출과 SQL 생성은 작업용 스크립트로 했다. 값이 비거나 같은 브랜드 안에서 이름이 겹치면 SQL을 만들지 않고 멈추게 했다.
+- **McDonald's, Burger King:** The official pages were opened in headless Chrome, and the responses of the official APIs the pages called and the rendered tables were read.
+- **Lotteria:** robots.txt allows AI crawlers only `/products/`, forbids `/api/`, and asks for a 5-second request interval. Only the product introduction pages were fetched, at 5-second intervals.
+- **KFC, Mom's Touch:** They publish only a table image shown inside the page. The image was enlarged 3 to 4 times in Chrome and cut into sections to read. Three checks were done to prevent misreading.
+  - **Double entry:** Another agent read the same enlarged image separately. Weight, energy, sugars, protein, and sodium all matched for all 61 rows.
+  - **Ratio cross-check:** The daily value ratios printed in the table (protein 55g, sodium 2,000mg) were automatically checked against the transcribed values to within 2.5 percentage points, for all 61 rows.
+  - **Names:** Blurry menu names were confirmed against the text on each brand's menu page (칰폴레맵, 올댓, 쿵파오, 휠렛, and so on).
+- Extraction and SQL generation were done with working scripts. If a value was empty or a name was duplicated within the same brand, the script stopped without generating SQL.
 
-## 찾지 못한 메뉴
+## Menu items not found
 
-| 브랜드   | 메뉴                                                                   | 이유                                                                      |
-| -------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| 버거킹   | 프렌치프라이(R), 프렌치프라이(L)                                       | 공식 영양 표에 행이 없다                                                  |
-| 버거킹   | 코카콜라·코카콜라 제로·스프라이트·스프라이트 제로·닥터페퍼 제로 (R, L) | 공식 영양 표에 행이 없거나, "코카콜라" 행의 값이 모두 0(미공개)이다       |
-| 버거킹   | 트러플 머쉬룸 와퍼                                                     | 공식 표에 값이 다른 두 행(735kcal, 761kcal)이 있어 어느 쪽인지 알 수 없다 |
-| 롯데리아 | 한우불고기버거                                                         | 상품 화면에 열량 범위(684~1,320kcal)만 있고 나머지 값이 없다              |
+| Brand       | Menu item                                                              | Reason                                                                                                        |
+| ----------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Burger King | 프렌치프라이(R), 프렌치프라이(L) (French fries R, L)                   | No row in the official nutrition table                                                                        |
+| Burger King | 코카콜라·코카콜라 제로·스프라이트·스프라이트 제로·닥터페퍼 제로 (R, L) (Coca-Cola, Coca-Cola Zero, Sprite, Sprite Zero, Dr Pepper Zero) | No row in the official nutrition table, or all values in the "코카콜라" (Coca-Cola) row are 0 (not published) |
+| Burger King | 트러플 머쉬룸 와퍼 (Truffle Mushroom Whopper)                           | The official table has two rows with different values (735kcal, 761kcal), so it is unclear which is right     |
+| Lotteria    | 한우불고기버거 (Hanwoo Bulgogi Burger)                                  | The product page has only an energy range (684~1,320kcal) and no other values                                |
 
-- 버거킹 표의 다른 중복 행은 포함했다. 핫 트러플 머쉬룸 와퍼는 카페인 칸만 달랐고, 비프불고기버거는 값이 모두 0인 행 하나를 빼면 같았다.
-- KFC "트위스터 (범계역)"는 한 매장 전용 값이라 넣지 않았다.
+- Other duplicate rows in the Burger King table were included. The Hot Truffle Mushroom Whopper differed only in the caffeine column, and the Beef Bulgogi Burger was the same except for one row with all values 0.
+- KFC "트위스터 (범계역)" (Twister, Beomgye Station) was not included because it is a value for one store only.
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
-- **DB** `database/migrations/013_foods_franchise.sql`: 164개 메뉴. docs/food-data.md의 형식(`ON CONFLICT … WHERE EXCLUDED.checked_on > foods.checked_on`)을 따르고, 한글은 `U&` 이스케이프로 썼다.
-  - 맥도날드: 버거 21, 사이드 2, 음료 10.
-  - 버거킹: 버거 37.
-  - 롯데리아: 버거 28, 사이드 2, 음료 3.
-  - KFC: 버거 12, 사이드 2, 음료 12.
-  - 맘스터치: 버거 29, 사이드 2, 음료 4.
-- **문서** `docs/food-data.md`: 프랜차이즈 공식 자료를 넣을 때의 규칙(포화지방만 있을 때, 이미지로만 공개된 표)을 더했다.
+- **DB** `database/migrations/013_foods_franchise.sql`: 164 menu items. It follows the format in docs/food-data.md (`ON CONFLICT … WHERE EXCLUDED.checked_on > foods.checked_on`), and Korean text is written with `U&` escapes.
+  - McDonald's: burgers 21, sides 2, drinks 10.
+  - Burger King: burgers 37.
+  - Lotteria: burgers 28, sides 2, drinks 3.
+  - KFC: burgers 12, sides 2, drinks 12.
+  - Mom's Touch: burgers 29, sides 2, drinks 4.
+- **Docs** `docs/food-data.md`: Added rules for entering official franchise data (when only saturated fat is given, and tables published only as images).
 
-## 검증
+## Checks
 
-- **무작위 대조**(이슈 완료 기준): 브랜드마다 무작위 5개를 골라 출처를 다시 받아 비교했다. 25개 모두 일치했다.
-  - 맥도날드·버거킹·롯데리아: 출처를 다시 받아 스크립트로 비교했다.
-  - KFC·맘스터치: 이미지를 다시 받아 처음 받은 파일과 바이트 단위로 같음을 확인했다. 해당 행을 새로 잘라 다시 읽었다.
+- **Random cross-check** (completion criterion of the issue): 5 random items were picked per brand, and their sources were fetched again and compared. All 25 matched.
+  - McDonald's, Burger King, Lotteria: the source was fetched again and compared with a script.
+  - KFC, Mom's Touch: the image was fetched again and confirmed to be byte-identical to the first file. The relevant row was cut out again and re-read.
 
-  | 브랜드   | 메뉴                           | 등록값 (중량/열량/당류/단백질/나트륨) | 다시 읽은 값       | 결과 |
-  | -------- | ------------------------------ | ------------------------------------- | ------------------ | ---- |
-  | 맥도날드 | 환타 미디엄                    | 425/62/16/0/16                        | 425/62/16/0/16     | 일치 |
-  | 맥도날드 | 코카 콜라 제로 미디엄          | 425/0/0/0/34                          | 425/0/0/0/34       | 일치 |
-  | 맥도날드 | 코카 콜라 제로 라지            | 610/0/0/0/47                          | 610/0/0/0/47       | 일치 |
-  | 맥도날드 | 슈비버거                       | 269/573/15/22/951                     | 269/573/15/22/951  | 일치 |
-  | 맥도날드 | 맥치킨                         | 206/515/7/19/1148                     | 206/515/7/19/1148  | 일치 |
-  | 버거킹   | 불고기 롱치킨버거              | 234/691/7/23/1434                     | 234/691/7/23/1434  | 일치 |
-  | 버거킹   | 통새우와퍼주니어               | 168/414/5/17/658                      | 168/414/5/17/658   | 일치 |
-  | 버거킹   | 통새우슈림프버거               | 190/512/8/16/1077                     | 190/512/8/16/1077  | 일치 |
-  | 버거킹   | 쯔란로제 크리스퍼              | 233/660/11/27/1694                    | 233/660/11/27/1694 | 일치 |
-  | 버거킹   | 더오치 맥시멈2                 | 375/1018/9/53/2045                    | 375/1018/9/53/2045 | 일치 |
-  | 롯데리아 | 미라클버거                     | 181/382/7/15/600                      | 181/382/7/15/600   | 일치 |
-  | 롯데리아 | 더블 한우불고기버거            | 352/802/18/39/1150                    | 352/802/18/39/1150 | 일치 |
-  | 롯데리아 | 전주 비빔라이스 버거           | 285/574/8/17/1450                     | 285/574/8/17/1450  | 일치 |
-  | 롯데리아 | 나폴리 모짜렐라버거 토마토바질 | 240/733/10/27/1080                    | 240/733/10/27/1080 | 일치 |
-  | 롯데리아 | 포테이토                       | 98/284/2/3/500                        | 98/284/2/3/500     | 일치 |
-  | KFC      | 콜라 제로(L)                   | 522/0/0/0/57                          | 522/0/0/0/57       | 일치 |
-  | KFC      | 스프라이트(M)                  | 348/157/39/0/31                       | 348/157/39/0/31    | 일치 |
-  | KFC      | 콜라(L)                        | 522/224/56/0/16                       | 522/224/56/0/16    | 일치 |
-  | KFC      | 징거더블다운                   | 368/842/5/67/1868                     | 368/842/5/67/1868  | 일치 |
-  | KFC      | 콜라 제로(M)                   | 348/0/0/0/38                          | 348/0/0/0/38       | 일치 |
-  | 맘스터치 | 새우불고기버거                 | 252/601/20/19/1054                    | 252/601/20/19/1054 | 일치 |
-  | 맘스터치 | 제로콜라                       | 380/0/0/0/51                          | 380/0/0/0/51       | 일치 |
-  | 맘스터치 | 불고기버거                     | 164/403/14/14/615                     | 164/403/14/14/615  | 일치 |
-  | 맘스터치 | 통새우버거                     | 178/449/9/12/707                      | 178/449/9/12/707   | 일치 |
-  | 맘스터치 | 스모키스매쉬버거               | 252/634/11/32/945                     | 252/634/11/32/945  | 일치 |
+  | Brand       | Menu item                      | Registered values (weight/energy/sugars/protein/sodium) | Re-read values     | Result |
+  | ----------- | ------------------------------ | ------------------------------------------------------- | ------------------ | ------ |
+  | McDonald's  | 환타 미디엄                    | 425/62/16/0/16                                          | 425/62/16/0/16     | Match  |
+  | McDonald's  | 코카 콜라 제로 미디엄          | 425/0/0/0/34                                            | 425/0/0/0/34       | Match  |
+  | McDonald's  | 코카 콜라 제로 라지            | 610/0/0/0/47                                            | 610/0/0/0/47       | Match  |
+  | McDonald's  | 슈비버거                       | 269/573/15/22/951                                       | 269/573/15/22/951  | Match  |
+  | McDonald's  | 맥치킨                         | 206/515/7/19/1148                                       | 206/515/7/19/1148  | Match  |
+  | Burger King | 불고기 롱치킨버거              | 234/691/7/23/1434                                       | 234/691/7/23/1434  | Match  |
+  | Burger King | 통새우와퍼주니어               | 168/414/5/17/658                                        | 168/414/5/17/658   | Match  |
+  | Burger King | 통새우슈림프버거               | 190/512/8/16/1077                                       | 190/512/8/16/1077  | Match  |
+  | Burger King | 쯔란로제 크리스퍼              | 233/660/11/27/1694                                      | 233/660/11/27/1694 | Match  |
+  | Burger King | 더오치 맥시멈2                 | 375/1018/9/53/2045                                      | 375/1018/9/53/2045 | Match  |
+  | Lotteria    | 미라클버거                     | 181/382/7/15/600                                        | 181/382/7/15/600   | Match  |
+  | Lotteria    | 더블 한우불고기버거            | 352/802/18/39/1150                                      | 352/802/18/39/1150 | Match  |
+  | Lotteria    | 전주 비빔라이스 버거           | 285/574/8/17/1450                                       | 285/574/8/17/1450  | Match  |
+  | Lotteria    | 나폴리 모짜렐라버거 토마토바질 | 240/733/10/27/1080                                      | 240/733/10/27/1080 | Match  |
+  | Lotteria    | 포테이토                       | 98/284/2/3/500                                          | 98/284/2/3/500     | Match  |
+  | KFC         | 콜라 제로(L)                   | 522/0/0/0/57                                            | 522/0/0/0/57       | Match  |
+  | KFC         | 스프라이트(M)                  | 348/157/39/0/31                                         | 348/157/39/0/31    | Match  |
+  | KFC         | 콜라(L)                        | 522/224/56/0/16                                         | 522/224/56/0/16    | Match  |
+  | KFC         | 징거더블다운                   | 368/842/5/67/1868                                       | 368/842/5/67/1868  | Match  |
+  | KFC         | 콜라 제로(M)                   | 348/0/0/0/38                                            | 348/0/0/0/38       | Match  |
+  | Mom's Touch | 새우불고기버거                 | 252/601/20/19/1054                                      | 252/601/20/19/1054 | Match  |
+  | Mom's Touch | 제로콜라                       | 380/0/0/0/51                                            | 380/0/0/0/51       | Match  |
+  | Mom's Touch | 불고기버거                     | 164/403/14/14/615                                       | 164/403/14/14/615  | Match  |
+  | Mom's Touch | 통새우버거                     | 178/449/9/12/707                                        | 178/449/9/12/707   | Match  |
+  | Mom's Touch | 스모키스매쉬버거               | 252/634/11/32/945                                       | 252/634/11/32/945  | Match  |
 
-- 테스트
-  - `backend/test/franchise-foods.test.ts`(DB 없이): 164행이 모두 `official`, 브랜드 공식 사이트의 https 주소, 확인 날짜 2026-11-08, `is_junk = true`이고 탄수화물·지방이 NULL인지 확인한다. 브랜드마다 정해진 공식 사이트를 쓰는지, 나트륨이나 행 전체가 다른 열로 밀리지 않았는지(단백질과 당류의 열량이 표시 열량을 넘지 않고 탄산음료의 단백질은 0), `DO UPDATE SET`에 `is_junk`가 없는지도 본다(1차 리뷰 뒤 추가).
-  - `backend/test/foods.integration.test.ts`: 적용된 DB에서 브랜드·분류별 개수, 출처·날짜·표시·빈 값이 없음을 확인한다. 브랜드마다 한 메뉴의 값이 출처대로인지(열 밀림)도 본다.
-- 임시 PostgreSQL 17 클러스터(포트 5472, `health_test`): CI처럼 psql로 모두 적용한 뒤 `npm run db:migrate`로 다시 적용했다. 오류가 없었고 브랜드·분류별 행 수가 위와 같았다.
-- `origin/main`(2ee3364)을 병합한 뒤 `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5472/health_test npm run check`: 통과.
-  - 백엔드: 193개 통과, 0개 건너뜀. 2차 리뷰 보완 뒤 다시 실행해 195개 통과, 0개 건너뜀.
-  - 프런트엔드: 370개 통과, 2개 건너뜀. 건너뛴 2개는 이 변경과 관계없는 기존 조건부 테스트다.
-  - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과.
+- Tests
+  - `backend/test/franchise-foods.test.ts` (no DB): checks that all 164 rows are `official`, have an https URL on the brand's official site, have the check date 2026-11-08, have `is_junk = true`, and have NULL carbohydrate and fat. It also checks that each brand uses its designated official site, that sodium or a whole row has not shifted into other columns (the energy from protein and sugars does not exceed the stated energy, and protein in soft drinks is 0), and that `is_junk` is not in `DO UPDATE SET` (added after the first review).
+  - `backend/test/foods.integration.test.ts`: on an applied DB, checks counts per brand and category, and that no source, date, label, or value is empty. It also checks that one menu item per brand has the values from the source (column shifts).
+- Temporary PostgreSQL 17 cluster (port 5472, `health_test`): everything was applied with psql as CI does, then applied again with `npm run db:migrate`. There were no errors and the row counts per brand and category were the same as above.
+- After merging `origin/main` (2ee3364), `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5472/health_test npm run check`: passed.
+  - Backend: 193 passed, 0 skipped. After the second review fixes it was run again: 195 passed, 0 skipped.
+  - Frontend: 370 passed, 2 skipped. The 2 skipped are existing conditional tests unrelated to this change.
+  - Skill checks: 4 passed.
+- `npm run knip`: passed.
 
-## 한계
+## Limits
 
-- 다섯 곳 모두 총지방과 탄수화물을 공개하지 않아 이 두 값은 비어 있다. 하루 합계에서는 "값을 모르는 음식"으로 표시된다.
-- 출처의 값이 바뀌면 새 확인 날짜로 다시 넣어야 한다. KFC·맘스터치는 이미지라 자동으로 비교할 수 없다.
+- None of the five publish total fat and carbohydrate, so these two values are empty. In the daily total, they are shown as "foods with unknown values".
+- If a value in a source changes, it must be entered again with a new check date. KFC and Mom's Touch are images, so they cannot be compared automatically.
 
-## 리뷰
+## Review
 
-- **1차:** 꼭 고칠 것은 없었다. 리뷰가 164행 전체를 원본 자료와 대조했고 모두 일치했다. 반영한 것은 다음과 같다.
-  - 병합 순서(#103 먼저)를 이 기록과 PR 체크리스트에 적었다.
-  - `franchise-foods.test.ts`에 세 가지를 더했다.
-    - 브랜드마다 정해진 공식 사이트를 쓰는지 확인한다.
-    - 나트륨이나 행 전체가 다른 열로 밀리지 않았는지 확인한다. 단백질과 당류의 열량(4kcal/g)이 표시 열량을 넘지 않고, 탄산음료의 단백질은 0이어야 한다. 비슷한 크기의 값끼리 맞바뀐 경우(단백질↔당류, 중량↔열량)는 잡지 못한다.
-    - `DO UPDATE SET`에 `is_junk`가 없는지 확인한다.
-  - 롯데리아 단위가 가정이라는 점, "(버터번)" 표기, 범위(아침 메뉴 제외, KFC 트위스터·올댓치즈독 분류), robots.txt 내용을 문서에 적었다.
-  - 그대로 둔 것: 한 행 안에서 당류와 단백질이 맞바뀌는 경우는 파일만으로 잡을 수 없다. 전체 행 대조(이중 입력·비율 대조·리뷰의 전수 대조)로 대신한다.
-- **2차:** 꼭 고칠 것은 없었다. 반영한 것은 다음과 같다.
-  - `is_junk` 테스트가 `DO UPDATE SET`을 찾지 못해도 통과하던 문제를 고쳤다. 이제 절이 있는지부터 확인한다.
-  - 이름 해독이 소문자 16진수도 받는다.
-  - 열 검사가 잡는 범위를 주석과 이 기록에 정확히 적었다.
-  - 테스트 수를 다시 실행한 결과로 고쳤다.
+- **First:** Nothing had to be fixed. The review compared all 164 rows with the original data and all matched. What was applied:
+  - The merge order (#103 first) was written in this record and the PR checklist.
+  - Three things were added to `franchise-foods.test.ts`.
+    - Checks that each brand uses its designated official site.
+    - Checks that sodium or a whole row has not shifted into other columns. The energy from protein and sugars (4kcal/g) must not exceed the stated energy, and protein in soft drinks must be 0. It does not catch swaps between values of similar size (protein↔sugars, weight↔energy).
+    - Checks that `is_junk` is not in `DO UPDATE SET`.
+  - Wrote in the docs that the Lotteria unit is an assumption, the "(버터번)" (butter bun) mark, the scope (breakfast items excluded, the classification of KFC Twister and All That Cheese Dog), and the robots.txt content.
+  - Left as it was: a swap of sugars and protein within one row cannot be caught from the file alone. Full-row cross-checks (double entry, ratio cross-check, and the review's full comparison) stand in for it.
+- **Second:** Nothing had to be fixed. What was applied:
+  - Fixed the `is_junk` test, which passed even when it could not find `DO UPDATE SET`. It now first checks that the clause exists.
+  - The name decoding also accepts lowercase hexadecimal.
+  - Wrote exactly what the column check catches in the comment and in this record.
+  - Fixed the test counts to match the rerun results.

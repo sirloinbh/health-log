@@ -1,146 +1,146 @@
-# #35 쿠팡 링크와 영양성분 표 붙여넣기로 음식 등록하기
+# #35 Register foods by pasting a Coupang link and a nutrition facts table
 
-- 이슈: [#35](https://github.com/sirloinbh/health-log/issues/35)
-- 브랜치: `feat/35-coupang-paste`
+- Issue: [#35](https://github.com/sirloinbh/health-log/issues/35)
+- Branch: `feat/35-coupang-paste`
 
-## 목적
+## Purpose
 
-쿠팡에서 산 식품을 영양성분표를 보며 하나씩 입력하는 수고를 줄인다.
+Reduce the effort of typing in food bought on Coupang one item at a time while looking at its nutrition facts table.
 
-## 정한 것
+## Decisions
 
-- #34 조사 뒤 사용자가 2026-11-08에 정했다([#34 댓글](https://github.com/sirloinbh/health-log/issues/34#issuecomment-6715972057)). 이 PR을 시작하기 전에 사용자에게 다시 확인받았다.
-  - 방식 E와 C를 함께 쓴다.
-    - E: 쿠팡 링크는 출처 주소로만 저장하고, 출처 종류는 `label`(제품 표기)로 둔다.
-    - C: 영양성분 표 글자를 붙여넣으면 앱이 읽어 칸을 채운다.
-  - 쿠팡 페이지 자동 수집(A)과 파트너스 API(B)는 쓰지 않는다.
-  - 이미지로만 된 표는 #47에서 다룬다.
-  - 식약처 DB 연동(F)은 [#118](https://github.com/sirloinbh/health-log/issues/118)로 남겼다(P4, needs-user, #83 아래).
-- **붙여넣기 해석은 이 이슈 안에서 구현했다.**
-  - E(출처 주소와 `label` 종류)는 음식 화면에 이미 있었다. 그래서 결정 뒤 #35에 남은 일의 대부분이 붙여넣기 해석이다.
-  - 해석은 화면 안의 순수 함수 하나로 끝나는 작은 변경이다. 서버, DB, 마이그레이션이 필요 없다.
-  - 별도 이슈로 나누면 #35에 남는 것이 안내 문구뿐이라 나누지 않았다.
-- **이슈 할 일과 완료 기준을 결정에 맞춰 바꿨다.** 방식이 바뀌어 할 일과 완료 기준이 아래처럼 달라졌다.
-  - "조사에서 고른 방식으로 상품명과 영양성분 추출": 붙여넣은 표에서 1회 제공량과 영양성분을 읽는다. 상품명은 표에 없어 직접 입력한다.
-  - "샘플 응답으로 추출하는 테스트": 영양성분 표 글자 표본으로 바꿨다.
-  - "쿠팡이 아닌 주소와 사내망 주소를 서버가 거부하는 테스트": 서버가 링크를 여는 방식일 때만 해당하는 기준이다. 이 방식은 서버도 앱도 링크를 열지 않아 해당하지 않는다. 화면 테스트에서 앱이 자기 API 말고는 요청하지 않는 것을 확인했다.
-  - "실제 상품 링크로 확인": 결정에 따라 쿠팡 페이지를 열지 않았다. 링크 문자열만 출처로 저장하는 것을 확인했다.
-  - "총 내용량과 먹은 양으로 칼로리 계산": 표의 총 내용량이 1회 제공량의 몇 배인지와 그만큼의 칼로리를 알려 준다. 식사에 그 회분 수로 기록하면 칼로리가 계산된다(기존 식사 기록의 수량).
+- The user decided this on 2026-11-08, after the #34 research ([#34 comment](https://github.com/sirloinbh/health-log/issues/34#issuecomment-6715972057)). The user confirmed again before this PR was started.
+  - Approaches E and C are used together.
+    - E: The Coupang link is stored only as a source URL, and the source type is `label` (product label).
+    - C: When the text of a nutrition facts table is pasted, the app reads it and fills the fields.
+  - Automatic collection of Coupang pages (A) and the Partners API (B) are not used.
+  - Tables that exist only as images are handled in #47.
+  - Linking with the MFDS DB (F) was left as [#118](https://github.com/sirloinbh/health-log/issues/118) (P4, needs-user, under #83).
+- **Interpreting the pasted text was implemented inside this issue.**
+  - E (the source URL and the `label` type) already existed on the food screen. So after the decision, most of what remained in #35 was interpreting the pasted text.
+  - The interpretation is a small change that is done by one pure function in the screen. It needs no server, DB, or migration.
+  - If it were split into a separate issue, only the guidance text would remain in #35, so it was not split.
+- **The issue's to-do items and completion criteria were changed to match the decision.** Because the approach changed, the to-do items and completion criteria changed as below.
+  - "Extract the product name and nutrition facts with the approach chosen in the research": The serving size and nutrition facts are read from the pasted table. The product name is not in the table, so it is typed in.
+  - "A test that extracts from a sample response": Changed to samples of nutrition facts table text.
+  - "A test that the server rejects non-Coupang addresses and internal network addresses": This criterion applies only when the server opens the link. In this approach neither the server nor the app opens the link, so it does not apply. A screen test confirms that the app makes no requests other than to its own API.
+  - "Check with a real product link": Following the decision, the Coupang page was not opened. It was confirmed that only the link string is stored as the source.
+  - "Calculate calories from the total content and the amount eaten": It tells how many times the serving size the table's total content is, and the calories for that amount. If a meal is recorded with that number of servings, the calories are calculated (the quantity of an existing meal record).
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
-- **`frontend/src/nutrition-label.ts`(새 파일)**
-  - `readNutritionLabel`: 붙여넣은 글자에서 기준량을 읽는다. "100g당", "1봉지(45g)당", "1회 제공량 1개(30g)"를 알아보고, 총 내용량만 있으면 총 내용량을 기준량으로 쓴다.
-  - 같은 함수가 총 내용량, 칼로리, 탄수화물, 단백질, 지방, 당류, 나트륨도 읽는다.
-    - 기준량 뒤에 나오는 값을 우선한다. 표에 한 봉지 전체 값이 함께 있어도 기준량의 값을 고른다.
-    - 트랜스지방과 포화지방(띄어 쓴 경우 포함)은 지방으로 읽지 않는다. "4g 당류"를 "g당" 기준량으로 읽지 않는다.
-    - 나트륨은 mg, 나머지는 g으로 바꾸고 소수 둘째 자리로 맞춘다.
-    - 전각 글자(㎉, ㎎, ｇ)와 천 단위 쉼표를 읽는다.
-    - "1g 미만"은 숫자로 저장하지 않고 따로 알린다.
-  - `packageText`: "총 내용량 90g은(는) 1회 제공량(45g)의 2배, 약 460kcal입니다. 한 봉지를 다 먹었으면 식사에 2회분으로 기록하세요."
-  - `isCoupangUrl`: 쿠팡 주소인지 문자열로만 판단한다(`coupang.com`과 그 하위 도메인). 주소를 열지 않는다.
-- **`frontend/src/foods.tsx` 음식 추가·수정 대화상자**
-  - 맨 위에 "영양성분 표 붙여넣기" 칸과 "표 읽어 채우기" 버튼을 더했다.
-  - 읽으면 찾은 칸만 채운다. 출처 종류가 "직접 입력"이면 "제품 표기"로 바꾸고, 확인 날짜가 비어 있으면 오늘(Asia/Seoul)로 채운다.
-  - 결과를 `role="status"`로 알린다: 채운 칸, "미만"이라 비운 칸, 표에 없어 그대로 둔 칸, 총 내용량 계산, "값을 확인한 뒤 저장을 눌러야 저장됩니다".
-  - 표를 찾지 못하면 `role="alert"`로 알리고 아무 칸도 바꾸지 않는다. 글자로 된 표만 읽을 수 있고, 이미지 표는 직접 입력하라고 안내한다.
-  - 저장은 기존 저장 버튼으로만 한다. 읽기만 해서는 서버에 아무것도 보내지 않는다.
-  - 출처 주소가 쿠팡 링크면 칸 아래에 안내를 보이고 `aria-describedby`로 잇는다. 안내 내용은 "출처로만 저장, 앱은 열지 않음, 표 글자를 붙여넣거나 직접 입력"이다.
-- 서버, DB, 마이그레이션은 바꾸지 않았다.
+- **`frontend/src/nutrition-label.ts` (new file)**
+  - `readNutritionLabel`: Reads the reference amount from the pasted text. It recognizes "100g당" (per 100g), "1봉지(45g)당" (per 1 bag (45g)), and "1회 제공량 1개(30g)" (1 serving, 1 piece (30g)), and if there is only a total content, it uses the total content as the reference amount.
+  - The same function also reads the total content, calories, carbohydrate, protein, fat, sugars, and sodium.
+    - The value that comes after the reference amount is preferred. Even if the table also has the whole-bag value, the value for the reference amount is chosen.
+    - Trans fat and saturated fat (including when written with a space) are not read as fat. "4g 당류" (4g sugars) is not read as the "g당" reference amount.
+    - Sodium is in mg and the others are converted to g, rounded to two decimal places.
+    - Full-width characters (㎉, ㎎, ｇ) and thousands separators are read.
+    - "1g 미만" (less than 1g) is not stored as a number and is reported separately.
+  - `packageText`: "총 내용량 90g은(는) 1회 제공량(45g)의 2배, 약 460kcal입니다. 한 봉지를 다 먹었으면 식사에 2회분으로 기록하세요." (The total content of 90g is 2 times the serving (45g), about 460kcal. If you ate the whole bag, record it as 2 servings in the meal.)
+  - `isCoupangUrl`: Decides only by string whether the address is a Coupang address (`coupang.com` and its subdomains). It does not open the address.
+- **`frontend/src/foods.tsx` add and edit food dialog**
+  - Added a "영양성분 표 붙여넣기" (paste nutrition facts table) field and a "표 읽어 채우기" (read table and fill) button at the top.
+  - Reading fills only the fields it found. If the source type is "직접 입력" (manual entry), it changes it to "제품 표기" (product label), and if the check date is empty, it fills in today (Asia/Seoul).
+  - The result is announced with `role="status"`: the fields filled, the fields left empty because of "미만" (less than), the fields left unchanged because they are not in the table, the total content calculation, and "값을 확인한 뒤 저장을 눌러야 저장됩니다" (it is saved only when you press save after checking the values).
+  - If no table is found, it is announced with `role="alert"` and no field is changed. Only text tables can be read, and for image tables it tells the user to enter values by hand.
+  - Saving is done only with the existing save button. Reading alone sends nothing to the server.
+  - If the source URL is a Coupang link, guidance is shown below the field and linked with `aria-describedby`. The guidance says: stored only as the source, the app does not open it, paste the table text or enter it manually.
+- The server, DB, and migrations were not changed.
 
-## 변경 — 2026-11-08 (1차 리뷰 반영)
+## Change — 2026-11-08 (first review applied)
 
-PR #119의 1차 리뷰(작성 문맥과 분리된 읽기 전용 리뷰)는 해석기를 복사해 40개 넘는 입력을 실제로 돌려 봤다. 상품 페이지를 통째로 붙여넣으면 빈 칸이 아니라 **틀린 값**이 채워지는 경우를 찾았다(high 4개, medium 4개, low 4개). 틀린 값을 쓰는 것이 빈 칸보다 나쁘므로, 해석기를 "표 안에서, 기준량 뒤에서만 읽는다"는 원칙으로 다시 짰다.
+The first review of PR #119 (a read-only review separated from the authoring context) copied the interpreter and ran more than 40 inputs through it. It found cases where pasting a whole product page fills **wrong values** instead of empty fields (4 high, 4 medium, 4 low). Using a wrong value is worse than an empty field, so the interpreter was rewritten on the principle "read only inside the table, and only after the reference amount".
 
-- **반영 1(high)** "100g당 가격 2,211원", "(10g당 120원)" 같은 쿠팡 단가 표시를 기준량으로 읽었다. 이제 "당" 뒤에 가격이나 "원"이 오면 기준량이 아니다. 기준량 후보가 여럿이면 바로 뒤에 열량이나 영양소가 오는 것을 고른다.
-- **반영 2(high)** 표 앞의 리뷰 문장("당류 0g 맞나요?", "단백질 20g!")을 값으로 읽었다. 이제 기준량 위치부터, 기준량이 없으면 "영양정보/영양성분" 머리말부터만 읽는다. 앞쪽으로 되돌아가 찾지 않는다. 열량은 "열량/에너지"가 붙은 값을 먼저 고른다.
-- **반영 3(high)** 1회 제공량 표 뒤의 "(100g당 500kcal)"이 섞여 한 음식에 두 기준이 들어갔다. 위의 기준량 선택과 앞쪽 탐색 금지로 고쳤다.
-- **반영 4(high)** "당알코올 18g"을 "18g당"으로 읽어 기준량이 1g이나 0g이 됐다. 이제 "당" 뒤에 한글이 이어지면 기준량이 아니다.
-- **반영 5(medium)** 열량 줄이 없을 때 표 아래 "2,000kcal 기준"을 칼로리로 넣었다. 이제 "kcal 기준"은 값으로 읽지 않는다.
-- **반영 6(medium)** "1회 제공량당"처럼 크기 없는 기준이 있어도 총 내용량을 기준으로 삼았다. 이제 기준량 표현이 아예 없을 때만 총 내용량을 쓰고, 요약에 "총 내용량을 기준으로 채웠다"고 알린다. "1회 섭취참고량"도 기준량으로 읽는다.
-- **반영 7(medium)** "미만"이라 비웠다고 알린 칸이 실제로는 이전 값 그대로였다. 다시 붙여넣으면 앞 제품의 값도 섞였다. 이제 "미만"과 범위 밖 값은 실제로 비운다. 새 기준량을 읽으면 표에 없는 영양소 칸도 비운다("표에 없어 비운 칸"). 기준량을 못 읽었을 때만 표에 없는 칸을 그대로 두고 그렇게 알린다.
-- **반영 8(medium)** 공식·공공 자료 음식에 표를 읽어도 출처 종류와 날짜가 그대로였다. 이제 표를 읽으면 항상 "제품 표기", 오늘 날짜가 된다. 예전 출처가 공식·공공이면 출처 주소를 확인하라고 알린다.
-- **반영 9(low)** 소수점 쉼표: "2,5g"은 2.5, "0,125g"은 0.125로 읽는다. 천 단위 쉼표는 1~9로 시작하는 숫자에만 적용한다.
-- **반영 10(low)** 기준량도 소수 둘째 자리로 맞추고, 0이나 99,999를 넘는 기준량은 버린다. 99,999를 넘는 영양소 값은 비우고 "값이 너무 커서 비운 칸"으로 알린다.
-- **반영 11(low)** 음료에도 맞도록 "한 봉지를 다 먹었으면"을 "포장 하나를 다 먹었으면"으로 바꿨다.
-- **반영 12(low)** 같은 결과를 다시 읽어도 화면 낭독기가 알리도록, 누를 때마다 결과 영역을 새로 그린다. 글자를 고치면 "찾지 못했습니다" 경고를 지운다.
-- "N이하"는 상한값으로 그 숫자를 저장한다. 리뷰도 허용 범위로 봤다.
-- 테스트
-  - `frontend/src/nutrition-label.test.ts`: 리뷰의 재현 입력으로 7개를 더했다(18개). 단가 표시, 앞쪽 리뷰 문장, 다른 기준 섞임, 당알코올, "kcal 기준", 크기 없는 기준·섭취참고량, 소수점 쉼표와 범위 밖 값이다.
-  - `frontend/src/foods.test.tsx`: 3개를 더했다.
-    - 공식 자료 음식에 표를 읽으면 오래된 값과 "미만" 칸이 비고, 출처 종류·날짜가 바뀌고 안내가 나온다.
-    - 같은 표를 다시 읽으면 결과를 다시 알린다.
-    - 기준량 없는 표는 표에 없는 칸을 그대로 둔다.
-- 검사: 서버를 바꾸지 않아 DB 없이 `npm run check`를 실행했고 통과했다.
-  - 백엔드: 127개 통과, 109개 건너뜀(DB 통합 테스트).
-  - 프론트엔드: 454개 통과, 2개 건너뜀(다크 전용 조건).
-  - `npm run knip`: 통과.
-- 아래 브라우저 확인은 반영 전 해석기로 했다. 반영 뒤에는 단위·화면 테스트로만 확인했다.
+- **Applied 1 (high)** Coupang unit price marks such as "100g당 가격 2,211원" (price per 100g 2,211 won) and "(10g당 120원)" were read as a reference amount. Now if a price or "원" (won) follows "당", it is not a reference amount. When there are several reference amount candidates, the one that is followed right away by energy or a nutrient is chosen.
+- **Applied 2 (high)** Review sentences before the table ("당류 0g 맞나요?" = "Are sugars really 0g?", "단백질 20g!" = "Protein 20g!") were read as values. Now it reads only from the position of the reference amount, or if there is none, only from the "영양정보/영양성분" (nutrition information/nutrition facts) heading. It does not go back to search earlier text. For energy, a value attached to "열량/에너지" (energy) is chosen first.
+- **Applied 3 (high)** "(100g당 500kcal)" after a per-serving table was mixed in, so two bases ended up in one food. Fixed with the reference amount selection above and the ban on searching earlier text.
+- **Applied 4 (high)** "당알코올 18g" (sugar alcohol 18g) was read as "18g당", making the reference amount 1g or 0g. Now if Korean text follows "당", it is not a reference amount.
+- **Applied 5 (medium)** When there was no energy line, "2,000kcal 기준" (based on 2,000kcal) below the table was put in as calories. Now "kcal 기준" is not read as a value.
+- **Applied 6 (medium)** Even when there was a reference like "1회 제공량당" (per serving) with no size, the total content was used as the basis. Now the total content is used only when there is no reference amount expression at all, and the summary says "filled based on the total content". "1회 섭취참고량" (reference intake per serving) is also read as a reference amount.
+- **Applied 7 (medium)** A field reported as emptied because of "미만" actually kept its previous value. Pasting again also mixed in values of the previous product. Now "미만" and out-of-range values are actually emptied. When a new reference amount is read, the nutrient fields that are not in the table are also emptied ("fields emptied because they are not in the table"). Only when the reference amount could not be read are the fields not in the table left as they are, and it says so.
+- **Applied 8 (medium)** For a food from official or public data, reading a table left the source type and date unchanged. Now reading a table always sets "제품 표기" (product label) and today's date. If the earlier source was official or public, it tells the user to check the source URL.
+- **Applied 9 (low)** Decimal comma: "2,5g" is read as 2.5 and "0,125g" as 0.125. The thousands separator applies only to numbers starting with 1 to 9.
+- **Applied 10 (low)** The reference amount is also rounded to two decimal places, and a reference amount of 0 or over 99,999 is discarded. A nutrient value over 99,999 is emptied and reported as "fields emptied because the value is too large".
+- **Applied 11 (low)** To fit drinks too, "한 봉지를 다 먹었으면" (if you ate the whole bag) was changed to "포장 하나를 다 먹었으면" (if you ate the whole package).
+- **Applied 12 (low)** So that a screen reader announces the same result even when it is read again, the result area is redrawn on every press. Editing the text clears the "찾지 못했습니다" (not found) warning.
+- "N이하" (N or less) is an upper bound and that number is stored. The review also treated it as an acceptable range.
+- Tests
+  - `frontend/src/nutrition-label.test.ts`: Added 7 tests from the review's reproduction inputs (18 in total). They are unit price marks, review sentences before the table, a mix of different bases, sugar alcohol, "kcal 기준", a reference with no size and reference intake, a decimal comma and out-of-range values.
+  - `frontend/src/foods.test.tsx`: Added 3 tests.
+    - When a table is read for a food from official data, old values and "미만" fields are emptied, the source type and date change, and the guidance appears.
+    - Reading the same table again announces the result again.
+    - A table with no reference amount leaves fields that are not in the table as they are.
+- Checks: Since the server was not changed, `npm run check` was run without a DB and passed.
+  - Backend: 127 passed, 109 skipped (DB integration tests).
+  - Frontend: 454 passed, 2 skipped (dark-only condition).
+  - `npm run knip`: passed.
+- The browser check below was done with the interpreter before these changes. After them, it was checked only with unit and screen tests.
 
-## 변경 — 2026-11-08 (2차 리뷰 반영)
+## Change — 2026-11-08 (second review applied)
 
-2차 리뷰(마지막)는 고친 해석기에 약 40개 입력을 다시 넣었다. 그 결과 표의 끝을 정하지 않아 생기는 **틀린 값** 경로를 두 가지 더 찾았다(high 2개, medium 3개, low 3개). 1차 반영의 "표 안에서만 읽는다"는 설명이 아직 사실이 아니었다.
+The second review (the last) fed about 40 inputs again into the fixed interpreter. It found two more paths to **wrong values** that arise because the end of the table was not defined (2 high, 3 medium, 3 low). The statement in the first round, "reads only inside the table", was still not true.
 
-- **반영 1(high)** 표 뒤의 상품평이나 "함께 보면 좋은 상품"의 값을 표에 없는 영양소 칸에 넣었다. 이제 표의 끝을 정한다.
-  - 기준량(또는 머리말) 다음 줄부터 표 줄처럼 보이는 줄만 읽는다. 표 줄은 영양소, 열량·에너지, kcal, %, 기준치, 내용량·제공량이 있는 줄이다.
-  - 그렇지 않은 첫 줄에서 멈춘다.
-  - 다음 줄 이후의 다른 기준량 앞에서도 멈춘다. 같은 줄의 두 번째 칸 머리는 그대로 둔다.
-- **반영 2(high)** 머리말이 있어도 그 앞(상품명·리뷰)의 "100g당"을 기준량으로 골랐다. 이제 머리말이 있으면 머리말 뒤의 기준량만 본다.
-  - 머리말 뒤에 기준량이 없으면 앞쪽 후보를 쓰지 않고, 기준 표현이 없는 경우로 다룬다(총 내용량 가정, 알림).
-  - 이 과정에서 표 아래 "1일 영양성분 기준치"가 머리말로 잡히는 것을 찾아, 머리말에서 제외했다.
-- **반영 3(medium)** 띄어쓰기 없는 "100g당열량"을 기준량으로 읽지 못해 총 내용량을 가정했다. "당" 뒤에 열량·에너지·칼로리·영양소 이름이 오면 기준량으로 읽는다. 당류와 당알코올은 여전히 제외한다.
-- **반영 5(medium)** 기준량만 읽고 값을 하나도 못 읽어도 칸을 모두 비웠다. 이제 값을 하나도 못 읽으면 아무 칸도 바꾸지 않고 알린다. 비운 칸 문구는 "표에서 읽지 못해 비운 칸"으로 바꿨다(표에 있어도 모양 때문에 못 읽었을 수 있음).
-- **반영 6(low)** "2000kcal를 기준으로"를 칼로리로 읽었다. "kcal을/를 기준"도 값이 아니다.
-- **분리 4, 7, 8** [#120](https://github.com/sirloinbh/health-log/issues/120)(P4, #83 아래)로 나눴다.
-  - 4: 크기 없는 첫 칸과 크기 있는 둘째 칸으로 된 두 칸 표. 이 경우만 아직 틀린 값을 짝짓는다.
-  - 7: 크기 없는 "1회 제공량당" 머리줄이 가까운 크기를 빌려 쓰기.
-  - 8: 기준량 없이 일부만 읽었을 때 출처가 섞이는 문제. 지금은 1회 제공량과 나머지 값은 그대로, 출처는 제품 표기·오늘이 되고 안내가 나온다.
-  - 값이 다음 줄에 있는 표, 파이프 표, %가 먼저 오는 표는 지금 빈 칸으로 끝나서 함께 적었다.
-- 테스트
-  - `frontend/src/nutrition-label.test.ts`: 5개를 더했다(23개). 표 뒤 상품평·다른 상품·다음 기준량, 머리말 앞 리뷰·상품명, 머리말 앞 쇼핑 문구, "100g당열량", "kcal를 기준으로"를 확인한다.
-  - `frontend/src/foods.test.tsx`: "기준량만 읽고 값이 없으면 아무 칸도 바꾸지 않는다"를 더했다.
-- 검사: DB 없이 `npm run check` 통과(백엔드 127개 통과·DB 통합 109개 건너뜀, 프론트엔드 460개 통과·2개 건너뜀), `npm run knip` 통과. 브라우저로는 다시 보지 않았다.
-- 두 리뷰의 재현 스크립트 약 40개 입력을 새 해석기로 다시 돌렸다. 모두 맞는 값이거나 빈 칸이었고, 틀린 값은 #120의 두 칸 표 한 경우뿐이었다.
+- **Applied 1 (high)** Values from a review or "함께 보면 좋은 상품" (products you may also like) after the table were put into nutrient fields that are not in the table. Now the end of the table is defined.
+  - From the line after the reference amount (or heading), it reads only lines that look like table lines. A table line is a line that has a nutrient, energy, kcal, %, daily value (기준치), or content or serving size.
+  - It stops at the first line that is not one.
+  - It also stops before another reference amount on a later line. The head of a second column on the same line is left as it is.
+- **Applied 2 (high)** Even with a heading, the "100g당" before it (product name or review) was chosen as the reference amount. Now when there is a heading, only the reference amount after the heading is looked at.
+  - If there is no reference amount after the heading, the earlier candidates are not used and it is treated as the case with no reference expression (total content assumed, with a notice).
+  - In this process, it was found that "1일 영양성분 기준치" (daily value of nutrients) below the table was caught as a heading, so it was excluded from headings.
+- **Applied 3 (medium)** "100g당열량" (per 100g energy) written with no space could not be read as a reference amount, so the total content was assumed. If an energy, calorie, or nutrient name follows "당", it is read as a reference amount. Sugars (당류) and sugar alcohol (당알코올) are still excluded.
+- **Applied 5 (medium)** Even when only the reference amount was read and no value at all, all fields were emptied. Now if no value can be read, no field is changed and it tells the user. The wording for emptied fields was changed to "fields emptied because they could not be read from the table" (they may be in the table but could not be read because of the shape).
+- **Applied 6 (low)** "2000kcal를 기준으로" (based on 2000kcal) was read as calories. "kcal을/를 기준" is not a value either.
+- **Split off 4, 7, 8** into [#120](https://github.com/sirloinbh/health-log/issues/120) (P4, under #83).
+  - 4: A two-column table with a first column that has no size and a second column that has one. Only this case still pairs wrong values.
+  - 7: A "1회 제공량당" header line with no size borrowing a nearby size.
+  - 8: Sources getting mixed when only part was read without a reference amount. For now the serving size and the other values stay, the source becomes product label and today, and the guidance appears.
+  - Tables where the value is on the next line, pipe tables, and tables where % comes first currently end up empty, so they were written there too.
+- Tests
+  - `frontend/src/nutrition-label.test.ts`: Added 5 tests (23 in total). They check reviews, other products, and the next reference amount after the table; reviews and product names before the heading; shopping text before the heading; "100g당열량"; and "kcal를 기준으로".
+  - `frontend/src/foods.test.tsx`: Added "when only the reference amount is read and there is no value, no field is changed".
+- Checks: `npm run check` without a DB passed (backend 127 passed, 109 DB integration skipped; frontend 460 passed, 2 skipped), and `npm run knip` passed. It was not viewed in a browser again.
+- The about 40 inputs of the two reviews' reproduction scripts were run again with the new interpreter. All gave correct values or empty fields, and the only wrong value was the one case of the two-column table in #120.
 
-## 변경 — 2026-11-08 (병합 직전 main 다시 병합)
+## Change — 2026-11-08 (main merged again right before merging)
 
-2차 리뷰 반영 뒤 main에 #40 약 기록(PR #117)이 병합됐다. `origin/main`을 병합했고 충돌은 없었다. README에서 #40을 끝남으로 옮기고, agent3의 진행 중 작업을 #48로 고쳤다. 병합한 트리에서 DB 없이 `npm run check`를 실행했고 통과했다(백엔드 133개 통과·118개 건너뜀, 프론트엔드 474개 통과·2개 건너뜀). `npm run knip`도 통과했다.
+After the second review was applied, the #40 medication records (PR #117) were merged into main. `origin/main` was merged with no conflicts. In the README, #40 was moved to done and agent3's in-progress work was changed to #48. On the merged tree, `npm run check` was run without a DB and passed (backend 133 passed, 118 skipped; frontend 474 passed, 2 skipped). `npm run knip` also passed.
 
-## 검증
+## Checks
 
-- 테스트
-  - `frontend/src/nutrition-label.test.ts`(11개)
-    - 일반적인 100g당 표, 트랜스·포화지방(띄어쓰기 포함)과 "g 당류" 구분, "1회 제공량 1개(30g)"와 "1봉지(45g)당"을 확인한다.
-    - 총 내용량만 있는 표, 기준량 뒤 값 우선, 단위 변환과 반올림, 전각·천 단위 쉼표, "미만", 표가 아닌 글자를 확인한다.
-    - 총 내용량 안내 문구, 쿠팡 주소 판단(사칭 도메인 `coupang.com.example.com`, `notcoupang.com` 거부)을 확인한다.
-  - `frontend/src/foods.test.tsx`(3개 추가)
-    - 붙여넣은 표가 칸을 채우고 출처 종류·확인 날짜를 정한다. 저장 전에는 POST가 없다.
-    - 저장 본문이 채운 값과 쿠팡 링크를 담는다. 앱은 `/api/` 말고는 요청하지 않는다.
-    - 표가 아닌 글자는 알림만 하고 칸을 바꾸지 않는다. 쿠팡 링크 안내가 나타났다 사라진다.
-- `npm run check`(DB 없이, 서버를 바꾸지 않아서): 통과.
-  - 백엔드: 127개 통과, 109개 건너뜀(DB 통합 테스트).
-  - 프론트엔드: 444개 통과, 2개 건너뜀(다크 전용 조건으로 무관).
-  - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과(처음에는 내보낸 타입 하나가 쓰이지 않아 실패해 고쳤다).
+- Tests
+  - `frontend/src/nutrition-label.test.ts` (11 tests)
+    - Checks an ordinary per-100g table, telling trans and saturated fat (including written with a space) from "g 당류" (g sugars), and "1회 제공량 1개(30g)" and "1봉지(45g)당".
+    - Checks a table with only a total content, preferring the value after the reference amount, unit conversion and rounding, full-width characters and thousands separators, "미만", and text that is not a table.
+    - Checks the total content guidance text and the Coupang address check (the spoofed domains `coupang.com.example.com` and `notcoupang.com` are rejected).
+  - `frontend/src/foods.test.tsx` (3 added)
+    - A pasted table fills the fields and sets the source type and check date. There is no POST before saving.
+    - The save body contains the filled values and the Coupang link. The app makes no requests other than to `/api/`.
+    - Text that is not a table only gives a notice and changes no field. The Coupang link guidance appears and disappears.
+- `npm run check` (without a DB, because the server was not changed): passed.
+  - Backend: 127 passed, 109 skipped (DB integration tests).
+  - Frontend: 444 passed, 2 skipped (a dark-only condition, unrelated).
+  - Skill checks: 4 passed.
+- `npm run knip`: passed (at first it failed because one exported type was unused, and it was fixed).
 
-### 브라우저 확인
+### Browser check
 
-임시 PostgreSQL 17(5471, `health_test`)에 실제 API(127.0.0.1:3971)와 Vite(5271)를 띄우고 헤드리스 Chrome(디버깅 9671)으로 음식 화면을 열었다. "음식 추가"에서 감자칩 표를 붙여넣었다(총 내용량 90g, 1봉지(45g)당 230kcal, 당류 1g 미만 등).
+A real API (127.0.0.1:3971) and Vite (5271) were started on a temporary PostgreSQL 17 (5471, `health_test`), and the food screen was opened in headless Chrome (debugging 9671). In "음식 추가" (add food), a potato chip table was pasted (total content 90g, 230kcal per 1 bag (45g), sugars less than 1g, and so on).
 
-| 항목                                                                                         | 390×844 | 1440×900 |
-| -------------------------------------------------------------------------------------------- | ------- | -------- |
-| "표 읽어 채우기" 뒤 1회 제공량 45 g, 칼로리 230, 나트륨 210, 당류 빈칸, 확인 날짜 2026-11-08 | 통과    | 통과     |
-| 출처 종류 "제품 표기", 결과 안내(채운 칸, 미만, 2배·약 460kcal, 저장해야 저장됨)             | 통과    | 통과     |
-| 출처 주소에 쿠팡 링크를 넣으면 안내가 보임                                                   | 통과    | 통과     |
-| 저장을 누른 뒤에만 목록에 음식이 생김                                                        | 통과    | 통과     |
-| 페이지가 쿠팡으로 보낸 요청 0건(`performance.getEntriesByType('resource')`)                  | 통과    | 통과     |
-| 대화상자 가로 넘침 없음                                                                      | 통과    | 통과     |
+| Item                                                                                                                                                | 390×844 | 1440×900 |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
+| After "표 읽어 채우기": serving size 45 g, calories 230, sodium 210, sugars empty, check date 2026-11-08                                              | Pass    | Pass     |
+| Source type "제품 표기" (product label), result guidance (fields filled, less than, 2 times and about 460kcal, it is saved only when saved)          | Pass    | Pass     |
+| Putting a Coupang link in the source URL shows the guidance                                                                                         | Pass    | Pass     |
+| The food appears in the list only after pressing save                                                                                               | Pass    | Pass     |
+| 0 requests sent by the page to Coupang (`performance.getEntriesByType('resource')`)                                                                 | Pass    | Pass     |
+| No horizontal overflow in the dialog                                                                                                                | Pass    | Pass     |
 
-- 실제 쿠팡 상품 페이지는 결정에 따라 열지 않았다. 확인에 쓴 링크(`https://www.coupang.com/vp/products/1234567`)는 문자열로만 저장했다.
-- 확인 뒤 Chrome, Vite, API, 임시 DB를 모두 껐다.
+- Following the decision, a real Coupang product page was not opened. The link used for the check (`https://www.coupang.com/vp/products/1234567`) was stored only as a string.
+- After the check, Chrome, Vite, the API, and the temporary DB were all shut down.
 
-## 제한·후속
+## Limits and follow-ups
 
-- 글자로 된 표만 읽는다. 이미지로만 된 표는 #47(사진 인식)에서 다룬다.
-- 표 모양이 아주 다르면 일부 칸을 못 찾을 수 있다. 그때는 못 찾은 칸을 알려 주고 직접 입력하게 한다.
-- 식약처 DB로 채우기는 #118에서 검토한다.
+- Only text tables are read. Tables that exist only as images are handled in #47 (photo recognition).
+- If the table shape is very different, some fields may not be found. In that case it tells the user which fields were not found and has them enter them by hand.
+- Filling from the MFDS DB is considered in #118.

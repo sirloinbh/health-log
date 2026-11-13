@@ -1,169 +1,169 @@
-# #43 주간·월간 변화 리포트
+# #43 Weekly and monthly change report
 
-- 이슈: [#43](https://github.com/sirloinbh/health-log/issues/43)
-- 브랜치: `feat/43-change-report`
+- Issue: [#43](https://github.com/sirloinbh/health-log/issues/43)
+- Branch: `feat/43-change-report`
 
-## 목적
+## Purpose
 
-이 서비스는 기록하는 데서 끝나지 않고 변화를 확인하는 것이 목적이다. 비어 있던 대시보드에 수면, 식단, 술·담배, 하루 체크의 주간·월간 변화를 모은다. 이전 기간과 비교하고, 술과 그날 밤 수면의 관계도 보여 준다.
+The purpose of this service is not just to record but to check changes. The empty dashboard gathers the weekly and monthly changes in sleep, diet, alcohol and tobacco, and daily checks. It compares with the previous period, and also shows the relation between alcohol and the sleep of that night.
 
-## 정한 것
+## Decisions
 
-이슈에 없던 세부는 아래처럼 정했고, 사용자 확인 없이 정했다. 이슈 댓글에 같은 내용을 남겼다.
+Details that were not in the issue were decided as below, without asking the user. The same content was left as an issue comment.
 
-- **기간:** 주(월~일)와 달(1일~말일)이다. #36·#37과 같은 Asia/Seoul 달력 날짜 계산(`backend/src/day-records.ts`)을 쓴다. 이전 기간은 바로 앞의 주나 달이다.
-- **평균의 분모:** 그 기록이 있는 날 수다. 기록이 없는 날은 분모에 넣지 않는다.
-  - 수면: 수면 기록이 있는 날의 `duration_minutes` 평균이다.
-  - 칼로리: 그 날 모든 항목의 칼로리를 아는 날만 평균에 넣는다. 칼로리를 모르는 항목이 있는 날은 낮은 날로 섞지 않고 "칼로리를 모르는 날 N일"로 따로 보인다.
-  - 흡연: 개비를 기록한 날의 하루 평균과 합계다.
-  - 술: 술을 기록한 날 가운데 마신 날 수와 그 비율이다. 기간마다 기록한 날 수가 다르므로, 증감은 날 수가 아니라 비율(%p)로 비교한다(1차 리뷰 뒤 변경).
-  - 체크: 그 질문에 답한 날 가운데 "예"의 비율이다.
-- **증감:** "지난주(4일)보다 +14분"처럼 이전 기간의 기록한 날 수와 함께 보인다(1차 리뷰 뒤 날 수 추가). 어느 한쪽 기간에 기록이 없으면 증감 대신 "지난주 기록 없음"이라고 쓴다. 비율의 증감 단위는 %p다.
-- **술과 그날 밤 수면:** 수면은 깬 날짜로 기록한다. 그래서 술을 기록한 날 D의 밤(D에 자고 D+1에 깸)은 D+1 날짜의 수면이다. 화면 이름은 1차 리뷰 뒤 "술 마신 다음 날 밤"에서 "술 마신 날 밤"으로 바꿨다. 처음 이름은 D+1의 밤으로 읽혔다.
-  - 그 주(달)에 술을 기록한 날을 "마신 날"과 "안 마신 날"로 나눠, 다음 밤 수면의 평균과 표본 수(밤 수)를 보인다.
-  - 술 기록이 없는 날의 다음 밤은 빼고 센다.
-  - 어느 한쪽 표본이 5일보다 적으면 "차이를 믿기 어렵다"는 안내를 붙인다.
-  - 화면에 "관련성을 보여 줄 뿐, 원인을 판정하지 않습니다"를 함께 쓴다.
-- **차트:** 프로젝트 규칙(`docs/project-setup.md` 8.2)대로 라이브러리 없이 SVG로 그렸다. 새 패키지는 설치하지 않았다.
-  - 날짜별 수면 시간과 칼로리를 각각 막대 차트로 그린다. 한 차트에 한 계열과 한 축만 쓴다.
-  - 기록이 없는 날은 막대 없이 바닥에 작은 표시만 남긴다. 0으로 그리지 않는다.
-  - PC에서는 마우스를 올리면, 휴대폰에서는 누르면 그 날의 값이 보인다.
-  - 각 차트에 "표로 보기" 표가 있다.
-- **색:** 데이터 시각화 기준 팔레트의 1번(파랑)과 2번(주황)을 썼다. 라이트 `#2a78d6`·`#eb6834`, 다크 `#3987e5`·`#d95926`이다.
-  - 검사 스크립트(`validate_palette.js`)로 두 모드 모두 확인했다. 명도 범위, 채도, 색각 이상 구분(ΔE 24.7·26.8), 일반 구분, 배경 대비가 모두 통과했다.
-  - 비교 막대는 색 옆에 이름과 값을 글자로 적는다. 색만으로 구분하지 않는다.
+- **Periods:** A week (Monday to Sunday) and a month (1st to the last day). It uses the same Asia/Seoul calendar date calculation as #36 and #37 (`backend/src/day-records.ts`). The previous period is the week or month right before.
+- **Denominator of averages:** The number of days that have that record. Days with no record are not put in the denominator.
+  - Sleep: the average of `duration_minutes` on days that have a sleep record.
+  - Calories: only days on which the calories of all items are known go into the average. A day with an item whose calories are unknown is not mixed in as a low day, and is shown separately as "칼로리를 모르는 날 N일" (N days with unknown calories).
+  - Smoking: the daily average and the total over days with cigarettes recorded.
+  - Alcohol: among the days alcohol was recorded, the number of days drunk and its ratio. The number of recorded days differs by period, so the change is compared by ratio (percentage points), not by number of days (changed after the first review).
+  - Checks: the ratio of "yes" among the days that question was answered.
+- **Change:** Shown together with the number of recorded days of the previous period, as in "지난주(4일)보다 +14분" (+14 minutes compared with last week (4 days)) (the day count was added after the first review). If either period has no record, it says "지난주 기록 없음" (no record last week) instead of a change. The unit of change for a ratio is percentage points (%p).
+- **Alcohol and sleep of that night:** Sleep is recorded by the date of waking up. So the night of a day D when alcohol was recorded (sleeping on D and waking on D+1) is the sleep of the date D+1. After the first review, the name on screen was changed from "술 마신 다음 날 밤" (the night after the day alcohol was drunk) to "술 마신 날 밤" (the night of the day alcohol was drunk). The first name read as the night of D+1.
+  - The days in that week (month) when alcohol was recorded are divided into "drank" days and "did not drink" days, and the average sleep of the next night and the sample size (number of nights) are shown.
+  - The next night of a day with no alcohol record is left out of the count.
+  - If either sample is fewer than 5 days, a notice "차이를 믿기 어렵다" (the difference is hard to trust) is attached.
+  - The screen also says "관련성을 보여 줄 뿐, 원인을 판정하지 않습니다" (it only shows a relation and does not judge a cause).
+- **Chart:** As the project rule (`docs/project-setup.md` 8.2) says, it is drawn with SVG without a library. No new package was installed.
+  - Sleep hours and calories by date are each drawn as a bar chart. One chart uses one series and one axis.
+  - A day with no record has no bar and keeps only a small mark at the bottom. It is not drawn as 0.
+  - On PC, hovering shows that day's value, and on a phone, pressing shows it.
+  - Each chart has a "표로 보기" (view as a table) table.
+- **Color:** Colors 1 (blue) and 2 (orange) of the data visualization reference palette were used. Light is `#2a78d6` and `#eb6834`, dark is `#3987e5` and `#d95926`.
+  - Both modes were checked with the validation script (`validate_palette.js`). The lightness range, saturation, color vision deficiency distinction (ΔE 24.7 and 26.8), general distinction, and background contrast all passed.
+  - Comparison bars write the name and value as text next to the color. They do not rely on color alone.
 
-## 변경 — 2026-11-05
+## Change — 2026-11-05
 
 - **API** `backend/src/report.ts`, `backend/src/app.ts`: `GET /api/report?period=week|month&date=YYYY-MM-DD`
-  - 응답은 현재 기간 요약, 이전 기간 요약, 날짜별 값(수면 분, 칼로리, 마셨는지), 술과 그날 밤 수면 비교다.
-  - 모든 조회를 `REPEATABLE READ READ ONLY` 트랜잭션 하나로 읽는다.
-  - 날짜별 값은 기간의 모든 날을 한 줄씩 만들고, 기록이 없는 날은 `null`이다.
-  - `period`와 `date`는 검사해서, 틀리면 한국어 400을 돌려준다. 다른 라우터처럼 요청 횟수 제한도 건다.
-- **화면** `frontend/src/report.tsx`, `frontend/src/report-text.ts`, `frontend/src/daily-bars.tsx`, `frontend/src/app.tsx`
-  - 대시보드(`/`)가 이 리포트를 보인다.
-  - 주간·월간 전환, 이전·다음 기간, "이번 주(달)" 버튼이 있다. 고른 기간은 주소(`?period=&date=`)에 남는다.
-  - 통계 카드 6개: 평균 수면, 하루 평균 칼로리, 술 마신 날, 하루 평균 흡연, 식단 지킴, 수면 만족. 카드마다 기록한 날 수와 이전 기간 대비 증감을 보인다.
-  - 날짜별 수면·칼로리 막대 차트와 "술과 그날 밤 수면" 카드가 있다.
-  - 오늘은 서버가 준 날짜(`/api/health`)를 쓴다.
+  - The response is the current period summary, the previous period summary, values by date (sleep minutes, calories, whether alcohol was drunk), and the comparison of alcohol and sleep of that night.
+  - All reads are done in one `REPEATABLE READ READ ONLY` transaction.
+  - Values by date make one row for every day of the period, and a day with no record is `null`.
+  - `period` and `date` are validated, and a wrong one returns a Korean 400. A request rate limit is also applied, like other routers.
+- **Screen** `frontend/src/report.tsx`, `frontend/src/report-text.ts`, `frontend/src/daily-bars.tsx`, `frontend/src/app.tsx`
+  - The dashboard (`/`) shows this report.
+  - It has weekly and monthly switching, previous and next period, and a "이번 주(달)" (this week (month)) button. The chosen period stays in the address (`?period=&date=`).
+  - 6 stat cards: average sleep, average calories per day, days alcohol was drunk, average smoking per day, diet kept, sleep satisfied. Each card shows the number of recorded days and the change from the previous period.
+  - There are bar charts of sleep and calories by date, and a "술과 그날 밤 수면" (alcohol and sleep that night) card.
+  - Today uses the date the server gave (`/api/health`).
 
-## 검증
+## Checks
 
-- 테스트
-  - `backend/test/report.test.ts`: 기간이 없거나 다를 때, 날짜가 없거나 잘못됐을 때, 날짜가 반복될 때 400인지, 요청이 DB에 닿지 않는지 검사한다.
+- Tests
+  - `backend/test/report.test.ts`: Checks that it is 400 when the period is missing or different, the date is missing or wrong, or the date is repeated, and that the request does not reach the DB.
   - `backend/test/report.integration.test.ts`
-    - 기록 없는 기간은 평균이 `null`이고, 7일이 모두 빈칸이다.
-    - 평균의 분모가 기록한 날 수다. 일주일에 이틀 잔 기록이면 평균은 그 이틀의 평균이다. 칼로리를 모르는 항목이 있는 날은 따로 센다.
-    - 체크하지 않은 질문과 메모만 있는 날은 분모에 들어가지 않는다.
-    - 주 경계(일요일 1979-04-01 / 월요일 04-02)와 달 경계(03-31 / 04-01, 04-30 / 05-01)에서 끊기고, 이전 기간이 바로 앞 기간이다.
-    - 술과 그날 밤 수면은 다음 날짜의 수면을 비교한다. 기록 없는 날의 밤은 빠지고, 기간 마지막 날(일요일)에 마신 술의 밤은 들어가며, 지난 일요일에 마신 술의 밤(이번 주 월요일 날짜)은 빠진다. 각 쪽의 표본 수를 돌려준다.
-    - 이 파일은 1979년 날짜를 쓴다. 1990년과 달력이 같아서 같은 경계를 검사할 수 있다. 테스트 파일은 동시에 돌기 때문에, 처음 1990년을 썼을 때는 다른 파일의 정리가 술·담배 동시 저장 테스트의 행을 지워 500이 난 적이 있다.
-  - `frontend/src/report-text.test.ts`: 시간 문구, 증감 문구(이전 기간 날 수, "지난주(3일)와"·"지난달(20일)과" 조사, 기록 없음), 비율, 기간 이동(해 넘김 포함), 기간 문구를 검사한다.
-  - `frontend/src/report.test.tsx`(처음 7개, 1차 리뷰 뒤 12개, 2차 리뷰 뒤 13개)
-    - 서버 날짜로 이번 주를 요청하고, 카드마다 값, 기록한 날 수, 증감을 보인다.
-    - 기록 없는 기간은 카드 6개 모두 "기록 없음"이고 0%를 보이지 않는다.
-    - 비교에 표본 수와 원인을 판정하지 않는다는 안내가 있다. 표본이 적을 때만 경고가 붙는다.
-    - 빈 날이 차트 설명과 표에서 "기록 없음"이다.
-    - 이전 주와 월간으로 바꾸면 맞는 기간을 요청하고 주소가 바뀐다.
-    - 실패 뒤 다시 시도할 수 있다.
-- 임시 PostgreSQL 17 클러스터(포트 5467)에서 `health_test`에 마이그레이션 9개를 두 번 적용했다. 두 번째도 오류가 없었다.
-- `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5467/health_test npm run check`: 두 번 연속 통과.
-  - 백엔드: 157개 통과, 0개 건너뜀.
-  - 프론트엔드: 317개 통과, 2개 건너뜀. 건너뛴 2개는 다크 전용 앱 조건 테스트로, 이 변경과 관계없다.
-  - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과.
+    - For a period with no record, the averages are `null` and all 7 days are blank.
+    - The denominator of averages is the number of recorded days. With a record of two days of sleep in a week, the average is the average of those two days. A day with an item whose calories are unknown is counted separately.
+    - A question not checked and a day with only a memo do not go into the denominator.
+    - It breaks at the week boundary (Sunday 1979-04-01 / Monday 04-02) and the month boundary (03-31 / 04-01, 04-30 / 05-01), and the previous period is the period right before.
+    - Alcohol and the sleep of that night compare the sleep of the next date. The night of a day with no record is left out, the night of alcohol drunk on the last day of the period (Sunday) is included, and the night of alcohol drunk last Sunday (this week's Monday date) is left out. The sample size of each side is returned.
+    - This file uses dates of 1979. The calendar is the same as 1990, so the same boundaries can be checked. Test files run at the same time, so when 1990 was used at first, the cleanup of another file once deleted rows of the alcohol and tobacco concurrent save test and caused a 500.
+  - `frontend/src/report-text.test.ts`: Checks the time text, the change text (the day count of the previous period, the particles in "지난주(3일)와" and "지난달(20일)과", no record), ratios, moving periods (including crossing a year), and the period text.
+  - `frontend/src/report.test.tsx` (7 at first, 12 after the first review, 13 after the second review)
+    - It requests this week with the server date, and each card shows the value, the number of recorded days, and the change.
+    - For a period with no record, all 6 cards show "기록 없음" and 0% is not shown.
+    - The comparison has the sample sizes and the notice that it does not judge a cause. The warning is attached only when the sample is small.
+    - An empty day is "기록 없음" in the chart description and the table.
+    - Switching to the previous week and to monthly requests the right period and changes the address.
+    - It can be retried after a failure.
+- On a temporary PostgreSQL 17 cluster (port 5467), the 9 migrations were applied twice to `health_test`. The second time had no errors either.
+- `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5467/health_test npm run check`: passed twice in a row.
+  - Backend: 157 passed, 0 skipped.
+  - Frontend: 317 passed, 2 skipped. The 2 skipped are condition tests for the dark-only app, unrelated to this change.
+  - Skill checks: 4 passed.
+- `npm run knip`: passed.
 
-### 브라우저 확인
+### Browser check
 
-임시 DB에 두 주치 기록을 넣었다(수면 8일, 식사 6일 중 1일은 칼로리 모름, 술·담배 6일, 체크 4일). 실제 API(3993)와 Vite(5203)를 띄우고 헤드리스 Chrome을 CDP로 움직였다. 다크 모드는 `prefers-color-scheme: dark`로 확인했다.
+Two weeks of records were put into a temporary DB (sleep 8 days, meals 6 days with 1 day of unknown calories, alcohol and tobacco 6 days, checks 4 days). A real API (3993) and Vite (5203) were started and headless Chrome was driven over CDP. Dark mode was checked with `prefers-color-scheme: dark`.
 
-| 항목                                                                              | 320 라이트 | 390 라이트 | 390 다크 | 1440 라이트 | 1440 다크 |
-| --------------------------------------------------------------------------------- | ---------- | ---------- | -------- | ----------- | --------- |
-| 카드 6개의 값·표본·증감이 손으로 계산한 값과 같음(예: 평균 수면 7시간 9분, +14분) | 통과       | 통과       | 통과     | 통과        | 통과      |
-| 술과 그날 밤 수면: 표본 2일 6시간 48분 / 표본 1일 8시간, 표본 부족 안내           | 통과       | 통과       | 통과     | 통과        | 통과      |
-| 수면 차트는 기록한 4일만 막대, 설명 "7일 중 4일 기록"                             | 통과       | 통과       | 통과     | 통과        | 통과      |
-| 막대 색이 모드별 값(`rgb(42,120,214)` / `rgb(57,135,229)`)                        | 통과       | 통과       | 통과     | 통과        | 통과      |
-| 막대에 마우스(PC)나 누르기(휴대폰)로 "11/4 · 8시간"                               | 통과       | 통과       | 통과     | 통과        | 통과      |
-| 이전 주 → 10월 26일~11월 1일, 월간 → 10월, 다음 달 → 11월(평균 7시간 13분, 5일)   | 통과       | 통과       | 통과     | 통과        | 통과      |
-| 가로 넘침 없음, 콘솔 오류 없음                                                    | 통과       | 통과       | 통과     | 통과        | 통과      |
+| Item                                                                                                                     | 320 light | 390 light | 390 dark | 1440 light | 1440 dark |
+| ------------------------------------------------------------------------------------------------------------------------ | --------- | --------- | -------- | ---------- | --------- |
+| The values, samples, and changes of the 6 cards equal hand-calculated values (for example average sleep 7 h 9 min, +14 min) | Pass      | Pass      | Pass     | Pass       | Pass      |
+| Alcohol and sleep that night: sample 2 days 6 h 48 min / sample 1 day 8 h, small-sample notice                           | Pass      | Pass      | Pass     | Pass       | Pass      |
+| The sleep chart has bars only for the 4 recorded days, description "7일 중 4일 기록" (4 of 7 days recorded)               | Pass      | Pass      | Pass     | Pass       | Pass      |
+| The bar color is the value of each mode (`rgb(42,120,214)` / `rgb(57,135,229)`)                                          | Pass      | Pass      | Pass     | Pass       | Pass      |
+| "11/4 · 8시간" (11/4 · 8 hours) by mouse (PC) or press (phone) on a bar                                                   | Pass      | Pass      | Pass     | Pass       | Pass      |
+| Previous week → Oct 26 to Nov 1, monthly → October, next month → November (average 7 h 13 min, 5 days)                   | Pass      | Pass      | Pass     | Pass       | Pass      |
+| No horizontal overflow, no console errors                                                                                | Pass      | Pass      | Pass     | Pass       | Pass      |
 
-브라우저 확인에서 휴대폰 누르기 문제를 찾아 고쳤다. 누를 때 `mouseenter`가 먼저 와서 값을 띄우고, 이어 오는 `click`이 그것을 다시 닫았다. 이제 누르면 그 날을 보이기만 한다.
+The browser check found and fixed a problem with pressing on a phone. When pressing, `mouseenter` came first and showed the value, and the `click` that followed closed it again. Now pressing only shows that day.
 
-## 1차 리뷰 — 2026-11-05
+## First review — 2026-11-05
 
-독립 리뷰에서 병합을 막는 결함은 없었다. 리뷰가 맞다고 확인한 것은 다음과 같다.
+The independent review found no defect that blocks merging. What the review confirmed to be correct is as follows.
 
-- 날짜 열과 행이 곱해지지 않는 조인
-- 술 마신 날을 `EXISTS`로 세는 방식
-- 칼로리 계산과 하루 완결 규칙
-- 날짜 문자열 처리
-- 입력 검사
-- 조사와 증감 단위
+- The join where the date column and rows are not multiplied
+- Counting days alcohol was drunk with `EXISTS`
+- The calorie calculation and the rule for a complete day
+- Date string handling
+- Input validation
+- Particles and units of change
 
-중간 4건과 낮음 6건이 나왔다.
+4 medium and 6 low points came up.
 
-- **중간: 이전 기간의 표본 수가 보이지 않았다.**
-  - 반영: 증감 문구가 "지난주(1일)보다 +30분"처럼 이전 기간의 날 수를 함께 보인다.
-- **중간: 술 마신 날의 증감을 날 수로 비교했다.** 기록한 날이 7일 중 2일인 주와 2일 중 2일인 주가 "같음"이 됐다.
-  - 반영: 값은 "2일 (50%)"로 보이고, 증감은 비율의 %p로 비교한다.
-- **중간: 비교 이름이 다른 밤을 가리켰다.**
-  - 반영: 카드 제목을 "술과 그날 밤 수면"으로, 항목을 "술 마신 날 밤 / 안 마신 날 밤"으로 바꿨다. 설명 문장도 고쳤다.
-- **중간: 날짜별 칼로리를 구하는 하위 질의가 식사 기록 전체를 매번 합쳤다.**
-  - 반영: 기간 안의 날짜로 제한했다.
-- **낮음: 서버 날짜(`/api/health`)를 못 받으면 "리포트 불러오는 중"이 계속 돌았다.**
-  - 반영: 이유를 문장으로 보이고, 불러오는 표시는 날짜가 있거나 서버 상태를 확인하는 동안에만 보인다.
-- **낮음: 9999-12-31, 0001-01-01 같은 극단 날짜가 400이 아니라 500이 된다.** 허용 날짜 범위 이슈 [#50](https://github.com/sirloinbh/health-log/issues/50)에 덧붙였다.
-- **낮음: 처음과 끝 막대의 툴팁이 카드 밖으로 나갈 수 있었다.**
-  - 반영: 가장자리 4분의 1 안의 막대는 툴팁을 안쪽으로 붙인다.
-- **낮음: 차트 주석이 키보드 포커스를 지원하는 것처럼 적혀 있었다.**
-  - 반영: 주석을 고쳤다. 키보드 사용자는 "표로 보기"를 쓴다.
-- **낮음: 테스트가 부족했다.**
-  - 늦게 온 이전 기간 응답 무시, 잘못된 주소 날짜의 대체, 서버 날짜 실패 화면, 가장자리 툴팁 위치를 화면 테스트로 더했다.
-  - 술 마신 날 비율 비교도 화면 테스트로 더했다.
-  - 이번 주 첫날(월요일)에 기록된, 지난 일요일 술의 밤이 빠지는지 통합 테스트로 더했다.
-  - 이전 기간 요약의 모든 항목을 통합 테스트로 더했다.
-- **낮음: `app.tsx`에 남은 빈 줄.**
-  - 반영: 지웠다.
+- **Medium: The sample size of the previous period was not visible.**
+  - Applied: The change text also shows the number of days of the previous period, as in "지난주(1일)보다 +30분" (+30 minutes compared with last week (1 day)).
+- **Medium: The change in days alcohol was drunk was compared by number of days.** A week with 2 recorded days out of 7 and a week with 2 out of 2 became "the same".
+  - Applied: The value is shown as "2일 (50%)" (2 days (50%)) and the change is compared by the percentage points of the ratio.
+- **Medium: The name of the comparison pointed to a different night.**
+  - Applied: The card title was changed to "술과 그날 밤 수면" and the items to "술 마신 날 밤 / 안 마신 날 밤" (the night of a day drunk / the night of a day not drunk). The description sentence was also fixed.
+- **Medium: The subquery that gets calories by date added up all meal records every time.**
+  - Applied: It was limited to the dates within the period.
+- **Low: If the server date (`/api/health`) could not be received, "리포트 불러오는 중" (loading the report) kept spinning.**
+  - Applied: The reason is shown as a sentence, and the loading mark is shown only when there is a date or while the server status is being checked.
+- **Low: Extreme dates such as 9999-12-31 and 0001-01-01 become 500 instead of 400.** It was added to the allowed date range issue [#50](https://github.com/sirloinbh/health-log/issues/50).
+- **Low: The tooltip of the first and last bars could go outside the card.**
+  - Applied: For a bar within the edge quarter, the tooltip is attached inward.
+- **Low: The chart comment was written as if it supported keyboard focus.**
+  - Applied: The comment was fixed. Keyboard users use "표로 보기".
+- **Low: Tests were lacking.**
+  - Added as screen tests: ignoring a late previous period response, the fallback for a wrong address date, the server date failure screen, and the edge tooltip position.
+  - The comparison of the ratio of days alcohol was drunk was also added as a screen test.
+  - Added as an integration test: that the night of last Sunday's alcohol, recorded on this week's first day (Monday), is left out.
+  - Added as an integration test: every item of the previous period summary.
+- **Low: A leftover blank line in `app.tsx`.**
+  - Applied: Removed.
 
-### 1차 반영 검증
+### First round verification
 
-- `npm run check`(같은 임시 DB): 통과.
-  - 백엔드: 158개 통과, 0개 건너뜀.
-  - 프론트엔드: 322개 통과, 2개 건너뜀.
-  - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과.
-- 브라우저: 새 코드로 API를 다시 띄우고 위 표의 항목을 다시 돌려 모두 통과했다.
-  - 새 기대값: "지난주(4일)보다 +14분", "2일 (50%)", "지난주(2일)와 같음".
-  - 다섯 가지 화면에서 첫 막대와 끝 막대를 눌러, 툴팁이 카드 안에 있고 가로 넘침이 없는지 확인했다.
+- `npm run check` (same temporary DB): passed.
+  - Backend: 158 passed, 0 skipped.
+  - Frontend: 322 passed, 2 skipped.
+  - Skill checks: 4 passed.
+- `npm run knip`: passed.
+- Browser: The API was started again with the new code and the items in the table above were run again, and all passed.
+  - New expected values: "지난주(4일)보다 +14분", "2일 (50%)", "지난주(2일)와 같음" (same as last week (2 days)).
+  - At the five screens, the first and last bars were pressed, and it was checked that the tooltip is inside the card and there is no horizontal overflow.
 
-## 2차 리뷰 — 2026-11-05
+## Second review — 2026-11-05
 
-1차 반영이 모두 맞고 새 회귀를 만들지 않았다고 확인됐다. 확인된 것: 조사, 비율 반올림, 각 카드의 분모, `$2`/`$3` 매개변수, 서버 날짜 실패 문구가 깜빡이지 않음, 툴팁 위치 계산. 병합을 막는 결함은 없었고, 중간 1건과 낮음 2건, 자잘한 것 1건이 나왔다. 모두 반영했다. 리뷰는 2회까지라 더 하지 않는다.
+It was confirmed that all the first round of fixes were correct and created no new regression. What was confirmed: the particles, ratio rounding, the denominator of each card, the `$2` and `$3` parameters, the server date failure text not flickering, and the tooltip position calculation. There was no defect that blocks merging, and 1 medium, 2 low, and 1 minor point came up. All were applied. Reviews are limited to two rounds, so no more are done.
 
-- **중간: 서버 상태 확인이 한 번 실패하면, 이미 보이던 리포트가 사라졌다.** 주소에 날짜가 없으면 오늘 날짜를 `/api/health`에서 받는다. 60초마다 하는 확인이 한 번 실패하면 날짜가 없어져 리포트를 비웠다.
-  - 반영: 마지막으로 받은 서버 날짜를 기억해 계속 쓴다.
-  - 테스트: 탭으로 돌아올 때의 재확인이 실패해도 리포트가 남는지 검사한다. 고치기 전 코드로 돌리면 실패하는 것을 확인했다.
-- **낮음: 가장자리 판정이 좌우로 달랐다.** 7일 차트에서 왼쪽은 두 막대, 오른쪽은 한 막대만 가장자리로 쳤다.
-  - 반영: 양쪽 모두 끝에서 4분의 1 안의 막대를 가장자리로 친다.
-  - 테스트: 오른쪽에서 두 번째, 왼쪽에서 두 번째 막대를 검사에 더했다.
-- **낮음: 이 문서에 옛 카드 이름("술과 다음 날 수면")과 옛 증감 문구가 남아 있었다.**
-  - 반영: 고쳤다.
-- **자잘한 것: 조사를 문자열을 잘라서 구했다.**
-  - 반영: 조사(`와`, `과`)를 따로 저장한다.
+- **Medium: If the server status check failed once, a report that was already shown disappeared.** If the address has no date, today's date is received from `/api/health`. When the check that runs every 60 seconds failed once, the date was lost and the report was emptied.
+  - Applied: The last server date received is remembered and kept in use.
+  - Test: It is checked that the report stays even if the recheck when returning to the tab fails. It was confirmed that it fails when run with the code before the fix.
+- **Low: The edge judgment differed between left and right.** On a 7-day chart, the left counted two bars and the right counted only one bar as the edge.
+  - Applied: Both sides count the bars within the quarter from the end as the edge.
+  - Test: Added the second bar from the right and the second bar from the left to the check.
+- **Low: This document still had the old card name ("술과 다음 날 수면") and the old change text.**
+  - Applied: Fixed.
+- **Minor: The particle was obtained by cutting a string.**
+  - Applied: The particle (`와`, `과`) is stored separately.
 
-### 2차 반영 검증
+### Second round verification
 
-- `npm run check`(같은 임시 DB): 통과.
-  - 백엔드: 158개 통과, 0개 건너뜀.
-  - 프론트엔드: 323개 통과, 2개 건너뜀.
-  - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과.
-- 브라우저: 위 항목을 다섯 가지 화면에서 다시 돌려 모두 통과했다.
+- `npm run check` (same temporary DB): passed.
+  - Backend: 158 passed, 0 skipped.
+  - Frontend: 323 passed, 2 skipped.
+  - Skill checks: 4 passed.
+- `npm run knip`: passed.
+- Browser: The items above were run again at the five screens and all passed.
 
-## 제한·후속
+## Limits and follow-ups
 
-- 리포트는 주와 달 단위만 있다. 4주·12주 같은 긴 기간과 기간 직접 지정은 범위 밖이다.
-- 항목 비교는 술과 그날 밤 수면 하나다. 다른 조합은 기록이 쌓인 뒤 필요하면 이슈로 더한다.
-- 막대 차트는 SVG를 화면 폭에 맞춰 늘린다. 그래서 넓은 화면에서는 막대가 두꺼워지고, 둥근 모서리가 조금 납작해진다.
-- 막대 값은 마우스와 누르기로 볼 수 있다. 키보드로는 "표로 보기"에서 본다.
-- 실제 휴대폰, Firefox, Safari는 확인하지 않았다. 다크 모드는 헤드리스 Chrome의 미디어 에뮬레이션으로만 확인했다.
+- The report has only week and month units. Longer periods such as 4 weeks and 12 weeks and choosing a period directly are out of scope.
+- The item comparison is only alcohol and sleep that night. Other combinations are added as an issue if needed after records accumulate.
+- The bar chart stretches the SVG to the screen width. So on a wide screen the bars get thicker, and the rounded corners get a little flatter.
+- Bar values can be seen by mouse and press. With a keyboard, they are seen in "표로 보기".
+- A real phone, Firefox, and Safari were not checked. Dark mode was checked only with media emulation of headless Chrome.

@@ -1,107 +1,107 @@
-# #38 정크푸드 섭취 횟수와 양 집계
+# #38 Count how often and how much junk food was eaten
 
-- 이슈: [#38](https://github.com/sirloinbh/health-log/issues/38)
-- 브랜치: `feat/38-junk-food`
+- Issue: [#38](https://github.com/sirloinbh/health-log/issues/38)
+- Branch: `feat/38-junk-food`
 
-## 목적
+## Purpose
 
-식사 기록만으로는 정크푸드를 얼마나 자주, 얼마나 많이 먹었는지 바로 알 수 없다. 음식에 정크푸드 표시를 두고, 주·달 단위로 횟수, 먹은 날 수, 칼로리 합계를 본다.
+Meal records alone do not show right away how often and how much junk food was eaten. Put a junk food mark on foods, and see the count, the number of days eaten, and the calorie total by week and month.
 
-## 정한 것
+## Decisions
 
-이슈의 추천안을 따랐고 사용자 확인 없이 정했다. 이슈 댓글에 같은 내용을 남겼다.
+The recommendation in the issue was followed and decided without asking the user. The same content was left as an issue comment.
 
-- **기준:** 음식마다 사용자가 직접 표시한다. 새로 만든 음식은 표시하지 않은 상태로 시작한다.
-- **기본값:** 프랜차이즈 패스트푸드 메뉴만 표시를 켠 채로 넣는다.
-  - 지금 저장소의 시드 음식(005)에는 브랜드가 있는 메뉴가 없어서, 이 PR에서 켠 음식은 없다.
-  - 앞으로 프랜차이즈 데이터를 넣는 조사 마이그레이션(예: #31 햄버거 프랜차이즈)이 `is_junk = true`로 넣는다. 규칙은 `docs/food-data.md`에 적었다.
-  - 표시는 처음 넣을 때만 정한다. 새 조사로 갱신돼도 사용자가 바꾼 표시는 그대로다.
-- **집계 규칙:** 식사 기록은 영양성분처럼 **기록할 때의 표시를 복사한다.** 음식의 표시를 나중에 바꿔도 지난 기록의 집계는 바뀌지 않고, 바꾼 뒤의 기록부터 새 표시를 따른다.
-  - 조합 기록은 기록할 때 각 음식의 표시를 따른다. 다른 날에서 복사할 때는 그날 기록된 표시를 그대로 가져온다.
-- **저장소에 없는 음식:** 바로 기록할 때 "정크푸드" 체크박스로 표시한다. 기본은 꺼져 있고, 기록하면 다시 꺼진다.
-- **셈:** 식사 기록 한 줄이 1회다. 수량(1.5회분 등)은 횟수가 아니라 칼로리에만 반영한다. 같은 날 두 번 먹으면 횟수 2, 먹은 날 1일이다.
-  - 칼로리 합계는 하루 합계와 같은 방식이다. 기록마다 `칼로리 × 수량`을 소수 둘째 자리로 반올림해 더한다.
-  - 칼로리를 모르는 기록은 횟수에는 넣는다. 칼로리에서는 빼고 "칼로리 모르는 기록 n개 제외"로 알린다.
-- **기간:** 다른 주·달 집계와 같다. 주는 월~일, 달은 1일~말일이고 Asia/Seoul 달력 날짜 기준이다.
-- **위치:** 하루 기록의 식단 카드, 영양 합계 아래에 "정크푸드 / 이 주 / 이 달"로 보인다.
-  - 리포트(`report.ts`, `report.tsx`)는 #45와 겹치지 않도록 이 PR에서 건드리지 않았다.
+- **Criterion:** The user marks each food directly. A newly created food starts unmarked.
+- **Default:** Only franchise fast food menu items are inserted with the mark on.
+  - The seed foods (005) in the repository now have no menu item with a brand, so this PR turns on no food.
+  - From now on, research migrations that insert franchise data (for example #31 burger franchises) insert with `is_junk = true`. The rule is written in `docs/food-data.md`.
+  - The mark is decided only at the first insert. Even if it is updated by a new research migration, a mark the user changed stays.
+- **Aggregation rule:** A meal record **copies the mark at the time of recording**, like the nutrition facts. Even if the food's mark is changed later, the totals of past records do not change, and records made after the change follow the new mark.
+  - A combo record follows each food's mark at the time of recording. When copying from another day, the mark recorded on that day is carried over as it is.
+- **Foods not in the food store:** Marked with a "정크푸드" (junk food) checkbox at direct entry. It is off by default, and turns off again after recording.
+- **Counting:** One meal record line is one time. The quantity (1.5 servings and so on) is reflected only in the calories, not in the count. Eating twice on the same day gives a count of 2 and 1 day eaten.
+  - The calorie total works the same way as the daily total. For each record, `calories × quantity` is rounded to two decimal places and added.
+  - A record with unknown calories is counted in the count. It is excluded from the calories and reported as "칼로리 모르는 기록 n개 제외" (n records with unknown calories excluded).
+- **Periods:** The same as the other week and month totals. A week is Monday to Sunday, a month is the 1st to the last day, based on Asia/Seoul calendar dates.
+- **Location:** Shown as "정크푸드 / 이 주 / 이 달" (junk food / this week / this month) in the meal card of the daily record, below the nutrition totals.
+  - The report (`report.ts`, `report.tsx`) was not touched in this PR so as not to overlap with #45.
 
-## 변경 — 2026-11-06
+## Change — 2026-11-06
 
 - **DB** `database/migrations/011_junk_food.sql`
-  - `foods.is_junk`, `meal_entries.is_junk`를 추가했다. 둘 다 `boolean NOT NULL DEFAULT false`다.
-  - 기간 집계용 부분 인덱스를 만들었다.
-  - 010(#45)에 의존하지 않는다. 다만 병합 순서에 제약이 있다. 실행기는 이미 적용된 번호보다 앞선 새 파일을 거부한다. 그래서 011이 먼저 병합되고 어떤 DB에 `npm run db:migrate`를 실행한 뒤 010이 오면, 그 DB에서 010이 거부된다(CI는 빈 DB라 드러나지 않는다). 그 경우 중앙 규칙대로 나중에 병합하는 쪽이 다음 번호(012 등)로 바꾼다. #45에 댓글로 알렸다. 아직 서버 배포는 하지 않는다.
+  - Added `foods.is_junk` and `meal_entries.is_junk`. Both are `boolean NOT NULL DEFAULT false`.
+  - Created a partial index for the period totals.
+  - It does not depend on 010 (#45). However, there is a constraint on the merge order. The runner rejects a new file numbered below an already applied one. So if 011 is merged first and `npm run db:migrate` is run on some DB, and then 010 comes, 010 is rejected on that DB (CI uses an empty DB, so this does not show up). In that case, following the central rule, whichever is merged later changes to the next number (012 and so on). #45 was told in a comment. The server is not deployed yet.
 - **API** `backend/src/foods.ts`
-  - 음식에 `isJunk`가 생겼다.
-  - 추가할 때 값을 빼면 `false`, 수정할 때 빼면 기존 값을 유지한다. 표시를 모르는 이전 화면이 표시를 지우지 못하게 하기 위해서다.
-  - 예·아니오가 아닌 값은 거부한다.
+  - Foods now have `isJunk`.
+  - If the value is left out when adding, it is `false`, and if left out when editing, the existing value is kept. This is so that an older screen that does not know the mark cannot erase it.
+  - Values that are not yes or no are rejected.
 - **API** `backend/src/meals.ts`
-  - 저장소 음식, 조합, 복사 기록이 `is_junk`를 함께 복사한다.
-  - 바로 기록은 `isJunk`를 받는다. 저장소 음식에 `isJunk`를 함께 보내면 거부한다.
-  - 하루 응답에 기록별 `isJunk`와 `junk.week`·`junk.month`(기간, `times`, `days`, `calories.value`·`missing`)가 들어 있다.
-  - 조회는 한 스냅샷에서 읽는다. 바꾸는 요청은 같은 트랜잭션에서 다시 읽어 답하며, 그 변경은 늘 응답에 반영된다. 같은 순간 다른 탭이 저장한 기록은 목록보다 집계에 먼저 보일 수 있고, 다음 조회 때 맞춰진다(1차 리뷰 뒤 문구 정정).
-  - 파일 안에 따로 있던 트랜잭션 함수는 `day-records.ts`의 공용 함수로 바꿨다.
-- **화면** `frontend/src/foods.tsx`: 음식 추가·수정 대화상자에 "정크푸드" 체크박스와 설명을 넣었다. 표시한 음식 카드에는 "정크푸드" 배지가 붙는다.
-- **화면** `frontend/src/meals.tsx`, `frontend/src/junk-text.ts`
-  - 기록, 검색 결과, 최근 먹은 음식에 배지를 붙였다.
-  - 바로 기록에 체크박스를 넣었다.
-  - "이 주 11.02~11.08: 3회 · 먹은 날 2일 · 1300kcal" 형식의 집계를 보인다. 없으면 "없음"이다.
-- **문서** `docs/food-data.md`: 조사 데이터 예시에 `is_junk`를 넣고 규칙을 적었다. 예시는 테스트가 그대로 실행한다.
-- **테스트 설정** `frontend/src/test/setup.ts`: jsdom에 없는 `ResizeObserver`를 비워 둔 구현으로 채웠다. form 안의 체크박스가 이것을 쓴다.
+  - Food store foods, combos, and copied records copy `is_junk` along with them.
+  - Direct entry takes `isJunk`. If `isJunk` is sent together with a food store food, it is rejected.
+  - The day response contains each record's `isJunk` and `junk.week` and `junk.month` (period, `times`, `days`, `calories.value` and `missing`).
+  - A read is done from one snapshot. A request that changes data reads again in the same transaction and answers, and that change is always reflected in the response. A record saved by another tab at the same moment may show in the totals before the list, and is matched at the next read (wording corrected after the first review).
+  - The separate transaction function inside the file was replaced with the shared function of `day-records.ts`.
+- **Screen** `frontend/src/foods.tsx`: Put a "정크푸드" checkbox and a description in the add and edit food dialog. A food card with the mark gets a "정크푸드" badge.
+- **Screen** `frontend/src/meals.tsx`, `frontend/src/junk-text.ts`
+  - Added the badge to records, search results, and recently eaten foods.
+  - Put the checkbox in direct entry.
+  - Shows the totals in the form "이 주 11.02~11.08: 3회 · 먹은 날 2일 · 1300kcal" (this week 11.02 to 11.08: 3 times, 2 days eaten, 1300kcal). If there are none, it shows "없음" (none).
+- **Docs** `docs/food-data.md`: Put `is_junk` in the research data example and wrote the rule. The test runs the example as it is.
+- **Test setup** `frontend/src/test/setup.ts`: Filled in `ResizeObserver`, which jsdom lacks, with an implementation that does nothing. The checkbox inside a form uses it.
 
-## 검증
+## Checks
 
-- 테스트
-  - `backend/test/junk.integration.test.ts`(1983년 날짜, 테스트마다 다른 달, `testDatabaseSkip`)
-    - 같은 날 두 번이면 2회·1일이다. 수량은 칼로리에만 반영되고, 표시하지 않은 음식과 바로 기록은 세지 않는다.
-    - 음식 표시를 끄거나 켜도 지난 기록은 그대로고, 그 뒤 기록부터 새 표시를 따른다. 수정에서 표시를 빼면 유지된다.
-    - 주 경계(1983-02-27 일 / 02-28 월)와 달 경계(02-28 / 03-01)에서 끊긴다.
-    - 조합 기록과 다른 날 복사가 기록된 표시를 가져온다.
-    - 칼로리를 모르는 기록은 세되 칼로리에서는 빠진다. 삭제하면 집계에서 빠진다.
-  - `backend/test/foods.integration.test.ts`: 조사 데이터가 표시를 켠 채로 들어가고, 사용자가 끈 표시는 새 조사 뒤에도 유지된다.
-  - `backend/test/foods.test.ts`, `meals.test.ts`: 표시 값 검사, 추가 기본값, 수정에서 뺀 값 유지, 저장소 음식에 표시를 함께 보내면 거부를 확인한다.
-  - `frontend/src/junk-text.test.ts`: 집계 문구, "없음", 칼로리를 모를 때의 문구를 확인한다.
-  - `frontend/src/meals.test.tsx`: 바로 기록 표시와 기록 뒤 해제, 저장소 음식은 표시 없이 보내는 것, 배지, 이 주·이 달 문구를 확인한다.
-  - `frontend/src/foods.test.tsx`: 체크박스 설명, 저장, 카드 배지, 수정이 기존 표시에서 시작하는 것을 확인한다.
-- 임시 PostgreSQL 17 클러스터(포트 5472)
-  - `health_test`에 CI처럼 psql로 적용한 뒤 실행기로 기록했다. 001~009와 011, 모두 오류가 없었다.
-  - `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5472/health_test npm run check`: 통과.
-    - 백엔드: 184개 통과, 0개 건너뜀.
-    - 프런트엔드: 363개(1차 보완 뒤 364개) 통과, 2개 건너뜀. 건너뛴 2개는 이 변경과 관계없는 기존 조건부 테스트다.
-    - 스킬 검사: 4개 통과.
-- `npm run knip`: 통과.
-- PR 전에 `origin/main`(38ada63)을 병합해 확인했다. 새 커밋이 없어 충돌도 없었다.
+- Tests
+  - `backend/test/junk.integration.test.ts` (dates in 1983, a different month for each test, `testDatabaseSkip`)
+    - Twice on the same day is 2 times and 1 day. The quantity is reflected only in the calories, and foods not marked and direct entries are not counted.
+    - Turning a food's mark off or on leaves past records as they are, and records after that follow the new mark. Leaving the mark out when editing keeps it.
+    - Totals break at the week boundary (1983-02-27 Sunday / 02-28 Monday) and the month boundary (02-28 / 03-01).
+    - Combo records and copies from another day carry over the recorded mark.
+    - A record with unknown calories is counted but left out of the calories. Deleting removes it from the totals.
+  - `backend/test/foods.integration.test.ts`: Research data goes in with the mark on, and a mark the user turned off stays even after a new research migration.
+  - `backend/test/foods.test.ts`, `meals.test.ts`: Check the mark value validation, the default when adding, keeping the value left out when editing, and rejection when the mark is sent together with a food store food.
+  - `frontend/src/junk-text.test.ts`: Checks the totals text, "없음", and the text when calories are unknown.
+  - `frontend/src/meals.test.tsx`: Checks the mark at direct entry and its release after recording, that a food store food is sent without the mark, the badge, and the this week and this month text.
+  - `frontend/src/foods.test.tsx`: Checks the checkbox description, saving, the card badge, and that editing starts from the existing mark.
+- Temporary PostgreSQL 17 cluster (port 5472)
+  - Applied to `health_test` with psql as CI does, then recorded with the runner. 001 to 009 and 011, all with no errors.
+  - `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5472/health_test npm run check`: passed.
+    - Backend: 184 passed, 0 skipped.
+    - Frontend: 363 passed (364 after the first round of fixes), 2 skipped. The 2 skipped are existing conditional tests unrelated to this change.
+    - Skill checks: 4 passed.
+- `npm run knip`: passed.
+- Before the PR, `origin/main` (38ada63) was merged and checked. There were no new commits, so no conflicts.
 
-### 브라우저 확인
+### Browser check
 
-임시 DB(`health_browser`)에 실제 API(3972)와 Vite(5272)를 띄우고 헤드리스 Chrome(CDP 9672)을 움직였다. 버튼과 체크박스는 마우스 이벤트로 누르고, 글자는 키 입력으로 넣었다. 18개 항목이 모두 통과했다.
+A real API (3972) and Vite (5272) were started on a temporary DB (`health_browser`), and headless Chrome (CDP 9672) was driven. Buttons and checkboxes were pressed with mouse events, and text was entered by key input. All 18 items passed.
 
-| 항목                                                                                         | 결과 |
-| -------------------------------------------------------------------------------------------- | ---- |
-| 390×844: 빈 주·달은 "없음"                                                                   | 통과 |
-| 390×844: 같은 날 정크푸드 두 번과 샐러드 → "2회 · 먹은 날 1일 · 1000kcal", 배지는 두 줄에만  | 통과 |
-| 390×844: 다른 날 바로 기록에 표시 → "3회 · 먹은 날 2일 · 1300kcal"(주·달), 기록 뒤 표시 해제 | 통과 |
-| 1440×900: 음식 카드 배지, 수정 대화상자가 켠 상태로 시작, 끄고 저장하면 배지가 사라짐        | 통과 |
-| 1440×900: 표시를 끈 뒤에도 지난 집계는 그대로, 새 기록은 세지 않음                           | 통과 |
-| 320×700, 390×844, 1440×900: 하루 기록과 음식 화면에 가로 넘침 없음, 콘솔 오류 없음           | 통과 |
+| Item                                                                                                                                            | Result |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 390×844: An empty week and month show "없음" (none)                                                                                              | Pass   |
+| 390×844: Junk food twice on the same day and a salad → "2회 · 먹은 날 1일 · 1000kcal", the badge only on two lines                               | Pass   |
+| 390×844: Marking a direct entry on another day → "3회 · 먹은 날 2일 · 1300kcal" (week and month), mark released after recording                  | Pass   |
+| 1440×900: The food card badge, the edit dialog starts with it on, and saving with it off removes the badge                                      | Pass   |
+| 1440×900: Even after turning the mark off, past totals stay, and new records are not counted                                                    | Pass   |
+| 320×700, 390×844, 1440×900: No horizontal overflow and no console errors on the daily record and food screens                                   | Pass   |
 
-- 확인 뒤 API, Vite, Chrome, 임시 DB를 모두 껐다.
-- 확인하지 못한 것: 다크 모드, 실제 휴대폰, Firefox·Safari.
+- After the check, the API, Vite, Chrome, and the temporary DB were all shut down.
+- Not checked: dark mode, a real phone, Firefox and Safari.
 
-## 리뷰
+## Review
 
-- **1차:** 코드에 꼭 고칠 것은 없었다. 병합 순서 제약(위 DB 항목)을 꼭 정리할 점으로 짚었고, 이 기록과 #45 댓글에 적었다. 반영한 것은 다음과 같다.
-  - `meals.ts`: 바꾸는 요청도 한 순간에 읽는 것처럼 적은 주석을 실제 동작대로 고쳤다. 쓰기 트랜잭션을 REPEATABLE READ로 바꾸면 동시에 지운 기록이 404가 아니라 직렬화 오류(500)가 될 수 있어 격리 수준은 바꾸지 않았다.
+- **First:** There was nothing in the code that had to be fixed. The merge order constraint (the DB item above) was pointed out as something that must be settled, and it was written in this record and in the #45 comment. What was applied:
+  - `meals.ts`: A comment that described a request that changes data as if it also reads at a single moment was corrected to match the real behavior. If the write transaction were changed to REPEATABLE READ, a record deleted at the same time could become a serialization error (500) instead of 404, so the isolation level was not changed.
   - `meals.tsx`
-    - 집계 영역 이름을 보이는 제목(`h3`)으로 주었다. 제목 탐색에도 나온다.
-    - 바로 기록 체크박스에 "위의 이 주·이 달 정크푸드 횟수로 셉니다." 설명을 붙였다.
-  - `meals.test.tsx`: 기록을 기다리는 동안 바꾼 표시는 다음 기록의 것으로 남는지 확인하는 테스트를 더했다. 이름·칼로리와 같은 규칙이다.
-  - 반영하지 않은 것
-    - 기다리는 동안 표시를 껐다 다시 켜면 지워지는 경우: 이름·칼로리와 같은 규칙이라 그대로 둔다.
-    - 집계를 라이브 영역으로 만드는 것: 기록 알림이 이미 읽힌다.
-    - 단위 테스트의 가짜 DB가 SQL 문자열로 응답을 고르는 방식: 바뀌면 테스트가 실패해 드러난다.
-- **2차:** 꼭 고칠 것은 없었다. 반영한 것은 다음과 같다.
-  - 정크푸드 제목의 굵기를 끼니 제목(`h3`)과 같게 맞췄다.
-  - 테스트 수를 1차 보완 뒤 기준으로 고쳤다.
-  - PR 본문에 적은 "main 세션에 알렸다"를 실제로 남긴 #45 댓글로 고쳤다. main 세션에 보낸 메시지는 승인 대기 중 만료돼 전달되지 않았다.
+    - The totals area was given a visible heading (`h3`) as its name. It also shows up in heading navigation.
+    - Added the description "위의 이 주·이 달 정크푸드 횟수로 셉니다." (Counted in the junk food counts for this week and this month above.) to the direct entry checkbox.
+  - `meals.test.tsx`: Added a test that checks that a mark changed while waiting for a record stays as that of the next record. It is the same rule as name and calories.
+  - Not applied
+    - The case where the mark is turned off and on again while waiting and is cleared: It is the same rule as name and calories, so it was left.
+    - Making the totals a live region: the record notice is already read.
+    - The way the fake DB in the unit tests picks a response by the SQL string: if it changes, the test fails and it shows up.
+- **Second:** Nothing had to be fixed. What was applied:
+  - The weight of the junk food heading was matched to the meal heading (`h3`).
+  - The test counts were fixed to those after the first round of fixes.
+  - The "the main session was told" written in the PR body was corrected to the #45 comment that was actually left. A message sent to the main session expired while waiting for approval and was not delivered.

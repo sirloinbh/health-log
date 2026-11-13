@@ -1,123 +1,123 @@
-# #39 병원 방문과 피부과 시술 기록
+# #39 Clinic visits and dermatology procedure records
 
-- 이슈: [#39](https://github.com/sirloinbh/health-log/issues/39)
-- 브랜치: `feat/39-clinic-visits`
+- Issue: [#39](https://github.com/sirloinbh/health-log/issues/39)
+- Branch: `feat/39-clinic-visits`
 
-## 목적
+## Purpose
 
-언제 어느 병원에서 무엇을 받았는지 한곳에 남겨 다음 진료 때 확인한다. 피부과 시술은 종류, 부위, 용량·횟수, 다음 시술 시기를 함께 본다.
+Keep in one place when, at which clinic, and what was received, so it can be checked at the next visit. For dermatology procedures, the type, body area, dose or session count, and the time of the next procedure are kept together.
 
-## 정한 것
+## Decisions
 
-사용자 확인 없이 정했다. 이슈 댓글에 같은 내용을 남겼다.
+Decided without asking the user. The same content was left as an issue comment.
 
-- **민감 정보:** 진료·시술 내용은 로그에 남지 않는다. 이 API는 요청을 로그에 쓰지 않고, 거부 메시지는 입력한 값을 되풀이하지 않는다(테스트로 확인). 서버 오류 로그는 기존대로 내부 메시지 한 줄뿐이다. 테스트와 문서에는 "가상"을 붙인 지어낸 값만 쓴다.
-- **시술은 방문에 딸린 항목**이다. 방문 하나에 시술을 0~10개 둔다. 방문을 삭제하면 그 시술도 함께 지워진다(`ON DELETE CASCADE`).
-- **용량·횟수는 글자**로 둔다("100유닛", "3회차"처럼 단위가 제각각이라 숫자 칸으로 나누지 않았다).
-- **비용은 원 단위 정수**(0원~1억 원)다. 화면에서는 `12000`과 `12,000` 모두 받고, `1.5`나 `12,00`처럼 애매한 값은 보내기 전에 거부한다.
-- **다음 예약일**은 방문 날짜보다 빠를 수 없다(화면, API, DB 모두).
-- **검색**은 병원 이름 또는 시술 이름의 일부로 찾는다. 대소문자를 가리지 않고, `%`·`_`는 글자 그대로 찾는다. 최근 방문부터 20건씩 보인다.
-- **화면**
-  - 주 메뉴에 "병원" 화면을 새로 둔다. 목록, 검색, 방문 기록·수정 대화상자, 삭제 확인이 있다.
-  - 하루 기록 화면의 "병원·약" 자리 표시를 실제 카드로 바꿨다. 그날의 방문을 보이고, "이 날 병원 방문 기록" 링크로 그 날짜가 채워진 대화상자를 연다. 기록과 수정은 "병원" 화면에서 한다. 약은 #40에서 이 카드에 더한다.
-  - 대화상자는 #78(닫으면 연 버튼으로 포커스)과 #98(저장 중·실패 뒤 포커스 유지) 방식을 따른다.
-  - 하루 기록 카드는 #71처럼 진행 중인 방문 저장이 끝난 뒤 읽고, #65처럼 "다시 시도" 뒤 카드 제목으로 포커스를 옮긴다.
+- **Sensitive information:** The contents of visits and procedures are not left in logs. This API does not write requests to the log, and rejection messages do not repeat the entered value (confirmed by tests). The server error log is, as before, only one line with an internal message. Tests and documents use only made-up values marked "가상" (fictional).
+- **A procedure is an item attached to a visit.** One visit holds 0 to 10 procedures. When a visit is deleted, its procedures are deleted too (`ON DELETE CASCADE`).
+- **Dose or session count is text** (units vary, as in "100유닛" (100 units) and "3회차" (3rd session), so it was not split into a number field).
+- **Cost is an integer in won** (0 won to 100 million won). On screen both `12000` and `12,000` are accepted, and ambiguous values such as `1.5` or `12,00` are rejected before sending.
+- **The next appointment date** cannot be earlier than the visit date (on the screen, the API, and the DB).
+- **Search** finds by part of the clinic name or the procedure name. It is case-insensitive, and `%` and `_` are searched as literal characters. The most recent visits are shown first, 20 at a time.
+- **Screen**
+  - A new "병원" (Clinic) screen is placed in the main menu. It has a list, search, a visit record and edit dialog, and a delete confirmation.
+  - The "병원·약" (clinic and medicine) placeholder in the daily record screen was replaced with a real card. It shows that day's visits, and the "이 날 병원 방문 기록" (record a clinic visit for this day) link opens the dialog with that date filled in. Recording and editing are done on the "병원" screen. Medicine will be added to this card in #40.
+  - The dialog follows the approach of #78 (on close, focus returns to the button that opened it) and #98 (focus kept during saving and after a failure).
+  - Like #71, the daily record card reads after an in-progress visit save finishes, and like #65, after a "다시 시도" (retry) it moves focus to the card title.
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
 - **DB** `database/migrations/015_clinic_visits.sql`
-  - `clinic_visits`: 날짜, 병원(1~100자), 진료과(50), 증상·진단 메모(1000), 진료비, 다음 예약일
-  - `clinic_procedures`: 방문, 순서(1~10), 시술 이름(1~100), 부위(50), 용량·횟수(50), 비용, 메모(500)
-  - 빈 글자, 범위 밖 비용, 방문보다 이른 예약일은 DB도 거부한다. 014는 #32가 쓴다.
+  - `clinic_visits`: date, clinic (1 to 100 characters), department (50), symptom and diagnosis memo (1000), medical fee, next appointment date
+  - `clinic_procedures`: visit, order (1 to 10), procedure name (1 to 100), body area (50), dose or session count (50), cost, memo (500)
+  - The DB also rejects empty text, an out-of-range cost, and an appointment date earlier than the visit. 014 is used by #32.
 - **API** `backend/src/visits.ts`, `backend/src/app.ts`
-  - `GET /api/visits?q=&offset=`: 검색과 쪽 나눔(20건, `more`)
-  - `GET /api/visits?date=`: 그날의 방문
-  - `POST /api/visits`, `PUT /api/visits/:id`: 방문과 시술 목록을 한 트랜잭션에서 쓴다. 수정은 시술 목록을 통째로 바꾼다.
-  - `DELETE /api/visits/:id`: 없으면 404다.
-  - 글자 수는 #92·#101과 같이 `charCount`로 센다. 날짜는 #50의 API 범위를 따르고, 화면은 하루 기록 범위(2000~2099)를 따른다(1차 리뷰 뒤).
-- **화면**
-  - `frontend/src/visits.tsx`: "병원" 화면과 방문 대화상자
-  - `frontend/src/visit-card.tsx`: 하루 기록의 "병원·약" 카드
-  - `frontend/src/visit-text.ts`: 형식과 원 단위 비용 읽기
-  - `frontend/src/app.tsx`: 경로와 주 메뉴
-  - `frontend/src/daily.tsx`: 마지막 자리 표시를 카드로 바꿨다.
+  - `GET /api/visits?q=&offset=`: search and paging (20 items, `more`)
+  - `GET /api/visits?date=`: the visits of that day
+  - `POST /api/visits`, `PUT /api/visits/:id`: Writes the visit and the procedure list in one transaction. An edit replaces the whole procedure list.
+  - `DELETE /api/visits/:id`: 404 if it does not exist.
+  - Character counts are done with `charCount`, as in #92 and #101. Dates follow the API range of #50, and the screen follows the daily record range (2000 to 2099) (after the first review).
+- **Screen**
+  - `frontend/src/visits.tsx`: the "병원" screen and the visit dialog
+  - `frontend/src/visit-card.tsx`: the "병원·약" card in the daily record
+  - `frontend/src/visit-text.ts`: formatting and reading cost in won
+  - `frontend/src/app.tsx`: the route and the main menu
+  - `frontend/src/daily.tsx`: replaced the last placeholder with the card.
 
-## 검증
+## Checks
 
-### 브라우저
+### Browser
 
-임시 DB(포트 5473, `health_browser`, `npm run db:migrate`)에 실제 API(3973)와 Vite(5273)를 띄웠다. 헤드리스 Chrome(디버깅 포트 9673)을 CDP로 움직였다. 지어낸 값("가상NN피부과", "가상NN레이저")만 썼다. 320×700, 390×844, 1440×900 모두 아래 순서가 그대로 통과했다.
+A real API (3973) and Vite (5273) were started on a temporary DB (port 5473, `health_browser`, `npm run db:migrate`). Headless Chrome (debugging port 9673) was driven over CDP. Only made-up values ("가상NN피부과" = fictional NN dermatology clinic, "가상NN레이저" = fictional NN laser) were used. At 320×700, 390×844, and 1440×900, the sequence below passed as it was.
 
-1. 하루 기록(2026-05-NN)의 "병원·약" 카드에 "이 날 병원 방문 기록이 없습니다"와 기록 링크가 보인다.
-2. 링크를 누르면 "병원" 화면에서 대화상자가 그 날짜로 열린다. 대화상자는 화면 폭 안에 들어온다.
-3. 병원·진료과·진료비 "12,000"과 시술 2개를 넣고 저장한다. 목록에 카드가 생기고, 포커스는 페이지 제목에 있다(연 링크가 다른 화면에 있었기 때문).
-4. 시술 이름으로 검색하면 찾고, 없는 이름은 "찾는 기록이 없습니다"를 보인다.
-5. 하루 기록 카드에 병원, 시술 두 줄("…레이저 · 50,000원"), "진료비 12,000원"이 보인다.
-6. 삭제를 확인하면 목록과 API에서 사라지고, 포커스는 페이지 제목에 있다. 확인 뒤 DB의 `clinic_visits`·`clinic_procedures`가 모두 0행이었다.
+1. The "병원·약" card of a daily record (2026-05-NN) shows "이 날 병원 방문 기록이 없습니다" (there is no clinic visit record for this day) and the record link.
+2. Pressing the link opens the dialog on the "병원" screen with that date. The dialog fits within the screen width.
+3. Enter a clinic, a department, a medical fee "12,000", and 2 procedures, and save. A card appears in the list, and focus is on the page title (because the link that opened it was on a different screen).
+4. Searching by a procedure name finds it, and a name that does not exist shows "찾는 기록이 없습니다" (there is no record you are looking for).
+5. The daily record card shows the clinic, two procedure lines ("…레이저 · 50,000원" = "…laser · 50,000 won"), and "진료비 12,000원" (medical fee 12,000 won).
+6. Confirming the delete removes it from the list and the API, and focus is on the page title. After the confirmation, `clinic_visits` and `clinic_procedures` in the DB had 0 rows.
 
-- 세 폭 모두 가로 넘침과 콘솔 오류가 없었다.
-- 320 첫 실행은 대화상자가 다 그려지기 전에 스크립트가 버튼을 눌러 멈췄다. 대기를 늘린 다시 실행에서는 통과했다.
-- 확인 뒤 임시 DB, API, Vite, Chrome을 모두 껐다.
+- At all three widths there was no horizontal overflow and no console errors.
+- In the first run at 320, the script pressed the button before the dialog was fully drawn and stopped. It passed in a rerun with a longer wait.
+- After the check, the temporary DB, API, Vite, and Chrome were all shut down.
 
-### 테스트
+### Tests
 
-- `backend/test/visits.test.ts`(7개, DB 없이)
-  - 날짜·병원 이름이 필요하다. 글자 수 한도는 이모지에도 같다.
-  - 비용은 0원~1억 원 정수만 받는다. 예약일은 방문보다 빠를 수 없다. 시술은 이름이 필요하고 10개까지다.
-  - 거부 메시지가 입력한 값을 되풀이하지 않는다.
-  - ID·날짜·검색어·목록 위치를 DB 전에 검사한다.
-- `backend/test/visits.integration.test.ts`(처음 7개, 1차 리뷰 뒤 9개, 1985-07~08, `testDatabaseSkip` 사용)
-  - 방문과 시술이 순서대로 저장되고 그날로 읽힌다.
-  - 병원 이름과 시술 이름으로 찾고, `%`는 글자 그대로 찾는다.
-  - 다시 저장하면 시술 목록이 통째로 바뀐다. 없는 방문은 404다.
-  - 방문을 삭제하면 시술도 지워진다.
-  - 두 번째 시술 저장이 실패하면 새 방문은 통째로 남지 않는다.
-  - 수정 중 두 번째 시술 저장이 실패하면 이전 방문이 그대로 남는다.
-  - DB가 빈 병원 이름, 이른 예약일, 음수 비용을 거부한다.
-- `frontend/src/visits.test.tsx`(처음 13개, 1차 리뷰 뒤 16개)
-  - 메뉴로 열고 목록을 보인다. 새 방문을 보내는 본문을 확인한다. 수정은 기존 값으로 시작하고 시술을 뺄 수 있다.
-  - 보내기 전 입력 검사를 확인한다. 시술 10개 제한, 검색어 인코딩과 "찾는 기록이 없습니다", 삭제 확인과 포커스를 확인한다.
-  - `?new=날짜`로 그 날짜의 대화상자가 열린다. 저장 실패 뒤 입력과 포커스가 남는다.
-  - 하루 기록 카드: 그날의 방문과 링크, 방문 없음 안내, "다시 시도" 뒤 포커스, 진행 중인 방문 저장을 기다린 뒤 읽기를 확인한다.
+- `backend/test/visits.test.ts` (7 tests, no DB)
+  - A date and a clinic name are required. The character limit is the same for emoji.
+  - Cost accepts only integers from 0 to 100 million won. The appointment date cannot be earlier than the visit. A procedure needs a name and at most 10 are allowed.
+  - Rejection messages do not repeat the entered value.
+  - The ID, date, search term, and list position are validated before the DB.
+- `backend/test/visits.integration.test.ts` (7 at first, 9 after the first review, 1985-07 to 08, using `testDatabaseSkip`)
+  - A visit and procedures are saved in order and read back by that day.
+  - Searching by clinic name and procedure name works, and `%` is searched as a literal character.
+  - Saving again replaces the whole procedure list. A visit that does not exist gives 404.
+  - Deleting a visit also deletes its procedures.
+  - If saving the second procedure fails, the new visit does not remain at all.
+  - If saving the second procedure fails during an edit, the previous visit stays as it was.
+  - The DB rejects an empty clinic name, an early appointment date, and a negative cost.
+- `frontend/src/visits.test.tsx` (13 at first, 16 after the first review)
+  - Opens from the menu and shows the list. Checks the body that sends a new visit. An edit starts from the existing values and a procedure can be removed.
+  - Checks the input validation before sending. Checks the 10-procedure limit, the search term encoding and "찾는 기록이 없습니다", and the delete confirmation and focus.
+  - `?new=date` opens the dialog with that date. Input and focus stay after a save failure.
+  - Daily record card: checks that day's visits and the link, the notice for no visits, focus after "다시 시도", and reading after waiting for an in-progress visit save.
 
-### 명령
+### Commands
 
-- `origin/main`(#32의 014, #104 포함)을 병합한 뒤 임시 `health_test`를 `npm run db:migrate`로 새로 만들어(001~015) `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과
-  - 백엔드 238개 통과, 0개 건너뜀(DB 통합 테스트 포함). 프런트 419개 통과, 2개 건너뜀. 스킬 4개 통과.
-- `npm run knip`: 통과
+- After merging `origin/main` (including #32's 014 and #104), a temporary `health_test` was created fresh with `npm run db:migrate` (001 to 015), and `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed
+  - Backend 238 passed, 0 skipped (including DB integration tests). Frontend 419 passed, 2 skipped. Skill checks 4 passed.
+- `npm run knip`: passed
 
-## 한계
+## Limits
 
-- 방문 기록과 수정은 "병원" 화면에서만 한다. 하루 기록 카드는 보여 주고 링크만 건넨다.
-- 검색은 병원 이름과 시술 이름만 본다. 진료과와 메모는 찾지 않는다.
-- 실제 화면 읽기 프로그램, Firefox, Safari로는 확인하지 않았다.
+- Visits are recorded and edited only on the "병원" screen. The daily record card shows them and only offers a link.
+- Search looks only at the clinic name and the procedure name. It does not search the department or memo.
+- It was not checked with a real screen reader, Firefox, or Safari.
 
-## 1차 리뷰 — 2026-11-08
+## First review — 2026-11-08
 
-별도 읽기 전용 리뷰를 실행했다. 반드시 고칠 것은 없었고, 다음을 반영했다.
+A separate read-only review was run. Nothing had to be fixed, and the following was applied.
 
-- **"더 보기"가 두 목록을 섞을 수 있던 문제(고치면 좋을 것):** 새 검색이나 저장·삭제 뒤 다시 읽기가 진행 중일 때 "결과 더 보기"를 누르면, 옛 검색어와 위치로 읽은 쪽이 새 목록 뒤에 붙을 수 있었다. 목록을 읽는 동안에는 "더 보기"를 바쁨(`aria-disabled`)으로 둔다.
-- **하루 기록 범위(고치면 좋을 것):** 대화상자가 방문 날짜와 다음 예약일에 하루 기록 범위(#50, 2000~2099)를 적용하지 않아, 하루 기록에서 열 수 없는 날의 방문을 만들 수 있었다. 보내기 전에 범위를 확인하고, 범위 밖 `?new=` 링크는 오늘로 연다. 오늘을 아직 모르면 알 때까지 기다린다.
-- **테스트 보강(고치면 좋을 것):** 20건씩 나누기(21건 → 20건과 `more`, `offset=20` → 1건), 검색어의 `_`를 글자 그대로 찾는 통합 테스트를 더했다.
-- **작은 지적 반영**
-  - 글자 수(`charCount`)와 비용 상한(1억 원)을 보내기 전에 확인한다.
-  - 10번째 시술을 추가해도 "시술 추가" 버튼이 포커스를 잃지 않는다(`aria-disabled`).
-  - 시술을 추가하면 새 행의 이름 칸으로, 빼면 "시술 추가" 버튼으로 포커스가 간다.
-  - 대화상자의 중복 스크롤 클래스를 지웠다.
-- **반영하지 않은 것:** 삭제 뒤 다시 읽으면 "더 보기"로 늘린 목록이 첫 쪽으로 돌아간다. 목록 순서·건수가 바뀐 뒤 위치를 유지하는 일은 다른 화면(음식·조합)과 같은 동작이라 그대로 둔다. 읽기 전용 목록의 index key는 해가 없어 두었다.
-- 리뷰 전 코드에서 새·바뀐 화면 테스트 5개가 실패한다.
-- 반영 뒤 `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과(백엔드 240개, 건너뜀 0. 프런트 422개 통과, 2개 건너뜀. 스킬 4개). `npm run knip`: 통과.
+- **"더 보기" (show more) could mix two lists (should fix):** If "결과 더 보기" (show more results) was pressed while a new search or a re-read after save or delete was in progress, the part read with the old search term and position could be attached after the new list. While the list is being read, "더 보기" is set to busy (`aria-disabled`).
+- **Daily record range (should fix):** The dialog did not apply the daily record range (#50, 2000 to 2099) to the visit date and the next appointment date, so a visit could be created for a day that cannot be opened in the daily record. The range is checked before sending, and a `?new=` link outside the range opens with today. If today is not yet known, it waits until it is.
+- **Test additions (should fix):** Added integration tests for paging by 20 (21 items → 20 and `more`, `offset=20` → 1 item) and for searching `_` in the search term as a literal character.
+- **Small points applied**
+  - The character count (`charCount`) and the cost limit (100 million won) are checked before sending.
+  - Even when the 10th procedure is added, the "시술 추가" (add procedure) button does not lose focus (`aria-disabled`).
+  - Adding a procedure moves focus to the name field of the new row, and removing one moves it to the "시술 추가" button.
+  - Removed a duplicate scroll class in the dialog.
+- **Not applied:** After a delete, the re-read returns a list that was extended with "더 보기" to the first page. Keeping the position after the order or count of the list changes behaves the same as other screens (foods and combos), so it was left. An index key on a read-only list is harmless, so it was kept.
+- On the code before the review, 5 new or changed screen tests fail.
+- After applying, `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed (backend 240, 0 skipped. Frontend 422 passed, 2 skipped. Skill checks 4). `npm run knip`: passed.
 
-## 2차 리뷰 — 2026-11-08
+## Second review — 2026-11-08
 
-1차 반영과 전체 diff를 별도 읽기 전용 리뷰로 다시 봤다. 반드시 고칠 것은 없었다. 리뷰는 여기서 끝낸다.
+The first round of fixes and the whole diff were reviewed again by a separate read-only review. Nothing had to be fixed. Reviews end here.
 
-- **확인된 것:** "더 보기"의 바쁨 상태는 가장 새 읽기만 풀어 멈춰 있지 않는다. 시술 행 포커스는 추가·빼기를 누른 직후 한 번만 옮긴다. 동시에 두 번 고쳐도 방문 행이 잠겨 시술 목록이 섞이지 않는다.
-- **안내 문구(고치면 좋을 것):** 1차 반영에서 "진료비은(는)", "1번째 시술 메모은(는)"처럼 어색한 안내가 생겼다. 화면 쪽은 이름의 마지막 글자에 맞춰 은/는을 고른다(`withTopic`, 예: "진료비는", "병원 이름은"). 서버 안내는 다른 API와 같은 "은(는)" 꼴로 둔다.
-- **`?new=` 링크 보강**
-  - 서버가 오늘을 알려 주지 못하면 링크가 영영 열리지 않을 수 있었다. 이제 빈 날짜로 열어 직접 고르게 한다.
-  - 오늘을 기다렸다가 여는 경우와 함께 테스트를 더했다. 새 테스트 2개와 `visit-text.test.ts`(은/는, 원 단위 읽기)를 더했다.
-- **한계에 더함**
-  - API로 2000년 전 날짜에 만든 방문(예: 1985년 테스트 데이터)은 화면에서 날짜를 바꾸기 전에는 저장할 수 없다.
-  - 삭제 뒤 다시 읽기가 실패하면, "더 보기"가 방문 하나를 두 번 읽을 수 있다. 드문 경우라 두었다.
-- 반영 뒤 `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과(백엔드 240개, 건너뜀 0. 프런트 426개 통과, 2개 건너뜀. 스킬 4개). `npm run knip`: 통과.
+- **Confirmed:** The busy state of "더 보기" is released only by the newest read, so it does not stay stuck. The focus of a procedure row moves only once right after add or remove is pressed. Even when edited twice at the same time, the visit row is locked, so procedure lists do not get mixed.
+- **Notice wording (should fix):** The first round of fixes produced awkward notices such as "진료비은(는)" and "1번째 시술 메모은(는)" (the Korean topic particle written in its generic "은(는)" form after a noun). The screen picks 은 or 는 to match the last character of the name (`withTopic`, for example "진료비는", "병원 이름은"). Server notices keep the same "은(는)" form as the other APIs.
+- **`?new=` link hardening**
+  - If the server could not tell today, the link might never open. Now it opens with an empty date and lets the user pick one.
+  - Tests were added along with the case of waiting for today and then opening. Added 2 new tests and `visit-text.test.ts` (은/는, reading cost in won).
+- **Added to limits**
+  - A visit created through the API with a date before 2000 (for example the 1985 test data) cannot be saved on the screen until the date is changed.
+  - If the re-read after a delete fails, "더 보기" can read one visit twice. It was left because it is rare.
+- After applying, `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed (backend 240, 0 skipped. Frontend 426 passed, 2 skipped. Skill checks 4). `npm run knip`: passed.

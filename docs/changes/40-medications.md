@@ -1,127 +1,127 @@
-# #40 약 처방과 복용 기록
+# #40 Medication prescriptions and intake records
 
-- 이슈: [#40](https://github.com/sirloinbh/health-log/issues/40)
-- 브랜치: `feat/40-medications`
+- Issue: [#40](https://github.com/sirloinbh/health-log/issues/40)
+- Branch: `feat/40-medications`
 
-## 목적
+## Purpose
 
-처방받은 약과 먹는 기간을 기록하고, 지금 먹는 약을 한눈에 본다. 진료 때 지금 먹는 약과 과거에 먹은 약을 정확히 말할 수 있게 한다.
+Record prescribed medicines and the period taken, and see at a glance what is being taken now. This lets the user say exactly which medicines are being taken now and which were taken in the past when seeing a doctor.
 
-## 정한 것
+## Decisions
 
-사용자 확인 없이 정했다. 이슈 댓글에 같은 내용을 남겼다.
+Decided without asking the user. The same content was left as an issue comment.
 
-- **기간만 기록한다.** 이슈 추천안대로 매일 복용 체크는 넣지 않는다. 필요하면 별도 이슈로 만든다.
-- **병원 방문과의 연결은 선택**이다.
-  - 처방 없이 산 약은 연결 없이 기록한다.
-  - 연결된 방문을 지우면 약 기록은 남고 연결만 끊긴다(`ON DELETE SET NULL`).
-  - "병원" 화면의 방문 카드에 "처방 약" 링크를 두어, 그 방문에 연결된 약을 방문 날짜로 바로 기록한다.
-  - 대화상자에서는 최근 방문 20건 중에서 고른다.
-- **복용 중 판정:** 서비스의 오늘(Asia/Seoul, `serviceDate`) 기준이다.
-  - 시작일 ≤ 오늘이고, 종료일이 없거나 오늘 이후면 "복용 중"이다. 종료일 당일도 포함한다.
-  - 시작일이 오늘 뒤면 "시작 예정", 종료일이 오늘 전이면 "지난 약"이다.
-- **용량·복용법은 글자**("500mg", "하루 2번 식후")로 둔다. 종료일은 시작일보다 빠를 수 없다(화면, API, DB 모두).
-- **화면**
-  - 주 메뉴에 "약" 화면을 새로 둔다. 복용 중, 시작 예정(있을 때만), 지난 약 순서로 보인다.
-  - 하루 기록의 "병원·약" 카드에 "이 날 먹은 약"을 더했다. 그날 기간에 든 약을 보인다.
-  - 화면의 날짜는 하루 기록 범위(#50, 2000~2099)를 따른다. 대화상자는 #78·#98 방식, 카드는 #71의 `writesSettled`와 #65의 다시 시도 포커스를 따른다.
-- **민감 정보:** 약 내용은 로그에 남지 않는다. 거부 메시지는 입력한 값을 되풀이하지 않는다(테스트로 확인). 테스트와 문서에는 "가상"을 붙인 지어낸 값만 쓴다.
+- **Only the period is recorded.** As the issue recommended, a daily intake check is not included. If needed, it is made a separate issue.
+- **Linking to a clinic visit is optional.**
+  - A medicine bought without a prescription is recorded with no link.
+  - If the linked visit is deleted, the medicine record stays and only the link is cut (`ON DELETE SET NULL`).
+  - A "처방 약" (prescribed medicine) link is placed on the visit card of the "병원" screen, to record the medicine linked to that visit directly with the visit date.
+  - In the dialog, the user chooses from the 20 most recent visits.
+- **Judging "currently taking":** Based on the service's today (Asia/Seoul, `serviceDate`).
+  - If the start date ≤ today and the end date is missing or after today, it is "복용 중" (currently taking). The end date itself is included.
+  - If the start date is after today, it is "시작 예정" (starting soon), and if the end date is before today, it is "지난 약" (past medicine).
+- **Dose and directions are text** ("500mg", "하루 2번 식후" = twice a day after meals). The end date cannot be earlier than the start date (on the screen, the API, and the DB).
+- **Screen**
+  - A new "약" (Medicine) screen is placed in the main menu. It is shown in the order currently taking, starting soon (only when there are some), and past medicine.
+  - Added "이 날 먹은 약" (medicine taken on this day) to the "병원·약" card of the daily record. It shows the medicines whose period includes that day.
+  - Dates on the screen follow the daily record range (#50, 2000 to 2099). The dialog follows the #78 and #98 approach, and the card follows `writesSettled` of #71 and the retry focus of #65.
+- **Sensitive information:** The contents of medicines are not left in logs. Rejection messages do not repeat the entered value (confirmed by tests). Tests and documents use only made-up values marked "가상" (fictional).
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
 - **DB** `database/migrations/016_medications.sql`: `medications`
-  - 약 이름(1~100자), 용량(50), 복용법(100), 시작일, 종료일(시작일 이상), 메모(500)
-  - 병원 방문(`clinic_visits` 참조, 지우면 NULL)
+  - Medicine name (1 to 100 characters), dose (50), directions (100), start date, end date (on or after the start date), memo (500)
+  - Clinic visit (references `clinic_visits`, NULL when deleted)
 - **API** `backend/src/medications.ts`, `backend/src/app.ts`
-  - `GET /api/medications`: `{ today, current, upcoming, past }`. 오늘은 `createApp`의 `today()`(기본 Asia/Seoul)다.
-  - `GET /api/medications?date=`: 그날 먹은 약
-  - `POST`, `PUT /:id`, `DELETE /:id`. 없는 방문을 연결하면 400 "연결할 병원 방문을 찾을 수 없습니다"다.
-- **화면**
-  - `frontend/src/medications.tsx`: "약" 화면과 약 대화상자
-  - `frontend/src/med-text.ts`: 형식
+  - `GET /api/medications`: `{ today, current, upcoming, past }`. Today is the `today()` of `createApp` (Asia/Seoul by default).
+  - `GET /api/medications?date=`: the medicines taken on that day
+  - `POST`, `PUT /:id`, `DELETE /:id`. Linking a visit that does not exist gives 400 "연결할 병원 방문을 찾을 수 없습니다" (the clinic visit to link cannot be found).
+- **Screen**
+  - `frontend/src/medications.tsx`: the "약" screen and the medicine dialog
+  - `frontend/src/med-text.ts`: formatting
   - `frontend/src/visit-card.tsx`: "이 날 먹은 약"
-  - `frontend/src/visits.tsx`: 방문 카드의 "처방 약" 링크
-  - `frontend/src/app.tsx`: 경로, 주 메뉴, 두 화면이 함께 쓰는 오늘 값
+  - `frontend/src/visits.tsx`: the "처방 약" link on the visit card
+  - `frontend/src/app.tsx`: the route, the main menu, and the today value shared by the two screens
 
-## 검증
+## Checks
 
-### 브라우저
+### Browser
 
-임시 DB(포트 5473, `health_browser`, `npm run db:migrate`)에 실제 API(3973)와 Vite(5273)를 띄웠다. 헤드리스 Chrome(디버깅 포트 9673)을 CDP로 움직였다.
+A real API (3973) and Vite (5273) were started on a temporary DB (port 5473, `health_browser`, `npm run db:migrate`). Headless Chrome (debugging port 9673) was driven over CDP.
 
-- 지어낸 값만 썼다. 오늘(2026-11-08) 이틀 전의 방문 "가상N내과"와 한 달 전에 끝난 "가상N지난약"을 API로 만들었다.
-- 320×700, 390×844, 1440×900 모두 아래 순서가 그대로 통과했다.
+- Only made-up values were used. A visit "가상N내과" (fictional N internal medicine) two days before today (2026-11-08) and "가상N지난약" (fictional N past medicine) that ended a month ago were created through the API.
+- At 320×700, 390×844, and 1440×900, the sequence below passed as it was.
 
-1. "병원" 화면의 방문 카드에서 "처방 약"을 누르면 "약" 화면에서 대화상자가 열린다. 시작일은 방문 날짜, 방문은 그 방문으로 골라져 있다. 대화상자는 화면 폭 안에 들어온다.
-2. 약 이름·용량·복용법을 넣고 저장하면 "복용 중 1"에 "…부터", "500mg · 하루 2번 식후", "…가상N내과 처방"이 보인다. 지난 약도 따로 보이고, 포커스는 페이지 제목에 있다.
-3. 그 방문 날의 하루 기록 카드에 방문과 "이 날 먹은 약: 가상N정 · 500mg · 하루 2번 식후"가 보인다.
-4. 방문을 지우면 약은 "복용 중"에 그대로 남고 "처방" 줄만 사라진다.
+1. Pressing "처방 약" on a visit card of the "병원" screen opens the dialog on the "약" screen. The start date is the visit date and the visit is chosen as that visit. The dialog fits within the screen width.
+2. Entering the medicine name, dose, and directions and saving shows, under "복용 중 1" (currently taking 1), "…부터" (from …), "500mg · 하루 2번 식후", and "…가상N내과 처방" (prescribed by fictional N internal medicine). Past medicine is also shown separately, and focus is on the page title.
+3. The daily record card of that visit day shows the visit and "이 날 먹은 약: 가상N정 · 500mg · 하루 2번 식후" (medicine taken on this day: fictional N tablet · 500mg · twice a day after meals).
+4. Deleting the visit leaves the medicine as it is under "복용 중", and only the "처방" (prescribed) line disappears.
 
-- 세 폭 모두 가로 넘침과 콘솔 오류가 없었다. 스크립트가 만든 기록은 끝에 지워 DB에 남지 않았다.
-- 확인 뒤 임시 DB, API, Vite, Chrome을 모두 껐다.
+- At all three widths there was no horizontal overflow and no console errors. The records the script created were deleted at the end, so none remained in the DB.
+- After the check, the temporary DB, API, Vite, and Chrome were all shut down.
 
-### 테스트
+### Tests
 
-- `backend/test/medications.test.ts`(6개, DB 없이)
-  - 종료일이 시작일보다 빠르면 거부한다. 날짜는 실제 날짜여야 한다.
-  - 이름이 필요하고, 글자 수는 이모지에도 같다.
-  - 방문 ID 형식을 검사한다. 거부 메시지가 입력값을 되풀이하지 않는다. ID·날짜를 DB 전에 검사한다.
-  - `serviceDate`가 UTC 15:00을 넘으면 서울의 다음 날이 된다.
-- `backend/test/medications.integration.test.ts`(처음 7개, 1차 리뷰 뒤 9개, 1985-09~10, `testDatabaseSkip` 사용)
-  - 저장하고 다시 읽는다.
-  - 서비스의 오늘(주입한 1985-09-10) 기준으로 나눈다: 종료일 당일은 복용 중, 오늘 시작은 복용 중, 내일 시작은 시작 예정, 어제 끝은 지난 약.
-  - 하루의 약을 확인한다. 연결된 방문을 지워도 약이 남고 연결만 끊긴다. 없는 방문은 연결할 수 없다.
-  - 다시 저장하면 모든 칸이 바뀐다. 404를 확인한다. DB가 시작보다 이른 종료를 거부한다.
-- `frontend/src/medications.test.tsx`(처음 10개, 1차 리뷰 뒤 14개)
-  - 메뉴로 열고 구역을 나눠 보인다. 새 약은 오늘 시작하고 방문을 연결해 보낸다. 수정에서 연결을 끊으면 `visitId: null`이다.
-  - 보내기 전 입력 검사, 방문 카드 링크로 연 대화상자, 삭제와 포커스, 저장 실패 뒤 포커스를 확인한다.
-  - 방문 카드의 "처방 약" 링크, 하루 기록 카드의 그날 약과 "기록 없음"을 확인한다.
+- `backend/test/medications.test.ts` (6 tests, no DB)
+  - Rejects an end date earlier than the start date. A date must be a real date.
+  - A name is required, and the character count is the same for emoji.
+  - Checks the visit ID format. Rejection messages do not repeat the entered value. The ID and dates are validated before the DB.
+  - If `serviceDate` passes 15:00 UTC, it becomes the next day in Seoul.
+- `backend/test/medications.integration.test.ts` (7 at first, 9 after the first review, 1985-09 to 10, using `testDatabaseSkip`)
+  - Saves and reads back.
+  - Divides by the service's today (1985-09-10, injected): the end date itself is currently taking, starting today is currently taking, starting tomorrow is starting soon, ending yesterday is past medicine.
+  - Checks the medicines of a day. Deleting the linked visit leaves the medicine and cuts only the link. A visit that does not exist cannot be linked.
+  - Saving again changes all fields. Checks 404. The DB rejects an end earlier than the start.
+- `frontend/src/medications.test.tsx` (10 at first, 14 after the first review)
+  - Opens from the menu and shows sections divided. A new medicine starts today and is sent with a visit link. In an edit, cutting the link gives `visitId: null`.
+  - Checks the input validation before sending, the dialog opened from the visit card link, delete and focus, and focus after a save failure.
+  - Checks the "처방 약" link on the visit card, and that day's medicine and "기록 없음" (no record) on the daily record card.
 
-### 명령
+### Commands
 
-- 임시 `health_test`(`npm run db:migrate`, 001~016)로 `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과
-  - 백엔드 254개 통과, 0개 건너뜀(DB 통합 테스트 포함). 프런트 440개 통과, 2개 건너뜀. 스킬 4개 통과.
-- `npm run knip`: 통과
+- With a temporary `health_test` (`npm run db:migrate`, 001 to 016), `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed
+  - Backend 254 passed, 0 skipped (including DB integration tests). Frontend 440 passed, 2 skipped. Skill checks 4 passed.
+- `npm run knip`: passed
 
-## 한계
+## Limits
 
-- 지난 약은 쪽 나눔 없이 모두 보인다. 개인 기록이라 수가 적다고 보았다.
-- 대화상자에서 고를 수 있는 방문은 최근 20건이다. 더 오래된 방문은 그 방문 카드의 "처방 약" 링크로 연결한다.
-- 실제 화면 읽기 프로그램, Firefox, Safari로는 확인하지 않았다.
+- Past medicine is all shown with no paging. It was judged that the number is small because these are personal records.
+- The visits that can be chosen in the dialog are the 20 most recent. An older visit is linked through the "처방 약" link on that visit's card.
+- It was not checked with a real screen reader, Firefox, or Safari.
 
-## 1차 리뷰 — 2026-11-08
+## First review — 2026-11-08
 
-별도 읽기 전용 리뷰를 실행했다. 반드시 고칠 것은 없었고, 다음을 반영했다.
+A separate read-only review was run. Nothing had to be fixed, and the following was applied.
 
-- **확인된 것**
-  - 복용 중·시작 예정·지난 약은 겹치거나 빠지지 않는다.
-  - 없는 방문 연결은 제약 이름으로 가려 400이 된다.
-  - 500 로그에는 CHECK 위반의 행 내용(detail)이 들어가지 않는다.
-- **테스트 보강(고치면 좋을 것)**
-  - 다시 저장할 때 방문 연결을 유지·변경·해제하고, 없는 방문으로 바꾸면 400이며 기록이 그대로인지 확인한다.
-  - 하루짜리 약이 첫날·마지막 날 모두 잡히는지 확인한다.
-  - 하루 기록 카드에서 약 요청만 실패해도 "다시 시도" 뒤 두 부분이 모두 돌아오고 포커스가 제목에 가는지 확인한다.
-  - 진행 중인 약 저장을 기다린 뒤 읽는지 확인한다.
-  - 최근 20건 밖의 연결된 방문, 날짜 없는 링크의 "선택한 방문", 시작 예정 목록을 확인한다.
-- **기존 테스트 바로잡기:** `visits.test.tsx`의 가짜 응답이 약 요청에 엉뚱한 값을 주고 있어, 약 요청을 따로 받게 고쳤다.
-- **작은 지적 반영**
-  - 날짜 없이 방문만 넘긴 링크에서는 "선택한 방문"에 오늘 날짜를 붙이지 않는다.
-  - 카드의 불러오는 중 이름을 "병원·약 기록 불러오는 중"으로 바꿨다.
-  - 테스트 주석의 시각을 바로잡았다.
-- **반영하지 않은 것**
-  - 약 요청만 실패해도 방문까지 감추는 동작은 그대로 둔다(다시 시도로 함께 돌아온다).
-  - 방문 목록을 불러오지 못했을 때의 안내는 없다(연결 없이 저장할 수 있다).
-  - "약 기록 보기" 링크가 늘 보이는 점은 그대로 둔다.
-- 반영 뒤 `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과(백엔드 256개, 건너뜀 0. 프런트 444개 통과, 2개 건너뜀. 스킬 4개). `npm run knip`: 통과.
+- **Confirmed**
+  - Currently taking, starting soon, and past medicine neither overlap nor leave anything out.
+  - Linking a visit that does not exist is told apart by the constraint name and becomes 400.
+  - The row content (detail) of a CHECK violation is not in the 500 log.
+- **Test additions (should fix)**
+  - When saving again, checks that the visit link can be kept, changed, or released, and that changing to a visit that does not exist gives 400 and the record stays as it was.
+  - Checks that a one-day medicine is caught on both the first day and the last day.
+  - Checks that on the daily record card, even if only the medicine request fails, both parts come back after "다시 시도" and focus goes to the title.
+  - Checks that it reads after waiting for an in-progress medicine save.
+  - Checks a linked visit outside the 20 most recent, the "선택한 방문" (selected visit) for a link with no date, and the starting soon list.
+- **Correcting an existing test:** The fake response in `visits.test.tsx` was giving a wrong value to the medicine request, so it was fixed to receive the medicine request separately.
+- **Small points applied**
+  - In a link that passed only the visit with no date, today's date is not attached to the "선택한 방문".
+  - The loading name of the card was changed to "병원·약 기록 불러오는 중" (loading clinic and medicine records).
+  - The time in a test comment was corrected.
+- **Not applied**
+  - The behavior of hiding the visit too when only the medicine request fails is left as it is (both come back together with retry).
+  - There is no notice when the visit list could not be loaded (it can be saved with no link).
+  - The "약 기록 보기" (view medicine records) link being always visible is left as it is.
+- After applying, `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed (backend 256, 0 skipped. Frontend 444 passed, 2 skipped. Skill checks 4). `npm run knip`: passed.
 
-## 2차 리뷰 — 2026-11-08
+## Second review — 2026-11-08
 
-1차 반영과 전체 diff를 별도 읽기 전용 리뷰로 다시 봤다. 반드시 고칠 것은 없었다. 리뷰는 여기서 끝낸다.
+The first round of fixes and the whole diff were reviewed again by a separate read-only review. Nothing had to be fixed. Reviews end here.
 
-- **확인된 것**
-  - 방문 링크의 날짜(`visitDate`)는 링크에 쓸 수 있는 날짜가 있을 때만 붙는다.
-  - 테스트는 매번 정리되어 남는 요청이나 타이머가 없다.
-  - 세 목록은 겹치지 않는다.
-- **작은 지적 반영:** 날짜 없는 "선택한 방문" 앞의 빈칸을 없앴고, 쓰지 않는 타입 칸을 지웠다.
-- **반영하지 않은 것:** 약 요청만 실패해도 방문까지 감추는 동작은 1차와 같은 이유로 그대로 둔다.
-- 반영 뒤 `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과(백엔드 256개, 건너뜀 0. 프런트 444개 통과, 2개 건너뜀. 스킬 4개). `npm run knip`: 통과.
+- **Confirmed**
+  - The date of the visit link (`visitDate`) is attached only when there is a date usable for the link.
+  - The tests clean up every time, so no requests or timers remain.
+  - The three lists do not overlap.
+- **Small points applied:** Removed the blank before the "선택한 방문" with no date, and removed an unused type field.
+- **Not applied:** The behavior of hiding the visit too when only the medicine request fails is left as it is, for the same reason as in the first review.
+- After applying, `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed (backend 256, 0 skipped. Frontend 444 passed, 2 skipped. Skill checks 4). `npm run knip`: passed.

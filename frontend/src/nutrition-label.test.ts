@@ -30,7 +30,7 @@ test('a per-100g table fills the basis and every nutrient it lists', () => {
 test('트랜스지방 and 포화지방 are not read as 지방, with or without a space', () => {
   const spaced = '100g당 120kcal 트랜스 지방 0g 포화 지방 2g 지방 7g 당류 3g';
   expect(readNutritionLabel(spaced).values.fat).toBe(7);
-  // Sugars right after a value is not a "g당" basis.
+  // Sugars right after a value is not a "g당" ("per g") basis.
   expect(readNutritionLabel('1회 제공량 30g 포화지방 4g 당류 6g 150kcal').basis).toEqual({
     size: 30,
     unit: 'g',
@@ -161,7 +161,7 @@ test('a named basis without a size is not replaced by the package size', () => {
   expect(unsized.basis).toBeNull();
   expect(unsized.basisFromTotal).toBe(false);
   expect(unsized.values.calories).toBe(150);
-  // 1회 섭취참고량 is a basis too.
+  // 1회 섭취참고량 (reference intake per serving) is a basis too.
   expect(readNutritionLabel('총 내용량 90g\n1회 섭취참고량 30g\n열량 150kcal').basis).toEqual({
     size: 30,
     unit: 'g',
@@ -447,7 +447,7 @@ test('"1회 제공량 30g (100g당)" claims no basis: one column cannot be for b
   }
   // A basis on the heading above the serving.
   expect(readNutritionLabel('영양정보 (100g당)\n1회 제공량 30g\n열량 250kcal').basis).toBeNull();
-  // The bracket only notes the serving: the 100g has 당.
+  // The bracket only notes the serving: the 100g has 당 ("per").
   expect(readNutritionLabel('영양정보\n100g당 (1회 제공량 30g)\n열량 250kcal').basis).toEqual({
     size: 100,
     unit: 'g',

@@ -121,7 +121,7 @@ test('popular foods are stored per serving with a checkable public source', { sk
   assert.equal(Number(ramen.rows[0]!.serving_size), 550);
   assert.equal(Number(ramen.rows[0]!.sodium), 1556.5);
 
-  // Measured records filed under another spelling: 자장면 and 돼지고기볶음(제육볶음) at the source.
+  // Measured records filed under another spelling: 자장면 (jajangmyeon) and 돼지고기볶음 (stir-fried pork, 제육볶음) at the source.
   const servings = await pool.query<{ name: string; serving_size: string; serving_unit: string }>(
     "SELECT name, serving_size, serving_unit FROM foods WHERE name IN ('짜장면(자장면)', '제육볶음') AND brand IS NULL ORDER BY name",
   );
@@ -273,7 +273,7 @@ test('popular foods can be found by the words people search for', { skip }, asyn
 });
 
 test('the documented example runs as written and repeats safely', { skip }, async (t) => {
-  // Its Korean literals must decode: the escapes spell 예시 and 브랜드.
+  // Its Korean literals must decode: the escapes spell 예시 ("example") and 브랜드 ("brand").
   const example = "name = '예시' AND brand = '브랜드'";
   const clean = () => pool.query(`DELETE FROM foods WHERE ${example}`);
   await clean();

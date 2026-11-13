@@ -14,10 +14,10 @@ export type LabelReading = {
   basis: Size | null;
   /** True when no basis is written and the values are taken to be for the whole package. */
   basisFromTotal: boolean;
-  /** The whole package, from "총 내용량". */
+  /** The whole package, from "총 내용량" (total content). */
   total: Size | null;
   values: Partial<Record<LabelNutrient, number>>;
-  /** Written as "N미만": not a number to store, so left empty. */
+  /** Written as "N미만" (less than N): not a number to store, so left empty. */
   lessThan: LabelNutrient[];
   /** Numbers found but larger than a food can hold, left empty. */
   outOfRange: LabelNutrient[];
@@ -29,7 +29,7 @@ const maxAmount = 99_999;
 const number = String.raw`(\d+(?:\.\d+)?)`;
 const unit = String.raw`(g|ml)`;
 
-// Hangul before a name means another nutrient: 트랜스지방 and 포화지방 are not 지방, nor are they
+// Hangul before a name means another nutrient: 트랜스지방 (trans fat) and 포화지방 (saturated fat) are not 지방 (fat), nor are they
 // when written with a space.
 const nutrientNames: { key: Exclude<LabelNutrient, 'calories'>; name: string; mg: boolean }[] = [
   { key: 'carbs', name: '탄수화물', mg: false },
@@ -176,7 +176,7 @@ function tableRange(
 
 /**
  * The size for a "1회 제공량당" column head without one, from the nearest "1회 제공량 30g" inside
- * the same table: never from a review or another product after it, never from 섭취참고량 (#120).
+ * the same table: never from a review or another product after it, never from 섭취참고량 (reference intake) (#120).
  */
 function borrowedServing(
   chosen: Candidate,

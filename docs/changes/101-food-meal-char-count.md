@@ -1,71 +1,71 @@
-# #101 음식·식사 글자 칸의 길이를 글자 수로 세기
+# #101 Count the length of food and meal text fields in characters
 
-- 이슈: [#101](https://github.com/sirloinbh/health-log/issues/101)
-- 브랜치: `fix/101-food-meal-char-count`
+- Issue: [#101](https://github.com/sirloinbh/health-log/issues/101)
+- Branch: `fix/101-food-meal-char-count`
 
-## 목적
+## Purpose
 
-#92에서 길이 기준을 글자(코드 포인트) 수로 정했다. 이 기준은 PostgreSQL `char_length`와 같아 이모지 하나가 1자다. 음식과 식사의 글자 칸은 #38과 같은 파일이라 그때 바꾸지 않았다. 이 칸들은 아직 `.length`(UTF-16 단위)로 세서, 이모지 하나가 2자가 됐다. 그래서 이모지 51개 음식 이름은 "100자 이하"인데도 거부됐다.
+#92 set the length rule to a count of characters (code points). This rule is the same as PostgreSQL `char_length`, so one emoji is 1 character. The text fields of foods and meals live in the same file as #38, so they were not changed then. These fields still counted with `.length` (UTF-16 units), so one emoji counted as 2 characters. A food name with 51 emoji was therefore rejected even though the limit is "100 characters or fewer".
 
-## 변경 — 2026-11-08
+## Change — 2026-11-08
 
-- `backend/src/foods.ts`: 다음 칸의 최대 길이를 `charCount`(`backend/src/text.ts`)로 센다.
-  - 음식 이름(100), 브랜드(50), 분류(30), 1회 제공량 단위(10)
-  - 출처 주소(2000), 검색어(100)
-- `backend/src/meals.ts`: 바로 기록하는 음식 이름(100)도 같은 방식으로 센다.
-- "입력해 주세요"(1자 이상) 검사는 그대로다. 빈 문자열은 어느 단위로 세도 0이다.
-- 화면(`foods.tsx`, `meals.tsx`)의 이 칸들에는 `maxLength`가 없어 바꿀 것이 없다. DB에도 이 칸들의 길이 제약이 없다.
+- `backend/src/foods.ts`: the maximum length of the following fields is counted with `charCount` (`backend/src/text.ts`).
+  - Food name (100), brand (50), category (30), serving unit (10)
+  - Source URL (2000), search term (100)
+- `backend/src/meals.ts`: the name of a food recorded directly (100) is counted the same way.
+- The "enter a value" check (at least 1 character) is unchanged. An empty string is 0 in any unit.
+- The screens (`foods.tsx`, `meals.tsx`) have no `maxLength` on these fields, so there is nothing to change. The database has no length constraint on these fields either.
 
-## 검증
+## Verification
 
-### 브라우저
+### Browser
 
-임시 DB(포트 5473, `health_browser`, `npm run db:migrate`로 새로 만듦)에 실제 API(3973)와 Vite(5273)를 띄웠다. 헤드리스 Chrome(디버깅 포트 9673)을 CDP로 움직였다. 음식 화면의 "음식 추가" 대화상자에 값을 넣고 저장했다.
+A temporary database (port 5473, `health_browser`, freshly created with `npm run db:migrate`) was started with the real API (3973) and Vite (5273). Headless Chrome (debugging port 9673) was driven over CDP. Values were entered in the "Add food" dialog on the foods screen and saved.
 
-- 음식 이름: 이모지 99개와 글자 하나(100자, UTF-16으로 199단위)
-- 1회 제공량 단위: 이모지 10개(10자, UTF-16으로 20단위)
+- Food name: 99 emoji and one letter (100 characters, 199 UTF-16 units)
+- Serving unit: 10 emoji (10 characters, 20 UTF-16 units)
 
-| 경우                                | 결과                                                                         |
-| ----------------------------------- | ---------------------------------------------------------------------------- |
-| 고치기 전(1440×900)                 | 대화상자가 남고 "음식 이름은 100자 이하…, 1회 제공량 단위는 10자 이하…" 안내 |
-| 고친 뒤(320×700, 390×844, 1440×900) | 대화상자가 닫히고, 이름 100자와 단위 이모지 10개가 그대로 저장됨             |
+| Case                                       | Result                                                                                                                                                                                      |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Before the fix (1440×900)                  | The dialog stayed open with the message "음식 이름은 100자 이하…, 1회 제공량 단위는 10자 이하…" (food name must be 100 characters or fewer…, serving unit must be 10 characters or fewer…) |
+| After the fix (320×700, 390×844, 1440×900) | The dialog closed, and the 100-character name and the 10-emoji unit were saved as entered                                                                                                   |
 
-- 처음 실행에서는 스크립트가 이름을 101자로 넣었고, 단위 칸의 기본값 "g"도 지우지 않았다. 고친 코드도 이 입력을 같은 안내로 거부했다. 한도를 넘으면 여전히 거부된다는 확인이 되었다.
-- 세 폭 모두 가로 넘침과 콘솔 오류가 없었다.
-- 확인 뒤 임시 DB, API, Vite, Chrome을 모두 껐다.
+- In the first run the script entered a 101-character name and did not clear the default "g" in the unit field. The fixed code rejected this input with the same message. This confirmed that going over the limit is still rejected.
+- There was no horizontal overflow and no console error at any of the three widths.
+- After checking, the temporary database, API, Vite, and Chrome were all shut down.
 
-### 테스트
+### Tests
 
-- `backend/test/text.test.ts`(1개 추가): 음식 이름·브랜드·분류·단위, 식사 음식 이름, 검색어에 한도보다 이모지 하나를 더 넣으면 400으로 거부되고 DB에 닿지 않는다. 이 테스트는 고치기 전 코드에서도 통과한다. 예전 방식은 이모지를 2자로 세어 같은 입력을 더 일찍 거부하기 때문이다. 한도 계산을 바꿔도 거부가 그대로임을 지키는 테스트다.
-- `backend/test/text.integration.test.ts`(1개 추가, 날짜 1985-06-10, `testDatabaseSkip` 사용)
-  - 이모지로 한도를 채운 음식(이름 100자, 브랜드 50, 분류 30, 단위 10)이 그대로 저장된다.
-  - 이모지 100개 검색어가 200으로 답한다.
-  - 이모지 100개 이름으로 바로 기록한 식사가 그대로 저장된다.
-  - 이 테스트는 고치기 전 코드에서 실패하고 고친 뒤 통과한다.
+- `backend/test/text.test.ts` (1 added): when one more emoji than the limit is put into the food name, brand, category, unit, the meal food name, or the search term, the request is rejected with 400 and does not reach the database. This test also passes on the code before the fix. The old method counted an emoji as 2 characters and rejected the same input earlier. It is a test that keeps the rejection in place when the limit calculation changes.
+- `backend/test/text.integration.test.ts` (1 added, date 1985-06-10, uses `testDatabaseSkip`)
+  - A food filled to the limits with emoji (name 100 characters, brand 50, category 30, unit 10) is saved as entered.
+  - A search term of 100 emoji answers with 200.
+  - A meal recorded directly with a name of 100 emoji is saved as entered.
+  - This test fails on the code before the fix and passes after it.
 
-### 명령
+### Commands
 
-- 임시 `health_test`(`npm run db:migrate`로 001~011 적용)로 `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과
-  - 백엔드 196개 통과, 0개 건너뜀(DB 통합 테스트 포함). 프런트 377개 통과, 2개 건너뜀. 스킬 4개 통과.
-- `npm run knip`: 통과
+- `TEST_DATABASE_URL=<temporary health_test> npm run check` with a temporary `health_test` (001 to 011 applied with `npm run db:migrate`): passed
+  - Backend 196 passed, 0 skipped (including DB integration tests). Frontend 377 passed, 2 skipped. Skills 4 passed.
+- `npm run knip`: passed
 
-## 한계
+## Limits
 
-- 출처 주소는 보통 ASCII라 이번 변경으로 달라지는 일이 거의 없다. 다른 칸과 같은 기준을 쓰려고 함께 바꿨다.
+- Source URLs are usually ASCII, so this change rarely alters anything for them. They were changed too so that every field uses the same rule.
 
-## 1차 리뷰 — 2026-11-08
+## First review — 2026-11-08
 
-별도 읽기 전용 리뷰를 실행했다. 반드시 고칠 것은 없었고, 다음을 반영했다.
+A separate read-only review was run. Nothing had to be fixed, and the following were applied.
 
-- **확인된 것:** `foods.ts`·`meals.ts`의 글자 한도는 모두 바뀌었다(`combos.ts`는 #92에서 바뀜). 남은 `.length`는 "1자 이상" 검사, 행·쪽 수, 중복 검사처럼 사용자에게 보이는 한도가 아니다. 검색어는 `likePattern`이 특수 문자만 이스케이프하고, ILIKE는 바이트 길이를 가정하지 않는다.
-- **DB 없이도 실패하는 테스트(고칠 것):** 고치기 전에 실패하는 테스트가 DB 통합 테스트뿐이었다. 이모지로 한도를 채운 음식·식사 이름과 검색어가 길이 규칙에 걸리지 않고 다음 단계로 가는 단위 테스트를 `backend/test/text.test.ts`에 더했다. 고치기 전 코드에서는 DB 없이도 실패한다.
-- **정리 코드:** 통합 테스트 정리에서 아무 테스트도 만들지 않는 이름을 지웠다.
-- **반영하지 않은 것:** `foods.integration.test.ts`가 전체 음식 수를 세는 동안 다른 파일이 음식을 만들고 지우면 어긋날 수 있다는 지적은 이 PR 전부터 있던 성질이다. 이 PR이 새 종류의 위험을 더하지 않아 그대로 두었다.
-- 반영 뒤 `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과(백엔드 197개, 건너뜀 0. 프런트 377개 통과, 2개 건너뜀. 스킬 4개). `npm run knip`: 통과.
+- **Confirmed:** every character limit in `foods.ts` and `meals.ts` was changed (`combos.ts` was changed in #92). The remaining `.length` uses are not limits shown to the user: the "at least 1 character" check, row and page counts, and duplicate checks. For the search term, `likePattern` only escapes special characters, and ILIKE does not assume a byte length.
+- **Test that fails without a DB (to fix):** before the fix, the only failing tests were the DB integration tests. A unit test was added to `backend/test/text.test.ts` in which food and meal names filled to the limit with emoji, and a search term, pass the length rules and move on to the next step. On the code before the fix it fails even without a DB.
+- **Cleanup code:** in the integration test cleanup, a name that no test creates was removed.
+- **Not applied:** the remark that `foods.integration.test.ts` can get out of step if another file creates and deletes foods while it counts all foods is a property that existed before this PR. This PR adds no new kind of risk, so it was left as it is.
+- After the changes, `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed (backend 197, skipped 0. Frontend 377 passed, 2 skipped. Skills 4). `npm run knip`: passed.
 
-## 2차 리뷰 — 2026-11-08
+## Second review — 2026-11-08
 
-1차 반영과 전체 diff를 별도 읽기 전용 리뷰로 다시 봤다. 반드시 고칠 것은 없었다. 리뷰는 여기서 끝낸다.
+The first-review changes and the whole diff were reviewed again by a separate read-only review. Nothing had to be fixed. The review ends here.
 
-- **테스트를 더 분명하게(고치면 좋을 것):** 1차에서 더한 단위 테스트는 "400이 아니다"만 봐서, 다른 오류(500)로 끝나도 통과했다. 음식 요청이 실제로 쓰였는지도 보이지 않았다. 이 테스트만의 가짜 DB가 풀과 트랜잭션의 문장을 모두 기록하게 했다. 이제 음식과 식사 항목의 `INSERT`가 그 이름으로 실행됐는지 확인한다. 브랜드 50자·분류 30자도 이모지로 채웠다. 고치기 전 코드에서는 DB 없이 실패한다.
-- 반영 뒤 `TEST_DATABASE_URL=<임시 health_test> npm run check`: 통과(백엔드 197개, 건너뜀 0. 프런트 377개 통과, 2개 건너뜀. 스킬 4개). `npm run knip`: 통과.
+- **Make the test clearer (nice to fix):** the unit test added in the first review only checked "is not 400", so it also passed if the request ended with another error (500). It also did not show that the food request was actually used. The fake DB used only by this test now records the statements of both the pool and the transaction. The test now checks that the `INSERT` for the food and for the meal item ran with that name. The brand (50) and category (30) are also filled with emoji. On the code before the fix it fails without a DB.
+- After the changes, `TEST_DATABASE_URL=<temporary health_test> npm run check`: passed (backend 197, skipped 0. Frontend 377 passed, 2 skipped. Skills 4). `npm run knip`: passed.

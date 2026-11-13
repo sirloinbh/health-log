@@ -69,13 +69,13 @@ The second review confirmed the first-review change (the `asked` state) is corre
 
 The real API (127.0.0.1:3971) and Vite (5271) were started on a temporary DB, and headless Chrome (debugging 9671) was driven over CDP. Data was put in by sending UTF-8 JSON to the API from a Node script. From 11-01 there were 4 goals, and on 11-06 a lunch of 950 kcal, sleep, and a direct check.
 
-| Item                                                                                                                                                                                                                         | 390×844 | 1440×900 |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
-| Adding 1,300 kcal with "바로 기록" (record directly) on the 11-06 meal card changed the goal card from "달성 950kcal" (achieved) to "미달 2,250kcal" (missed) without a button                                               | passed  | —        |
-| Adding 1,300 kcal on 11-07 (no meals) changed "기록 없음" (no record) to "달성 1,300kcal" (achieved)                                                                                                                         | —       | passed   |
+| Item                                                                                                                                                                                                                           | 390×844 | 1440×900 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- | -------- |
+| Adding 1,300 kcal with "바로 기록" (record directly) on the 11-06 meal card changed the goal card from "달성 950kcal" (achieved) to "미달 2,250kcal" (missed) without a button                                                 | passed  | —        |
+| Adding 1,300 kcal on 11-07 (no meals) changed "기록 없음" (no record) to "달성 1,300kcal" (achieved)                                                                                                                           | —       | passed   |
 | #45 sleep goal hours and minutes inputs: the existing 7 hours 0 minutes were filled in, `1O` in minutes was rejected, 7 hours 10 minutes saved from 11-06 → current goal and form updated, focus moved to the sleep card title | passed  | —        |
-| After saving, the 11-06 sleep judgment became "달성" (achieved) with the new goal (7 hours 10 minutes or more)                                                                                                               | passed  | —        |
-| The hours, minutes, and start-date fields of the sleep goal have the same height (after the fix). Before the fix at 1440 the hours field was pushed down                                                                      | passed  | passed   |
+| After saving, the 11-06 sleep judgment became "달성" (achieved) with the new goal (7 hours 10 minutes or more)                                                                                                                 | passed  | —        |
+| The hours, minutes, and start-date fields of the sleep goal have the same height (after the fix). Before the fix at 1440 the hours field was pushed down                                                                       | passed  | passed   |
 
 - Each change was tried by clicking at only one of the two widths, and at the other width only the layout was checked.
 - After checking, Chrome, Vite, the API, and the temporary DB were all shut down.

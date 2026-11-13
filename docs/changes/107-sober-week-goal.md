@@ -57,11 +57,11 @@ The second review (the last) confirmed the first-review changes are correct and 
 
 The real API (127.0.0.1:3971) and Vite (5271) were started on a temporary DB, and the settings screen was opened with headless Chrome (debugging 9671). The sobriety goal was entered as 5 days from 11-01 and 6 days from 11-09.
 
-| Item                                                                                                                                                                              | 390×844 | 1440×900 |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
+| Item                                                                                                                                                                                | 390×844 | 1440×900 |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
 | The sobriety card description is "이번 주(11.02~11.08) 목표: 주 5일 이상 금주 (2026-11-01부터)" (this week's (11.02 to 11.08) goal: sober at least 5 days a week (from 2026-11-01)) | passed  | passed   |
-| "(예정)" (scheduled) is put on the change from the next Monday (11-09)                                                                                                            | passed  | passed   |
-| No horizontal scroll                                                                                                                                                              | passed  | —        |
+| "(예정)" (scheduled) is put on the change from the next Monday (11-09)                                                                                                              | passed  | passed   |
+| No horizontal scroll                                                                                                                                                                | passed  | —        |
 
 - The server's today on the day of the check (2026-11-08) is a Sunday, so there is no date after today within this week. "A later change within this week is not scheduled" could not be seen in the browser and was checked only by tests.
 - After checking, Chrome, Vite, the API, and the temporary DB were all shut down.

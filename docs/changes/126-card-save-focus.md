@@ -24,14 +24,14 @@ On the daily record cards and goal settings, pressing Save made the save button 
 
 ## Change — 2026-11-08
 
-| File                                                             | Content                                                                                                                                                                                      |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `frontend/src/busy-button.tsx`                                   | New shared button                                                                                                                                                                            |
-| `frontend/src/sleep.tsx`, `body.tsx`, `habits.tsx`, `checks.tsx` | Save and cancel buttons changed to `BusyButton`, and `submit` got ignoring while saving and clearing the message                                                                             |
-| `frontend/src/goals.tsx`                                         | The Save and "시작일부터 목표 끄기" (turn the goal off from the start date) buttons, and the same handling in `submit` and `save`                                                            |
+| File                                                             | Content                                                                                                                                                                                                   |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `frontend/src/busy-button.tsx`                                   | New shared button                                                                                                                                                                                         |
+| `frontend/src/sleep.tsx`, `body.tsx`, `habits.tsx`, `checks.tsx` | Save and cancel buttons changed to `BusyButton`, and `submit` got ignoring while saving and clearing the message                                                                                          |
+| `frontend/src/goals.tsx`                                         | The Save and "시작일부터 목표 끄기" (turn the goal off from the start date) buttons, and the same handling in `submit` and `save`                                                                         |
 | `frontend/src/meals.tsx`                                         | "추가" (Add) of search results and recent foods, "기록" (Record) of a combo, "복사" (Copy), and "바로 기록" (Record directly) changed to `BusyButton`, and each add function ignores a press while adding |
-| `frontend/src/save-focus.test.tsx`                               | Failure scenarios of six forms, form submission while saving, and `BusyButton` unit tests                                                                                                    |
-| `frontend/src/*.test.tsx`                                        | Changed the `toBeDisabled()` check during saving to an `aria-disabled` check                                                                                                                 |
+| `frontend/src/save-focus.test.tsx`                               | Failure scenarios of six forms, form submission while saving, and `BusyButton` unit tests                                                                                                                 |
+| `frontend/src/*.test.tsx`                                        | Changed the `toBeDisabled()` check during saving to an `aria-disabled` check                                                                                                                              |
 
 ## Verification
 
@@ -50,14 +50,14 @@ On the daily record cards and goal settings, pressing Save made the save button 
 
 Checked on a temporary PostgreSQL 17 (5472, `health_test`), API 3972, Vite 5272, and headless Chrome 9672. The save request was delayed by 1.2 seconds with the DevTools protocol and then failed with 500. The results were the same at widths 1440px and 390px.
 
-| Form                | Focus while saving                              | Focus after failure         | Enter again while saving | Focus after success             |
-| ------------------- | ----------------------------------------------- | --------------------------- | ------------------------ | ------------------------------- |
-| Sleep               | Save (`aria-disabled`, not `disabled`)          | Save, message shown         | 1 request                | Card title                      |
-| Body                | Save                                            | Save                        | 1 request                | Card title                      |
-| Alcohol and tobacco | Save                                            | Save                        | 1 request                | Card title                      |
-| Daily check         | Save                                            | Save                        | 1 request                | Card title                      |
-| Meal direct record  | "바로 기록" (Record directly)                   | "바로 기록"                 | 1 request                | "바로 기록" (same as before)    |
-| Goal (calories)     | Save                                            | Save                        | 1 request                | Card title                      |
+| Form                | Focus while saving                     | Focus after failure | Enter again while saving | Focus after success          |
+| ------------------- | -------------------------------------- | ------------------- | ------------------------ | ---------------------------- |
+| Sleep               | Save (`aria-disabled`, not `disabled`) | Save, message shown | 1 request                | Card title                   |
+| Body                | Save                                   | Save                | 1 request                | Card title                   |
+| Alcohol and tobacco | Save                                   | Save                | 1 request                | Card title                   |
+| Daily check         | Save                                   | Save                | 1 request                | Card title                   |
+| Meal direct record  | "바로 기록" (Record directly)          | "바로 기록"         | 1 request                | "바로 기록" (same as before) |
+| Goal (calories)     | Save                                   | Save                | 1 request                | Card title                   |
 
 Before the fix, the same procedure left focus on `<body>` after every failure (the #126 reproduction).
 

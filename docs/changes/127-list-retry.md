@@ -38,7 +38,6 @@
     | 320   | 154px | 88px                 | 196px               | none     |
     | 390   | 154px | 158px                | 266px               | none     |
     | 1440  | 135px | —                    | 888px               | none     |
-
     - "Field before the fix" is the value measured on screen with the new class removed.
     - At 390px, only 4px was left even before the fix. This is the same state as what looked cut off in the check.
     - At phone widths the "방문 기록" button sits on the row below the search box. At 1440 it is on one row as before. There were 0 console errors.

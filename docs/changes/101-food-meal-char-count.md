@@ -25,10 +25,10 @@ A temporary database (port 5473, `health_browser`, freshly created with `npm run
 - Food name: 99 emoji and one letter (100 characters, 199 UTF-16 units)
 - Serving unit: 10 emoji (10 characters, 20 UTF-16 units)
 
-| Case                                       | Result                                                                                                                                                                                      |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Case                                       | Result                                                                                                                                                                                     |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Before the fix (1440×900)                  | The dialog stayed open with the message "음식 이름은 100자 이하…, 1회 제공량 단위는 10자 이하…" (food name must be 100 characters or fewer…, serving unit must be 10 characters or fewer…) |
-| After the fix (320×700, 390×844, 1440×900) | The dialog closed, and the 100-character name and the 10-emoji unit were saved as entered                                                                                                   |
+| After the fix (320×700, 390×844, 1440×900) | The dialog closed, and the 100-character name and the 10-emoji unit were saved as entered                                                                                                  |
 
 - In the first run the script entered a 101-character name and did not clear the default "g" in the unit field. The fixed code rejected this input with the same message. This confirmed that going over the limit is still rejected.
 - There was no horizontal overflow and no console error at any of the three widths.

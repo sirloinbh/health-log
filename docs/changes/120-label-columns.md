@@ -86,13 +86,13 @@ The second review (the last) confirmed that the 4 first-review fixes hold (74 te
 
 After the second-review changes, it was checked again in the "Add food" dialog by the same method (temporary DB, real API 127.0.0.1:3971, Vite 5271, headless Chrome 9671).
 
-| Pasted table                                                                    | Result                                                  | 390×844 | 1440×900 |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------- | ------- | -------- |
-| Two-column table `총 내용량당 \| 100g당`                                        | 300g, 900kcal, 600mg                                    | passed  | passed   |
+| Pasted table                                                                            | Result                                                  | 390×844 | 1440×900 |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------- | -------- |
+| Two-column table `총 내용량당 \| 100g당`                                                | 300g, 900kcal, 600mg                                    | passed  | passed   |
 | "1회 제공량당" with no size, "1회 제공량 30g" above it, rows with bars and ratios first | 30g, 150kcal, 90mg, a notice about 2x                   | passed  | passed   |
-| Two-column table split by tabs, `당류\t\t5g` (empty first column)               | 100g, 250kcal, 300mg, sugars left empty                 | passed  | passed   |
-| `열량 310kcal 단백질 12g` (no basis amount)                                     | Fields unchanged, a warning and the list of values read | passed  | passed   |
-| Horizontal overflow of the dialog                                               | none                                                    | passed  | passed   |
+| Two-column table split by tabs, `당류\t\t5g` (empty first column)                       | 100g, 250kcal, 300mg, sugars left empty                 | passed  | passed   |
+| `열량 310kcal 단백질 12g` (no basis amount)                                             | Fields unchanged, a warning and the list of values read | passed  | passed   |
+| Horizontal overflow of the dialog                                                       | none                                                    | passed  | passed   |
 
 - After checking, Chrome, Vite, the API, and the temporary DB were all shut down.
 
@@ -121,11 +121,11 @@ After the second-review changes, it was checked again in the "Add food" dialog b
 
 The real API (127.0.0.1:3971) and Vite (5271) were started on a temporary PostgreSQL 17 (5471), and the "Add food" dialog was opened with headless Chrome (9671).
 
-| Pasted table                                                                                     | Result                                                                                                              | 390×844 | 1440×900 |
-| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
-| `총 내용량당 \| 100g당`, `총 내용량 300g`, `열량 900kcal \| 300kcal`, two columns of sodium     | Serving size 300g, calories 900, sodium 600                                                                         | passed  | passed   |
-| `1회 제공량 30g`, `1회 제공량당 \| 총 내용량당`, `열량 \| 150kcal \| …`, `나트륨 15% 90mg \| …` | 30g, 150, 90, a notice about 2x the total amount                                                                    | passed  | passed   |
-| `열량 310kcal 단백질 12g` (no basis amount)                                                      | Fields unchanged, a warning and "읽은 값: 칼로리 310kcal, 단백질 12g" (values read: calories 310kcal, protein 12g) | passed  | passed   |
-| Horizontal overflow of the dialog                                                                | none                                                                                                                | passed  | passed   |
+| Pasted table                                                                                    | Result                                                                                                             | 390×844 | 1440×900 |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------- | -------- |
+| `총 내용량당 \| 100g당`, `총 내용량 300g`, `열량 900kcal \| 300kcal`, two columns of sodium     | Serving size 300g, calories 900, sodium 600                                                                        | passed  | passed   |
+| `1회 제공량 30g`, `1회 제공량당 \| 총 내용량당`, `열량 \| 150kcal \| …`, `나트륨 15% 90mg \| …` | 30g, 150, 90, a notice about 2x the total amount                                                                   | passed  | passed   |
+| `열량 310kcal 단백질 12g` (no basis amount)                                                     | Fields unchanged, a warning and "읽은 값: 칼로리 310kcal, 단백질 12g" (values read: calories 310kcal, protein 12g) | passed  | passed   |
+| Horizontal overflow of the dialog                                                               | none                                                                                                               | passed  | passed   |
 
 - After checking, Chrome, Vite, the API, and the temporary DB were all shut down.

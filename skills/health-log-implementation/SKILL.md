@@ -5,7 +5,7 @@ description: Follow the user's issue, numbered branch, implementation with docs,
 
 # Meal, sleep, and health log implementation steps
 
-This skill applies to changes in `sirloinbh/health-log`. Do not apply this account, repository, or policy to other projects. First read `AGENTS.md` in the project root and the related docs. Follow the order below, go through automated code review (at most 2 rounds), and deliver the result with the PR merged after the required CI passes.
+This skill applies to changes in `sirloinbh/health-log`. Do not apply this account, repository, or policy to other projects. First read `AGENTS.md` in the project root and the related docs. Follow the order below, go through automated code review (1 or 2 rounds, more only while blocking findings remain), and deliver the result with the PR merged after the required CI passes.
 
 ## 1. Register the issue card
 
@@ -42,13 +42,13 @@ This skill applies to changes in `sirloinbh/health-log`. Do not apply this accou
 - Pass the PR body as a UTF-8 file. Include the problem and the behavior after the change, the main changes, the real check commands and results, the evidence that is possible for a screen change, and `Closes #<number>`. If there are no images, write why, and the limits of the verification.
 - Check the GitHub Actions results and fix the related failures. Say so for a check that is still running. If you changed code after creating the PR, run the affected checks again and update the results in the docs and the PR.
 
-## 5. Automated code review after the PR (at most 2 rounds)
+## 5. Automated code review after the PR (1 or 2 rounds, more only while blocking findings remain)
 
 1. **First review**: After you open the PR, run a read-only review that is separate from the context that wrote it (a separate agent, a review tool, and so on). Look at correctness, regressions, security, missing tests, and the docs record, against the issue's done criteria and the whole PR diff.
 2. **If there is nothing to fix**, end the review and move on to the CI check and the merge.
 3. **If there is something to fix**, apply only the findings that are in the scope of this PR. Make an extra commit with the related tests and docs record, and push it.
 4. **Second review**: Check that the first findings were applied, and the extra diff. Also look at the final whole PR diff. If there is nothing to fix, move on to CI.
-5. **Second fixes**: Apply the second findings in an extra commit. The review is at most 2 rounds, so do not do a third review and move on to CI.
+5. **Second fixes**: Apply the second findings in an additional commit. Stop after round 2 unless a blocking finding remains. If one does, fix it on the same branch and review again, repeating only while blocking findings remain (std-code-review section 8), then go on to CI.
 6. **Split large changes**: Do not fix findings of the following kinds in this PR. Make a new issue card (with the problem, scope, and done criteria) instead. Leave the issue link in a PR comment and in the docs record, and keep going with this PR.
    - A feature outside the requested scope
    - A change of design or data structure

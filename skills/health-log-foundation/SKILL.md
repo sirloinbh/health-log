@@ -5,7 +5,7 @@ description: Establish or improve the repeatable development foundation of the h
 
 # Meal, sleep, and health log development foundation
 
-This skill sets out how this app is developed, verified, and run so that it can be repeated. First read `AGENTS.md` in the project root and `skills/health-log-implementation/SKILL.md`, then work in this order: issue → branch named with the issue number → implementation and docs record → tests and PR → automated code review (at most 2 rounds) → the agent merges after CI passes. This skill does not let you skip the issue and PR steps or the CI pass condition, and it does not grant deployment permission.
+This skill sets out how this app is developed, verified, and run so that it can be repeated. First read `AGENTS.md` in the project root and `skills/health-log-implementation/SKILL.md`, then work in this order: issue → branch named with the issue number → implementation and docs record → tests and PR → automated code review (1 or 2 rounds, more only while blocking findings remain) → the agent merges after CI passes. This skill does not let you skip the issue and PR steps or the CI pass condition, and it does not grant deployment permission.
 
 ## Baseline
 

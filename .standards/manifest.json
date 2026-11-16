@@ -1,5 +1,5 @@
 {
-  "centralSha": "a0890cfe2de43403c6c740ec20408636a5e3b523",
+  "centralSha": "fed37ba151aa56f71a19eaf3f2f80b007ffdde2d",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -130,7 +130,7 @@
     },
     ".github/workflows/ci.yml": {
       "mode": "full",
-      "sha256": "fea088b16a8806222f15d07b097d6a84fa04c7c8503a4e193f9763063021b454",
+      "sha256": "d54be0c79ab8b94e7f3ec9f020bcceab9f94cefc457e558f514041901e4ec28c",
       "source": "templates/app/.github/workflows/ci.yml.tmpl"
     },
     ".gitignore": {
@@ -812,7 +812,8 @@
     "@sirloinbh/eslint-config": "1.1.0",
     "@sirloinbh/prettier-config": "1.0.0",
     "@sirloinbh/tsconfig": "1.0.0",
-    "@sirloinbh/design-tokens": "1.0.0"
+    "@sirloinbh/design-tokens": "1.0.0",
+    "@sirloinbh/auth-client": "1.0.0"
   },
   "registry": {
     "ports": {

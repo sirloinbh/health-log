@@ -22,6 +22,7 @@ import { type Health, healthText } from './health';
 import { medicationsPagePath } from './med-text';
 import { MedicationsPage } from './medications';
 import { ReportPage } from './report';
+import { AccountActions, SignInGate } from './sign-in';
 import { visitsPagePath } from './visit-text';
 import { VisitsPage } from './visits';
 
@@ -128,37 +129,39 @@ export function App() {
     health.state === 'ok' ? health.today : health.state === 'loading' ? undefined : null;
   return (
     <BrowserRouter>
-      <AppShell appName="Diet, Sleep and Health Log" nav={nav}>
-        <Routes>
-          <Route path={pages.overview} element={<ReportPage health={health} />} />
-          <Route
-            path={pages.daily}
-            element={<TodayRedirect basePath={pages.daily} health={health} />}
-          />
-          <Route
-            path={`${pages.daily}/:date`}
-            element={<DailyPage basePath={pages.daily} health={health} />}
-          />
-          <Route path={pages.foods} element={<FoodsPage />} />
-          <Route path={pages.combos} element={<CombosPage />} />
-          <Route path={pages.visits} element={<VisitsPage today={pageToday} />} />
-          <Route path={pages.medications} element={<MedicationsPage today={pageToday} />} />
-          <Route
-            path={pages.settings}
-            element={
-              <Page
-                title="Settings"
-                description="App preferences and data management"
-                health={health}
-              >
-                <GoalsSettings />
-              </Page>
-            }
-          />
-          <Route path="*" element={<Navigate to={pages.overview} replace />} />
-        </Routes>
-      </AppShell>
-      <Toaster />
+      <SignInGate>
+        <AppShell appName="Diet, Sleep and Health Log" nav={nav} actions={<AccountActions />}>
+          <Routes>
+            <Route path={pages.overview} element={<ReportPage health={health} />} />
+            <Route
+              path={pages.daily}
+              element={<TodayRedirect basePath={pages.daily} health={health} />}
+            />
+            <Route
+              path={`${pages.daily}/:date`}
+              element={<DailyPage basePath={pages.daily} health={health} />}
+            />
+            <Route path={pages.foods} element={<FoodsPage />} />
+            <Route path={pages.combos} element={<CombosPage />} />
+            <Route path={pages.visits} element={<VisitsPage today={pageToday} />} />
+            <Route path={pages.medications} element={<MedicationsPage today={pageToday} />} />
+            <Route
+              path={pages.settings}
+              element={
+                <Page
+                  title="Settings"
+                  description="App preferences and data management"
+                  health={health}
+                >
+                  <GoalsSettings />
+                </Page>
+              }
+            />
+            <Route path="*" element={<Navigate to={pages.overview} replace />} />
+          </Routes>
+        </AppShell>
+        <Toaster />
+      </SignInGate>
     </BrowserRouter>
   );
 }

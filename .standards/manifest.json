@@ -1,5 +1,5 @@
 {
-  "centralSha": "74a105e99e677d4609f99dc4873ed79a2cd204df",
+  "centralSha": "aba0794137264f87dfdd25c776304fae7cb6ffba",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -428,7 +428,7 @@
     },
     "frontend/public/manifest.webmanifest": {
       "mode": "full",
-      "sha256": "10251e75bb8232055a3e2798cdaf529f9e67db02facbf75ae2f1b0c8bc148cde",
+      "sha256": "b6361773ca080918efd6bb203d2db453e00a0973a9bd03601c9053d2870b30a4",
       "source": "templates/app/frontend/public/manifest.webmanifest.tmpl"
     },
     "frontend/public/offline.html": {
@@ -738,7 +738,7 @@
     },
     "knip.json": {
       "mode": "full",
-      "sha256": "98d012da1b99df680e21a39d1c4ea63cdebaffdf2ca1d7183aa554e2c019a93c",
+      "sha256": "b3b9fcc9dd9c425b8d7043d4d5a306f32044317ee5c53ff6ce3c6700c2eefc85",
       "source": "templates/app/knip.json"
     },
     "lighthouserc.json": {

@@ -1,7 +1,7 @@
 {
   "name": "Diet, Sleep and Health Log",
   "short_name": "Health Log",
-  "description": "A personal service for recording diet, sleep, and health by date and seeing how they change. There is one user (me) and no login. Before any public exposure, design private access or authentication first.",
+  "description": "Record your diet, sleep, and health by date and see how they change.",
   "lang": "en",
   "start_url": "/",
   "scope": "/",

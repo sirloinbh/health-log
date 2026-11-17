@@ -1,5 +1,5 @@
 {
-  "centralSha": "aba0794137264f87dfdd25c776304fae7cb6ffba",
+  "centralSha": "9f05ff31ce4c4151dfe85a0ffd38195fe8ecdee4",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -220,7 +220,7 @@
     },
     "AGENTS.md": {
       "mode": "full",
-      "sha256": "51425e0ebf14e61c591a0605da5f00d46a4c795b05a1e812e6f6f2ee7d7d6049",
+      "sha256": "b23bb42c6b031b35c0a99c6e3f423559e077d8218fd1b2a33ffa7414deb8563f",
       "source": "templates/app/AGENTS.md.tmpl"
     },
     "backend/.npmrc": {
@@ -339,7 +339,7 @@
     },
     "deploy/remote-deploy.sh": {
       "mode": "full",
-      "sha256": "f525967df8f68330e3ac778b99f909b6dffb0df6cdf2f453d26096e75fd24d2b",
+      "sha256": "06519a93e4f5642b926625c22402f587272b9075a5ea0254f73dd33c265ef486",
       "source": "templates/app/deploy/remote-deploy.sh.tmpl"
     },
     "deploy/report.service": {
@@ -349,7 +349,7 @@
     },
     "deploy/report.sh": {
       "mode": "full",
-      "sha256": "be4409407e93ae5a2e18bcc8efa7a0fcbe787895ea798a900ce4e49a2d60dd3b",
+      "sha256": "d4f711d20933cc3800d9c59d63a8363ad7591071abf676047b2d0ed7c792271d",
       "source": "templates/app/deploy/report.sh.tmpl"
     },
     "deploy/report.timer": {
@@ -804,7 +804,7 @@
     },
     "scripts/push-repositories.ps1": {
       "mode": "full",
-      "sha256": "c7f47ea66313be06fd174b9da7745c48d489414bb84fcba65db43216f351c06c",
+      "sha256": "c64e2c39bcd40d72339ea27b00d6c0706ef58dd3c55abebf017058b3e8061b7a",
       "source": "templates/app/scripts/push-repositories.ps1"
     },
     "skills/std-backlog/SKILL.md": {

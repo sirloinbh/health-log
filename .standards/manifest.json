@@ -1,5 +1,5 @@
 {
-  "centralSha": "ef519a027a81e433b3ccb701683cf17492cba689",
+  "centralSha": "1d20cf11e897809cbead42177bae51189e92db2b",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -379,7 +379,7 @@
     },
     "frontend/nginx.conf": {
       "mode": "full",
-      "sha256": "720cb8acf2ddd3b1be5f322ea369a4e23904005d26a57879e0354d8e775388ba",
+      "sha256": "59d1cf91b88ed377edd79d767692e9a9e882c20c027b39c2f0412379f6e21386",
       "source": "templates/app/frontend/nginx.conf.tmpl"
     },
     "frontend/package.json": {

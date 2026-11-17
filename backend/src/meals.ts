@@ -23,9 +23,9 @@ export const servingsInput = z
   .max(999, 'The quantity is too large')
   .refine(hasTwoDecimalsAtMost, 'The quantity can have at most 2 decimal places');
 
-const comboUse = z.object({ meal: mealKey }, { error: 'The request body is not valid' });
+export const comboUse = z.object({ meal: mealKey }, { error: 'The request body is not valid' });
 
-const mealCopy = z.object(
+export const mealCopy = z.object(
   {
     from: z
       .string({ error: 'Choose a date to copy from' })
@@ -35,7 +35,7 @@ const mealCopy = z.object(
   { error: 'The request body is not valid' },
 );
 
-const entryInput = z
+export const entryInput = z
   .object(
     {
       meal: mealKey,

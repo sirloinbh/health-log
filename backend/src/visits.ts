@@ -44,7 +44,7 @@ const cost = (label: string) =>
     .nullable()
     .default(null);
 
-const visitInput = z
+export const visitInput = z
   .object(
     {
       date: z
@@ -84,7 +84,7 @@ const visitInput = z
 
 type VisitInput = z.infer<typeof visitInput>;
 
-const listQuery = z.object({
+export const listQuery = z.object({
   q: z
     .string({ error: 'The search term is not valid' })
     .trim()

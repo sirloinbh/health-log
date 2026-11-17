@@ -14,7 +14,7 @@ import { HttpError } from './standard/http.js';
 /** Days ahead a reminder starts showing; today counts as day 0. */
 const leadDays = 7;
 
-const doneInput = z.object(
+export const doneInput = z.object(
   {
     kind: z.enum(['visit', 'medication'], { error: 'The reminder type is not valid' }),
     id: z

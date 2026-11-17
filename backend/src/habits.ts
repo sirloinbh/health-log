@@ -26,7 +26,7 @@ const drinkInput = z.object(
   { error: 'The drink record is not valid' },
 );
 
-const habitInput = z
+export const habitInput = z
   .object(
     {
       // null: not recorded. 0: recorded as none.

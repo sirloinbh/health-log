@@ -16,7 +16,7 @@ const check = (label: string) =>
     .nullable()
     .default(null);
 
-const checkInput = z
+export const checkInput = z
   .object(
     {
       dietKept: check('Diet kept'),

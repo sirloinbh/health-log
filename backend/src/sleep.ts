@@ -15,7 +15,7 @@ export const sleepMinutes = (bedAt: string, wakeAt: string) =>
 
 const instant = (label: string) => z.iso.datetime({ offset: true, error: `${label} is not valid` });
 
-const sleepInput = z.object(
+export const sleepInput = z.object(
   { bedAt: instant('Bedtime'), wakeAt: instant('Wake-up time') },
   { error: 'The request body is not valid' },
 );

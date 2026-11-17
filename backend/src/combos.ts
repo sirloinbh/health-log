@@ -10,7 +10,7 @@ import { charCount } from './text.js';
 
 const maxItems = 20;
 
-const comboInput = z.object(
+export const comboInput = z.object(
   {
     name: z
       .string({ error: 'Enter a combo name' })

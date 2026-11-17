@@ -31,7 +31,7 @@ const pressure = (label: string, min: number, max: number) =>
     .nullable()
     .default(null);
 
-const bodyInput = z
+export const bodyInput = z
   .object(
     {
       weightKg: measure('Weight', 500),

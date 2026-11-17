@@ -48,7 +48,7 @@ const isHttpUrl = (value: string) => {
   }
 };
 
-const foodInput = z
+export const foodInput = z
   .object(
     {
       name: z
@@ -116,7 +116,7 @@ const foodInput = z
     }
   });
 
-const searchQuery = z.object({
+export const searchQuery = z.object({
   q: z
     .string({ error: 'The search term is not valid' })
     .trim()

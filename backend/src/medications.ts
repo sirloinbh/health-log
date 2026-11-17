@@ -24,7 +24,7 @@ const optionalText = (label: string, max: number) =>
     .default(null)
     .transform((value) => value || null);
 
-const medicationInput = z
+export const medicationInput = z
   .object(
     {
       name: z
@@ -61,7 +61,7 @@ const medicationInput = z
 
 type MedicationInput = z.infer<typeof medicationInput>;
 
-const dayQuery = z.object({
+export const dayQuery = z.object({
   date: z
     .string({ error: 'The date is not valid' })
     .refine(isRealDate, 'The date is not valid')

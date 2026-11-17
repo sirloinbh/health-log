@@ -7,7 +7,7 @@ import { isRealDate } from './dates.js';
 import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.js';
 import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 
-const reportQuery = z.object({
+export const reportQuery = z.object({
   period: z.enum(['week', 'month'], { error: 'The period must be week or month' }),
   date: z.string({ error: 'The date is not valid' }).refine(isRealDate, 'The date is not valid'),
 });

@@ -15,7 +15,7 @@ import { defaultRateLimit, type RateLimitSettings } from './rate-limit.js';
 import { remindersRouter } from './reminders.js';
 import { reportRouter } from './report.js';
 import { sleepRouter } from './sleep.js';
-import { errorHandler, notFound } from './standard/http.js';
+import { errorHandler, notFound, requestLog } from './standard/http.js';
 import { rejectNul } from './text.js';
 import { visitsRouter } from './visits.js';
 
@@ -45,6 +45,8 @@ export function createApp(
   const today = options.today ?? (() => serviceDate());
   const app = express();
   app.disable('x-powered-by');
+  // project-standards#658: a request ID and one JSON log line for every request, first so a 401 has them too.
+  app.use(requestLog);
   app.use(express.json({ limit: '256kb' }));
   app.use(rejectNul);
   // #167: the shared sign-in guards every /api route except /api/health, before any route registers.

@@ -1,5 +1,5 @@
 {
-  "centralSha": "d974c93bf39765824b671009f2b2d2cec202e6ee",
+  "centralSha": "5c449961854f81ed9802a621ae5ecd91bd6d72e2",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -339,7 +339,7 @@
     },
     "deploy/remote-deploy.sh": {
       "mode": "full",
-      "sha256": "63e213ed9c2301340e64d8a14ad3280497036520eb5d6d01149381f019e3b9e1",
+      "sha256": "60c7181bd079dfdaf1d25d18a691e0b8aeeaa845ce845a5a981b92ce3e635015",
       "source": "templates/app/deploy/remote-deploy.sh.tmpl"
     },
     "deploy/report.service": {

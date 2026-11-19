@@ -78,6 +78,8 @@ frontend/src/service-worker.test.tsx
 frontend/src/test/standard-setup.ts
 backend/test/standard/
 backend/test/standard-api.test.ts
+frontend/src/lib/query.ts
+frontend/src/lib/query.test.tsx
 # --- project ---
 # Written by `npm run openapi` (JSON.stringify); the backend test compares it with the routes.
 docs/openapi.json

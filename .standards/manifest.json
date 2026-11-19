@@ -1,5 +1,5 @@
 {
-  "centralSha": "93cf8d7f01ab2bab1d5a224af934c7811180e6d5",
+  "centralSha": "7425a45fda829c10c418983d914321148357bd1f",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -130,7 +130,7 @@
     },
     ".github/workflows/ci.yml": {
       "mode": "full",
-      "sha256": "741f6f4bf4e99437b1173d7b177bc8b3dbb2a3395914b69f3cde2aa4216897c0",
+      "sha256": "18bb186ee1af3f4a9c8f1f985a51ca0e53dce3dc11aeb640f55b83600e809560",
       "source": "templates/app/.github/workflows/ci.yml.tmpl"
     },
     ".gitignore": {
@@ -871,7 +871,7 @@
     },
     "frontend/src/lib/api.ts": {
       "mode": "full",
-      "sha256": "7adda482b7879e446ece1b541f7334416f8974d8202f83086fe2c733a55a6c94",
+      "sha256": "af5e5390152006439cbe6bbb5f5624b78df4c5e9902022faf3b5da565d64a813",
       "source": "templates/ui/frontend/src/lib/api.ts"
     },
     "frontend/src/lib/apps.ts": {

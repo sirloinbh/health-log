@@ -165,7 +165,7 @@ test('the migrate command applies, then reports nothing to apply', { skip }, asy
     const first = await command();
     assert.equal(first.stdout.trim(), `Applied: ${names.join(', ')}`);
     const second = await command();
-    assert.equal(second.stdout.trim(), 'There are no migrations to apply.');
+    assert.equal(second.stdout.trim(), 'No pending migrations.');
     const status = await command('--status');
     assert.deepEqual(
       status.stdout.trim().split('\n'),

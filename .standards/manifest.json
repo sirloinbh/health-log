@@ -1,5 +1,5 @@
 {
-  "centralSha": "7425a45fda829c10c418983d914321148357bd1f",
+  "centralSha": "f19cd0bec767bbae0a88591709634cfae8179bb7",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -350,7 +350,7 @@
     },
     "deploy/autodeploy.sh": {
       "mode": "full",
-      "sha256": "3c2b584d9f31a81a73be7a11c12839fb4886172c58ed928d75a0e1896b4feb12",
+      "sha256": "dac22341f42f1575c6fa9eed5891eedd382d0eab26187d521e4e091875ed8f4f",
       "source": "templates/deploy/deploy/autodeploy.sh.tmpl"
     },
     "deploy/autodeploy.timer": {
@@ -861,7 +861,7 @@
     },
     "frontend/src/health.ts": {
       "mode": "full",
-      "sha256": "883b0f670b801155fc7e47802ca3864d3b67f53dc4aa46a3444aa786c8912892",
+      "sha256": "2b9dcf54a0b6baa6a2dd896ccd55af04b51cf7c6a3585cff14bc53c8eb4a755a",
       "source": "templates/ui/frontend/src/health.ts"
     },
     "frontend/src/lib/api.test.ts": {

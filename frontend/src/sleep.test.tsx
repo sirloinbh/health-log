@@ -3,6 +3,7 @@ import { expect, test, vi } from 'vitest';
 
 import { toast } from './components/ui/sonner';
 import { SleepCard } from './sleep';
+import { findLive, queryLive } from './test/live';
 
 const date = '2026-03-15';
 const record = {
@@ -75,7 +76,7 @@ test('saving without both times explains itself and sends nothing', async () => 
   render(<SleepCard date={date} />);
   await screen.findByLabelText('Bedtime');
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Enter a bedtime and a wake-up time');
+  expect(await findLive('alert')).toHaveTextContent('Enter a bedtime and a wake-up time');
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
@@ -88,9 +89,7 @@ test('the server refusing the times shows its reason and keeps what was typed', 
   await screen.findByLabelText('Bedtime');
   typeTimes('07:00', '07:00');
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent(
-    'The wake-up time must be after the bedtime',
-  );
+  expect(await findLive('alert')).toHaveTextContent('The wake-up time must be after the bedtime');
   expect(screen.getByLabelText('Bedtime')).toHaveValue('07:00');
   expect(screen.getByRole('button', { name: 'Save' })).not.toHaveAttribute('aria-disabled');
 });
@@ -154,11 +153,11 @@ test('an imported sleep says where it came from', async () => {
 test('a failed load offers another try, with no form to overwrite an unseen record', async () => {
   server({ status: 500, body: { error: 'Server error occurred' } }, { body: { record } });
   render(<SleepCard date={date} />);
-  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   expect(screen.queryByLabelText('Bedtime')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
   expect(await screen.findByText('7 h 30 min')).toBeInTheDocument();
-  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(queryLive('alert')).not.toBeInTheDocument();
 });
 
 test('pressing edit moves focus to the card instead of losing it', async () => {

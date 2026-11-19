@@ -3,6 +3,7 @@ import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
 import { toast } from './components/ui/sonner';
+import { findLive, getLive, queryLive } from './test/live';
 
 const food = {
   id: 1,
@@ -153,7 +154,7 @@ test('a server rejection keeps the form open with the Korean message and the typ
   fireEvent.change(within(dialog).getByLabelText('Food name'), { target: { value: '치즈버거' } });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-  expect(await within(dialog).findByRole('alert')).toHaveTextContent('Enter a serving size');
+  expect(await findLive('alert', dialog)).toHaveTextContent('Enter a serving size');
   expect(within(dialog).getByLabelText('Food name')).toHaveValue('치즈버거');
   expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled();
 });
@@ -205,7 +206,7 @@ test.each([
   expect(field).toHaveValue('49,5');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-  expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+  expect(await findLive('alert', dialog)).toHaveTextContent(
     `${label}: enter digits only. Use a period for the decimal point`,
   );
   expect(field).toHaveValue('49,5');
@@ -299,7 +300,7 @@ test('after a failed search, saving reloads the search the list still shows', as
   await vi.waitFor(() => expect(foodCalls(fetchMock).at(-1)?.[0]).toBe('/api/foods?q=shown'));
   fireEvent.change(search, { target: { value: 'broken' } });
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-  await screen.findByRole('alert');
+  await findLive('alert');
 
   fireEvent.click(screen.getByRole('button', { name: 'Edit 치즈버거' }));
   const dialog = await screen.findByRole('dialog');
@@ -311,7 +312,7 @@ test('after a failed search, saving reloads the search the list still shows', as
 test('a failed load shows the server message', async () => {
   serve(() => json({ error: 'Server error occurred' }, 500));
   open();
-  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   expect(screen.queryByText('No foods')).not.toBeInTheDocument();
 });
 
@@ -388,12 +389,12 @@ test('a next page leaves the message of a failed search in place', async () => {
   await screen.findByRole('heading', { level: 2, name: '치즈버거' });
   fireEvent.change(screen.getByLabelText('Search foods'), { target: { value: 'broken' } });
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('The search failed');
+  expect(await findLive('alert')).toHaveTextContent('The search failed');
 
   fireEvent.click(screen.getByRole('button', { name: 'Show more results' }));
   await screen.findByRole('heading', { level: 2, name: '피자' });
   // The list is still the answer to the earlier words, so the failure must stay in view.
-  expect(screen.getByRole('alert')).toHaveTextContent('The search failed');
+  expect(getLive('alert')).toHaveTextContent('The search failed');
 });
 
 test('a failed next page keeps the list and the button to try again', async () => {
@@ -404,7 +405,7 @@ test('a failed next page keeps the list and the button to try again', async () =
   );
   open();
   fireEvent.click(await screen.findByRole('button', { name: 'Show more results' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   expect(screen.getByRole('heading', { level: 2, name: '치즈버거' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Show more results' })).not.toHaveAttribute(
     'aria-disabled',
@@ -563,7 +564,7 @@ test('while saving and after a failed save, keyboard focus stays in the dialog',
   expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
 
   finish(json({ error: 'This item already exists' }, 409));
-  expect(await within(dialog).findByRole('alert')).toHaveTextContent('This item already exists');
+  expect(await findLive('alert', dialog)).toHaveTextContent('This item already exists');
   expect(within(dialog).getByRole('button', { name: 'Save' })).toHaveFocus();
   expect(within(dialog).getByRole('button', { name: 'Save' })).not.toHaveAttribute('aria-disabled');
 });
@@ -589,14 +590,14 @@ test('Enter in a field while saving sends nothing more, and the same failure twi
   expect(posts()).toHaveLength(1);
 
   finishers[0](json({ error: 'This item already exists' }, 409));
-  expect(await within(dialog).findByRole('alert')).toHaveTextContent('This item already exists');
+  expect(await findLive('alert', dialog)).toHaveTextContent('This item already exists');
 
   // A second try clears the message, so the same answer appears anew and is read out again.
   fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
   await within(dialog).findByRole('button', { name: 'Saving…' });
-  expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+  expect(queryLive('alert', dialog)).not.toBeInTheDocument();
   finishers[1](json({ error: 'This item already exists' }, 409));
-  expect(await within(dialog).findByRole('alert')).toHaveTextContent('This item already exists');
+  expect(await findLive('alert', dialog)).toHaveTextContent('This item already exists');
   expect(posts()).toHaveLength(2);
 });
 
@@ -615,7 +616,7 @@ test('a pasted nutrition table fills the form, and nothing is saved until Save i
   });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Read the table and fill in' }));
 
-  const summary = within(dialog).getByRole('status');
+  const summary = getLive('status', dialog);
   expect(summary).toHaveTextContent(
     'Filled in: Serving size, Calories, Carbs, Protein, Fat, Sodium',
   );
@@ -669,7 +670,7 @@ test('text without a table says so and changes nothing', async () => {
     target: { value: '맛있는 감자칩 로켓배송' },
   });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Read the table and fill in' }));
-  expect(within(dialog).getByRole('alert')).toHaveTextContent('Could not find a nutrition table');
+  expect(getLive('alert', dialog)).toHaveTextContent('Could not find a nutrition table');
   expect(within(dialog).getByLabelText('Serving size')).toHaveValue('');
   expect(within(dialog).getByRole('combobox', { name: 'Source type' })).toHaveTextContent('Manual');
 });
@@ -705,7 +706,7 @@ test('reading a table into a published food clears stale values and marks it as 
   expect(within(dialog).getByLabelText('Sugars (g)')).toHaveValue('');
   expect(within(dialog).getByLabelText('Fat (g)')).toHaveValue('');
   expect(within(dialog).getByLabelText('Calories (kcal)')).toHaveValue('280');
-  const summary = within(dialog).getByRole('status');
+  const summary = getLive('status', dialog);
   expect(summary).toHaveTextContent('Cleared because the table has no value: Carbs, Fat, Sodium');
   expect(summary).toHaveTextContent('The source type was changed to "Product label"');
   // Read today, not the date of the official source it replaced.
@@ -724,10 +725,10 @@ test('reading the same table again announces the result again', async () => {
   });
   const read = within(dialog).getByRole('button', { name: 'Read the table and fill in' });
   fireEvent.click(read);
-  const first = within(dialog).getByRole('status');
+  const first = getLive('status', dialog);
   fireEvent.click(read);
   // A new element, so a screen reader reads it out instead of seeing no change.
-  expect(within(dialog).getByRole('status')).not.toBe(first);
+  expect(getLive('status', dialog)).not.toBe(first);
 });
 
 test('values without a basis change nothing and are shown to type in', async () => {
@@ -745,7 +746,7 @@ test('values without a basis change nothing and are shown to type in', async () 
   expect(within(dialog).getByRole('combobox', { name: 'Source type' })).toHaveTextContent(
     'Official data',
   );
-  const alert = within(dialog).getByRole('alert');
+  const alert = getLive('alert', dialog);
   expect(alert).toHaveTextContent('Could not find the serving size, so no field was changed');
   expect(alert).toHaveTextContent('Values read: Calories 310kcal, Protein 12g');
 });
@@ -759,7 +760,7 @@ test('a basis read without any value changes nothing', async () => {
     target: { value: '100g당\n수치는 상세 이미지를 참고하세요' },
   });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Read the table and fill in' }));
-  expect(within(dialog).getByRole('alert')).toHaveTextContent(
+  expect(getLive('alert', dialog)).toHaveTextContent(
     'Found the basis amount (100g) but could not read the nutrition values, so no field was changed',
   );
   expect(within(dialog).getByLabelText('Serving size')).toHaveValue('120');

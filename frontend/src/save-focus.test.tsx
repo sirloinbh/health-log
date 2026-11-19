@@ -9,6 +9,7 @@ import { GoalsSettings } from './goals';
 import { HabitsCard } from './habits';
 import { MealCard } from './meals';
 import { SleepCard } from './sleep';
+import { findLive, queryLive } from './test/live';
 
 // #126: a save that fails must leave the keyboard focus on the button that was pressed, not on
 // the page. A disabled button loses focus in a browser, so the button must stay enabled.
@@ -163,15 +164,15 @@ test.each(cases)(
     expect(writes()).toBe(1);
 
     fail();
-    expect(await screen.findByRole('alert')).toHaveTextContent('It is a server error');
+    expect(await findLive('alert')).toHaveTextContent('It is a server error');
     expect(save).not.toHaveAttribute('aria-disabled');
     expect(save).toHaveFocus();
 
     // Trying again clears the old message, so the same failure appears anew and is read out again.
     fireEvent.click(save);
-    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    await waitFor(() => expect(queryLive('alert')).not.toBeInTheDocument());
     fail();
-    expect(await screen.findByRole('alert')).toHaveTextContent('It is a server error');
+    expect(await findLive('alert')).toHaveTextContent('It is a server error');
     expect(save).toHaveFocus();
     expect(writes()).toBe(2);
   },

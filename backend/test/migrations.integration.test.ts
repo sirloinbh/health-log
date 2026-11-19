@@ -6,8 +6,18 @@ import { promisify } from 'node:util';
 
 import { Client } from 'pg';
 
-import { checksum, migrate, readMigrations } from '../src/migrations.js';
+import {
+  checksum,
+  migrate as runMigrate,
+  type Migration,
+  readMigrations,
+} from '../src/standard/migrations.js';
 import { testDatabaseSkip } from './helpers.js';
+
+// The runner takes the app's advisory lock key; tests use their own.
+const lockKey = 581_900;
+const migrate = (db: Parameters<typeof runMigrate>[0], files: Migration[]) =>
+  runMigrate(db, files, lockKey);
 
 const url = process.env.TEST_DATABASE_URL;
 const skip = testDatabaseSkip(url);
@@ -111,7 +121,7 @@ test(
           index === 0 ? { ...file, sql: 'SELECT 2', checksum: checksum('SELECT 2') } : file,
         );
         const extra = { name: '900_new.sql', sql: 'SELECT 1', checksum: checksum('SELECT 1') };
-        await assert.rejects(migrate(client, [...changed, extra]), /has changed: 001_initial\.sql/);
+        await assert.rejects(migrate(client, [...changed, extra]), /was changed: 001_initial\.sql/);
         assert.deepEqual(await recorded(client), names, 'the new file did not run');
       });
 

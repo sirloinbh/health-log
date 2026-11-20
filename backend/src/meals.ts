@@ -164,25 +164,25 @@ const junkOf = async (db: Db, period: { from: string; to: string }) => {
   };
 };
 
+// A read runs this in one snapshot (snapshotRead), so the day and its periods agree. A change runs
+// it in its own transaction, which sees the change; an entry another tab saves at that same moment
+// may show in the periods before the list, until the next read. The AI tool list_meals calls it too (#711).
+export const mealsOfDay = async (db: Db, date: string) => {
+  const { rows } = await db.query<EntryRow>(daySql, [date]);
+  const { week, month } = periodsOf(date);
+  return {
+    entries: rows.map(toEntry),
+    totals: toTotals(rows[0]),
+    junk: { week: await junkOf(db, week), month: await junkOf(db, month) },
+  };
+};
+
 export function mealsRouter(pool: Pool) {
   const router = Router();
 
-  // A read runs this in one snapshot (snapshotRead), so the day and its periods agree. A change runs
-  // it in its own transaction, which sees the change; an entry another tab saves at that same moment
-  // may show in the periods before the list, until the next read.
-  const day = async (db: Db, date: string) => {
-    const { rows } = await db.query<EntryRow>(daySql, [date]);
-    const { week, month } = periodsOf(date);
-    return {
-      entries: rows.map(toEntry),
-      totals: toTotals(rows[0]),
-      junk: { week: await junkOf(db, week), month: await junkOf(db, month) },
-    };
-  };
-
   router.get('/:date', async (req, res) => {
     const date = parseDate(req.params.date);
-    res.json(await inTransaction(pool, (client) => day(client, date), snapshotRead));
+    res.json(await inTransaction(pool, (client) => mealsOfDay(client, date), snapshotRead));
   });
 
   // Each change answers with the whole day, so the screen needs no second request. A change and the
@@ -209,7 +209,7 @@ export function mealsRouter(pool: Pool) {
           [date, entry.meal, entry.servings, entry.name, entry.calories, entry.isJunk ?? false],
         );
       }
-      return day(client, date);
+      return mealsOfDay(client, date);
     });
     res.status(201).json(answer);
   });
@@ -238,7 +238,7 @@ export function mealsRouter(pool: Pool) {
           ? new HttpError(400, 'The combo has no foods')
           : new HttpError(404, 'Combo not found');
       }
-      return day(client, date);
+      return mealsOfDay(client, date);
     });
     res.status(201).json(answer);
   });
@@ -261,7 +261,7 @@ export function mealsRouter(pool: Pool) {
         [date, from, meal],
       );
       if (!rowCount) throw new HttpError(404, 'There are no records to copy');
-      return day(client, date);
+      return mealsOfDay(client, date);
     });
     res.status(201).json(answer);
   });
@@ -275,7 +275,7 @@ export function mealsRouter(pool: Pool) {
         [id, date],
       );
       if (!rowCount) throw new HttpError(404, 'Meal record not found');
-      return day(client, date);
+      return mealsOfDay(client, date);
     });
     res.json(answer);
   });

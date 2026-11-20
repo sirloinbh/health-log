@@ -1,5 +1,5 @@
 {
-  "centralSha": "910f8c9042683eb0785ed925cb2feb4b6c7bb42c",
+  "centralSha": "04b2f6737785ee8523e013a1bc24450a3fa77cdf",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -125,7 +125,7 @@
     },
     ".github/dependabot.yml": {
       "mode": "full",
-      "sha256": "32c0c2b8ae82d2461b30ca81ea5b576b4026c7cc7d7e450e3ca148b7556e641a",
+      "sha256": "2f0727942c37c1e62ac3900734354a479510ea7ef3ca16231aef9b2ab4701c9c",
       "source": "templates/app/.github/dependabot.yml"
     },
     ".github/ISSUE_TEMPLATE/task.md": {
@@ -165,7 +165,7 @@
     },
     ".prettierignore": {
       "mode": "section",
-      "sha256": "574f9404b392a8fa23546ca0d80b9c7f2423e9b83567fc64ef912b1c04a47a86",
+      "sha256": "eecaa09e597906a8c0bfafaec67567ac980a312a46d0fc47f6d188aac62da3ff",
       "source": "templates/app/.prettierignore.tmpl"
     },
     ".standards/blocked-packages.json": {
@@ -368,6 +368,11 @@
       "sha256": "9fdd0787e01ad71a6dc267246d28996d61bfc3ac4ce5a4e8bce0921c5a58e3c7",
       "source": "templates/deploy/deploy/backup.timer.tmpl"
     },
+    "deploy/bootstrap-env.sh": {
+      "mode": "full",
+      "sha256": "c1ca97a31375ddb106e290e27e23deb608cfa213aa0b247ada5e4cbb1323971a",
+      "source": "templates/app/deploy/bootstrap-env.sh.tmpl"
+    },
     "deploy/health.service": {
       "mode": "full",
       "sha256": "a51b8f0ab9b6275964e3d35109209f17a0e8d2a3de190fdef5836fe65ebe9631",
@@ -427,6 +432,16 @@
       "mode": "full",
       "sha256": "269aae2d315e49858685d91da8c62f2797bbc3823619a3cba15ceeafb67682dc",
       "source": "templates/deploy/deploy/ssm-get.sh.tmpl"
+    },
+    "e2e/support/jev.ts": {
+      "mode": "full",
+      "sha256": "83ec5d7d0250919b6f4361125aa8cb6c31f6c8fbb75869ef6140d41c3130086a",
+      "source": "templates/e2e/e2e/support/jev.ts"
+    },
+    "e2e/support/judged.ts": {
+      "mode": "full",
+      "sha256": "34f28bf74fc2d1289226e7e546b92d33f1487b67fc178d633f3faef287f14266",
+      "source": "templates/e2e/e2e/support/judged.ts"
     },
     "e2e/tsconfig.json": {
       "mode": "full",
@@ -990,7 +1005,7 @@
     },
     "knip.json": {
       "mode": "full",
-      "sha256": "909bde707c1607e4a23fbb310fbda9b0ede39bb495c7d5e4453501ed5518ae55",
+      "sha256": "24b4699f1cf24f37df1e5d5f6f75914b955b06a2b7a913dad04cd63ad14686e3",
       "source": "templates/app/knip.json"
     },
     "lighthouserc.json": {

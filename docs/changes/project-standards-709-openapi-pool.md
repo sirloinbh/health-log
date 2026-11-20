@@ -5,5 +5,5 @@
 - `openapi-cli.ts` is the one-line entry to the managed CLI.
 - `src/pool.ts` is removed: `server.ts` uses the managed `createPool(new Pool(...))`, which now also listens on checked-out clients.
 - `docs/openapi.json` is regenerated: it gains the shared sign-in security scheme and the default 401, 413 and 429 responses.
-- Verification: typecheck, eslint, prettier, non-DB tests (313 pass). DB tests run in CI.
+- Verification: typecheck, eslint, prettier, non-DB tests (140 pass). DB tests run in CI.
 - The `limited(...)` helper is gone from the table: the one managed `apiRateLimit` (project-standards#779) and the builder already document 429 on every guarded route.

@@ -1,5 +1,5 @@
 {
-  "centralSha": "04b2f6737785ee8523e013a1bc24450a3fa77cdf",
+  "centralSha": "9c1f654987fbeb535abcfddb0cb2bf5828c53c10",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -140,7 +140,7 @@
     },
     ".github/workflows/ci.yml": {
       "mode": "full",
-      "sha256": "9907d1d4f82dac34a4a881eed28cf34123257da731954d3635b3ea42c0b9d9e6",
+      "sha256": "eb436a3ae95dcb4abd6e85cfad03ef5f7dbd54e5a4203baeab7fe810d24ed965",
       "source": "templates/app/.github/workflows/ci.yml.tmpl"
     },
     ".gitignore": {
@@ -175,7 +175,7 @@
     },
     ".standards/check.mjs": {
       "mode": "full",
-      "sha256": "0507fcf2a617ec2a7b7dde04bd66adfa15a26e25cd4d5f5d50ecce455616ce1e",
+      "sha256": "ef4c3be007af70fd1701cc63d590f0dc4aa52a4aeaa34526f5e6f9abc1369ba7",
       "source": "scripts/standards-check.mjs"
     },
     ".standards/ci-migrate.sh": {
@@ -185,7 +185,7 @@
     },
     ".standards/ioc-scan.mjs": {
       "mode": "full",
-      "sha256": "a89be5071d7761fe9a77a9f9b3a14288aa2a261a04a55e46a21d1fe09e5d75b6",
+      "sha256": "1fdedfb197f82a9e97a6f2282d48b693f0a5bc8d20f6fb34c88075fd342b1ed0",
       "source": "scripts/ioc-scan.mjs"
     },
     ".standards/lib/env-tags.mjs": {
@@ -210,7 +210,7 @@
     },
     ".standards/secret-scan.mjs": {
       "mode": "full",
-      "sha256": "cb6a324f3b8207b779bfb4ef48cff98527461f2761c0d83a322a46e45e209fa8",
+      "sha256": "951b4e75e5515818717413a0ed03e94d8224a7f89ba4af7f2399a66860cd1b9e",
       "source": "scripts/secret-scan.mjs"
     },
     ".vscode/extensions.json": {
@@ -265,7 +265,7 @@
     },
     "backend/src/standard/auth.ts": {
       "mode": "full",
-      "sha256": "e779809ab79e2e3bf7d3169b9b617fb107053360c4c3e14d5e7a27ed1082d6d3",
+      "sha256": "7cb3e8eb7a319c56d5d89575dbbda06489bc5970b6c8f3ee1f9a1bfa312600e8",
       "source": "templates/app/backend/src/standard/auth.ts"
     },
     "backend/src/standard/db.ts": {
@@ -275,7 +275,7 @@
     },
     "backend/src/standard/http.ts": {
       "mode": "full",
-      "sha256": "b07a92105df2ffac9e756fc13a56695d4b5b903d77e79f7eeedd0f04e17dd252",
+      "sha256": "92bfa44e4dee30e4ca4b73010085cb5fea2a799c62898abd2c2598f421681fa8",
       "source": "templates/app/backend/src/standard/http.ts"
     },
     "backend/src/standard/migrate.ts": {
@@ -295,7 +295,7 @@
     },
     "backend/src/standard/openapi.ts": {
       "mode": "full",
-      "sha256": "75f71f04dfec9770d52b72ca87ae30fa0b84edf3f1ce1187753d35a3cff8378e",
+      "sha256": "e9fe812e39f00d8c85ec55c7313fb3674fe02ed086e64e725e2671bef2e8ebc8",
       "source": "templates/app/backend/src/standard/openapi.ts"
     },
     "backend/src/standard/rate-limit.ts": {
@@ -345,7 +345,7 @@
     },
     "deploy/autodeploy.sh": {
       "mode": "full",
-      "sha256": "dac22341f42f1575c6fa9eed5891eedd382d0eab26187d521e4e091875ed8f4f",
+      "sha256": "569a0ee71f95475ebbe3bd870b582826bddbe252517cea4faa27e5b530458c28",
       "source": "templates/deploy/deploy/autodeploy.sh.tmpl"
     },
     "deploy/autodeploy.timer": {
@@ -360,7 +360,7 @@
     },
     "deploy/backup.sh": {
       "mode": "full",
-      "sha256": "f9ca6e76baa43112666fde37ef27fcd8149f58e93d8f52577119d4537f8060fc",
+      "sha256": "14653b238a28217c75e3700a9e38684ded03b22c9a61cd24b10873da4c22dad5",
       "source": "templates/deploy/deploy/backup.sh.tmpl"
     },
     "deploy/backup.timer": {
@@ -400,7 +400,7 @@
     },
     "deploy/remote-deploy.sh": {
       "mode": "full",
-      "sha256": "8d5d79612e439bc3e01ba1511cffb4880928df8015dab38112edb084b5ab79f6",
+      "sha256": "4a90d59bcc0612e0d89302a76e137568128dff1a00cb7426315a4e1e2b507a6f",
       "source": "templates/deploy/deploy/remote-deploy.sh.tmpl"
     },
     "deploy/report.service": {
@@ -535,12 +535,12 @@
     },
     "frontend/src/components/layout/ai-shell.test.tsx": {
       "mode": "full",
-      "sha256": "2cef555260c6276f33477a65a309d50303ca4acba973fb856c209a7b3e96b3be",
+      "sha256": "84b383a2ba9c5e93097258c7aa477fcb687d0f05268bbd4db5051ae5194dd87b",
       "source": "templates/ui/frontend/src/components/layout/ai-shell.test.tsx"
     },
     "frontend/src/components/layout/ai-shell.tsx": {
       "mode": "full",
-      "sha256": "f8567493f3f640451e22654c0eaf16ee10f7ae448bc754b2e907495036d612cc",
+      "sha256": "f9e11aaf69a5e8ab67c6591d3d0dff4dd3abb15cb6e6c5edeb46962f60e8034b",
       "source": "templates/ui/frontend/src/components/layout/ai-shell.tsx"
     },
     "frontend/src/components/layout/app-shell.test.tsx": {
@@ -925,7 +925,7 @@
     },
     "frontend/src/lib/use-ai-chat.ts": {
       "mode": "full",
-      "sha256": "5908817117c3059c3808bb1b4726fcde18724ddf3908491ff7ef7be977299c54",
+      "sha256": "c503af1629155d854657698d4b187e60b51fd1151ae040453ca6011e4d54a7cc",
       "source": "templates/ui/frontend/src/lib/use-ai-chat.ts"
     },
     "frontend/src/lib/use-notice.ts": {

@@ -1,5 +1,5 @@
 {
-  "centralSha": "e5a7ee6e2a90090b5dfd687667c7fd8cb0e1cc84",
+  "centralSha": "910f8c9042683eb0785ed925cb2feb4b6c7bb42c",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -295,7 +295,7 @@
     },
     "backend/src/standard/openapi.ts": {
       "mode": "full",
-      "sha256": "8c90b84e0298c77d62a4ca4ec23bb0c0691f944cdf9c07823d194301e85043d2",
+      "sha256": "75f71f04dfec9770d52b72ca87ae30fa0b84edf3f1ce1187753d35a3cff8378e",
       "source": "templates/app/backend/src/standard/openapi.ts"
     },
     "backend/src/standard/rate-limit.ts": {
@@ -305,7 +305,7 @@
     },
     "backend/src/standard/tools.ts": {
       "mode": "full",
-      "sha256": "833c04b69994066d759e99717e612658c2ced698f6767b2f535ddcac85343334",
+      "sha256": "ab47124dfdeca19e68ba17453f069a7c8194540a44e2b1f1209348f3907b21fa",
       "source": "templates/app/backend/src/standard/tools.ts"
     },
     "backend/test/standard-api.test.ts": {
@@ -975,7 +975,7 @@
     },
     "frontend/tsconfig.json": {
       "mode": "full",
-      "sha256": "0a086f123f3e30fdb63e62f26f7443200f6a71eb9848cb4a545cf68d3d36bf01",
+      "sha256": "e41dcca13115bee1ce0e7702c00a376d463969a59f638d067f1f6429bb26efe4",
       "source": "templates/app/frontend/tsconfig.json.tmpl"
     },
     "frontend/vite.config.ts": {
@@ -1054,7 +1054,7 @@
     },
     "scripts/contract.mjs": {
       "mode": "full",
-      "sha256": "e90007c2ce6bdfcc35f0126af68745532ec7717bd3500fa3349c732f634b789c",
+      "sha256": "abab9822dac0cd56188812efac00fc306e71f2a89e02d26d5393989bde578b19",
       "source": "templates/app/scripts/contract.mjs"
     },
     "scripts/gh-project.ps1": {
@@ -1069,7 +1069,7 @@
     },
     "scripts/test/contract.test.mjs": {
       "mode": "full",
-      "sha256": "9958d3633250b3ce2e1b96021562db989761142c1c3f71de11a02700bc6b0c81",
+      "sha256": "29763254f7b3d81db6eae67536e00362a9e495edf2bc5d66059ae6ef4277807b",
       "source": "templates/app/scripts/test/contract.test.mjs"
     },
     "skills/std-backlog/SKILL.md": {

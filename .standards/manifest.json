@@ -1,5 +1,5 @@
 {
-  "centralSha": "7812b9c848637f018e66f23aad2d35417d3f38a8",
+  "centralSha": "46a56fa4f4dbc4278aed7f6a101c3076b8316aef",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -140,7 +140,7 @@
     },
     ".github/workflows/ci.yml": {
       "mode": "full",
-      "sha256": "92e5e5c0289cee8f6a74c07092f4ce5d9d244f425ea965db8fc2421f027da50a",
+      "sha256": "dfae64911d5571ade3ecad9fe85187e652f7d046d977547bb735d5521078ee85",
       "source": "templates/app/.github/workflows/ci.yml.tmpl"
     },
     ".gitignore": {
@@ -345,7 +345,7 @@
     },
     "deploy/autodeploy.sh": {
       "mode": "full",
-      "sha256": "fdadfa24d9000a215a18399480a9400e50148b3950f4d9f48bfe2fca9269f110",
+      "sha256": "1bfc3fc6571512aa5e3bc7d11d6fb228efcad3878c43fb333f46c2111857180f",
       "source": "templates/deploy/deploy/autodeploy.sh.tmpl"
     },
     "deploy/autodeploy.timer": {
@@ -400,7 +400,7 @@
     },
     "deploy/remote-deploy.sh": {
       "mode": "full",
-      "sha256": "4a90d59bcc0612e0d89302a76e137568128dff1a00cb7426315a4e1e2b507a6f",
+      "sha256": "fd24d9fe4e7c2f2188c807066c10a93c0524536c9b37a48580a8c36cec886db3",
       "source": "templates/deploy/deploy/remote-deploy.sh.tmpl"
     },
     "deploy/report.service": {

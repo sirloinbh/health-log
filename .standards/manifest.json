@@ -1,5 +1,5 @@
 {
-  "centralSha": "9c1f654987fbeb535abcfddb0cb2bf5828c53c10",
+  "centralSha": "c8ec08e7d9887071c29524c1817ccced8e22a625",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -345,7 +345,7 @@
     },
     "deploy/autodeploy.sh": {
       "mode": "full",
-      "sha256": "569a0ee71f95475ebbe3bd870b582826bddbe252517cea4faa27e5b530458c28",
+      "sha256": "fdadfa24d9000a215a18399480a9400e50148b3950f4d9f48bfe2fca9269f110",
       "source": "templates/deploy/deploy/autodeploy.sh.tmpl"
     },
     "deploy/autodeploy.timer": {

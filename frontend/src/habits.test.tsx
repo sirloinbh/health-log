@@ -3,6 +3,7 @@ import { beforeAll, expect, test, vi } from 'vitest';
 
 import { toast } from './components/ui/sonner';
 import { HabitsCard } from './habits';
+import { findLive } from './test/live';
 
 // jsdom lacks pointer capture and scrolling, which Radix Select calls.
 beforeAll(() => {
@@ -170,7 +171,7 @@ test.each([
     fireEvent.change(screen.getByLabelText('Drink 1 amount'), { target: { value: input.amount } });
   }
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent(new RegExp(message));
+  expect(await findLive('alert')).toHaveTextContent(new RegExp(message));
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
@@ -181,7 +182,7 @@ test('drinking with every row removed asks for one', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Drank' }));
   fireEvent.click(screen.getByRole('button', { name: 'Drink 1 remove' }));
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Enter at least one drink');
+  expect(await findLive('alert')).toHaveTextContent('Enter at least one drink');
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
@@ -251,7 +252,7 @@ test('a server refusal is shown and the form keeps what was typed', async () => 
   render(<HabitsCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Cigarettes'), { target: { value: '300' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('200 or fewer');
+  expect(await findLive('alert')).toHaveTextContent('200 or fewer');
   expect(screen.getByLabelText('Cigarettes')).toHaveValue('300');
   expect(screen.getByRole('button', { name: 'Save' })).not.toHaveAttribute('aria-disabled');
 });
@@ -259,7 +260,7 @@ test('a server refusal is shown and the form keeps what was typed', async () => 
 test('a failed load can be tried again', async () => {
   server({ status: 500, body: { error: 'Server error occurred' } }, { body: dayOf(null) });
   render(<HabitsCard date={date} />);
-  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   expect(within(card()).queryByRole('region', { name: 'This week' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
   expect(await screen.findByLabelText('Cigarettes')).toBeInTheDocument();
@@ -274,7 +275,7 @@ test('the same kind and unit twice is refused before anything is sent', async ()
   choose(screen.getByLabelText('Drink 2 type'), 'Soju');
   expect(screen.getByLabelText('Drink 2 type')).toHaveTextContent('Soju');
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Soju (bottle) appears twice');
+  expect(await findLive('alert')).toHaveTextContent('Soju (bottle) appears twice');
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 

@@ -3,6 +3,7 @@ import express from 'express';
 import type { Pool } from 'pg';
 import { types } from 'pg';
 
+import { tools } from './ai-tools.js';
 import { bodyRouter } from './body.js';
 import { checksRouter } from './checks.js';
 import { combosRouter } from './combos.js';
@@ -17,6 +18,7 @@ import { sleepRouter } from './sleep.js';
 import { setInt8Parser } from './standard/db.js';
 import { errorHandler, notFound, requestLog } from './standard/http.js';
 import { apiRateLimit } from './standard/rate-limit.js';
+import { registerToolRoutes } from './standard/tools.js';
 import { rejectNul } from './text.js';
 import { visitsRouter } from './visits.js';
 
@@ -43,6 +45,8 @@ export function createApp(
     today?: () => string;
     requestsPerMinute?: number;
     auth?: express.RequestHandler;
+    /** shared-ai's public key (PEM); without it the AI tool routes are off (project-standards#711). */
+    toolsPublicKey?: string;
   } = {},
 ) {
   const today = options.today ?? (() => serviceDate());
@@ -72,6 +76,15 @@ export function createApp(
   app.use('/api/visits', visitsRouter(pool));
   app.use('/api/medications', medicationsRouter(pool, today));
   app.use('/api/reminders', remindersRouter(pool, today));
+  // AI tools for shared-ai on /internal/tools: outside /api, so nginx never forwards them and the signed
+  // call token, not the session, is the check. The token must name its tool and carry a jti (#822).
+  registerToolRoutes(app, {
+    app: 'health-log',
+    tools,
+    pool,
+    publicKey: options.toolsPublicKey,
+    requireBinding: true,
+  });
   app.use('/api', notFound);
   app.use(errorHandler);
   return app;

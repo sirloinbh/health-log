@@ -1,12 +1,10 @@
 import { Router } from 'express';
-import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { isRealDate, parseDate } from './dates.js';
 import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.js';
 import { hasTwoDecimalsAtMost } from './foods.js';
-import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError, parseId } from './standard/http.js';
 import { charCount } from './text.js';
 
@@ -81,7 +79,7 @@ export const entryInput = z
   });
 
 type EntryRow = {
-  id: string;
+  id: number;
   meal: string;
   food_id: string | null;
   name: string;
@@ -117,7 +115,7 @@ const daySql = `WITH eaten AS (
   SELECT *, ${totals} FROM eaten ORDER BY id`;
 
 const toEntry = (row: EntryRow) => ({
-  id: Number(row.id),
+  id: row.id,
   meal: row.meal,
   foodId: optionalNumber(row.food_id),
   name: row.name,
@@ -166,9 +164,8 @@ const junkOf = async (db: Db, period: { from: string; to: string }) => {
   };
 };
 
-export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
+export function mealsRouter(pool: Pool) {
   const router = Router();
-  router.use(rateLimit(rateLimitOptions(limits)));
 
   // A read runs this in one snapshot (snapshotRead), so the day and its periods agree. A change runs
   // it in its own transaction, which sees the change; an entry another tab saves at that same moment

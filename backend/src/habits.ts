@@ -1,12 +1,10 @@
 import { Router } from 'express';
-import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { parseDate } from './dates.js';
 import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.js';
 import { hasTwoDecimalsAtMost } from './foods.js';
-import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError } from './standard/http.js';
 
 const drinkKinds = ['soju', 'beer', 'wine', 'makgeolli', 'whisky', 'other'] as const;
@@ -130,9 +128,8 @@ const readDay = async (db: Db, date: string) => {
   };
 };
 
-export function habitsRouter(pool: Pool, limits: RateLimitSettings) {
+export function habitsRouter(pool: Pool) {
   const router = Router();
-  router.use(rateLimit(rateLimitOptions(limits)));
 
   router.get('/:date', async (req, res) => {
     const date = parseDate(req.params.date);

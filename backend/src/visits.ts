@@ -1,10 +1,9 @@
 import { Router } from 'express';
-import { rateLimit } from 'express-rate-limit';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
 import { isRealDate } from './dates.js';
-import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
+import { withTransaction } from './standard/db.js';
 import { HttpError, parseId } from './standard/http.js';
 import { charCount } from './text.js';
 
@@ -112,7 +111,7 @@ type Procedure = {
 };
 
 type VisitRow = {
-  id: string;
+  id: number;
   visit_date: string;
   clinic: string;
   department: string | null;
@@ -123,7 +122,7 @@ type VisitRow = {
 };
 
 const toVisit = (row: VisitRow) => ({
-  id: Number(row.id),
+  id: row.id,
   date: row.visit_date,
   clinic: row.clinic,
   department: row.department,
@@ -151,9 +150,8 @@ const visitSql = (where: string, page = '') => `
   ORDER BY v.visit_date DESC, v.id DESC
   ${page}`;
 
-export function visitsRouter(pool: Pool, limits: RateLimitSettings) {
+export function visitsRouter(pool: Pool) {
   const router = Router();
-  router.use(rateLimit(rateLimitOptions(limits)));
 
   const read = async (db: Pick<Pool, 'query'> | PoolClient, id: number) => {
     const { rows } = await db.query<VisitRow>(visitSql('WHERE v.id = $1'), [id]);
@@ -161,20 +159,8 @@ export function visitsRouter(pool: Pool, limits: RateLimitSettings) {
   };
 
   // A visit and its procedures change together, or not at all.
-  const inTransaction = async <T>(run: (client: PoolClient) => Promise<T>) => {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const result = await run(client);
-      await client.query('COMMIT');
-      return result;
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
-    }
-  };
+  const inTransaction = <T>(run: (client: PoolClient) => Promise<T>) =>
+    withTransaction<T, PoolClient>(pool, run);
 
   // One statement per procedure keeps the order explicit; the transaction undoes them all on failure.
   const putProcedures = async (
@@ -224,12 +210,12 @@ export function visitsRouter(pool: Pool, limits: RateLimitSettings) {
   router.post('/', async (req, res) => {
     const visit = visitInput.parse(req.body);
     const created = await inTransaction(async (client) => {
-      const { rows } = await client.query<{ id: string }>(
+      const { rows } = await client.query<{ id: number }>(
         `INSERT INTO clinic_visits (visit_date, clinic, department, note, cost, next_visit_on)
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
         values(visit),
       );
-      const id = Number(rows[0].id);
+      const id = rows[0].id;
       await putProcedures(client, id, visit.procedures);
       return read(client, id);
     });

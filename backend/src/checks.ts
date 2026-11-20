@@ -1,11 +1,9 @@
 import { Router } from 'express';
-import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { parseDate } from './dates.js';
 import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.js';
-import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError } from './standard/http.js';
 import { charCount } from './text.js';
 
@@ -88,9 +86,8 @@ const readDay = async (db: Db, date: string) => {
   };
 };
 
-export function checksRouter(pool: Pool, limits: RateLimitSettings) {
+export function checksRouter(pool: Pool) {
   const router = Router();
-  router.use(rateLimit(rateLimitOptions(limits)));
 
   router.get('/:date', async (req, res) => {
     const date = parseDate(req.params.date);

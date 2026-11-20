@@ -1,10 +1,8 @@
 import { Router } from 'express';
-import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { parseDate } from './dates.js';
-import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError, serviceDate } from './standard/http.js';
 
 const maxSpan = 24 * 60 * 60_000;
@@ -49,9 +47,8 @@ const toRecord = (row: SleepRow) => ({
   source: row.source,
 });
 
-export function sleepRouter(pool: Pool, limits: RateLimitSettings) {
+export function sleepRouter(pool: Pool) {
   const router = Router();
-  router.use(rateLimit(rateLimitOptions(limits)));
 
   router.get('/:date', async (req, res) => {
     const date = parseDate(req.params.date);

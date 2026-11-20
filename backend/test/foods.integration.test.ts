@@ -98,7 +98,7 @@ test('a re-run never overwrites a food whose date was cleared by an edit', { ski
 });
 
 test('popular foods are stored per serving with a checkable public source', { skip }, async () => {
-  const { rows } = await pool.query<{ total: string; sourced: string }>(
+  const { rows } = await pool.query<{ total: number; sourced: number }>(
     `SELECT count(*) AS total,
             count(*) FILTER (
               WHERE source_type = 'public'
@@ -155,7 +155,7 @@ test(
       burgers: string;
       sides: string;
       drinks: string;
-      unchecked: string;
+      unchecked: number;
     }>(
       `SELECT brand,
             count(*) FILTER (WHERE category = '버거') AS burgers,
@@ -210,7 +210,7 @@ test(
 
 // #32. Bibigo retort soups: official, labelled for the whole package, not junk food.
 test('Bibigo soups are found by name and keep their label values', { skip }, async () => {
-  const { rows } = await pool.query<{ total: string; unchecked: string }>(
+  const { rows } = await pool.query<{ total: number; unchecked: number }>(
     `SELECT count(*) AS total,
             count(*) FILTER (
               WHERE source_type <> 'official' OR checked_on IS NULL OR is_junk
@@ -219,7 +219,7 @@ test('Bibigo soups are found by name and keep their label values', { skip }, asy
             ) AS unchecked
      FROM foods WHERE brand = '비비고' AND category = '국·탕·찌개'`,
   );
-  assert.deepEqual(rows[0], { total: '27', unchecked: '0' });
+  assert.deepEqual(rows[0], { total: 27, unchecked: 0 });
 
   await withApi(pool, async (call) => {
     const { data } = await call(`/api/foods?q=${encodeURIComponent('갈비탕')}`);

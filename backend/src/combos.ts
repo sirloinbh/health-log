@@ -1,10 +1,9 @@
 import { Router } from 'express';
-import { rateLimit } from 'express-rate-limit';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
 import { servingsInput } from './meals.js';
-import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
+import { withTransaction } from './standard/db.js';
 import { HttpError, parseId } from './standard/http.js';
 import { charCount } from './text.js';
 
@@ -44,7 +43,7 @@ export const comboInput = z.object(
 type ComboInput = z.infer<typeof comboInput>;
 
 type ComboRow = {
-  id: string;
+  id: number;
   name: string;
   food_id: string | null;
   food_name: string | null;
@@ -92,10 +91,10 @@ type Combo = {
 };
 
 const toCombos = (rows: ComboRow[]) => {
-  const combos = new Map<string, Combo>();
+  const combos = new Map<number, Combo>();
   for (const row of rows) {
     const combo: Combo = combos.get(row.id) ?? {
-      id: Number(row.id),
+      id: row.id,
       name: row.name,
       items: [],
       calories: {
@@ -125,9 +124,8 @@ const nameTaken = (error: unknown) => {
   return code === '23505' && constraint === 'meal_combos_name_key';
 };
 
-export function combosRouter(pool: Pool, limits: RateLimitSettings) {
+export function combosRouter(pool: Pool) {
   const router = Router();
-  router.use(rateLimit(rateLimitOptions(limits)));
 
   const read = async (db: Pick<Pool, 'query'> | PoolClient, id: number) => {
     const { rows } = await db.query<ComboRow>(comboSql('WHERE c.id = $1'), [id]);
@@ -136,18 +134,11 @@ export function combosRouter(pool: Pool, limits: RateLimitSettings) {
 
   // The combo and its foods change together, or not at all.
   const inTransaction = async <T>(run: (client: PoolClient) => Promise<T>) => {
-    const client = await pool.connect();
     try {
-      await client.query('BEGIN');
-      const result = await run(client);
-      await client.query('COMMIT');
-      return result;
+      return await withTransaction<T, PoolClient>(pool, run);
     } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
       if (nameTaken(error)) throw new HttpError(409, 'A combo with that name already exists');
       throw error;
-    } finally {
-      client.release();
     }
   };
 
@@ -171,11 +162,11 @@ export function combosRouter(pool: Pool, limits: RateLimitSettings) {
   router.post('/', async (req, res) => {
     const combo = comboInput.parse(req.body);
     const created = await inTransaction(async (client) => {
-      const { rows } = await client.query<{ id: string }>(
+      const { rows } = await client.query<{ id: number }>(
         'INSERT INTO meal_combos (name) VALUES ($1) RETURNING id',
         [combo.name],
       );
-      const id = Number(rows[0].id);
+      const id = rows[0].id;
       await putItems(client, id, combo.items);
       return read(client, id);
     });

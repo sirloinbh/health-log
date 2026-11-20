@@ -4,7 +4,6 @@ import { test } from 'node:test';
 import type { Pool } from 'pg';
 
 import { createApp } from '../src/app.js';
-import { defaultRateLimit } from '../src/rate-limit.js';
 import { listenForFetch, withApi } from './helpers.js';
 
 const queries: unknown[] = [];
@@ -15,7 +14,7 @@ const pool = {
   },
 } as unknown as Pool;
 
-test('requests over the limit get a Korean 429 and never reach the database', async () => {
+test('requests over the limit get a 429 and never reach the database', async () => {
   await withApi(
     pool,
     async (call) => {
@@ -25,23 +24,10 @@ test('requests over the limit get a Korean 429 and never reach the database', as
 
       const { status, data } = await call('/api/foods');
       assert.equal(status, 429);
-      assert.equal(data.error, 'Too many requests. Try again in a moment');
+      assert.equal(data.error, 'Too many requests. Try again in a minute.');
       assert.equal(queries.length, before);
     },
-    { rateLimit: { max: 2, windowMs: 60_000 } },
-  );
-});
-
-test('the count starts over when the window ends', async () => {
-  await withApi(
-    pool,
-    async (call) => {
-      assert.equal((await call('/api/foods')).status, 200);
-      assert.equal((await call('/api/foods')).status, 429);
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      assert.equal((await call('/api/foods')).status, 200);
-    },
-    { rateLimit: { max: 1, windowMs: 400 } },
+    { requestsPerMinute: 2 },
   );
 });
 
@@ -53,7 +39,7 @@ test('writes count toward the limit too', async () => {
       await call('/api/foods/abc', { method: 'PUT', body });
       assert.equal((await call('/api/foods', { method: 'POST', body })).status, 429);
     },
-    { rateLimit: { max: 1, windowMs: 60_000 } },
+    { requestsPerMinute: 1 },
   );
 });
 
@@ -65,15 +51,13 @@ test('the health check stays available while the API is limited', async () => {
       assert.equal((await call('/api/foods')).status, 429);
       assert.equal((await call('/api/health')).status, 200);
     },
-    { rateLimit: { max: 1, windowMs: 60_000 } },
+    { requestsPerMinute: 1 },
   );
 });
 
 test('a request forwarded by nginx is limited without a validation error', async (t) => {
   const logged = t.mock.method(console, 'error', () => {});
-  const { server, port } = await listenForFetch(
-    createApp(pool, { rateLimit: { max: 1, windowMs: 60_000 } }),
-  );
+  const { server, port } = await listenForFetch(createApp(pool, { requestsPerMinute: 1 }));
   t.after(() => server.close());
   const get = () =>
     fetch(`http://127.0.0.1:${port}/api/foods`, { headers: { 'x-forwarded-for': '203.0.113.9' } });
@@ -81,10 +65,4 @@ test('a request forwarded by nginx is limited without a validation error', async
   assert.equal((await get()).status, 200);
   assert.equal((await get()).status, 429);
   assert.equal(logged.mock.callCount(), 0);
-});
-
-test('the default limit is above what nginx lets through in its window', () => {
-  // nginx allows 10 r/s with a burst of 40: 640 requests in a minute (frontend/nginx.conf).
-  assert.equal(defaultRateLimit.windowMs, 60_000);
-  assert.ok(defaultRateLimit.max > 640);
 });

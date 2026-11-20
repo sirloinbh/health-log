@@ -45,6 +45,9 @@ export async function inSnapshot(pool: Pool, run: (snapshot: Pool) => Promise<vo
   const query = async (text: unknown, ...rest: unknown[]) => {
     if (typeof text !== 'string') return send(text, ...rest);
     const word = text.trim().split(/\s+/)[0]!.toUpperCase();
+    // The snapshot already has its isolation level: a route's SET TRANSACTION would fail after a query.
+    if (word === 'SET' && text.trim().toUpperCase().startsWith('SET TRANSACTION'))
+      return send('SELECT 1');
     if (word === 'BEGIN' || word === 'START') {
       const name = `app_transaction_${(count += 1)}`;
       const result = await send(`SAVEPOINT ${name}`);

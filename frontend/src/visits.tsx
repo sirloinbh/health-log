@@ -736,7 +736,8 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
           onSaved={() => {
             closeDialog();
             toast.success('Saved');
-            void load(applied.current, visits?.length ?? 0);
+            // A new visit takes a place in the list, so one more is read to keep the last one shown.
+            void load(applied.current, (visits?.length ?? 0) + (editing.visit ? 0 : 1));
           }}
         />
       ) : null}

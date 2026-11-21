@@ -291,6 +291,28 @@ test('saving a visit on the second page keeps both pages shown', async () => {
   expect(reads.slice(-2)).toEqual(['/api/visits?q=', '/api/visits?q=&offset=20']);
 });
 
+test('adding a visit after loading more keeps every loaded visit shown', async () => {
+  const list = manyVisits(40);
+  serve((url, init) => {
+    if (init?.method === 'POST') {
+      list.unshift({ ...visit, id: 300, clinic: '가상의원 새', department: null, procedures: [] });
+      return json(list[0], 201);
+    }
+    return paged(list)(url);
+  });
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: 'Show more results' }));
+  expect(await screen.findByText('40 visits')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Add visit' }));
+  fill('Clinic name', '가상의원 새');
+  fireEvent.click(within(dialog()).getByRole('button', { name: 'Save' }));
+
+  // Reading only as many as before would leave the old last visit behind "Show more results".
+  expect(await screen.findByText('41 visits')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 2, name: '가상의원 40' })).toBeInTheDocument();
+});
+
 test('deleting a visit on the second page reads both pages again', async () => {
   const list = manyVisits(41);
   serve((url, init) => {

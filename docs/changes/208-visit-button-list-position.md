@@ -42,3 +42,11 @@ A temporary local PostgreSQL 17 cluster (port 5484, DB `health_browser`), the AP
 - `TEST_DATABASE_URL= npm run check`: passed on the second run.
   - Frontend 653 passed, 3 skipped. Backend 141 passed, 126 DB tests skipped (`TEST_DATABASE_URL` emptied: the shell value points at another project's DB; CI runs the DB tests). Skill checks 3 passed.
   - The first run failed once in `frontend/src/daily.test.tsx` ("the main menu opens the day the server counts as today", text not found in time) while the whole suite ran. The file passed alone (28 passed) and the whole check passed on the rerun. This change does not touch the daily page.
+
+## First review — 2026-11-22
+
+Self-review of the whole PR diff (design, behavior, tests, security). One finding, fixed in this PR.
+
+- **A new visit hid the last loaded visit.** After adding a visit, the page read only as many visits as were shown before, so the list grew by one and the old last visit went behind "Show more results". A new visit now reads one more (`keep` + 1); an edit reads the same count.
+- New test in `frontend/src/visits.test.tsx`: "adding a visit after loading more keeps every loaded visit shown" (40 visits loaded, one added, page shows `41 visits` with the old last one). It failed with `keep` unchanged and passes with the fix.
+- `npm test -- src/visits.test.tsx` (frontend): 21 passed. `TEST_DATABASE_URL= npm run check`: passed (frontend 654 passed, 3 skipped; backend 141 passed, 126 DB tests skipped; skill checks 3 passed).

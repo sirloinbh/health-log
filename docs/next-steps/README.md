@@ -6,13 +6,13 @@ Requirements are registered as GitHub issues. Work in the order below, and choos
 
 ## To do tomorrow
 
-| Order | Task                                         | Status         | Next action                                                                                                                                                                                                                                                                                         |
-| ----- | -------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | #42 Check backup and restore                 | Decided not to | User decision (2026-11-08): do not check it. #42 was closed as not planned, and the draft PR #68 was closed without merging. The branch `chore/42-backup-restore` is still there                                                                                                                    |
-| 2     | #67 Lift the 100-item limit on the food list | Done           | Includes #31 burger franchises and #32 Bibigo data                                                                                                                                                                                                                                                  |
-| 3     | #36 Alcohol and cigarettes, #37 Daily check  | Done           | #43 change report, #38 junk food, #45 goals and the follow-ups #104 and #107 are also done. The judgement rules decided in #45 are in the issue comment                                                                                                                                             |
-| 4     | #41 Access protection before external access | User           | Decided to allow only the named IPs. Put the office and home IPs in `allowed_cidrs` and apply. Opening the web port is #74: the `compose.yaml` contract is done. The firewall 8103 `port_info` (draft in the #74 comment), the server `.env`, and the check after the first deploy are for the user |
-| 5     | #28 Import Garmin sleep data                 | User key       | The user creates a key in Garmin Connect, agrees to the terms, and then the real response is checked                                                                                                                                                                                                |
+| Order | Task                                         | Status         | Next action                                                                                                                                                                                                                       |
+| ----- | -------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | #42 Check backup and restore                 | Decided not to | User decision (2026-11-08): do not check it. #42 was closed as not planned, and the draft PR #68 was closed without merging. The branch `chore/42-backup-restore` is still there                                                  |
+| 2     | #67 Lift the 100-item limit on the food list | Done           | Includes #31 burger franchises and #32 Bibigo data                                                                                                                                                                                |
+| 3     | #36 Alcohol and cigarettes, #37 Daily check  | Done           | #43 change report, #38 junk food, #45 goals and the follow-ups #104 and #107 are also done. The judgement rules decided in #45 are in the issue comment                                                                           |
+| 4     | #41 Access protection before external access | User           | The allow list is applied (22, 80 and 443). The web goes through the shared HTTPS proxy at `https://health-log.daysofme.com`, so no extra firewall port is needed (#74). What is left is the first deploy and the checks after it |
+| 5     | #28 Import Garmin sleep data                 | User key       | The user creates a key in Garmin Connect, agrees to the terms, and then the real response is checked                                                                                                                              |
 
 ## In progress
 
@@ -23,7 +23,7 @@ Requirements are registered as GitHub issues. Work in the order below, and choos
   - Dashboard #128, #129, and #130 (PR #133), and the part of #74 that belongs to this repository (the `compose.yaml` deploy contract, the [server setup document](../access-protection.md#server-setup), PR #125)
 - **Bundle issues:** #84 lifestyle records, #85 clinic and medication, #86 change report and goal judgement, and #87 daily record date handling are closed because all their sub-issues are done.
 - **User actions left:**
-  - #41 and #74 server port: the firewall 8103 `port_info` (draft in the #74 comment), the server `.env`, and the check after the first deploy
+  - #41, #74 and #167: the first deploy and the checks after it ([checks](../access-protection.md#checks-after-a-deploy))
   - #47 photo recognition
   - #28 Garmin key
   - #115 dev tool dependencies

@@ -51,7 +51,7 @@ services:
   web:
     build: { context: ., dockerfile: frontend/Dockerfile, secrets: [npm_token] }
     image: health-frontend:${IMAGE_TAG:-local}
-    # Local default stays 127.0.0.1:8103; the server sets WEB_BIND/WEB_PORT in .env (#74).
+    # 127.0.0.1:8103 locally and on the server: only the shared HTTPS proxy reaches the web (#74).
     ports: ['${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8103}:80']
     depends_on:
       api: { condition: service_healthy }

@@ -543,18 +543,29 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
     return () => clearTimeout(timer);
   }, [moveFocus]);
 
+  /**
+   * Reads the list from the start. `keep` is how many visits were shown: after a save or a delete
+   * the pages are read again up to that many, so someone who loaded more keeps their place (#208).
+   */
   const load = useCallback(
-    async (words: string) => {
+    async (words: string, keep = 0) => {
       // A slow older answer must not overwrite a newer one.
       const request = ++latest.current;
       clearPage();
       setSearching(true);
       try {
-        const page = await requestJson<Page>(`${visitsPath}?q=${encodeURIComponent(words)}`);
+        const path = `${visitsPath}?q=${encodeURIComponent(words)}`;
+        let page = await requestJson<Page>(path);
+        const list = [...page.visits];
+        while (page.more && list.length < keep) {
+          if (request !== latest.current) return;
+          page = await requestJson<Page>(`${path}&offset=${list.length}`);
+          list.push(...page.visits);
+        }
         if (request !== latest.current) return;
         applied.current = words;
         clear();
-        setVisits(page.visits);
+        setVisits(list);
         setMore(page.more);
       } catch (cause) {
         if (request === latest.current) error(cause);
@@ -627,7 +638,7 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
     // Dropped now, so its delete button is not what the closing dialog hands focus back to.
     setVisits((list) => list?.filter((item) => item.id !== visit.id) ?? list);
     setMoveFocus((count) => count + 1);
-    void load(applied.current);
+    void load(applied.current, (visits?.length ?? 0) - 1);
   };
 
   return (
@@ -668,7 +679,7 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
         </form>
         <Button onClick={(event) => openDialog(event.currentTarget, null)}>
           <Plus aria-hidden />
-          Visit records
+          Add visit
         </Button>
       </div>
       <Notice notice={notice} />
@@ -725,7 +736,8 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
           onSaved={() => {
             closeDialog();
             toast.success('Saved');
-            void load(applied.current);
+            // A new visit takes a place in the list, so one more is read to keep the last one shown.
+            void load(applied.current, (visits?.length ?? 0) + (editing.visit ? 0 : 1));
           }}
         />
       ) : null}

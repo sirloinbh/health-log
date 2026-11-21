@@ -25,3 +25,10 @@
 ## Limits
 
 - No browser check at 390×844 and 1440×900: the only visible change is the "Try again" button, which already existed and now also shows above a loaded goal grid after a failed read. The tests cover the behavior.
+
+## Review round 1
+
+- `issue:` a goal saved while a delete's read was still on its way could be undone on screen when that older read answered after the save, because the save set the goals without invalidating the read. Fixed in the commit "fix: keep a saved goal over an older delete read (#202)": `onSaved` bumps the read counter before setting the saved goals.
+- New test in `frontend/src/goals.test.tsx`: "a save after a delete is not undone by the read the delete started". It fails without the fix and passes with it.
+- `vitest run src/goals.test.tsx`: 23 passed.
+- `npm run check` with `TEST_DATABASE_URL` empty: passed. Backend 141 passed, 126 skipped (DB tests); frontend 653 passed, 3 skipped; skills 4 passed.

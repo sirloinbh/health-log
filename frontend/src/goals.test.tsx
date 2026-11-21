@@ -622,6 +622,56 @@ test('when two deletes read again out of order, the older answer does not bring 
   expect(within(changes).getByText('From 2026-11-01 At least 100g a day')).toBeInTheDocument();
 });
 
+test('a save after a delete is not undone by the read the delete started', async () => {
+  const history = [
+    { item: 'protein', from: '2026-11-20', target: 120 },
+    { item: 'protein', from, target: 100 },
+  ];
+  const reads: ((body: unknown) => void)[] = [];
+  const saved = goalsOf(
+    { calories: { from: '2026-11-06', target: 1800 }, protein: { from, target: 100 } },
+    [{ item: 'calories', from: '2026-11-06', target: 1800 }, history[1]],
+  );
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((_url: string, init?: RequestInit) => {
+      if (init?.method === 'DELETE') return Promise.resolve(new Response(null, { status: 204 }));
+      if (init?.method === 'PUT') return Promise.resolve(new Response(JSON.stringify(saved)));
+      return new Promise<Response>((resolve) => {
+        reads.push((body) => resolve(new Response(JSON.stringify(body))));
+      });
+    }),
+  );
+  render(<GoalsSettings />);
+  await waitFor(() => expect(reads).toHaveLength(1));
+  reads[0](goalsOf({ protein: { from, target: 100 } }, history));
+  const changes = await screen.findByRole('region', { name: 'Protein goal changes' });
+  fireEvent.click(
+    within(changes).getByRole('button', { name: 'Delete 2026-11-20 Protein goal change' }),
+  );
+  fireEvent.click(
+    within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }),
+  );
+  await waitFor(() => expect(reads).toHaveLength(2));
+
+  const calories = cardOf('Calories');
+  fireEvent.change(within(calories).getByLabelText('Daily calorie limit (kcal)'), {
+    target: { value: '1800' },
+  });
+  fireEvent.click(within(calories).getByRole('button', { name: 'Save' }));
+  await waitFor(() =>
+    expect(
+      within(cardOf('Calories')).getByText('Current goal: Up to 1,800kcal a day (from 2026-11-06)'),
+    ).toBeInTheDocument(),
+  );
+  // The delete's read answers after the save, without the saved calorie goal.
+  reads[1](goalsOf({ protein: { from, target: 100 } }, [history[1]]));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(
+    within(cardOf('Calories')).getByText('Current goal: Up to 1,800kcal a day (from 2026-11-06)'),
+  ).toBeInTheDocument();
+});
+
 test('deleting a sober change says it stops counting from the week of its date', async () => {
   server({
     body: goalsOf({ sober_days: { from, target: 5 }, sleep: { from, target: 420 } }, [

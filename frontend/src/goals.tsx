@@ -393,6 +393,9 @@ export function GoalsSettings() {
                     goal={goal}
                     today={goals.today}
                     onSaved={(saved) => {
+                      // A read still on its way from a delete was asked before this save, so its
+                      // answer would undo it on screen.
+                      latest.current += 1;
                       setGoals(saved);
                       moveFocus(item);
                     }}

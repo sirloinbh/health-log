@@ -27,3 +27,7 @@ In the alcohol and tobacco form (`frontend/src/habits.tsx`), "Add drink" used `d
 ## Limits
 
 - No browser check at 390×844 and 1440×900: running the app locally needs the `health` database, which this worktree does not have. The visible change is one line of muted text under "Add drink" at 20 rows and the button's dimmed state, both styled like the procedure limit in `visits.tsx`.
+
+## Review round 1
+
+- Approve, no blocking comments. One non-blocking thought: the procedure editor in `visits.tsx` could move focus to a neighbouring row the same way; left out of this PR's scope.

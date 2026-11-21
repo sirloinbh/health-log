@@ -17,3 +17,12 @@
 ## Verification
 
 - Docs only. Prettier check on the changed files.
+
+## Merge of main and review round 1 (2026-11-22)
+
+- Merged `origin/main` into the branch (no conflicts).
+- Review round 1 found 3 items, all fixed here:
+  - `compose.yaml`: the web port comment no longer says the server sets `WEB_BIND`/`WEB_PORT` differently; it says `127.0.0.1:8103` locally and on the server.
+  - `.env.example` and `docs/access-protection.md`: the first deploy (`deploy/bootstrap-env.sh`, now on main) writes `WEB_BIND=127.0.0.1` and `WEB_PORT=8103` into the server `.env`. The docs now say to keep those values instead of "leave them out".
+  - This verification section.
+- `npm run check` with `TEST_DATABASE_URL` empty, on the merged head: format, lint, contract, typecheck and the backend tests (267 tests, 0 failed, 126 skipped because `health_test` is not set locally) passed. The frontend tests failed once in `src/daily.test.tsx` ("the main menu opens the day the server counts as today", element not found) while four worktrees ran checks at the same time. The file alone then passed 28/28, and the full frontend run passed (644 passed, 3 skipped). `test:skills` and `build` passed. CI runs the DB tests.

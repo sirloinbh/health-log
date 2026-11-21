@@ -28,11 +28,11 @@ Two layers protect the records: **the server opens only to the IPs we name (offi
 
 The way in from outside is **the shared HTTPS proxy** (project-standards ADR-0012, #253, #254). The earlier plan to open a separate firewall port `8103` is dropped: the web stays on `127.0.0.1` and is never opened in the firewall.
 
-| Item                            | Value                                                     | Where it is set        |
-| ------------------------------- | --------------------------------------------------------- | ---------------------- |
-| `WEB_BIND` in the server `.env` | `127.0.0.1` (the default; leave it out or write it as is) | `/opt/health-log/.env` |
-| `WEB_PORT` in the server `.env` | `8103` (the default and the registry `ports.web`)         | `/opt/health-log/.env` |
-| Address to connect to           | `https://health-log.daysofme.com`                         | Only from allowed IPs  |
+| Item                            | Value                                              | Where it is set                                               |
+| ------------------------------- | -------------------------------------------------- | ------------------------------------------------------------- |
+| `WEB_BIND` in the server `.env` | `127.0.0.1` (written by the first deploy; keep it) | `/opt/health-log/.env` (created by `deploy/bootstrap-env.sh`) |
+| `WEB_PORT` in the server `.env` | `8103` (the registry `ports.web`; keep it)         | `/opt/health-log/.env` (created by `deploy/bootstrap-env.sh`) |
+| Address to connect to           | `https://health-log.daysofme.com`                  | Only from allowed IPs                                         |
 
 - **Never set `WEB_BIND=0.0.0.0` on the server.** The proxy needs only `127.0.0.1`, and binding wider would put the plain-HTTP web on every interface.
 - Do not write `IMAGE_TAG` in `.env`. The deploy script sets it from the commit.

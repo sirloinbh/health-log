@@ -93,7 +93,7 @@ test('a new visit is sent with its procedures, blanks as nothing and costs with 
   });
   open();
   expect(await screen.findByText('No clinic records')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Visit records' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add visit' }));
   // Today, as the server counts it, is where a new visit starts.
   expect(within(dialog()).getByLabelText('Visit date')).toHaveValue('2026-03-15');
   fill('Clinic name', '가상피부과');
@@ -146,7 +146,7 @@ test('editing starts from the visit, can take a procedure out, and saves to its 
 test('what cannot be sent is explained in the dialog before anything is sent', async () => {
   const fetchMock = serve(() => json({ visits: [], more: false }));
   open();
-  fireEvent.click(await screen.findByRole('button', { name: 'Visit records' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Add visit' }));
   const save = () => fireEvent.click(within(dialog()).getByRole('button', { name: 'Save' }));
   const said = async (text: string) =>
     expect(await within(dialog()).findByRole('alert')).toHaveTextContent(text);
@@ -190,7 +190,7 @@ test('what cannot be sent is explained in the dialog before anything is sent', a
 test('a visit takes at most ten procedures', async () => {
   serve(() => json({ visits: [], more: false }));
   open();
-  fireEvent.click(await screen.findByRole('button', { name: 'Visit records' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Add visit' }));
   const add = within(dialog()).getByRole('button', { name: 'Add procedure' });
   for (let count = 0; count < 10; count += 1) {
     add.focus();
@@ -247,6 +247,76 @@ test('deleting asks first, removes the visit and keeps keyboard focus on the pag
   );
 });
 
+/** Made-up visits served 20 to a page, as the server does; `list` can change between reads. */
+const paged = (list: Visit[]) => (url: string) => {
+  const offset = Number(new URL(url, 'http://test').searchParams.get('offset') ?? 0);
+  return json({ visits: list.slice(offset, offset + 20), more: list.length > offset + 20 });
+};
+const manyVisits = (count = 21) =>
+  Array.from({ length: count }, (_, index) => ({
+    ...visit,
+    id: 100 + index,
+    clinic: `가상의원 ${index + 1}`,
+    department: null,
+    procedures: [],
+  }));
+
+test('saving a visit on the second page keeps both pages shown', async () => {
+  const list = manyVisits();
+  const fetchMock = serve((url, init) => {
+    if (init?.method === 'PUT') {
+      list[20] = { ...list[20], clinic: '가상의원 수정' };
+      return json(list[20]);
+    }
+    return paged(list)(url);
+  });
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: 'Show more results' }));
+  expect(await screen.findByText('21 visits')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Edit 2026-03-10 가상의원 21' }));
+  fill('Clinic name', '가상의원 수정');
+  fireEvent.click(within(dialog()).getByRole('button', { name: 'Save' }));
+
+  expect(
+    await screen.findByRole('heading', { level: 2, name: '가상의원 수정' }),
+  ).toBeInTheDocument();
+  expect(screen.getByText('21 visits')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 2, name: '가상의원 1' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Show more results' })).not.toBeInTheDocument();
+  // The reload read page one again and then the page after it.
+  const reads = fetchMock.mock.calls
+    .map(([url]) => url)
+    .filter((url) => url.startsWith('/api/visits?'));
+  expect(reads.slice(-2)).toEqual(['/api/visits?q=', '/api/visits?q=&offset=20']);
+});
+
+test('deleting a visit on the second page reads both pages again', async () => {
+  const list = manyVisits(41);
+  serve((url, init) => {
+    if (init?.method === 'DELETE') {
+      list.splice(
+        list.findIndex((item) => url.endsWith(`/${item.id}`)),
+        1,
+      );
+      return json(null, 204);
+    }
+    return paged(list)(url);
+  });
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: 'Show more results' }));
+  expect(await screen.findByText('Showing 40 visits. There are more.')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Delete 2026-03-10 가상의원 30' }));
+  const confirm = screen.getByRole('dialog', { name: 'Delete this clinic visit?' });
+  fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
+
+  // 40 left, all read again: page one alone would say "Showing 20 visits".
+  expect(await screen.findByText('40 visits')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 2, name: '가상의원 41' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { level: 2, name: '가상의원 30' })).not.toBeInTheDocument();
+});
+
 test('the daily link opens a new visit on its day', async () => {
   serve(() => json({ visits: [], more: false }));
   open('/visits?new=2026-03-02');
@@ -262,7 +332,7 @@ test('a failed save keeps the dialog, what was typed and the focus inside it', a
       : json({ visits: [], more: false }),
   );
   open();
-  fireEvent.click(await screen.findByRole('button', { name: 'Visit records' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Add visit' }));
   fill('Clinic name', '가상의원');
   const save = within(dialog()).getByRole('button', { name: 'Save' });
   save.focus();
@@ -347,7 +417,7 @@ test('the daily card reads only after a visit save still on its way', async () =
 test('removing a procedure row moves focus to the add button, not the page', async () => {
   serve(() => json({ visits: [], more: false }));
   open();
-  fireEvent.click(await screen.findByRole('button', { name: 'Visit records' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Add visit' }));
   fireEvent.click(within(dialog()).getByRole('button', { name: 'Add procedure' }));
   const remove = within(dialog()).getByRole('button', { name: 'Remove Procedure 1' });
   remove.focus();

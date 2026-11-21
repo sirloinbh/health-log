@@ -43,6 +43,25 @@ test('writes count toward the limit too', async () => {
   );
 });
 
+// #194: the limit is one budget per client across /api, not one per feature router.
+test('requests to different feature routers share one budget', async () => {
+  await withApi(
+    pool,
+    async (call) => {
+      assert.notEqual((await call('/api/foods')).status, 429);
+      assert.notEqual((await call('/api/sleep?from=2026-01-01&to=2026-01-07')).status, 429);
+      assert.notEqual((await call('/api/goals')).status, 429);
+      const before = queries.length;
+
+      for (const path of ['/api/meals/2026-01-01', '/api/report?period=week', '/api/reminders']) {
+        assert.equal((await call(path)).status, 429, path);
+      }
+      assert.equal(queries.length, before);
+    },
+    { requestsPerMinute: 3 },
+  );
+});
+
 test('the health check stays available while the API is limited', async () => {
   await withApi(
     pool,

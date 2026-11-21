@@ -1,5 +1,5 @@
 import { Plus, X } from 'lucide-react';
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { BusyButton } from './busy-button';
 import { Button } from './components/ui/button';
@@ -112,11 +112,13 @@ const readForm = (form: Form) => {
 function DrinkRow({
   index,
   drink,
+  removeId,
   onChange,
   onRemove,
 }: {
   index: number;
   drink: DraftDrink;
+  removeId: string;
   onChange: (next: DraftDrink) => void;
   onRemove: () => void;
 }) {
@@ -167,7 +169,8 @@ function DrinkRow({
           type="button"
           variant="ghost"
           size="icon"
-          aria-label={`${name} remove`}
+          id={removeId}
+          aria-label={`Remove drink ${index + 1}`}
           onClick={onRemove}
         >
           <X aria-hidden />
@@ -202,6 +205,25 @@ function HabitForm({
 
   const setDrinks = (update: (drinks: DraftDrink[]) => DraftDrink[]) =>
     setForm((current) => ({ ...current, drinks: update(current.drinks) }));
+  const full = form.drinks.length >= maxDrinks;
+
+  // A removed row takes its focused remove button with it (#203). Focus then goes to the remove
+  // button of the row that takes its place, the row before it, or the add button.
+  const idPrefix = useId();
+  const removeIdOf = (key: number) => `${idPrefix}-drink-${key}-remove`;
+  const addId = `${idPrefix}-drink-add`;
+  const focusNext = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusNext.current) return;
+    document.getElementById(focusNext.current)?.focus();
+    focusNext.current = null;
+  });
+  const remove = (key: number) => {
+    const at = form.drinks.findIndex((drink) => drink.key === key);
+    const next = form.drinks[at + 1] ?? form.drinks[at - 1];
+    focusNext.current = next ? removeIdOf(next.key) : addId;
+    setDrinks((drinks) => drinks.filter((other) => other.key !== key));
+  };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -278,28 +300,39 @@ function HabitForm({
                   key={drink.key}
                   index={index}
                   drink={drink}
+                  removeId={removeIdOf(drink.key)}
                   onChange={(next) =>
                     setDrinks((drinks) =>
                       drinks.map((other) => (other.key === drink.key ? next : other)),
                     )
                   }
-                  onRemove={() =>
-                    setDrinks((drinks) => drinks.filter((other) => other.key !== drink.key))
-                  }
+                  onRemove={() => remove(drink.key)}
                 />
               ))}
             </ul>
+            {/* aria-disabled, not disabled: adding the last allowed row must not drop focus to
+                the page (#98, #203). */}
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="self-start"
-              disabled={form.drinks.length >= maxDrinks}
-              onClick={() => setDrinks((drinks) => [...drinks, newDraft(drinks)])}
+              id={addId}
+              className="self-start aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+              aria-disabled={full || undefined}
+              aria-describedby={full ? `${addId}-limit` : undefined}
+              onClick={() => {
+                if (full) return;
+                setDrinks((drinks) => [...drinks, newDraft(drinks)]);
+              }}
             >
               <Plus aria-hidden />
               Add drink
             </Button>
+            {full ? (
+              <p id={`${addId}-limit`} className="text-body-sm text-muted-foreground">
+                You can record up to {maxDrinks} drinks per day.
+              </p>
+            ) : null}
           </>
         ) : null}
       </fieldset>

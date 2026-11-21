@@ -144,7 +144,7 @@ test('a removed drink row is not sent', async () => {
   await screen.findByLabelText('Cigarettes');
   fireEvent.click(screen.getByRole('button', { name: 'Drank' }));
   fireEvent.click(screen.getByRole('button', { name: 'Add drink' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Drink 1 remove' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Remove drink 1' }));
   expect(screen.queryByLabelText('Drink 2 amount')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await screen.findByText('Beer 1 bottle');
@@ -180,7 +180,7 @@ test('drinking with every row removed asks for one', async () => {
   render(<HabitsCard date={date} />);
   await screen.findByLabelText('Cigarettes');
   fireEvent.click(screen.getByRole('button', { name: 'Drank' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Drink 1 remove' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Remove drink 1' }));
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   expect(await findLive('alert')).toHaveTextContent('Enter at least one drink');
   expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -293,6 +293,51 @@ test('once every kind is listed, a new row takes a unit not used yet', async () 
   expect(kinds).toEqual(['Soju', 'Beer', 'Wine', 'Makgeolli', 'Spirits', 'Other']);
   expect(screen.getByLabelText('Drink 7 type')).toHaveTextContent('Soju');
   expect(screen.getByLabelText('Drink 7 unit')).toHaveTextContent('glass');
+});
+
+// #203: the add button keeps keyboard focus at the limit instead of dropping it to the page.
+test('adding the last allowed drink keeps focus on the add button, which then refuses more', async () => {
+  // A saved day with every kind and unit once (18 rows), so only two rows are added here.
+  const drinks = ['soju', 'beer', 'wine', 'makgeolli', 'whisky', 'other'].flatMap((kind) =>
+    ['glass', 'bottle', 'can'].map((unit) => ({ kind, unit, amount: 1 })),
+  );
+  server({ body: dayOf({ date, cigarettes: null, drinks }) });
+  render(<HabitsCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+  const add = screen.getByRole('button', { name: 'Add drink' });
+  add.focus();
+  fireEvent.click(add);
+  expect(add).not.toHaveAttribute('aria-disabled');
+  fireEvent.click(add);
+  expect(screen.getByLabelText('Drink 20 amount')).toBeInTheDocument();
+  expect(add).toHaveAttribute('aria-disabled', 'true');
+  expect(add).not.toBeDisabled();
+  expect(add).toHaveFocus();
+  expect(add).toHaveAccessibleDescription('You can record up to 20 drinks per day.');
+  fireEvent.click(add);
+  expect(screen.queryByLabelText('Drink 21 amount')).not.toBeInTheDocument();
+});
+
+test('removing a drink moves focus to the next row, then the previous row, then the add button', async () => {
+  server({ body: dayOf(null) });
+  render(<HabitsCard date={date} />);
+  await screen.findByLabelText('Cigarettes');
+  fireEvent.click(screen.getByRole('button', { name: 'Drank' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add drink' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add drink' }));
+  const removeButton = (row: number) => screen.getByRole('button', { name: `Remove drink ${row}` });
+
+  // The middle row: the row after it moves up and takes the focus.
+  removeButton(2).focus();
+  fireEvent.click(removeButton(2));
+  await waitFor(() => expect(removeButton(2)).toHaveFocus());
+  expect(screen.getByLabelText('Drink 2 type')).toHaveTextContent('Wine');
+  // The last row: the row before it.
+  fireEvent.click(removeButton(2));
+  await waitFor(() => expect(removeButton(1)).toHaveFocus());
+  // The only row: the add button.
+  fireEvent.click(removeButton(1));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Add drink' })).toHaveFocus());
 });
 
 test('coming back while a save is on its way shows the saved day, not a blank form', async () => {

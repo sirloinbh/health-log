@@ -8,6 +8,12 @@ import { sendError } from './standard/http.js';
  */
 export const charCount = (value: string) => [...value].length;
 
+/**
+ * An ILIKE pattern that finds `text` anywhere. `\`, `%` and `_` are escaped, so a search for "100%"
+ * means those characters, not a wildcard.
+ */
+export const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, '\\$&')}%`;
+
 // A loop over an explicit stack, not recursion: a deeply nested body within the size limit would
 // otherwise overflow the call stack and turn into a 500 (PR #102 review). Each value is visited
 // once, so the cost follows the size of the body.

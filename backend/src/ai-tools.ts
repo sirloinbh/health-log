@@ -3,7 +3,7 @@
 import { z } from 'zod/v4';
 
 import { isRealDate } from './dates.js';
-import type { Db } from './day-records.js';
+import type { Db } from './db.js';
 import { mealsOfDay } from './meals.js';
 import { defineTool } from './standard/tools.js';
 

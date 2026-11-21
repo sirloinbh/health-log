@@ -3,7 +3,8 @@ import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { parseDate } from './dates.js';
-import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.js';
+import { periodsOf } from './day-records.js';
+import { type Db, inTransaction, snapshotRead } from './db.js';
 import { HttpError } from './standard/http.js';
 import { charCount } from './text.js';
 
@@ -92,7 +93,7 @@ export function checksRouter(pool: Pool) {
   router.get('/:date', async (req, res) => {
     const date = parseDate(req.params.date);
     // One snapshot for the record and both rates.
-    res.json(await inTransaction(pool, (client) => readDay(client, date), snapshotRead));
+    res.json(await inTransaction(pool, (client) => readDay(client, date), { setup: snapshotRead }));
   });
 
   router.put('/:date', async (req, res) => {

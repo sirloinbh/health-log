@@ -3,9 +3,9 @@ import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
 import { isRealDate } from './dates.js';
-import { withTransaction } from './standard/db.js';
+import { inTransaction } from './db.js';
 import { HttpError, parseId } from './standard/http.js';
-import { charCount } from './text.js';
+import { charCount, likePattern } from './text.js';
 
 // Clinic visits and their procedures (#39). Medical details are sensitive, so no message here ever
 // repeats what was entered, and nothing in this file logs a request.
@@ -100,8 +100,6 @@ export const listQuery = z.object({
     .default(0),
 });
 
-const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, '\\$&')}%`;
-
 type Procedure = {
   name: string;
   area: string | null;
@@ -158,10 +156,6 @@ export function visitsRouter(pool: Pool) {
     return rows[0] ? toVisit(rows[0]) : undefined;
   };
 
-  // A visit and its procedures change together, or not at all.
-  const inTransaction = <T>(run: (client: PoolClient) => Promise<T>) =>
-    withTransaction<T, PoolClient>(pool, run);
-
   // One statement per procedure keeps the order explicit; the transaction undoes them all on failure.
   const putProcedures = async (
     client: PoolClient,
@@ -209,7 +203,7 @@ export function visitsRouter(pool: Pool) {
 
   router.post('/', async (req, res) => {
     const visit = visitInput.parse(req.body);
-    const created = await inTransaction(async (client) => {
+    const created = await inTransaction(pool, async (client) => {
       const { rows } = await client.query<{ id: number }>(
         `INSERT INTO clinic_visits (visit_date, clinic, department, note, cost, next_visit_on)
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
@@ -226,7 +220,7 @@ export function visitsRouter(pool: Pool) {
   router.put('/:id', async (req, res) => {
     const id = parseId(req.params.id, 'clinic visit');
     const visit = visitInput.parse(req.body);
-    const updated = await inTransaction(async (client) => {
+    const updated = await inTransaction(pool, async (client) => {
       const { rowCount } = await client.query(
         `UPDATE clinic_visits SET visit_date = $1, clinic = $2, department = $3, note = $4,
            cost = $5, next_visit_on = $6, updated_at = now()

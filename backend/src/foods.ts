@@ -3,13 +3,11 @@ import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { isRealDate } from './dates.js';
+import { hasTwoDecimalsAtMost, optionalNumber } from './numbers.js';
 import { HttpError, parseId } from './standard/http.js';
-import { charCount } from './text.js';
+import { charCount, likePattern } from './text.js';
 
 const maxAmount = 99_999;
-
-// The columns keep two decimals; anything finer would be rounded silently, even down to zero.
-export const hasTwoDecimalsAtMost = (value: number) => Number(value.toFixed(2)) === value;
 
 const amount = (label: string) =>
   z
@@ -152,9 +150,6 @@ type FoodRow = {
 const columns =
   'id, name, brand, category, serving_size, serving_unit, calories, carbs, protein, fat, sugars, sodium, source_type, source_url, checked_on, is_junk';
 
-// pg returns BIGINT and NUMERIC as strings.
-const optionalNumber = (value: string | null) => (value === null ? null : Number(value));
-
 const toFood = (row: FoodRow) => ({
   id: row.id,
   name: row.name,
@@ -193,9 +188,6 @@ const inputValues = (food: z.infer<typeof foodInput>) => [
 
 /** How many recently eaten foods the meal card offers before any search. */
 const recentLimit = 10;
-
-// A search for "100%" means those characters, not a LIKE wildcard.
-const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, '\\$&')}%`;
 
 export function foodsRouter(pool: Pool, today: () => string) {
   const router = Router();

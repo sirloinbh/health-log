@@ -1,5 +1,5 @@
 {
-  "centralSha": "52d0d2c2eb7310dae0d93356742a36fc4914fb30",
+  "centralSha": "b205088594b7c7295df8eba87cb06a37e0a32e0e",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -395,7 +395,7 @@
     },
     "deploy/install-backup.sh": {
       "mode": "full",
-      "sha256": "17c7415d136a0aa270e2aa000c31de062d433ad71b53c366fd7b42d97df20ae4",
+      "sha256": "8446ada6d43679b006e21edc01adb07ded9d659f606234a0b1db814e09a189e5",
       "source": "templates/deploy/deploy/install-backup.sh.tmpl"
     },
     "deploy/notify.sh": {
@@ -410,18 +410,18 @@
     },
     "deploy/report.service": {
       "mode": "full",
-      "sha256": "113cb2aee02c413d4b63814689c211e83403cc5495cdf8506d702947baab2afd",
-      "source": "templates/app/deploy/report.service.tmpl"
+      "sha256": "8bd5de2c752d63b361ca14ea3784f4086f9b0b25dd66fa9316ed8adfd4e7115b",
+      "source": "templates/deploy/deploy/report.service.tmpl"
     },
     "deploy/report.sh": {
       "mode": "full",
-      "sha256": "218b3d0728f8fb4134f712d951931a1872a8ae1fe56e266b3324e16bef4c7dd6",
-      "source": "templates/app/deploy/report.sh.tmpl"
+      "sha256": "6512d6e040af7617d595217c0a6c650bf7bf9bb509b5186280d9c0a4dd759c97",
+      "source": "templates/deploy/deploy/report.sh.tmpl"
     },
     "deploy/report.timer": {
       "mode": "full",
-      "sha256": "8553aa8bfbf12e16e4a8560bd62875e8aa9d74b9ab8154b15937c0c0cfd6330d",
-      "source": "templates/app/deploy/report.timer.tmpl"
+      "sha256": "8ca9c0bd24abb1e330ba329456dc4f273f49d8a7b4cc751072bd3dd801b6fce2",
+      "source": "templates/deploy/deploy/report.timer.tmpl"
     },
     "deploy/restore-check.service": {
       "mode": "full",

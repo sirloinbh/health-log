@@ -214,9 +214,11 @@ export function foodsRouter(pool: Pool, today: () => string) {
     // One row past the page says whether another page exists, without counting every match.
     // Pages only add up if every food has one place in the order. A name and brand are already
     // unique; id keeps that true even if the rule is ever relaxed.
+    // The screens show a food as "brand name" (#198), so the search runs on that text: it also
+    // finds the name alone or the brand alone, and concat_ws drops a missing brand.
     const { rows } = await pool.query<FoodRow>(
       `SELECT ${columns} FROM foods
-       WHERE $1 = '' OR name ILIKE $2 OR brand ILIKE $2
+       WHERE $1 = '' OR concat_ws(' ', brand, name) ILIKE $2
        ORDER BY name, brand NULLS FIRST, id
        LIMIT $3 OFFSET $4`,
       [q, likePattern(q), foodPageSize + 1, offset],

@@ -1,5 +1,5 @@
 {
-  "centralSha": "686734e92c60717d304d1655535b297f4c177720",
+  "centralSha": "52d0d2c2eb7310dae0d93356742a36fc4914fb30",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -115,7 +115,7 @@
     },
     ".dockerignore": {
       "mode": "full",
-      "sha256": "5ed5e711032081e3f5219896e9d11be7e59e67562a55d20f6310e0bf1e5c3aba",
+      "sha256": "f8b83b53552e65e003ebd36ac56870b323a1f1cc9d7062e408ec4a1ad5e62e38",
       "source": "templates/app/.dockerignore.tmpl"
     },
     ".editorconfig": {
@@ -240,7 +240,7 @@
     },
     "backend/Dockerfile": {
       "mode": "full",
-      "sha256": "c05db94a04a33f0453dbf2872223d268dc63a35abf29ba47187e59d6f816bfbc",
+      "sha256": "18e9310726dd8f2c3b9e64c3503ccebd9e71dbe1e85901f015c1710bb5c79ffb",
       "source": "templates/app/backend/Dockerfile.tmpl"
     },
     "backend/package.json": {
@@ -405,7 +405,7 @@
     },
     "deploy/remote-deploy.sh": {
       "mode": "full",
-      "sha256": "fd24d9fe4e7c2f2188c807066c10a93c0524536c9b37a48580a8c36cec886db3",
+      "sha256": "b435a727fe20efbdb6a23ffbc87ca388cb54ccbd76df96d93fe9aa954ee53011",
       "source": "templates/deploy/deploy/remote-deploy.sh.tmpl"
     },
     "deploy/report.service": {

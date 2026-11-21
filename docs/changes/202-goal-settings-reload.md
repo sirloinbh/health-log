@@ -32,3 +32,7 @@
 - New test in `frontend/src/goals.test.tsx`: "a save after a delete is not undone by the read the delete started". It fails without the fix and passes with it.
 - `vitest run src/goals.test.tsx`: 23 passed.
 - `npm run check` with `TEST_DATABASE_URL` empty: passed. Backend 141 passed, 126 skipped (DB tests); frontend 653 passed, 3 skipped; skills 4 passed.
+
+## Review round 2
+
+- Approve, no blocking comments. The round 1 fix and its test are in place; the final diff was re-read.

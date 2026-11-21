@@ -16,6 +16,20 @@ export const isRealDate = (value: string) => {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 };
 
+// Calendar-day arithmetic. A YYYY-MM-DD is already a day in the service time zone, fixed by the
+// caller; counting it as a UTC midnight keeps every step exactly one day, whatever the server's
+// zone and across daylight-saving changes, so no day is ever 23 or 25 hours long.
+const dayMs = 86_400_000;
+const utcMidnight = (date: string) => Date.parse(`${date}T00:00:00Z`);
+
+/** The calendar day `days` after `date` (before it when negative). */
+export const shiftDay = (date: string, days: number) =>
+  new Date(utcMidnight(date) + days * dayMs).toISOString().slice(0, 10);
+
+/** Whole days from `from` to `to`: 0 for the same day, negative when `to` is earlier. */
+export const daysBetween = (from: string, to: string) =>
+  Math.round((utcMidnight(to) - utcMidnight(from)) / dayMs);
+
 /** A date in a path, or a 400 HttpError. */
 export const parseDate = (value: unknown) => {
   if (typeof value !== 'string' || !isRealDate(value)) {

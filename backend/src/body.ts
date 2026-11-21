@@ -2,14 +2,12 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
-import { parseDate } from './dates.js';
+import { daysBetween, parseDate } from './dates.js';
+import { hasTwoDecimalsAtMost, optionalNumber } from './numbers.js';
 import { HttpError } from './standard/http.js';
 import { charCount } from './text.js';
 
 const maxRangeDays = 366;
-
-// The columns keep two decimals; anything finer would be rounded silently.
-const hasTwoDecimalsAtMost = (value: number) => Number(value.toFixed(2)) === value;
 
 const measure = (label: string, max: number) =>
   z
@@ -76,9 +74,6 @@ type BodyRow = {
 const columns =
   'record_date, weight_kg, body_fat_percent, waist_cm, systolic_mmhg, diastolic_mmhg, memo';
 
-// pg returns NUMERIC as a string.
-const optionalNumber = (value: string | null) => (value === null ? null : Number(value));
-
 const toRecord = (row: BodyRow) => ({
   date: row.record_date,
   weightKg: optionalNumber(row.weight_kg),
@@ -88,9 +83,6 @@ const toRecord = (row: BodyRow) => ({
   diastolicMmhg: row.diastolic_mmhg,
   memo: row.memo,
 });
-
-const daysBetween = (from: string, to: string) =>
-  Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 
 export function bodyRouter(pool: Pool) {
   const router = Router();

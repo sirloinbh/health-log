@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import type { Pool } from 'pg';
 
-import { isRealDate } from '../src/dates.js';
+import { daysBetween, isRealDate, shiftDay } from '../src/dates.js';
 import { withApi } from './helpers.js';
 
 const untouched = () =>
@@ -75,4 +75,36 @@ test('the other places that take a date use the same ends', async () => {
       assert.match(String(data.error), new RegExp(message), path);
     }
   });
+});
+
+// #193: one copy of the day arithmetic for body, report, reminders and periodsOf.
+test('shiftDay steps whole calendar days across month, year and leap-day ends', () => {
+  assert.equal(shiftDay('2026-01-31', 1), '2026-02-01');
+  assert.equal(shiftDay('2026-12-31', 1), '2027-01-01');
+  assert.equal(shiftDay('2028-02-28', 1), '2028-02-29');
+  assert.equal(shiftDay('2027-03-01', -1), '2027-02-28');
+  assert.equal(shiftDay('2026-11-22', 0), '2026-11-22');
+  assert.equal(shiftDay('2026-11-22', 7), '2026-11-29');
+});
+
+test('daysBetween counts whole days, negative when the end is earlier', () => {
+  assert.equal(daysBetween('2026-11-22', '2026-11-22'), 0);
+  assert.equal(daysBetween('2026-02-28', '2026-03-01'), 1);
+  assert.equal(daysBetween('2028-01-01', '2029-01-01'), 366);
+  assert.equal(daysBetween('2026-11-22', '2026-11-15'), -7);
+});
+
+test('day arithmetic does not depend on the server time zone or daylight saving', () => {
+  const zone = process.env.TZ;
+  try {
+    // Los Angeles springs forward on 2026-03-08: that day is 23 hours long there.
+    for (const tz of ['America/Los_Angeles', 'Asia/Seoul', 'UTC']) {
+      process.env.TZ = tz;
+      assert.equal(shiftDay('2026-03-08', 1), '2026-03-09', tz);
+      assert.equal(daysBetween('2026-03-01', '2026-03-15'), 14, tz);
+    }
+  } finally {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
 });

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import type { Pool } from 'pg';
 
 import { createApp } from '../src/app.js';
-import { charCount } from '../src/text.js';
+import { charCount, likePattern } from '../src/text.js';
 import { listenForFetch, withApi } from './helpers.js';
 
 const recording = () => {
@@ -26,6 +26,14 @@ test('a character is counted once, as the database counts it, even when it is an
   assert.equal(charCount('🍙'), 1);
   assert.equal('🍙'.length, 2);
   assert.equal(charCount('🍙'.repeat(200)), 200);
+});
+
+// #193: one copy for the food and clinic visit searches.
+test('a search pattern matches anywhere and takes %, _ and backslash literally', () => {
+  assert.equal(likePattern('rice'), '%rice%');
+  assert.equal(likePattern('100%'), '%100\\%%');
+  assert.equal(likePattern('a_b'), '%a\\_b%');
+  assert.equal(likePattern('c:\\x'), '%c:\\\\x%');
 });
 
 test('a NUL character anywhere in a body or query is refused before the database', async () => {

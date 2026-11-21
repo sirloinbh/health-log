@@ -296,16 +296,21 @@ export function GoalsSettings() {
   const moveFocus = (target: 'section' | GoalItem) =>
     setFocusOn((current) => ({ target, count: current.count + 1 }));
 
+  // Each delete reads again, so reads can overlap; only the latest one may show its answer (#202).
+  const latest = useRef(0);
+
   const load = useCallback(async () => {
+    const request = ++latest.current;
+    const current = () => live.current && request === latest.current;
     clear();
     try {
       // A change from before leaving the page may still be on its way; read after it lands.
       await writesSettled(goalsPath);
-      if (!live.current) return;
+      if (!current()) return;
       const data = await requestJson<Goals>(goalsPath);
-      if (live.current) setGoals(data);
+      if (current()) setGoals(data);
     } catch (cause) {
-      if (live.current) error(cause);
+      if (current()) error(cause);
     }
   }, [clear, error]);
 
@@ -343,7 +348,8 @@ export function GoalsSettings() {
         </p>
       </div>
       <Notice notice={notice} />
-      {notice && goals === undefined ? (
+      {/* A failed read after a delete keeps the goals on screen, and can be tried again too. */}
+      {notice ? (
         <Button
           variant="outline"
           className="self-start"
@@ -387,6 +393,9 @@ export function GoalsSettings() {
                     goal={goal}
                     today={goals.today}
                     onSaved={(saved) => {
+                      // A read still on its way from a delete was asked before this save, so its
+                      // answer would undo it on screen.
+                      latest.current += 1;
                       setGoals(saved);
                       moveFocus(item);
                     }}

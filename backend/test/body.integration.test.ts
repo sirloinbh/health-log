@@ -148,3 +148,36 @@ test(
     }
   },
 );
+
+// #197: the memo and empty-record rules of bodyInput hold for a direct write too.
+test(
+  'the database itself refuses an empty record and a memo the API would refuse',
+  { skip },
+  async (t) => {
+    const date = '1990-02-07';
+    t.after(() => pool.query('DELETE FROM body_records WHERE record_date = $1', [date]));
+    const insert = (weightKg: number | null, memo: string | null) =>
+      pool.query('INSERT INTO body_records (record_date, weight_kg, memo) VALUES ($1, $2, $3)', [
+        date,
+        weightKg,
+        memo,
+      ]);
+    const refused: [number | null, string | null, string][] = [
+      [null, null, 'body_records_not_empty'],
+      [70, '', 'body_records_memo_length'],
+      [70, '  \n\t', 'body_records_memo_length'],
+      [70, 'x'.repeat(501), 'body_records_memo_length'],
+    ];
+    for (const [weightKg, memo, constraint] of refused) {
+      await assert.rejects(insert(weightKg, memo), { code: '23514', constraint }, constraint);
+    }
+
+    // A memo alone is a record, as in the API, and 500 characters (one emoji is one) fit.
+    await insert(null, `${'x'.repeat(499)}😀`);
+    const { rows } = await pool.query<{ length: number }>(
+      'SELECT char_length(memo) AS length FROM body_records WHERE record_date = $1',
+      [date],
+    );
+    assert.deepEqual(rows, [{ length: 500 }]);
+  },
+);

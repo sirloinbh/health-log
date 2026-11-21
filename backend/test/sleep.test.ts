@@ -146,7 +146,7 @@ test('the sleep API is rate limited', async () => {
       assert.equal(limited.status, 429);
       assert.match(String(limited.data.error), /Too many requests/);
     },
-    { rateLimit: { max: 1, windowMs: 60_000 } },
+    { requestsPerMinute: 1 },
   );
 });
 

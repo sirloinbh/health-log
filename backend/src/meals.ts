@@ -1,12 +1,10 @@
 import { Router } from 'express';
-import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { isRealDate, parseDate } from './dates.js';
 import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.js';
 import { hasTwoDecimalsAtMost } from './foods.js';
-import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError, parseId } from './standard/http.js';
 import { charCount } from './text.js';
 
@@ -81,7 +79,7 @@ export const entryInput = z
   });
 
 type EntryRow = {
-  id: string;
+  id: number;
   meal: string;
   food_id: string | null;
   name: string;
@@ -117,7 +115,7 @@ const daySql = `WITH eaten AS (
   SELECT *, ${totals} FROM eaten ORDER BY id`;
 
 const toEntry = (row: EntryRow) => ({
-  id: Number(row.id),
+  id: row.id,
   meal: row.meal,
   foodId: optionalNumber(row.food_id),
   name: row.name,
@@ -166,26 +164,25 @@ const junkOf = async (db: Db, period: { from: string; to: string }) => {
   };
 };
 
-export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
-  const router = Router();
-  router.use(rateLimit(rateLimitOptions(limits)));
-
-  // A read runs this in one snapshot (snapshotRead), so the day and its periods agree. A change runs
-  // it in its own transaction, which sees the change; an entry another tab saves at that same moment
-  // may show in the periods before the list, until the next read.
-  const day = async (db: Db, date: string) => {
-    const { rows } = await db.query<EntryRow>(daySql, [date]);
-    const { week, month } = periodsOf(date);
-    return {
-      entries: rows.map(toEntry),
-      totals: toTotals(rows[0]),
-      junk: { week: await junkOf(db, week), month: await junkOf(db, month) },
-    };
+// A read runs this in one snapshot (snapshotRead), so the day and its periods agree. A change runs
+// it in its own transaction, which sees the change; an entry another tab saves at that same moment
+// may show in the periods before the list, until the next read. The AI tool list_meals calls it too (#711).
+export const mealsOfDay = async (db: Db, date: string) => {
+  const { rows } = await db.query<EntryRow>(daySql, [date]);
+  const { week, month } = periodsOf(date);
+  return {
+    entries: rows.map(toEntry),
+    totals: toTotals(rows[0]),
+    junk: { week: await junkOf(db, week), month: await junkOf(db, month) },
   };
+};
+
+export function mealsRouter(pool: Pool) {
+  const router = Router();
 
   router.get('/:date', async (req, res) => {
     const date = parseDate(req.params.date);
-    res.json(await inTransaction(pool, (client) => day(client, date), snapshotRead));
+    res.json(await inTransaction(pool, (client) => mealsOfDay(client, date), snapshotRead));
   });
 
   // Each change answers with the whole day, so the screen needs no second request. A change and the
@@ -212,7 +209,7 @@ export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
           [date, entry.meal, entry.servings, entry.name, entry.calories, entry.isJunk ?? false],
         );
       }
-      return day(client, date);
+      return mealsOfDay(client, date);
     });
     res.status(201).json(answer);
   });
@@ -241,7 +238,7 @@ export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
           ? new HttpError(400, 'The combo has no foods')
           : new HttpError(404, 'Combo not found');
       }
-      return day(client, date);
+      return mealsOfDay(client, date);
     });
     res.status(201).json(answer);
   });
@@ -264,7 +261,7 @@ export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
         [date, from, meal],
       );
       if (!rowCount) throw new HttpError(404, 'There are no records to copy');
-      return day(client, date);
+      return mealsOfDay(client, date);
     });
     res.status(201).json(answer);
   });
@@ -278,7 +275,7 @@ export function mealsRouter(pool: Pool, limits: RateLimitSettings) {
         [id, date],
       );
       if (!rowCount) throw new HttpError(404, 'Meal record not found');
-      return day(client, date);
+      return mealsOfDay(client, date);
     });
     res.json(answer);
   });

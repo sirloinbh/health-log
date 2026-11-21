@@ -1,11 +1,9 @@
 import { Router } from 'express';
-import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { isRealDate, parseDate } from './dates.js';
 import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.js';
-import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError } from './standard/http.js';
 
 const goalItems = ['calories', 'protein', 'sleep', 'sober_days'] as const;
@@ -221,9 +219,8 @@ const readDay = async (db: Db, date: string) => {
   };
 };
 
-export function goalsRouter(pool: Pool, today: () => string, limits: RateLimitSettings) {
+export function goalsRouter(pool: Pool, today: () => string) {
   const router = Router();
-  router.use(rateLimit(rateLimitOptions(limits)));
 
   router.get('/', async (_req, res) => {
     res.json(await inTransaction(pool, (client) => readGoals(client, today()), snapshotRead));

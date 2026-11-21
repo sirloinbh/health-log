@@ -6,6 +6,7 @@ import { App } from './app';
 import { toast } from './components/ui/sonner';
 import type { Medication, MedicationLists } from './med-text';
 import { trackWrite } from './pending-writes';
+import { findLive, getLive, queryLive } from './test/live';
 import { VisitsCard } from './visit-card';
 import type { Visit } from './visit-text';
 
@@ -322,7 +323,7 @@ test('when the day’s medicines fail to load, trying again brings both parts ba
     }),
   );
   renderCard();
-  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   const again = screen.getByRole('button', { name: 'Try again' });
   again.focus();
   fireEvent.click(again);
@@ -359,16 +360,16 @@ test('a list that failed to load can be tried again, and focus stays on the page
   let fail = true;
   serve(() => (fail ? json({ error: 'Fake server error' }, 500) : json(lists())));
   open();
-  expect(await screen.findByRole('alert')).toHaveTextContent('Fake server error');
+  expect(await findLive('alert')).toHaveTextContent('Fake server error');
   const retry = screen.getByRole('button', { name: 'Try again' });
   fail = false;
   retry.focus();
   fireEvent.click(retry);
   expect(await screen.findByRole('region', { name: 'Taking now 1' })).toBeInTheDocument();
-  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(queryLive('alert')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
   // Said once the list is in, as focus on the title alone says nothing about it.
-  expect(screen.getByRole('status')).toHaveTextContent('The list was reloaded.');
+  expect(getLive('status')).toHaveTextContent('The list was reloaded.');
   await waitFor(() =>
     expect(screen.getByRole('heading', { level: 1, name: 'Medication' })).toHaveFocus(),
   );
@@ -389,10 +390,10 @@ test('trying again also asks again for the visits a medicine can be linked to (#
   );
   vi.stubGlobal('fetch', fetchMock);
   open();
-  await screen.findByRole('alert');
+  await findLive('alert');
   down = false;
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
-  expect(screen.getByRole('status')).toHaveTextContent('Reloading the list…');
+  expect(getLive('status')).toHaveTextContent('Reloading the list…');
   await screen.findByRole('region', { name: 'Taking now 1' });
   fireEvent.click(screen.getByRole('button', { name: 'Medication record' }));
   const choices = within(dialog()).getByLabelText('Prescribing clinic visit');
@@ -405,9 +406,9 @@ test('trying again also asks again for the visits a medicine can be linked to (#
 test('failing again says so again (#127)', async () => {
   serve(() => json({ error: 'Fake server error' }, 500));
   open();
-  await screen.findByRole('alert');
+  await findLive('alert');
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
-  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  expect(await screen.findByRole('alert')).toHaveTextContent('Fake server error');
+  expect(queryLive('alert')).not.toBeInTheDocument();
+  expect(await findLive('alert')).toHaveTextContent('Fake server error');
   expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
 });

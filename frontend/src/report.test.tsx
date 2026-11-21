@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
+import { findLive, getLive } from './test/live';
 
 const today = '2026-11-05';
 const empty = {
@@ -338,7 +339,7 @@ test('a failed "This week" does not move focus on a later report (#138 review)',
   render(<App />);
   await screen.findByText('Oct 26 – Nov 1');
   fireEvent.click(screen.getByRole('button', { name: 'This week' }));
-  await screen.findByRole('alert');
+  await findLive('alert');
   // Pressing Monthly without focusing it, as Safari does: the month's arrival must not take focus.
   const outside = document.createElement('input');
   document.body.append(outside);
@@ -354,7 +355,7 @@ test('a failed report can be tried again', async () => {
   let fail = true;
   serve(() => (fail ? json({ error: 'Server error occurred' }, 500) : json(reportOf())));
   render(<App />);
-  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   fail = false;
   const retry = screen.getByRole('button', { name: 'Try again' });
   retry.focus();
@@ -375,7 +376,7 @@ test('a retry that fails again keeps focus on its button', async () => {
         }),
   );
   render(<App />);
-  await screen.findByRole('alert');
+  await findLive('alert');
   const retry = screen.getByRole('button', { name: 'Try again' });
   retry.focus();
   fireEvent.click(retry);
@@ -384,7 +385,7 @@ test('a retry that fails again keeps focus on its button', async () => {
   expect(retry).toHaveFocus();
   answer(json({ error: 'Server error occurred' }, 500));
   await waitFor(() => expect(retry).not.toHaveAttribute('aria-disabled'));
-  expect(screen.getByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(getLive('alert')).toHaveTextContent('Server error occurred');
   expect(retry).toHaveFocus();
 });
 
@@ -671,7 +672,7 @@ test('one failed check of the server keeps the report already on screen', async 
   healthy = false;
   // Returning to the tab checks the server again.
   document.dispatchEvent(new Event('visibilitychange'));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Cannot reach the server');
+  expect(await findLive('alert')).toHaveTextContent('Cannot reach the server');
   expect(screen.getByText('Nov 2 – Nov 8')).toBeInTheDocument();
   expect(stat('Average sleep')).toHaveTextContent('7 h 30 min');
   expect(screen.queryByText(/today date is unknown/)).not.toBeInTheDocument();

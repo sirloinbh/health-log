@@ -3,6 +3,7 @@ import { expect, test, vi } from 'vitest';
 
 import { BodyCard } from './body';
 import { toast } from './components/ui/sonner';
+import { findLive, queryLive } from './test/live';
 
 const date = '2026-03-15';
 const record = {
@@ -147,13 +148,11 @@ test('a trend that fails to load leaves today usable and can be retried', async 
   });
   render(<BodyCard date={date} />);
   expect(await screen.findByLabelText('Weight (kg)')).toBeEnabled();
-  expect(await screen.findByRole('alert')).toHaveTextContent(
-    'Could not load the changes over time',
-  );
+  expect(await findLive('alert')).toHaveTextContent('Could not load the changes over time');
 
   fireEvent.click(screen.getByRole('button', { name: 'Reload changes' }));
   expect(await screen.findByRole('row', { name: /Weight/ })).toBeInTheDocument();
-  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(queryLive('alert')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Reload changes' })).not.toBeInTheDocument();
 });
 
@@ -174,9 +173,7 @@ test('numbers from before a failed reload do not stay on screen', async () => {
   fireEvent.change(screen.getByLabelText('Weight (kg)'), { target: { value: '60' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent(
-    'Could not load the changes over time',
-  );
+  expect(await findLive('alert')).toHaveTextContent('Could not load the changes over time');
   expect(screen.getByText('60kg')).toBeInTheDocument();
   expect(screen.queryByRole('table')).not.toBeInTheDocument();
 });
@@ -201,14 +198,12 @@ test('a trend retry shows it is running, allows one at a time, and announces fai
   const retry = await screen.findByRole('button', { name: /Reload changes/ });
   expect(retry).toBeDisabled();
   expect(retry).toHaveAttribute('aria-busy', 'true');
-  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(queryLive('alert')).not.toBeInTheDocument();
   fireEvent.click(retry);
   expect(historyCalls).toBe(2);
 
   finishRetry(new Response(JSON.stringify({ error: 'x' }), { status: 500 }));
-  expect(await screen.findByRole('alert')).toHaveTextContent(
-    'Could not load the changes over time',
-  );
+  expect(await findLive('alert')).toHaveTextContent('Could not load the changes over time');
   expect(screen.getByRole('button', { name: 'Reload changes' })).toBeEnabled();
   await waitFor(() =>
     expect(document.activeElement).toBe(
@@ -224,7 +219,7 @@ test('a value too long to read is refused and the stored value stays', async () 
   fireEvent.change(screen.getByLabelText('Weight (kg)'), { target: { value: '9'.repeat(400) } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('enter digits only');
+  expect(await findLive('alert')).toHaveTextContent('enter digits only');
   expect(
     fetchMock.mock.calls.some(
       (args) => (args as unknown as [string, RequestInit])[1]?.method === 'PUT',
@@ -252,7 +247,7 @@ test('when both fail, one retry brings back the record and the trend', async () 
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
   expect(await screen.findByText('70.5kg')).toBeInTheDocument();
   expect(await screen.findByRole('row', { name: /Weight/ })).toBeInTheDocument();
-  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(queryLive('alert')).not.toBeInTheDocument();
 });
 
 test('a slow older trend does not overwrite the one that includes a save', async () => {
@@ -337,7 +332,7 @@ test('a server rejection keeps the form and the typed values', async () => {
   });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('Enter both');
+  expect(await findLive('alert')).toHaveTextContent('Enter both');
   expect(screen.getByLabelText('Systolic blood pressure (mmHg)')).toHaveValue('120');
   expect(screen.getByRole('button', { name: 'Save' })).not.toHaveAttribute('aria-disabled');
 });
@@ -350,7 +345,7 @@ test('a comma decimal is refused, never read as ten times the value', async () =
   expect(weight).toHaveValue('49,5');
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent(
+  expect(await findLive('alert')).toHaveTextContent(
     'Weight (kg): enter digits only. Use a period for the decimal point',
   );
   expect(weight).toHaveValue('49,5');

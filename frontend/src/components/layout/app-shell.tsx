@@ -8,11 +8,13 @@ import { DARK_ONLY } from '../../lib/theme-config';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '../ui/sheet';
+import { AiShell } from './ai-shell';
 import { AppSwitcher } from './app-switcher';
 import { ThemeToggle } from './theme-toggle';
 
 // The common app frame (docs/layout.md): top bar, main menu (LNB), content and footer.
 // From md (768px) the menu is a fixed sidebar; below it opens as a sheet from the left.
+// The header adds the top safe-area inset to its 3.5rem, so the sidebar's top and height add it too (#686).
 // Only the app name differs between apps; menu items come from the app's own page list.
 
 export type NavItem = { to: string; label: string; icon?: LucideIcon; end?: boolean };
@@ -90,6 +92,7 @@ function AppShell({
           </Link>
           <div className="ml-auto flex items-center gap-1">
             {actions}
+            <AiShell />
             <AppSwitcher />
             {/* A dark-only app (ADR-0011) has no mode to choose. */}
             {!DARK_ONLY && <ThemeToggle />}
@@ -97,12 +100,12 @@ function AppShell({
         </div>
       </header>
       <div className="md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
-        <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] overflow-y-auto border-r bg-sidebar text-sidebar-foreground md:block">
+        <aside className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] hidden h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] overflow-y-auto border-r bg-sidebar text-sidebar-foreground md:block">
           <nav aria-label="Main menu">
             <NavList items={nav} />
           </nav>
         </aside>
-        <div className="flex min-h-[calc(100dvh-3.5rem)] min-w-0 flex-col">
+        <div className="flex min-h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] min-w-0 flex-col">
           <main
             id="main"
             tabIndex={-1}

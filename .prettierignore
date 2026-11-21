@@ -17,6 +17,8 @@ AGENTS.md
 CLAUDE.md
 skills/std-*/
 .claude/skills/std-*/
+skills/orca-lanes/
+.claude/skills/orca-lanes/
 .github/ISSUE_TEMPLATE/
 .github/pull_request_template.md
 .github/dependabot.yml
@@ -49,10 +51,16 @@ frontend/src/lib/theme.ts
 frontend/src/lib/theme.test.ts
 frontend/src/lib/theme-config.ts
 frontend/src/lib/apps.ts
+frontend/src/lib/auth-config.ts
+frontend/src/lib/ai-config.ts
 frontend/src/lib/api.ts
 frontend/src/lib/api.test.ts
 frontend/src/lib/use-notice.ts
+frontend/src/lib/ai-chat.ts
+frontend/src/lib/ai-chat.test.ts
+frontend/src/lib/use-ai-chat.ts
 frontend/src/health.ts
+frontend/src/health.test.ts
 frontend/src/sign-in.tsx
 frontend/src/auth-origin.ts
 frontend/src/auth-origin.test.ts
@@ -62,6 +70,25 @@ frontend/src/components/layout/
 frontend/public/theme-init.js
 playwright.config.ts
 frontend/vitest.config.ts
+scripts/contract.mjs
+scripts/test/contract.test.mjs
+scripts/test/claude-skills.test.mjs
+backend/tsconfig.check.json
+frontend/tsconfig.build.json
+e2e/tsconfig.json
+e2e/support/jev.ts
+e2e/support/judged.ts
+e2e/fixtures/jev/
+frontend/src/vite-env.d.ts
+frontend/vite.config.ts
+frontend/src/main.tsx
+frontend/src/service-worker.ts
+frontend/src/service-worker.test.tsx
+frontend/src/test/standard-setup.ts
+backend/test/standard/
+backend/test/standard-api.test.ts
+frontend/src/lib/query.ts
+frontend/src/lib/query.test.tsx
 # --- project ---
 # Written by `npm run openapi` (JSON.stringify); the backend test compares it with the routes.
 docs/openapi.json

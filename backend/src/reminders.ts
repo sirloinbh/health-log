@@ -1,10 +1,8 @@
 import { Router } from 'express';
-import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { isRealDate } from './dates.js';
-import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError } from './standard/http.js';
 
 // Reminders shown in the app (#48): the next visit day of a clinic visit (#39) and the last day of
@@ -29,7 +27,7 @@ export const doneInput = z.object(
 );
 
 type VisitRow = {
-  id: string;
+  id: number;
   due_on: string;
   days_left: number;
   clinic: string;
@@ -37,7 +35,7 @@ type VisitRow = {
   procedures: string[];
 };
 
-type MedicationRow = { id: string; due_on: string; days_left: number; name: string };
+type MedicationRow = { id: number; due_on: string; days_left: number; name: string };
 
 // Each kind's date column and the column its done marks are kept under.
 const targets = {
@@ -58,9 +56,8 @@ const addDays = (day: string, days: number) => {
 const isForeignKeyError = (error: unknown) => (error as { code?: unknown })?.code === '23503';
 
 /** `today` is the service date (Asia/Seoul), so "tomorrow" never follows the server clock's zone. */
-export function remindersRouter(pool: Pool, today: () => string, limits: RateLimitSettings) {
+export function remindersRouter(pool: Pool, today: () => string) {
   const router = Router();
-  router.use(rateLimit(rateLimitOptions(limits)));
 
   // Due from today to `leadDays` ahead, both ends included, and not marked done for that day.
   router.get('/', async (_req, res) => {
@@ -89,7 +86,7 @@ export function remindersRouter(pool: Pool, today: () => string, limits: RateLim
     const reminders = [
       ...visits.rows.map((row) => ({
         kind: 'visit' as const,
-        id: Number(row.id),
+        id: row.id,
         dueOn: row.due_on,
         daysLeft: row.days_left,
         clinic: row.clinic,
@@ -98,7 +95,7 @@ export function remindersRouter(pool: Pool, today: () => string, limits: RateLim
       })),
       ...medications.rows.map((row) => ({
         kind: 'medication' as const,
-        id: Number(row.id),
+        id: row.id,
         dueOn: row.due_on,
         daysLeft: row.days_left,
         name: row.name,

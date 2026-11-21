@@ -1,10 +1,8 @@
 import { Router } from 'express';
-import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { isRealDate } from './dates.js';
-import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError, parseId } from './standard/http.js';
 import { charCount } from './text.js';
 
@@ -69,7 +67,7 @@ export const dayQuery = z.object({
 });
 
 type MedicationRow = {
-  id: string;
+  id: number;
   name: string;
   dose: string | null;
   directions: string | null;
@@ -82,7 +80,7 @@ type MedicationRow = {
 };
 
 const toMedication = (row: MedicationRow) => ({
-  id: Number(row.id),
+  id: row.id,
   name: row.name,
   dose: row.dose,
   directions: row.directions,
@@ -119,9 +117,8 @@ const unknownVisit = (error: unknown) => {
  * `today` is the service date (Asia/Seoul), so "being taken now" never follows the server's own
  * clock zone.
  */
-export function medicationsRouter(pool: Pool, today: () => string, limits: RateLimitSettings) {
+export function medicationsRouter(pool: Pool, today: () => string) {
   const router = Router();
-  router.use(rateLimit(rateLimitOptions(limits)));
 
   const read = async (id: number) => {
     const { rows } = await pool.query<MedicationRow>(medicationSql('WHERE m.id = $1', 'm.id'), [
@@ -184,13 +181,13 @@ export function medicationsRouter(pool: Pool, today: () => string, limits: RateL
   router.post('/', async (req, res) => {
     const item = medicationInput.parse(req.body);
     const { rows } = await write(() =>
-      pool.query<{ id: string }>(
+      pool.query<{ id: number }>(
         `INSERT INTO medications (name, dose, directions, start_on, end_on, note, visit_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
         values(item),
       ),
     );
-    res.status(201).json(await read(Number(rows[0].id)));
+    res.status(201).json(await read(rows[0].id));
   });
 
   router.put('/:id', async (req, res) => {

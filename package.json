@@ -22,14 +22,13 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "npm run typecheck --workspaces && tsc -p e2e/tsconfig.json",
     "standards:check": "node .standards/check.mjs",
-    "lockfiles:sync": "node .standards/lockfiles.mjs --write",
     "knip": "knip",
     "db:migrate": "npm run db:migrate -w backend --"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
     "@eslint/js": "10.0.1",
-    "@lhci/cli": "0.16.1",
+    "@lhci/cli": "0.16.0",
     "@playwright/test": "1.63.0",
     "@sirloinbh/eslint-config": "1.1.0",
     "@sirloinbh/prettier-config": "1.0.0",

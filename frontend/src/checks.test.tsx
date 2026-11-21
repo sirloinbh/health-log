@@ -3,6 +3,7 @@ import { expect, test, vi } from 'vitest';
 
 import { ChecksCard } from './checks';
 import { toast } from './components/ui/sonner';
+import { findLive } from './test/live';
 
 const date = '2026-11-04';
 type Rate = { days: number; yes: number };
@@ -123,7 +124,7 @@ test('nothing checked and no memo is refused before anything is sent', async () 
   render(<ChecksCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Note'), { target: { value: '   ' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Enter at least one check or a note');
+  expect(await findLive('alert')).toHaveTextContent('Enter at least one check or a note');
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
@@ -204,7 +205,7 @@ test('a server refusal is shown and the answers stay', async () => {
     ),
   );
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('200 characters or fewer');
+  expect(await findLive('alert')).toHaveTextContent('200 characters or fewer');
   expect(
     within(group('Did you keep your diet?')).getByRole('button', { name: 'Kept' }),
   ).toHaveAttribute('aria-pressed', 'true');
@@ -214,7 +215,7 @@ test('a server refusal is shown and the answers stay', async () => {
 test('a failed load can be tried again', async () => {
   server({ status: 500, body: { error: 'Server error occurred' } }, { body: dayOf(null) });
   render(<ChecksCard date={date} />);
-  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   expect(screen.queryByRole('region', { name: 'This week' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
   expect(await screen.findByRole('group', { name: 'Did you keep your diet?' })).toBeInTheDocument();
@@ -239,7 +240,7 @@ test('while saving, the answers and the memo cannot change under the save', asyn
   );
   expect(screen.getByLabelText('Note')).toHaveAttribute('readonly');
   finish(new Response(JSON.stringify({ error: 'Server error occurred' }), { status: 500 }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   expect(within(diet).getByRole('button', { name: 'Not kept' })).toBeEnabled();
   expect(screen.getByLabelText('Note')).not.toHaveAttribute('readonly');
 });
@@ -264,9 +265,7 @@ test('200 emoji are sent as the hint says, and one more is refused before sendin
 
   fireEvent.change(field, { target: { value: memo + '🍙' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent(
-    'The note must be 200 characters or fewer',
-  );
+  expect(await findLive('alert')).toHaveTextContent('The note must be 200 characters or fewer');
   expect(fetchMock).toHaveBeenCalledTimes(1);
 
   fireEvent.change(field, { target: { value: memo } });
@@ -313,7 +312,7 @@ test('pressing Enter in the memo keeps the focus there when the save fails', asy
   fireEvent.change(memo, { target: { value: 'Note' } });
   memo.focus();
   fireEvent.submit(memo.closest('form')!);
-  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   expect(memo).toHaveFocus();
 });
 

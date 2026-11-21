@@ -1,10 +1,8 @@
 import { Router } from 'express';
-import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { isRealDate } from './dates.js';
-import { rateLimitOptions, type RateLimitSettings } from './rate-limit.js';
 import { HttpError, parseId } from './standard/http.js';
 import { charCount } from './text.js';
 
@@ -133,7 +131,7 @@ export const searchQuery = z.object({
 const foodPageSize = 100;
 
 type FoodRow = {
-  id: string;
+  id: number;
   name: string;
   brand: string | null;
   category: string | null;
@@ -158,7 +156,7 @@ const columns =
 const optionalNumber = (value: string | null) => (value === null ? null : Number(value));
 
 const toFood = (row: FoodRow) => ({
-  id: Number(row.id),
+  id: row.id,
   name: row.name,
   brand: row.brand,
   category: row.category,
@@ -199,9 +197,8 @@ const recentLimit = 10;
 // A search for "100%" means those characters, not a LIKE wildcard.
 const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, '\\$&')}%`;
 
-export function foodsRouter(pool: Pool, today: () => string, limits: RateLimitSettings) {
+export function foodsRouter(pool: Pool, today: () => string) {
   const router = Router();
-  router.use(rateLimit(rateLimitOptions(limits)));
 
   const parseFood = (body: unknown) => {
     const food = foodInput.parse(body);

@@ -7,6 +7,7 @@ import { trackWrite } from './pending-writes';
 import type { Reminder, Reminders } from './reminder-text';
 import { reminderDetail, reminderTitle, whenText } from './reminder-text';
 import { RemindersCard } from './reminders';
+import { findLive, queryLive } from './test/live';
 
 // Made-up values only: no real appointment or prescription belongs in tests.
 const appointment: Reminder = {
@@ -136,9 +137,7 @@ test('marking one done sends its day, takes it off and keeps focus in the card',
   });
 
   finish(json(null, 204));
-  expect(await screen.findByRole('status')).toHaveTextContent(
-    '가상정 ends reminder marked as done.',
-  );
+  expect(await findLive('status')).toHaveTextContent('가상정 ends reminder marked as done.');
   // Same id, other kind: the visit stays.
   const list = screen.getByRole('list', { name: 'Upcoming' });
   expect(within(list).getAllByRole('listitem')).toHaveLength(1);
@@ -162,11 +161,11 @@ test('a reminder moved or deleted elsewhere: the list is read again, then said s
   });
   reminders = [{ ...appointment, dueOn: '2026-03-18', daysLeft: 3 }];
   fireEvent.click(button);
-  expect(await screen.findByRole('status')).toHaveTextContent(
+  expect(await findLive('status')).toHaveTextContent(
     'The date was changed or the item was removed elsewhere, so the list was reloaded.',
   );
   expect(screen.getByText('In 3 days')).toBeInTheDocument();
-  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(queryLive('alert')).not.toBeInTheDocument();
   expect(reads(fetchMock)).toHaveLength(2);
   await waitFor(() =>
     expect(screen.getByRole('heading', { name: 'Upcoming' }).parentElement).toHaveFocus(),
@@ -221,7 +220,7 @@ test('any other failure keeps the reminder for another try', async () => {
     name: '가상피부과 · 피부과 appointment reminder done',
   });
   fireEvent.click(button);
-  expect(await screen.findByRole('alert')).toHaveTextContent('Cannot reach the server');
+  expect(await findLive('alert')).toHaveTextContent('Cannot reach the server');
   expect(button).toBeInTheDocument();
   expect(button).not.toHaveAttribute('aria-disabled');
 });
@@ -235,7 +234,7 @@ test('a failed load can be tried again, and focus stays in the card', async () =
   retry.focus();
   fireEvent.click(retry);
   expect(await screen.findByText('가상내과 appointment')).toBeInTheDocument();
-  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(queryLive('alert')).not.toBeInTheDocument();
   await waitFor(() =>
     expect(screen.getByRole('heading', { name: 'Upcoming' }).parentElement).toHaveFocus(),
   );

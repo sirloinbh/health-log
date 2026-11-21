@@ -3,6 +3,7 @@ import { beforeEach, expect, test, vi } from 'vitest';
 
 import { toast } from './components/ui/sonner';
 import { MealCard } from './meals';
+import { findLive, getLive, queryLive } from './test/live';
 
 const date = '2026-03-15';
 const noTotal = { value: null, missing: 0 };
@@ -176,12 +177,10 @@ test('quick entry without its fields explains itself and sends nothing', async (
   render(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Enter a food name');
+  expect(await findLive('alert')).toHaveTextContent('Enter a food name');
   fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '떡볶이' } });
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
-  await waitFor(() =>
-    expect(screen.getByRole('alert')).toHaveTextContent('Calories must be a number'),
-  );
+  await waitFor(() => expect(getLive('alert')).toHaveTextContent('Calories must be a number'));
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
@@ -197,7 +196,7 @@ test.each([
   await screen.findByLabelText('Search foods');
   fireEvent.change(screen.getByLabelText('Quantity (in servings)'), { target: { value } });
   fireEvent.click(await searchFood());
-  expect(await screen.findByRole('alert')).toHaveTextContent(message);
+  expect(await findLive('alert')).toHaveTextContent(message);
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
 
@@ -218,7 +217,7 @@ test.each([
   expect(field).toHaveValue('49,5');
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent(
+  expect(await findLive('alert')).toHaveTextContent(
     `${name}: enter digits only. Use a period for the decimal point`,
   );
   expect(field).toHaveValue('49,5');
@@ -255,7 +254,7 @@ test('the server refusing an entry shows why and keeps what was typed', async ()
     target: { value: '100000' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Calories are too large');
+  expect(await findLive('alert')).toHaveTextContent('Calories are too large');
   expect(screen.getByLabelText('Food name')).toHaveValue('떡볶이');
   expect(screen.getByRole('button', { name: 'Record now' })).not.toHaveAttribute('aria-disabled');
 });
@@ -361,10 +360,10 @@ test('the next attempt clears the last error', async () => {
   render(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
-  await screen.findByRole('alert');
+  await findLive('alert');
   fireEvent.click(await searchFood());
   await screen.findByText('버거집 치즈버거');
-  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(queryLive('alert')).not.toBeInTheDocument();
 });
 
 test('a slower older search does not replace a newer one', async () => {
@@ -398,7 +397,7 @@ test('a failed search removes results that would read as its answer', async () =
   await screen.findByLabelText('Search foods');
   await searchFood();
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-  await screen.findByRole('alert');
+  await findLive('alert');
   expect(screen.queryByRole('button', { name: 'Add 버거집 치즈버거' })).not.toBeInTheDocument();
 });
 
@@ -415,7 +414,7 @@ test('a failed search says why', async () => {
   render(<MealCard date={date} />);
   await screen.findByLabelText('Search foods');
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   expect(screen.getByRole('button', { name: 'Search' })).toBeEnabled();
 });
 
@@ -458,11 +457,11 @@ test('an entry gone but the day unreadable does not claim success, and offers an
   render(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete 버거집 치즈버거' }));
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   expect(shown).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
   expect(await screen.findByText('No meals recorded yet.')).toBeInTheDocument();
-  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(queryLive('alert')).not.toBeInTheDocument();
   shown.mockRestore();
 });
 
@@ -495,11 +494,11 @@ test('a failed delete says why and keeps the entry and the dialog', async () => 
 test('a failed load offers another try, with no form to record into an unseen day', async () => {
   server({ status: 500, body: { error: 'Server error occurred' } }, { body: oneEntry });
   render(<MealCard date={date} />);
-  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   expect(screen.queryByLabelText('Search foods')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
   expect(await screen.findByText('버거집 치즈버거')).toBeInTheDocument();
-  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(queryLive('alert')).not.toBeInTheDocument();
 });
 
 test('each form shows its errors next to its own buttons', async () => {
@@ -507,11 +506,11 @@ test('each form shows its errors next to its own buttons', async () => {
   render(<MealCard date={date} />);
   const typedForm = (await screen.findByLabelText('Food name')).closest('form')!;
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
-  expect(within(typedForm).getByRole('alert')).toHaveTextContent('Enter a food name');
+  expect(getLive('alert', typedForm)).toHaveTextContent('Enter a food name');
 
   fireEvent.change(screen.getByLabelText('Quantity (in servings)'), { target: { value: '0' } });
   fireEvent.click(await searchFood());
-  const shown = await screen.findByRole('alert');
+  const shown = await findLive('alert');
   expect(shown).toHaveTextContent('The quantity must be a number greater than 0');
   expect(typedForm).not.toContainElement(shown);
   expect(shown.compareDocumentPosition(screen.getByRole('list', { name: 'Search results' }))).toBe(
@@ -529,7 +528,7 @@ test('a searched food the server refuses says why and can be tried again', async
   await screen.findByLabelText('Search foods');
   const add = await searchFood();
   fireEvent.click(add);
-  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   await waitFor(() => expect(add).not.toHaveAttribute('aria-disabled'));
 });
 
@@ -595,7 +594,7 @@ test('a read started before an entry was recorded does not undo it on screen', a
   render(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete 버거집 치즈버거' }));
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
-  await screen.findByRole('alert');
+  await findLive('alert');
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
   fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '떡볶이' } });
@@ -762,7 +761,7 @@ test('combos that cannot be read say why next to their button', async () => {
   render(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Choose from combos' }));
   const section = screen.getByRole('region', { name: 'Combos' });
-  expect(await within(section).findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert', section)).toHaveTextContent('Server error occurred');
   expect(within(section).getByRole('button', { name: 'Choose from combos' })).toBeEnabled();
 });
 
@@ -776,7 +775,7 @@ test('a combo the server refuses says why and records nothing on screen', async 
   fireEvent.click(await screen.findByRole('button', { name: 'Choose from combos' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Record 점심 세트' }));
   const section = screen.getByRole('region', { name: 'Combos' });
-  expect(await within(section).findByRole('alert')).toHaveTextContent('Combo not found');
+  expect(await findLive('alert', section)).toHaveTextContent('Combo not found');
   expect(screen.getByText('No meals recorded yet.')).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(3);
 });
@@ -824,7 +823,7 @@ test.each([
   const form = copyForm();
   fireEvent.change(within(form).getByLabelText('Date to copy from'), { target: { value: from } });
   fireEvent.click(within(form).getByRole('button', { name: 'Copy breakfast' }));
-  expect(await within(form).findByRole('alert')).toHaveTextContent(message);
+  expect(await findLive('alert', form)).toHaveTextContent(message);
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
@@ -835,7 +834,7 @@ test('a meal with nothing to copy says which day and meal were empty', async () 
   fireEvent.click(screen.getByRole('button', { name: 'Dinner' }));
   const form = copyForm();
   fireEvent.click(within(form).getByRole('button', { name: 'Copy dinner' }));
-  expect(await within(form).findByRole('alert')).toHaveTextContent(
+  expect(await findLive('alert', form)).toHaveTextContent(
     'No dinner records to copy from Saturday, March 14, 2026',
   );
   expect(screen.getByText('No meals recorded yet.')).toBeInTheDocument();
@@ -850,7 +849,7 @@ test('another failure to copy shows the server message next to the copy button',
   await screen.findByLabelText('Food name');
   const form = copyForm();
   fireEvent.click(within(form).getByRole('button', { name: 'Copy breakfast' }));
-  expect(await within(form).findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert', form)).toHaveTextContent('Server error occurred');
 });
 
 test('while a copy is on its way the button says so and cannot copy twice', async () => {
@@ -929,12 +928,12 @@ test('a recent food refused shows why next to the recent list', async () => {
   const section = await screen.findByRole('region', { name: 'Recently eaten foods' });
   fireEvent.change(screen.getByLabelText('Quantity (in servings)'), { target: { value: '0' } });
   fireEvent.click(within(section).getByRole('button', { name: 'Add 샘플 햇반' }));
-  expect(await within(section).findByRole('alert')).toHaveTextContent(
+  expect(await findLive('alert', section)).toHaveTextContent(
     'The quantity must be a number greater than 0',
   );
   fireEvent.change(screen.getByLabelText('Quantity (in servings)'), { target: { value: '1' } });
   fireEvent.click(within(section).getByRole('button', { name: 'Add 샘플 햇반' }));
-  expect(await within(section).findByRole('alert')).toHaveTextContent('Food not found');
+  expect(await findLive('alert', section)).toHaveTextContent('Food not found');
   // Nothing was recorded, so the list is not read again.
   expect(recentCalls).toHaveLength(1);
 });
@@ -948,14 +947,14 @@ test('recent foods that cannot be read say why and can be read again', async () 
   server({ body: emptyDay }, { body: { foods: [] } });
   render(<MealCard date={date} />);
   const section = await screen.findByRole('region', { name: 'Recently eaten foods' });
-  expect(await within(section).findByRole('alert')).toHaveTextContent(
+  expect(await findLive('alert', section)).toHaveTextContent(
     'Could not load recently eaten foods: Server error occurred',
   );
   // Another action clears its own messages, not the reason the retry button is there.
   fireEvent.change(screen.getByLabelText('Search foods'), { target: { value: '없는 음식' } });
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   await screen.findByText(/No matching foods/);
-  expect(within(section).getByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(getLive('alert', section)).toHaveTextContent('Server error occurred');
 
   fail = false;
   fireEvent.click(within(section).getByRole('button', { name: 'Reload' }));
@@ -963,7 +962,7 @@ test('recent foods that cannot be read say why and can be read again', async () 
     'aria-disabled',
   );
   expect(within(section).queryByRole('button', { name: 'Reload' })).not.toBeInTheDocument();
-  expect(within(section).queryByRole('alert')).not.toBeInTheDocument();
+  expect(queryLive('alert', section)).not.toBeInTheDocument();
   // The retry button is gone, so focus goes to the list's heading rather than the page.
   await waitFor(() =>
     expect(document.activeElement).toBe(within(section).getByText('Recently eaten foods')),
@@ -1052,7 +1051,7 @@ test('focus follows the retry even when a read started by an add answers first',
   await waitFor(() =>
     expect(document.activeElement).toBe(within(section).getByText('Recently eaten foods')),
   );
-  expect(within(section).queryByRole('alert')).not.toBeInTheDocument();
+  expect(queryLive('alert', section)).not.toBeInTheDocument();
 });
 
 test('search results say when more are waiting, and the next page joins the list', async () => {
@@ -1087,19 +1086,19 @@ test('a next page clears only its own message, not the other forms', async () =>
   const typedForm = (await screen.findByLabelText('Food name')).closest('form')!;
   await searchFood();
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
-  expect(within(typedForm).getByRole('alert')).toHaveTextContent('Enter a food name');
+  expect(getLive('alert', typedForm)).toHaveTextContent('Enter a food name');
 
   const more = screen.getByRole('button', { name: 'Show more results' });
   fireEvent.click(more);
   // The failure shows below the list, next to the button, not at the search far above.
   const failed = await screen.findByText(/Server error occurred/);
   expect(more.compareDocumentPosition(failed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(within(typedForm).getByRole('alert')).toHaveTextContent('Enter a food name');
+  expect(getLive('alert', typedForm)).toHaveTextContent('Enter a food name');
 
   fireEvent.click(more);
   await screen.findByRole('button', { name: 'Add 버거집 불고기버거' });
   expect(screen.queryByText(/Server error occurred/)).not.toBeInTheDocument();
-  expect(within(typedForm).getByRole('alert')).toHaveTextContent('Enter a food name');
+  expect(getLive('alert', typedForm)).toHaveTextContent('Enter a food name');
 });
 
 test('coming back while an entry is being recorded shows it, not the day without it', async () => {

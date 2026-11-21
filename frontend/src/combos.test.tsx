@@ -4,6 +4,7 @@ import { expect, test, vi } from 'vitest';
 import { App } from './app';
 import type { Combo } from './combo-text';
 import { toast } from './components/ui/sonner';
+import { findLive, getLive, queryLive } from './test/live';
 
 const rice = {
   id: 3,
@@ -176,7 +177,7 @@ test.each([
   }
   fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-  expect(await within(dialog).findByRole('alert')).toHaveTextContent(message);
+  expect(await findLive('alert', dialog)).toHaveTextContent(message);
   expect(writes(fetchMock)).toHaveLength(0);
 });
 
@@ -232,7 +233,7 @@ test('a server rejection keeps the dialog open with its message and what was typ
   fireEvent.change(within(dialog).getByLabelText('Combo name'), { target: { value: '점심 세트' } });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-  expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+  expect(await findLive('alert', dialog)).toHaveTextContent(
     'A combo with that name already exists',
   );
   expect(within(dialog).getByLabelText('Combo name')).toHaveValue('점심 세트');
@@ -311,7 +312,7 @@ test('a combo already gone counts as deleted', async () => {
 test('a failed load shows the server message', async () => {
   serve(() => json({ error: 'Server error occurred' }, 500));
   open();
-  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert')).toHaveTextContent('Server error occurred');
 });
 
 test('the food search in a combo also reads the next page', async () => {
@@ -442,7 +443,7 @@ test('while saving and after a failed save, keyboard focus stays in the dialog',
   expect(writes(fetchMock)).toHaveLength(1);
 
   finish(json({ error: 'A combo with that name already exists' }, 409));
-  expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+  expect(await findLive('alert', dialog)).toHaveTextContent(
     'A combo with that name already exists',
   );
   expect(within(dialog).getByRole('button', { name: 'Save' })).toHaveFocus();
@@ -460,7 +461,7 @@ test('the same failure twice is said twice, as the message is cleared before eac
   for (const finish of [0, 1]) {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
     await within(dialog).findByRole('button', { name: 'Saving…' });
-    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+    expect(queryLive('alert', dialog)).not.toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveAttribute(
       'aria-disabled',
       'true',
@@ -469,7 +470,7 @@ test('the same failure twice is said twice, as the message is cleared before eac
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     finishers[finish](json({ error: 'A combo with that name already exists' }, 409));
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+    expect(await findLive('alert', dialog)).toHaveTextContent(
       'A combo with that name already exists',
     );
   }
@@ -479,16 +480,16 @@ test('a list that failed to load can be tried again, and focus stays on the page
   let fail = true;
   serve(() => (fail ? json({ error: 'Fake server error' }, 500) : json({ combos: [breakfast] })));
   open();
-  expect(await screen.findByRole('alert')).toHaveTextContent('Fake server error');
+  expect(await findLive('alert')).toHaveTextContent('Fake server error');
   const retry = screen.getByRole('button', { name: 'Try again' });
   fail = false;
   retry.focus();
   fireEvent.click(retry);
   expect(await screen.findByRole('heading', { name: breakfast.name })).toBeInTheDocument();
-  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(queryLive('alert')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
   // Said once the list is in, as focus on the title alone says nothing about it.
-  expect(screen.getByRole('status')).toHaveTextContent('The list was reloaded.');
+  expect(getLive('status')).toHaveTextContent('The list was reloaded.');
   await waitFor(() =>
     expect(screen.getByRole('heading', { level: 1, name: 'Combos' })).toHaveFocus(),
   );
@@ -504,13 +505,13 @@ test('failing again says so again, and the wait is said meanwhile (#127)', async
       : new Promise<Response>((resolve) => (answer = resolve));
   });
   open();
-  await screen.findByRole('alert');
+  await findLive('alert');
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
   // The old failure is gone, so the same one coming back is a new alert.
-  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  expect(screen.getByRole('status')).toHaveTextContent('Reloading the list…');
+  expect(queryLive('alert')).not.toBeInTheDocument();
+  expect(getLive('status')).toHaveTextContent('Reloading the list…');
   answer(json({ error: 'Fake server error' }, 500));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Fake server error');
+  expect(await findLive('alert')).toHaveTextContent('Fake server error');
   expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
 });
 
@@ -531,9 +532,9 @@ test('a list already shown keeps a way to read again when reading after a delete
   fireEvent.click(
     within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }),
   );
-  expect(await screen.findByRole('alert')).toHaveTextContent('Fake server error');
+  expect(await findLive('alert')).toHaveTextContent('Fake server error');
   failReads = false;
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
   expect(await screen.findByText('No combos')).toBeInTheDocument();
-  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(queryLive('alert')).not.toBeInTheDocument();
 });

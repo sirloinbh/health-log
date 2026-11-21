@@ -1,5 +1,5 @@
 #!/bin/bash
-# Managed file. Edit it in sirloinbh/project-standards templates/app/deploy/
+# Managed file. Edit it in sirloinbh/project-standards templates/deploy/deploy/
 # Database backups of health-log on the Lightsail server (#262).
 #   backup.sh dump [label]  pg_dump to /var/backups/health (14 days), row counts beside it,
 #                           and a copy to S3 when the server .env names a bucket
@@ -15,8 +15,11 @@ dir=/var/backups/$db
 # Before install-backup.sh created the server folder, dumps stay in the app folder (ignored by Git).
 if [ ! -w "$dir" ]; then dir=$PWD/backups; fi
 mkdir -p "$dir"
-# compose.yaml names images by ${IMAGE_TAG}; any value lets compose run commands in containers.
-export IMAGE_TAG=${IMAGE_TAG:-$(cat .deployed 2>/dev/null || echo none)}
+# The running database container, found by its compose labels. Not through docker compose: a compose.yaml
+# may require secrets that deploy/remote-deploy.sh reads from SSM, and this script runs without them (#696).
+db_container() {
+  docker ps -q --filter label=com.docker.compose.project=health-log --filter label=com.docker.compose.service=db | head -n 1
+}
 
 env_value() { sed -n "s/^$1=//p" .env 2>/dev/null | tail -n 1 | tr -d "\"'\r"; }
 # Keys every app shares (the S3 backup pair) live in one server file outside the apps
@@ -34,8 +37,11 @@ shared_value() {
 signal_check=""
 signal_message=""
 restore_container=""
+# The unfinished dump file while pg_dump runs; removed on any exit so a failed dump leaves nothing behind (#874).
+partial_file=""
 finish() {
   local status=$?
+  if [ -n "$partial_file" ]; then rm -f "$partial_file"; fi
   if [ -n "$restore_container" ]; then docker rm -f "$restore_container" > /dev/null 2>&1 || true; fi
   if [ -n "$signal_check" ] && [ -f deploy/notify.sh ]; then
     if [ "$status" -eq 0 ]; then
@@ -87,24 +93,29 @@ upload() {
 }
 
 dump() {
-  local label=${1:-} name file
+  local label=${1:-} name file dbc
   # One dump at a time across the apps on the server, so they do not compete for memory.
   exec 8> /run/lock/apps-backup.lock
   flock -w 900 8 || { echo "another backup is running" >&2; exit 4; }
+  dbc=$(db_container)
+  if [ -z "$dbc" ]; then echo "the health-log database is not running" >&2; exit 1; fi
   name=$db-$(date +%F-%H%M%S)${label:+-$label}
   file=$dir/$name.sql.gz
   # --no-owner keeps the dump restorable into a database whose user has another name.
-  docker compose exec -T db sh -c 'pg_dump --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB"' | gzip > "$file.part"
+  partial_file=$file.part
+  docker exec "$dbc" sh -c 'pg_dump --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB"' | gzip > "$file.part"
   mv "$file.part" "$file"
+  partial_file=""
   # Row counts are for the weekly restore check only: a failure here must not fail the dump
   # (or block a deploy). Without the file, the next restore check reports it.
-  if ! docker compose exec -T db sh -c 'psql -At -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$0"' "$COUNT_SQL" > "$dir/$name.counts"; then
+  if ! docker exec "$dbc" sh -c 'psql -At -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$0"' "$COUNT_SQL" > "$dir/$name.counts"; then
     echo "row counts failed; $file has no .counts for the restore check" >&2
     rm -f "$dir/$name.counts"
   fi
-  find "$dir" -maxdepth 1 \( -name "$db-*.sql.gz" -o -name "$db-*.counts" \) -mtime +14 -delete
+  # Also a .part file older than a day, left by a killed script (the exit handler cannot run then).
+  find "$dir" -maxdepth 1 \( \( -name "$db-*.sql.gz" -o -name "$db-*.counts" \) -mtime +14 -o -name "$db-*.part" -mtime +0 \) -delete
   # Only the nightly dump prunes; a failed prune is retried the next night and does not fail the backup.
-  if [ -z "$label" ] && ! docker compose exec -T db sh -c 'psql -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$0"' "$PRUNE_SQL"; then
+  if [ -z "$label" ] && ! docker exec "$dbc" sh -c 'psql -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$0"' "$PRUNE_SQL"; then
     echo "audit_log retention delete failed" >&2
   fi
   echo "dumped $file ($(du -h "$file" | cut -f1))"
@@ -125,7 +136,7 @@ verify() {
   # The same postgres image as the running database. Split quotes keep the Go template away
   # from the central template renderer.
   image_format='{''{.Config.Image}}'
-  image=$(docker inspect --format "$image_format" "$(docker compose ps -q db)")
+  image=$(docker inspect --format "$image_format" "$(db_container)")
   container=$db-restore-check
   docker rm -f "$container" > /dev/null 2>&1 || true
   restore_container=$container

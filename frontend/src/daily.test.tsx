@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
+import { findLive, getLive } from './test/live';
 
 const noSleep = () => new Response(JSON.stringify({ record: null }));
 const noMeals = () =>
@@ -158,7 +159,7 @@ test('a year still being typed does not change the page', () => {
 test('a date that does not exist shows an error with a way back', async () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-02-30');
-  expect(screen.getByRole('alert')).toHaveTextContent('Not a real date: 2026-02-30');
+  expect(getLive('alert')).toHaveTextContent('Not a real date: 2026-02-30');
   expect(screen.queryByRole('heading', { level: 2, name: 'Sleep' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('link', { name: "Go to today's record" }));
   expect(await screen.findByText('Sunday, March 15, 2026')).toBeInTheDocument();
@@ -168,7 +169,7 @@ test('a date that does not exist shows an error with a way back', async () => {
 test('a server error is reported instead of guessing today', async () => {
   health({ error: 'Server error occurred' }, 500);
   open('/daily');
-  expect(await screen.findByRole('alert')).toHaveTextContent('Server error occurred');
+  expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   expect(window.location.pathname).toBe('/daily');
 });
 
@@ -178,7 +179,7 @@ test('an unreachable server is reported instead of guessing today', async () => 
     vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
   );
   open('/daily');
-  expect(await screen.findByRole('alert')).toHaveTextContent('Cannot reach the server');
+  expect(await findLive('alert')).toHaveTextContent('Cannot reach the server');
   expect(window.location.pathname).toBe('/daily');
 });
 
@@ -414,7 +415,7 @@ test('an address outside the range says which days can be recorded, with a way b
   health({ today: '2026-03-15' });
   for (const date of ['1999-12-31', '2100-01-01', '0002-03-15', '9999-12-31']) {
     open(`/daily/${date}`);
-    expect(screen.getByRole('alert')).toHaveTextContent(
+    expect(getLive('alert')).toHaveTextContent(
       `Records can be kept from 2000-01-01 to 2099-12-31: ${date}`,
     );
     expect(screen.getByRole('link', { name: "Go to today's record" })).toBeInTheDocument();

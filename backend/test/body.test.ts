@@ -124,6 +124,6 @@ test('the body API is rate limited like the others', async () => {
       assert.equal((await call(path)).status, 200);
       assert.equal((await call(path)).status, 429);
     },
-    { rateLimit: { max: 1, windowMs: 60_000 } },
+    { requestsPerMinute: 1 },
   );
 });

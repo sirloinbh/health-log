@@ -9,11 +9,32 @@ import { createAuthMiddleware } from '@sirloinbh/auth-client';
 
 /**
  * The session check from AUTH_INTERNAL_URL (compose sets http://shared-auth-api:3110).
- * Unset: undefined, so local development runs without the sign-in. Production refuses to start without it.
+ * Unset: the API starts without a sign-in only in explicit local mode (NODE_ENV=development or test, or
+ * AUTH_DISABLED=1) and logs one warning; any other value, including unset or a typo, refuses to start (#667).
  */
-export function sharedAuth(env: Record<string, string | undefined> = process.env) {
+export function sharedAuth(
+  env: Record<string, string | undefined> = process.env,
+  warn: (message: string) => void = console.warn,
+) {
   const authUrl = env.AUTH_INTERNAL_URL;
-  if (!authUrl && env.NODE_ENV === 'production')
-    throw new Error('AUTH_INTERNAL_URL is required in production (the shared sign-in service)');
-  return authUrl ? createAuthMiddleware({ authUrl }) : undefined;
+  if (authUrl) return createAuthMiddleware({ authUrl });
+  const local = env.NODE_ENV === 'development' || env.NODE_ENV === 'test' || env.AUTH_DISABLED === '1';
+  if (!local)
+    throw new Error(
+      'AUTH_INTERNAL_URL is required (the shared sign-in service). For local development set NODE_ENV=development or AUTH_DISABLED=1',
+    );
+  warn('WARNING: AUTH_INTERNAL_URL is not set, so the API runs WITHOUT sign-in (local development only)');
+  return undefined;
+}
+
+/**
+ * The address the API listens on (#866): `HOST` if set; otherwise all interfaces when the sign-in is on and only
+ * 127.0.0.1 when it is off, so a local run without sign-in is not open to the network.
+ *
+ *   const auth = sharedAuth();
+ *   const host = listenHost(auth !== undefined);   // server.ts
+ */
+export function listenHost(authEnabled: boolean, env: Record<string, string | undefined> = process.env) {
+  if (env.HOST) return env.HOST;
+  return authEnabled ? '0.0.0.0' : '127.0.0.1';
 }

@@ -1,30 +1,23 @@
 import type { Pool, PoolClient } from 'pg';
 
+import { withTransaction } from './standard/db.js';
+
 /** A pool or a client inside a transaction: either can run the reads. */
 export type Db = Pick<Pool, 'query'> | PoolClient;
 
-/** Begins a read where every statement sees the same moment. */
-export const snapshotRead = 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY';
+/** Run first inside a transaction: every statement of a read then sees the same moment. */
+export const snapshotRead = 'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY';
 
-/** Runs `run` in one transaction, rolled back if it throws. */
-export const inTransaction = async <T>(
+/** Runs `run` in one transaction (managed withTransaction), rolled back if it throws. `setup` runs first. */
+export const inTransaction = <T>(
   pool: Pool,
   run: (client: PoolClient) => Promise<T>,
-  begin = 'BEGIN',
-) => {
-  const client = await pool.connect();
-  try {
-    await client.query(begin);
-    const result = await run(client);
-    await client.query('COMMIT');
-    return result;
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
-    throw error;
-  } finally {
-    client.release();
-  }
-};
+  setup?: string,
+) =>
+  withTransaction<T, PoolClient>(pool, async (client) => {
+    if (setup) await client.query(setup);
+    return run(client);
+  });
 
 const toDate = (time: number) => new Date(time).toISOString().slice(0, 10);
 

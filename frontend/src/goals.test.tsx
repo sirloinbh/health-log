@@ -563,6 +563,63 @@ test('a deleted change stays gone even if reading the goals again fails', async 
   expect(
     within(cardOf('Sleep')).getByText('Current goal: At least 7 h (from 2026-11-01)'),
   ).toBeInTheDocument();
+  // #202: the read can be tried again without leaving the page, and the goals stay on screen.
+  server({
+    body: goalsOf({ sleep: { from, target: 420 } }, [{ item: 'sleep', from, target: 420 }]),
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  await waitFor(() => expect(screen.queryByText('Server error')).not.toBeInTheDocument());
+  expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+  expect(within(cardOf('Sleep')).getByText('From 2026-11-01 At least 7 h')).toBeInTheDocument();
+  // The pressed button is gone, so focus goes to the section title.
+  await waitFor(() =>
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Goals' })),
+  );
+});
+
+test('when two deletes read again out of order, the older answer does not bring a change back', async () => {
+  const history = [
+    { item: 'protein', from: '2026-12-01', target: 130 },
+    { item: 'protein', from: '2026-11-20', target: 120 },
+    { item: 'protein', from, target: 100 },
+  ];
+  const reads: ((body: unknown) => void)[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((_url: string, init?: RequestInit) => {
+      // Deletes answer at once; the reads after them wait until the test answers them.
+      if (init?.method === 'DELETE') return Promise.resolve(new Response(null, { status: 204 }));
+      return new Promise<Response>((resolve) => {
+        reads.push((body) => resolve(new Response(JSON.stringify(body))));
+      });
+    }),
+  );
+  render(<GoalsSettings />);
+  await waitFor(() => expect(reads).toHaveLength(1));
+  reads[0](goalsOf({ protein: { from, target: 100 } }, history));
+  const changes = await screen.findByRole('region', { name: 'Protein goal changes' });
+
+  const remove = async (day: string) => {
+    fireEvent.click(
+      within(changes).getByRole('button', { name: `Delete ${day} Protein goal change` }),
+    );
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }),
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  };
+  await remove('2026-12-01');
+  await waitFor(() => expect(reads).toHaveLength(2));
+  await remove('2026-11-20');
+  await waitFor(() => expect(reads).toHaveLength(3));
+
+  // The second delete's read answers first, then the first one's, from before the second delete.
+  reads[2](goalsOf({ protein: { from, target: 100 } }, [history[2]]));
+  reads[1](goalsOf({ protein: { from, target: 100 } }, history.slice(1)));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(within(changes).queryByText(/From 2026-11-20/)).not.toBeInTheDocument();
+  expect(within(changes).queryByText(/From 2026-12-01/)).not.toBeInTheDocument();
+  expect(within(changes).getByText('From 2026-11-01 At least 100g a day')).toBeInTheDocument();
 });
 
 test('deleting a sober change says it stops counting from the week of its date', async () => {

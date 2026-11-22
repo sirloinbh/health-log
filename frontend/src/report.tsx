@@ -1,5 +1,6 @@
+import { keepPreviousData, queryOptions, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { periodsOf } from '../../shared/contract';
@@ -11,8 +12,9 @@ import { SkeletonText } from './components/ui/skeleton';
 import { DailyBars } from './daily-bars';
 import { dailyRangeText, earliestDate, inDailyRange, isValidDate, latestDate } from './daily-date';
 import { type Health, healthText } from './health';
-import { requestJson } from './lib/api';
-import { useNotice } from './lib/use-notice';
+import { type RequestError, requestJson } from './lib/api';
+import { apiKey } from './lib/query';
+import { errorText, type NoticeValue } from './lib/use-notice';
 import { count } from './plural';
 import { RemindersCard } from './reminders';
 import { initialReportFocus, reportFocus } from './report-focus';
@@ -227,6 +229,14 @@ function SleepAfterDrinking({ report }: { report: Report }) {
   );
 }
 
+/** One period's report. Kept in the cache by period and date, so going back to one is instant. */
+const reportQuery = (period: Period, date: string) =>
+  queryOptions<Report, RequestError>({
+    queryKey: apiKey('/api/report', period, date),
+    queryFn: ({ signal }) =>
+      requestJson<Report>(`/api/report?period=${period}&date=${date}`, { signal }),
+  });
+
 const periods: { value: Period; label: string }[] = [
   { value: 'week', label: 'Weekly' },
   { value: 'month', label: 'Monthly' },
@@ -244,12 +254,21 @@ export function ReportPage({ health }: { health: Health }) {
   // report (#130).
   const outOfRange = asked !== null && isValidDate(asked) && !inDailyRange(asked);
   const date = outOfRange ? null : asked && isValidDate(asked) ? asked : today;
-  const [report, setReport] = useState<Report | null>(null);
+  const client = useQueryClient();
+  const options = reportQuery(period, date ?? '');
   // Moving to another period keeps the report on screen, dimmed, until the next one arrives: the
   // period row and the button just pressed stay, and so does keyboard focus (#138).
-  const [loading, setLoading] = useState(false);
-  const { notice, error, clear } = useNotice();
-  const latest = useRef(0);
+  const query = useQuery({
+    ...options,
+    enabled: date !== null,
+    placeholderData: keepPreviousData,
+  });
+  const loading = query.isPlaceholderData;
+  // A failed read; hidden while reading again, so a repeated failure is announced anew.
+  const notice: NoticeValue | undefined =
+    query.isError && !query.isFetching
+      ? { kind: 'error', text: errorText(query.error) }
+      : undefined;
   // Where focus goes as reports load: one state for what started the load on its way (#212).
   const [focus, dispatch] = useReducer(reportFocus, initialReportFocus);
   // While a retry is on its way its button stays, so keyboard focus is not dropped to the page;
@@ -258,47 +277,39 @@ export function ReportPage({ health }: { health: Health }) {
   const span = useRef<HTMLParagraphElement>(null);
   const retryButton = useRef<HTMLButtonElement>(null);
 
-  const load = useCallback(async (): Promise<'ok' | 'failed' | 'stale'> => {
-    // A slow answer for a period already left must not replace the one on screen, nor land next
-    // to the word about a date out of range.
-    const request = ++latest.current;
-    clear();
-    if (!date) {
-      setReport(null);
-      setLoading(false);
-      return 'stale';
-    }
-    setLoading(true);
-    try {
-      const data = await requestJson<Report>(`/api/report?period=${period}&date=${date}`);
-      if (request !== latest.current) return 'stale';
-      setReport(data);
-      setLoading(false);
-      return 'ok';
-    } catch (cause) {
-      if (request !== latest.current) return 'stale';
-      setReport(null);
-      setLoading(false);
-      error(cause);
-      return 'failed';
-    }
-  }, [clear, date, error, period]);
+  // Each address asked for is one load; its end decides where focus goes. fetchQuery joins the read
+  // the query has just started, or answers at once from a report still fresh in the cache. An answer
+  // for a period already left ends nothing: the period change ended that load, and a newer retry
+  // may be on its way, whose button must stay.
+  useEffect(() => {
+    if (!date) return;
+    let left = false;
+    dispatch({ type: 'load' });
+    client.fetchQuery(reportQuery(period, date)).then(
+      () => !left && dispatch({ type: 'done', outcome: 'ok' }),
+      () => !left && dispatch({ type: 'done', outcome: 'failed' }),
+    );
+    return () => {
+      left = true;
+    };
+  }, [client, date, period]);
 
-  // An answer for a period already left ends nothing: the period change ended that load, and a
-  // newer retry may be on its way, whose button must stay.
-  const settle = useCallback((outcome: 'ok' | 'failed' | 'stale') => {
-    if (outcome !== 'stale') dispatch({ type: 'done', outcome });
-  }, []);
+  // The address on screen, for a retry that ends after the person moved on.
+  const address = `${period}/${date ?? ''}`;
+  const shownAddress = useRef(address);
+  useEffect(() => {
+    shownAddress.current = address;
+  }, [address]);
 
   const retry = async () => {
+    const asked = address;
     dispatch({ type: 'retry' });
-    settle(await load());
+    const result = await query.refetch({ cancelRefetch: false });
+    // A retry for a period already left ends nothing; the move ended it.
+    if (shownAddress.current === asked) {
+      dispatch({ type: 'done', outcome: result.isError ? 'failed' : 'ok' });
+    }
   };
-
-  useEffect(() => {
-    dispatch({ type: 'load' });
-    void load().then(settle);
-  }, [load, settle]);
 
   // Only focus that a gone button dropped; somewhere the person moved to meanwhile stays.
   useEffect(() => {
@@ -320,7 +331,9 @@ export function ReportPage({ health }: { health: Health }) {
   };
 
   const words = periodWords[period];
-  // The last report, even for the period just left while the next one is on its way.
+  // The last report, even for the period just left while the next one is on its way. A date out of
+  // range shows none.
+  const report = date ? query.data : undefined;
   const shown = report && report.period in periodWords ? report : null;
 
   // The first and last periods holding a day the daily page opens (#130).

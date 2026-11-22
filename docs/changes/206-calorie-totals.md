@@ -29,3 +29,7 @@
 
 - Per-item and per-entry calories (`combos.tsx` food rows, `meals.tsx` entries, `food-choices.tsx`) still print the raw value; the issue covers totals only.
 - No browser check at 390×844 and 1440×900: running the app locally needs the `health` database, which this worktree does not have. The visible change is the number format of a text line.
+
+## Review round 1
+
+- Approve, no blocking comments. Out-of-scope finding filed as #271: per-food and per-entry calories in `combos.tsx`, `meals.tsx` and `food-choices.tsx` still print raw values.

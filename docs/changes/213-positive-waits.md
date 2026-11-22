@@ -36,3 +36,5 @@
 - The 12 changed test files after merging `main`: 337 passed.
 
 ### Commands
+
+- `TEST_DATABASE_URL= npm run check` (under the shared check lock): passed (frontend 764 passed, 3 skipped; backend 155 passed, 137 DB tests skipped locally because `TEST_DATABASE_URL` was emptied; CI runs them).

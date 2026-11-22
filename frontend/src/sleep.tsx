@@ -24,7 +24,7 @@ import {
   minutesBetween,
   toInstants,
 } from './sleep-time';
-import { asRequest, useReadAfterWrites } from './writes';
+import { asRequest, putAnswer, useReadAfterWrites } from './writes';
 
 type SleepRecord = {
   date: string;
@@ -45,7 +45,7 @@ const keyOf = (date: string) => apiKey(pathOf(date));
 function useSleepWrite(date: string, recordAfter: (data: unknown) => SleepRecord | null) {
   const client = useQueryClient();
   return useApiMutation<unknown, ApiRequest>(asRequest, {
-    onSuccess: (data) => client.setQueryData<SleepDay>(keyOf(date), { record: recordAfter(data) }),
+    onSuccess: (data) => putAnswer<SleepDay>(client, keyOf(date), { record: recordAfter(data) }),
   });
 }
 
@@ -244,7 +244,7 @@ export function SleepCard({ date }: { date: string }) {
         toast.error(errorText(cause));
         throw cause;
       }
-      client.setQueryData<SleepDay>(keyOf(date), { record: null });
+      putAnswer<SleepDay>(client, keyOf(date), { record: null });
     }
     toast.success('Deleted');
     finish();

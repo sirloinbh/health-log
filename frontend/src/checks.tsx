@@ -26,7 +26,7 @@ import { RequestError } from './lib/api';
 import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
 import { trackWrite } from './pending-writes';
-import { asRequest, useReadAfterWrites } from './writes';
+import { asRequest, putAnswer, useReadAfterWrites } from './writes';
 
 const pathOf = (date: string) => `/api/checks/${date}`;
 const keyOf = (date: string) => apiKey(pathOf(date));
@@ -53,7 +53,7 @@ function CheckForm({
   const client = useQueryClient();
   // The answer is the whole day with its new rates; it goes into the cache even after the card is gone.
   const save = useApiMutation<CheckDay, ApiRequest>(asRequest, {
-    onSuccess: (saved) => client.setQueryData(keyOf(date), saved),
+    onSuccess: (saved) => putAnswer(client, keyOf(date), saved),
   });
   const saving = save.isPending;
   const { notice, error, clear } = useNotice();

@@ -25,7 +25,7 @@ import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/quer
 import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
 import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
 import { trackWrite } from './pending-writes';
-import { asRequest, useReadAfterWrites } from './writes';
+import { asRequest, putAnswer, useReadAfterWrites } from './writes';
 
 const pathOf = (date: string) => `/api/body/${date}`;
 const keyOf = (date: string) => apiKey(pathOf(date));
@@ -52,7 +52,7 @@ function useBodyWrite(date: string, recordAfter: (data: unknown) => BodyRecord |
   const client = useQueryClient();
   return useApiMutation<unknown, ApiRequest>(asRequest, {
     onSuccess: (data) => {
-      client.setQueryData<BodyDay>(keyOf(date), { record: recordAfter(data) });
+      putAnswer<BodyDay>(client, keyOf(date), { record: recordAfter(data) });
       refreshHistory(client);
     },
   });
@@ -412,7 +412,7 @@ export function BodyCard({ date }: { date: string }) {
         toast.error(errorText(cause));
         throw cause;
       }
-      client.setQueryData<BodyDay>(keyOf(date), { record: null });
+      putAnswer<BodyDay>(client, keyOf(date), { record: null });
       refreshHistory(client);
     }
     toast.success('Deleted');

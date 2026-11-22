@@ -38,7 +38,7 @@ import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/quer
 import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
 import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
 import { trackWrite } from './pending-writes';
-import { asRequest, useReadAfterWrites } from './writes';
+import { asRequest, putAnswer, useReadAfterWrites } from './writes';
 
 const pathOf = (date: string) => `/api/habits/${date}`;
 const keyOf = (date: string) => apiKey(pathOf(date));
@@ -199,7 +199,7 @@ function HabitForm({
   const client = useQueryClient();
   // The answer is the whole day with its new totals; it goes into the cache even after the card is gone.
   const save = useApiMutation<HabitDay, ApiRequest>(asRequest, {
-    onSuccess: (saved) => client.setQueryData(keyOf(date), saved),
+    onSuccess: (saved) => putAnswer(client, keyOf(date), saved),
   });
   const saving = save.isPending;
   const { notice, error, clear } = useNotice();

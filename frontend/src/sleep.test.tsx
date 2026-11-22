@@ -329,3 +329,34 @@ test('coming back soon after a save shows the saved night from the cache, withou
   expect(screen.getByText('7 h 30 min')).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
+
+test('a read from returning to the tab that is still on its way cannot undo a save', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  let finishRead = (_response: Response) => {};
+  let reads = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') return Promise.resolve(new Response(JSON.stringify(record)));
+      reads += 1;
+      if (reads === 1) return Promise.resolve(new Response(JSON.stringify({ record: null })));
+      return new Promise<Response>((resolve) => (finishRead = resolve));
+    }),
+  );
+  renderWithQuery(<SleepCard date={date} />);
+  await screen.findByLabelText('Bedtime');
+  // Half a minute later the day is stale, so coming back to the tab reads it again.
+  vi.setSystemTime(Date.now() + 31_000);
+  document.dispatchEvent(new Event('visibilitychange', { bubbles: true }));
+  await waitFor(() => expect(reads).toBe(2));
+
+  typeTimes('23:30', '07:00');
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(await screen.findByText('7 h 30 min')).toBeInTheDocument();
+  // The older read answers last, with the day as it was before the save.
+  finishRead(new Response(JSON.stringify({ record: null })));
+  // Long enough for a late answer to reach the screen if it were taken.
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  expect(screen.getByText('7 h 30 min')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Bedtime')).not.toBeInTheDocument();
+});

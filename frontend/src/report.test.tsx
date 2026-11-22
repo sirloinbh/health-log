@@ -4,6 +4,10 @@ import { expect, test, vi } from 'vitest';
 import { App } from './app';
 import { answered } from './test/answered';
 import { findLive, getLive } from './test/live';
+import { testQueryClient } from './test/query';
+
+// Without the app's one retry after a server error, so each failure a test serves shows at once.
+const renderApp = () => render(<App queryClient={testQueryClient()} />);
 
 const today = '2026-11-05';
 const empty = {
@@ -74,7 +78,7 @@ const stat = (label: string) => screen.getByText(label, { selector: 'dt' }).pare
 
 test('the dashboard asks for this week from the server date and shows each average with its days', async () => {
   const fetchMock = serve(() => json(reportOf()));
-  render(<App />);
+  renderApp();
   expect(await screen.findByText('Nov 2 – Nov 8')).toBeInTheDocument();
   expect(reportCalls(fetchMock)).toEqual([`/api/report?period=week&date=${today}`]);
 
@@ -106,7 +110,7 @@ test('a period with no record says so instead of showing zero', async () => {
       }),
     ),
   );
-  render(<App />);
+  renderApp();
   await screen.findByText('Nov 2 – Nov 8');
   for (const label of [
     'Average sleep',
@@ -124,7 +128,7 @@ test('a period with no record says so instead of showing zero', async () => {
 
 test('the drinking comparison shows how many nights each side has, and warns when few', async () => {
   serve(() => json(reportOf()));
-  render(<App />);
+  renderApp();
   const card = (
     await screen.findByRole('heading', { name: 'Drinking and sleep that night' })
   ).closest<HTMLElement>('[data-slot=card]')!;
@@ -151,14 +155,14 @@ test('enough nights on both sides drop the warning', async () => {
       }),
     ),
   );
-  render(<App />);
+  renderApp();
   await screen.findByRole('heading', { name: 'Drinking and sleep that night' });
   expect(screen.queryByText(/One sample has/)).not.toBeInTheDocument();
 });
 
 test('a day without a record is a gap in the chart and says so in the table', async () => {
   serve(() => json(reportOf()));
-  render(<App />);
+  renderApp();
   const chart = await screen.findByRole('img', { name: /Sleep time: 6 of 7 days recorded/ });
   expect(chart).toHaveAccessibleName('Sleep time: 6 of 7 days recorded, highest day 7 h 40 min');
   const figure = chart.closest('figure')!;
@@ -180,7 +184,7 @@ test('switching to months and stepping back asks for those periods', async () =>
         : reportOf(),
     ),
   );
-  render(<App />);
+  renderApp();
   await screen.findByText('Nov 2 – Nov 8');
   fireEvent.click(screen.getByRole('button', { name: 'Previous week' }));
   await waitFor(() =>
@@ -220,7 +224,7 @@ test('moving between periods keeps the row and the pressed button focused while 
           );
         }),
   );
-  render(<App />);
+  renderApp();
   await screen.findByText('Nov 2 – Nov 8');
 
   const previous = screen.getByRole('button', { name: 'Previous week' });
@@ -253,7 +257,7 @@ test('pressing a period button twice before the answer moves two periods (#138)'
   const fetchMock = serve(() =>
     ++calls === 1 ? json(reportOf()) : new Promise<Response>(() => {}),
   );
-  render(<App />);
+  renderApp();
   await screen.findByText('Nov 2 – Nov 8');
   const previous = screen.getByRole('button', { name: 'Previous week' });
   fireEvent.click(previous);
@@ -274,7 +278,7 @@ test('"This week" goes once the week is shown, and its focus moves to the period
     ),
   );
   window.history.replaceState(null, '', '/?period=week&date=2026-10-28');
-  render(<App />);
+  renderApp();
   await screen.findByText('Oct 26 – Nov 1');
   const thisWeek = screen.getByRole('button', { name: 'This week' });
   thisWeek.focus();
@@ -296,7 +300,7 @@ test('"This week" keeps its focus while the week loads (#138 review)', async () 
         ),
   );
   window.history.replaceState(null, '', '/?period=week&date=2026-10-28');
-  render(<App />);
+  renderApp();
   await screen.findByText('Oct 26 – Nov 1');
   const thisWeek = screen.getByRole('button', { name: 'This week' });
   thisWeek.focus();
@@ -312,7 +316,7 @@ test('"This week" keeps its focus while the week loads (#138 review)', async () 
 test('a move whose report fails puts focus on Try again (#138 review)', async () => {
   let calls = 0;
   serve(() => (++calls === 1 ? json(reportOf()) : json({ error: 'Server error occurred' }, 500)));
-  render(<App />);
+  renderApp();
   await screen.findByText('Nov 2 – Nov 8');
   const previous = screen.getByRole('button', { name: 'Previous week' });
   previous.focus();
@@ -340,7 +344,7 @@ test('a failed "This week" does not move focus on a later report (#138 review)',
           ),
   );
   window.history.replaceState(null, '', '/?period=week&date=2026-10-28');
-  render(<App />);
+  renderApp();
   await screen.findByText('Oct 26 – Nov 1');
   fireEvent.click(screen.getByRole('button', { name: 'This week' }));
   await findLive('alert');
@@ -357,7 +361,7 @@ test('a failed "This week" does not move focus on a later report (#138 review)',
 test('a failed report can be tried again', async () => {
   let fail = true;
   serve(() => (fail ? json({ error: 'Server error occurred' }, 500) : json(reportOf())));
-  render(<App />);
+  renderApp();
   expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   fail = false;
   const retry = screen.getByRole('button', { name: 'Try again' });
@@ -378,7 +382,7 @@ test('a retry that fails again keeps focus on its button', async () => {
           answer = resolve;
         }),
   );
-  render(<App />);
+  renderApp();
   await findLive('alert');
   const retry = screen.getByRole('button', { name: 'Try again' });
   retry.focus();
@@ -402,7 +406,7 @@ test('a retry for a period already left does not end a newer retry (#128 review)
       }),
   );
   const failure = () => json({ error: 'Server error occurred' }, 500);
-  render(<App />);
+  renderApp();
   await waitFor(() => expect(answers).toHaveLength(1));
   answers[0](failure());
   const weekRetry = await screen.findByRole('button', { name: 'Try again' });
@@ -440,7 +444,7 @@ test('focus moved elsewhere during a retry stays there (#128 review)', async () 
           answer = resolve;
         }),
   );
-  render(<App />);
+  renderApp();
   const retry = await screen.findByRole('button', { name: 'Try again' });
   fireEvent.click(retry);
   await waitFor(() => expect(calls).toBe(2));
@@ -474,7 +478,7 @@ test('the first and last periods of the range do not move past it (#130)', async
     );
   });
   window.history.replaceState(null, '', '/?period=week&date=2000-01-01');
-  render(<App />);
+  renderApp();
   await screen.findByText('Dec 27, 1999 – Jan 2, 2000');
   const previous = screen.getByRole('button', { name: 'Previous week' });
   expect(previous).toHaveAttribute('aria-disabled', 'true');
@@ -522,7 +526,7 @@ test('the week before the second week of 2000 is asked for by a day in range (#1
     ),
   );
   window.history.replaceState(null, '', '/?period=week&date=2000-01-05');
-  render(<App />);
+  renderApp();
   await screen.findByText('Jan 3 – Jan 9, 2000');
   fireEvent.click(screen.getByRole('button', { name: 'Previous week' }));
   expect(await screen.findByText('Dec 27, 1999 – Jan 2, 2000')).toBeInTheDocument();
@@ -538,7 +542,7 @@ test('a report still on its way does not land next to the word about a date out 
         answer = resolve;
       }),
   );
-  render(<App />);
+  renderApp();
   // The week's report is on its way before the address moves out of range.
   await waitFor(() => expect(reportCalls(fetchMock)).toHaveLength(1));
   window.history.pushState(null, '', '/?period=week&date=1999-06-01');
@@ -553,7 +557,7 @@ test('a report still on its way does not land next to the word about a date out 
 test('a date in the address outside the range is said, not shown as an empty report (#130)', async () => {
   const fetchMock = serve(() => json(reportOf()));
   window.history.replaceState(null, '', '/?period=week&date=1999-06-01');
-  render(<App />);
+  renderApp();
   expect(
     await screen.findByText('Records can be kept from 2000-01-01 to 2099-12-31: 1999-06-01'),
   ).toBeInTheDocument();
@@ -576,7 +580,7 @@ test('drinking compares the share of recorded days, since the periods may hold d
       }),
     ),
   );
-  render(<App />);
+  renderApp();
   await screen.findByText('Nov 2 – Nov 8');
   // Two of two against two of seven: the same count, but not the same share.
   expect(stat('Days with drinking')).toHaveTextContent('2 days (100%)');
@@ -600,7 +604,7 @@ test('an answer for a period already left does not replace the one on screen', a
         : reportOf(),
     );
   });
-  render(<App />);
+  renderApp();
   // The week's report is on its way before the month is asked for.
   await waitFor(() => expect(first).toBe(false));
   fireEvent.click(screen.getByRole('button', { name: 'Monthly' }));
@@ -617,7 +621,7 @@ test('an answer for a period already left does not replace the one on screen', a
 test('a date in the address that does not exist falls back to the server date', async () => {
   const fetchMock = serve(() => json(reportOf()));
   window.history.replaceState(null, '', '/?period=week&date=2026-02-30');
-  render(<App />);
+  renderApp();
   await screen.findByText('Nov 2 – Nov 8');
   expect(reportCalls(fetchMock)).toEqual([`/api/report?period=week&date=${today}`]);
 });
@@ -629,7 +633,7 @@ test('without the server date the page says why, instead of loading forever', as
     ),
   );
   vi.stubGlobal('fetch', fetchMock);
-  render(<App />);
+  renderApp();
   expect(await screen.findByText(/today date is unknown/)).toBeInTheDocument();
   expect(screen.queryByRole('status', { name: 'Loading report' })).not.toBeInTheDocument();
   expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith('/api/report'))).toBe(false);
@@ -637,7 +641,7 @@ test('without the server date the page says why, instead of loading forever', as
 
 test('the tip of an edge bar hangs inward instead of past the card', async () => {
   serve(() => json(reportOf()));
-  render(<App />);
+  renderApp();
   const chart = await screen.findByRole('img', { name: /Sleep time/ });
   const columns = [...chart.querySelectorAll('rect[fill="transparent"]')];
   fireEvent.mouseEnter(columns[0]);
@@ -677,7 +681,7 @@ test('one failed check of the server keeps the report already on screen', async 
     ),
   );
   vi.stubGlobal('fetch', fetchMock);
-  render(<App />);
+  renderApp();
   await screen.findByText('Nov 2 – Nov 8');
   healthy = false;
   // Returning to the tab checks the server again.
@@ -686,4 +690,50 @@ test('one failed check of the server keeps the report already on screen', async 
   expect(screen.getByText('Nov 2 – Nov 8')).toBeInTheDocument();
   expect(stat('Average sleep')).toHaveTextContent('7 h 30 min');
   expect(screen.queryByText(/today date is unknown/)).not.toBeInTheDocument();
+});
+
+test('going back to a period just shown brings it back at once, without asking again (#282)', async () => {
+  const month = reportOf({
+    period: 'month',
+    current: { ...reportOf().current, from: '2026-11-01', to: '2026-11-30' },
+  });
+  const fetchMock = serve((url) => json(url.includes('period=month') ? month : reportOf()));
+  renderApp();
+  await screen.findByText('Nov 2 – Nov 8');
+  fireEvent.click(screen.getByRole('button', { name: 'Monthly' }));
+  await screen.findByText('Nov 1 – Nov 30');
+  fireEvent.click(screen.getByRole('button', { name: 'Weekly' }));
+  // Already there in the same render: the week is still fresh in the cache.
+  expect(screen.getByText('Nov 2 – Nov 8')).toBeInTheDocument();
+  expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+  expect(reportCalls(fetchMock)).toHaveLength(2);
+});
+
+test('a period cached a while ago is shown dimmed while it is read again (#282 review)', async () => {
+  const month = reportOf({
+    period: 'month',
+    current: { ...reportOf().current, from: '2026-11-01', to: '2026-11-30' },
+  });
+  let finishWeek: () => void = () => {};
+  let weeks = 0;
+  serve((url) =>
+    url.includes('period=month')
+      ? json(month)
+      : ++weeks === 1
+        ? json(reportOf())
+        : new Promise<Response>((resolve) => (finishWeek = () => resolve(json(reportOf())))),
+  );
+  renderApp();
+  await screen.findByText('Nov 2 – Nov 8');
+  fireEvent.click(screen.getByRole('button', { name: 'Monthly' }));
+  await screen.findByText('Nov 1 – Nov 30');
+  // Half a minute later the week in the cache is no longer fresh.
+  const now = Date.now();
+  vi.spyOn(Date, 'now').mockReturnValue(now + 31_000);
+  fireEvent.click(screen.getByRole('button', { name: 'Weekly' }));
+  await waitFor(() => expect(weeks).toBe(2));
+  expect(screen.getByText('Nov 2 – Nov 8')).toBeInTheDocument();
+  expect(stat('Average sleep').closest('[aria-busy="true"]')).not.toBeNull();
+  finishWeek();
+  await waitFor(() => expect(document.querySelector('[aria-busy="true"]')).toBeNull());
 });

@@ -307,7 +307,8 @@ test('a day without medicines says so', async () => {
 });
 
 test('a linked visit older than the recent ones is still offered, and an unknown one is named plainly', async () => {
-  clockAt('2026-03-15T03:00:00Z');
+  // This device is already on 2026-03-16 in Asia/Seoul while the server's date says 2026-03-15.
+  clockAt('2026-03-15T23:30:00Z');
   const older: Medication = {
     ...prescribed,
     id: 5,
@@ -323,7 +324,8 @@ test('a linked visit older than the recent ones is still offered, and an unknown
   fireEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
-  // A link without a date names the visit without inventing one.
+  // A link without a date names the visit without inventing one, and starts on this device's
+  // today like the add button (#306).
   window.history.pushState(null, '', '/medications?visit=99');
   window.dispatchEvent(new PopStateEvent('popstate'));
   const linked = await screen.findByRole('dialog', { name: 'Add medication' });
@@ -331,7 +333,7 @@ test('a linked visit older than the recent ones is still offered, and an unknown
     expect(within(linked).getByLabelText('Prescribing clinic visit')).toHaveValue('99'),
   );
   expect(within(linked).getByRole('option', { name: 'Selected visit' })).toBeInTheDocument();
-  expect(within(linked).getByLabelText('Start date')).toHaveValue('2026-03-15');
+  expect(within(linked).getByLabelText('Start date')).toHaveValue('2026-03-16');
 });
 
 test('medicines starting later have their own list', async () => {

@@ -66,12 +66,12 @@ Versions under the 14-day rule ([dependency policy](https://github.com/sirloinbh
 - `npm run check` (with `TEST_DATABASE_URL` empty): passed. Frontend 790 tests passed, 3 skipped. Backend 158 passed, 0 failed, 137 skipped (no local test DB; CI runs them). Run twice: after the design-tokens lockfile change, and again after the `@lhci/cli` 0.16.1 lockfile change (same counts).
 - Cold load of `/` (Vite dev server, fresh Chromium via Playwright, 390x844 and 1440x900):
 
-| Measure                  | 1.0.0 (before)        | 1.1.0 (after)                | Change         |
-| ------------------------ | --------------------- | ---------------------------- | -------------- |
-| Font files on `/`        | 1                     | 2 (`subset.91`, `subset.86`) |                |
-| Font bytes on `/`        | 2,057,988             | 64,312                       | -96.9%         |
-| Build CSS `index-*.css`  | 55.63 kB / 10.31 gzip | 103.61 kB / 25.37 kB gzip    | +15.06 kB gzip |
-| Font + CSS on a cold `/` | about 2,068 kB        | about 90 kB                  | -95.7%         |
+| Measure                  | 1.0.0 (before)           | 1.1.0 (after)                | Change         |
+| ------------------------ | ------------------------ | ---------------------------- | -------------- |
+| Font files on `/`        | 1                        | 2 (`subset.91`, `subset.86`) |                |
+| Font bytes on `/`        | 2,057,988                | 64,312                       | -96.9%         |
+| Build CSS `index-*.css`  | 55.63 kB / 10.31 kB gzip | 103.61 kB / 25.37 kB gzip    | +15.06 kB gzip |
+| Font + CSS on a cold `/` | about 2,068 kB           | about 90 kB                  | -95.7%         |
 
 - The production build emits the 92 chunks as separate assets (2,957,724 bytes in total); a page fetches only the chunks its text needs. A specimen with Latin, digits, Korean and symbols at weights 400-700 needed 11 chunks, 289,392 bytes (-85.9%), measured before the release with the same files.
 - Look: screenshots at 390x844 and 1440x900 show the dashboard in Pretendard. The earlier pixel comparison with these exact files (project-standards #989) found every Latin and Hangul glyph and position identical; only `+ = @ ~ →` sit 1 px lower, because they come from a different chunk than the text around them.

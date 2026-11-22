@@ -5,6 +5,7 @@ import { toast } from './components/ui/sonner';
 import { MealCard } from './meals';
 import { answered } from './test/answered';
 import { findLive, getLive, queryLive } from './test/live';
+import { unexpectedRequest } from './test/requests';
 
 const date = '2026-03-15';
 const noTotal = { value: null, missing: 0 };
@@ -86,10 +87,13 @@ const stubFetch = (inner: (url: string, init?: RequestInit) => Promise<Response>
 
 type Reply = { status?: number; body?: unknown };
 
-// Answers in order, so a test states exactly what the server said to each request.
+// Answers in order, so a test states exactly what the server said to each request. A request after the
+// last reply fails the test (#214).
 const server = (...replies: Reply[]) => {
-  const fetchMock = vi.fn(() => {
-    const { status = 200, body } = replies.shift() ?? {};
+  const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+    const reply = replies.shift();
+    if (!reply) return unexpectedRequest(url, init);
+    const { status = 200, body } = reply;
     return Promise.resolve(
       new Response(body === undefined ? null : JSON.stringify(body), { status }),
     );

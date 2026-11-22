@@ -31,3 +31,7 @@ Three latent gaps that the current forms cannot reach but the helpers allowed:
 ## Limits
 
 - No screen change, so no browser check.
+
+## Review round 1
+
+- Approve, no blocking comments. One non-blocking nitpick: an over-long number still gets the generic "enter digits only" message, as the 400-digit case already did.

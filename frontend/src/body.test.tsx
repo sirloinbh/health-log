@@ -330,18 +330,130 @@ test('a server rejection keeps the form and the typed values', async () => {
   server({
     recordReplies: [
       { body: { record: null } },
-      { status: 400, body: { error: 'Enter both systolic and diastolic blood pressure' } },
+      { status: 400, body: { error: 'The request body is not valid' } },
     ],
   });
   renderWithQuery(<BodyCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Systolic blood pressure (mmHg)'), {
     target: { value: '120' },
   });
+  fireEvent.change(screen.getByLabelText('Diastolic blood pressure (mmHg)'), {
+    target: { value: '80' },
+  });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-  expect(await findLive('alert')).toHaveTextContent('Enter both');
+  expect(await findLive('alert')).toHaveTextContent('The request body is not valid');
   expect(screen.getByLabelText('Systolic blood pressure (mmHg)')).toHaveValue('120');
   expect(screen.getByRole('button', { name: 'Save' })).not.toHaveAttribute('aria-disabled');
+});
+
+// #205: what the server would refuse is refused before sending, with the server's own words.
+const systolic = 'Systolic blood pressure (mmHg)';
+const diastolic = 'Diastolic blood pressure (mmHg)';
+test.each([
+  {
+    name: 'three decimals',
+    values: { 'Weight (kg)': '70.555' },
+    message: 'Weight can have at most 2 decimal places',
+  },
+  { name: 'zero weight', values: { 'Weight (kg)': '0' }, message: 'Weight must be greater than 0' },
+  {
+    name: 'body fat over 100',
+    values: { 'Body fat (%)': '100.5' },
+    message: 'Body fat must be 100 or less',
+  },
+  { name: 'waist over 300', values: { 'Waist (cm)': '301' }, message: 'Waist must be 300 or less' },
+  {
+    name: 'fractional blood pressure',
+    values: { [systolic]: '120.5', [diastolic]: '80' },
+    message: 'Systolic blood pressure must be a whole number',
+  },
+  {
+    name: 'diastolic below 20',
+    values: { [systolic]: '120', [diastolic]: '19' },
+    message: 'Diastolic blood pressure must be 20 or more',
+  },
+  {
+    name: 'systolic alone',
+    values: { [systolic]: '120' },
+    message: 'Enter both systolic and diastolic blood pressure',
+  },
+  {
+    name: 'diastolic alone',
+    values: { [diastolic]: '80' },
+    message: 'Enter both systolic and diastolic blood pressure',
+  },
+  {
+    name: 'systolic not above diastolic',
+    values: { [systolic]: '80', [diastolic]: '80' },
+    message: 'Systolic blood pressure must be higher than diastolic',
+  },
+  {
+    name: 'nothing but spaces',
+    values: { Note: '   ' },
+    message: 'Enter at least one value to save',
+  },
+  {
+    name: 'a 501-character note',
+    values: { Note: '가'.repeat(501) },
+    message: 'The note must be 500 characters or fewer',
+  },
+])('$name is refused before anything is sent', async ({ values, message }) => {
+  const fetchMock = server({ recordReplies: [{ body: { record: null } }] });
+  renderWithQuery(<BodyCard date={date} />);
+  await screen.findByLabelText('Weight (kg)');
+  for (const [label, value] of Object.entries(values)) {
+    fireEvent.change(screen.getByLabelText(label), { target: { value } });
+  }
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+  expect(await findLive('alert')).toHaveTextContent(message);
+  expect(
+    fetchMock.mock.calls.some(
+      (args) => (args as unknown as [string, RequestInit])[1]?.method === 'PUT',
+    ),
+  ).toBe(false);
+});
+
+test('values at the edges the server takes are sent', async () => {
+  const saved = {
+    ...record,
+    weightKg: 500,
+    bodyFatPercent: 0.01,
+    systolicMmhg: 300,
+    diastolicMmhg: 200,
+    memo: '가'.repeat(500),
+  };
+  const fetchMock = server({ recordReplies: [{ body: { record: null } }, { body: saved }] });
+  renderWithQuery(<BodyCard date={date} />);
+  fireEvent.change(await screen.findByLabelText('Weight (kg)'), { target: { value: '500' } });
+  fireEvent.change(screen.getByLabelText('Body fat (%)'), { target: { value: '0.01' } });
+  fireEvent.change(screen.getByLabelText('Systolic blood pressure (mmHg)'), {
+    target: { value: '300' },
+  });
+  fireEvent.change(screen.getByLabelText('Diastolic blood pressure (mmHg)'), {
+    target: { value: '200' },
+  });
+  fireEvent.change(screen.getByLabelText('Note'), { target: { value: '가'.repeat(500) } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+  expect(await screen.findByText('300/200mmHg')).toBeInTheDocument();
+  expect(sent(fetchMock, 'PUT').body).toEqual({
+    weightKg: 500,
+    bodyFatPercent: 0.01,
+    waistCm: null,
+    systolicMmhg: 300,
+    diastolicMmhg: 200,
+    memo: '가'.repeat(500),
+  });
+});
+
+test('a saved row with only one blood pressure value shows no blood pressure', async () => {
+  server({ recordReplies: [{ body: { record: { ...record, diastolicMmhg: null } } }] });
+  renderWithQuery(<BodyCard date={date} />);
+  expect(await screen.findByText('70.5kg')).toBeInTheDocument();
+  expect(screen.queryByText('Blood pressure')).not.toBeInTheDocument();
+  expect(screen.queryByText(/null/)).not.toBeInTheDocument();
 });
 
 test('a comma decimal is refused, never read as ten times the value', async () => {

@@ -9,6 +9,7 @@ import {
   formatSpan,
 } from './body-change';
 import { BusyButton } from './busy-button';
+import { charCount } from './check-text';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
@@ -22,7 +23,7 @@ import { shiftDate } from './daily-date';
 import { RequestError } from './lib/api';
 import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
-import { parseAmount, unreadableAmount } from './number-input';
+import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
 import { trackWrite } from './pending-writes';
 import { asRequest, useReadAfterWrites } from './writes';
 
@@ -57,12 +58,29 @@ function useBodyWrite(date: string, recordAfter: (data: unknown) => BodyRecord |
   });
 }
 
+// `name`, `min` and `max` follow the server's checks in `backend/src/body.ts`, so its messages
+// appear before anything is sent (#205). Measures are above 0 with up to 2 decimals; blood
+// pressure is a whole number from `min`.
 const numberFields = [
-  { key: 'weightKg', id: 'body-weight', label: 'Weight (kg)' },
-  { key: 'bodyFatPercent', id: 'body-fat', label: 'Body fat (%)' },
-  { key: 'waistCm', id: 'body-waist', label: 'Waist (cm)' },
-  { key: 'systolicMmhg', id: 'body-systolic', label: 'Systolic blood pressure (mmHg)' },
-  { key: 'diastolicMmhg', id: 'body-diastolic', label: 'Diastolic blood pressure (mmHg)' },
+  { key: 'weightKg', id: 'body-weight', label: 'Weight (kg)', name: 'Weight', max: 500 },
+  { key: 'bodyFatPercent', id: 'body-fat', label: 'Body fat (%)', name: 'Body fat', max: 100 },
+  { key: 'waistCm', id: 'body-waist', label: 'Waist (cm)', name: 'Waist', max: 300 },
+  {
+    key: 'systolicMmhg',
+    id: 'body-systolic',
+    label: 'Systolic blood pressure (mmHg)',
+    name: 'Systolic blood pressure',
+    min: 50,
+    max: 300,
+  },
+  {
+    key: 'diastolicMmhg',
+    id: 'body-diastolic',
+    label: 'Diastolic blood pressure (mmHg)',
+    name: 'Diastolic blood pressure',
+    min: 20,
+    max: 200,
+  },
 ] as const;
 
 const changeRows = [
@@ -83,14 +101,40 @@ const formOf = (record: BodyRecord | null): Form => ({
   memo: record?.memo ?? '',
 });
 
-const bodyOf = (form: Form) => ({
-  weightKg: parseAmount(form.weightKg),
-  bodyFatPercent: parseAmount(form.bodyFatPercent),
-  waistCm: parseAmount(form.waistCm),
-  systolicMmhg: parseAmount(form.systolicMmhg),
-  diastolicMmhg: parseAmount(form.diastolicMmhg),
-  memo: form.memo.trim() || null,
-});
+/** The request body, or the first reason the server would refuse it. */
+const readForm = (form: Form) => {
+  const values: Partial<Record<NumberKey, number | null>> = {};
+  for (const field of numberFields) {
+    const value = parseAmount(form[field.key]);
+    if (value === undefined) return unreadableAmount(field.label);
+    if (value !== null) {
+      if ('min' in field) {
+        if (!Number.isInteger(value)) return `${field.name} must be a whole number`;
+        if (value < field.min) return `${field.name} must be ${field.min} or more`;
+      } else if (value <= 0) {
+        return `${field.name} must be greater than 0`;
+      }
+      if (value > field.max) return `${field.name} must be ${field.max} or less`;
+      if (!('min' in field) && !hasTwoDecimalsAtMost(value)) {
+        return `${field.name} can have at most 2 decimal places`;
+      }
+    }
+    values[field.key] = value;
+  }
+  const memo = form.memo.trim() || null;
+  if (memo !== null && charCount(memo) > 500) return 'The note must be 500 characters or fewer';
+  const body = { ...(values as Record<NumberKey, number | null>), memo };
+  const { systolicMmhg: systolic, diastolicMmhg: diastolic } = body;
+  if ((systolic === null) !== (diastolic === null)) {
+    return 'Enter both systolic and diastolic blood pressure';
+  }
+  if (systolic !== null && diastolic !== null && systolic <= diastolic) {
+    return 'Systolic blood pressure must be higher than diastolic';
+  }
+  if (Object.values(body).every((value) => value === null))
+    return 'Enter at least one value to save';
+  return body;
+};
 
 function BodyForm({
   date,
@@ -120,9 +164,9 @@ function BodyForm({
     event.preventDefault();
     // The save button stays pressable while saving (#126), and Enter in a field submits too.
     if (saving) return;
-    const unreadable = numberFields.find(({ key }) => parseAmount(form[key]) === undefined);
-    if (unreadable) {
-      error(unreadableAmount(unreadable.label));
+    const body = readForm(form);
+    if (typeof body === 'string') {
+      error(body);
       return;
     }
     // A repeated failure then appears anew and is announced again (as in #98).
@@ -131,7 +175,7 @@ function BodyForm({
       // trackWrite until every card reads through React Query (#220).
       const saved = await trackWrite(
         pathOf(date),
-        save.mutateAsync({ path: pathOf(date), method: 'PUT', body: bodyOf(form) }),
+        save.mutateAsync({ path: pathOf(date), method: 'PUT', body }),
       );
       onSaved(saved as BodyRecord);
     } catch (cause) {
@@ -212,7 +256,8 @@ function BodySummary({
             </dd>
           </div>
         ))}
-        {record.systolicMmhg !== null ? (
+        {/* Both halves, so a row saved before the pair rule never reads "120/nullmmHg". */}
+        {record.systolicMmhg !== null && record.diastolicMmhg !== null ? (
           <div>
             <dt className="text-muted-foreground">Blood pressure</dt>
             <dd>

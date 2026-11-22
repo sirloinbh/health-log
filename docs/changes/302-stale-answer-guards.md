@@ -24,3 +24,8 @@
 - Old-code check: with `add-entry.tsx`, `food-dialog.tsx`, `foods.tsx` and `combos.tsx` put back to `origin/main`, the four tests above other than the guard fail (4 failed, 143 passed); with the change, `vitest run` on the three files passes 147 of 147.
 - `TEST_DATABASE_URL= npm run check` (under the shared check lock): passed (exit 0). Frontend: 76 files, 791 passed, 3 skipped. Backend: 293 tests, 156 passed, 0 failed, 137 skipped (the DB tests need `health_test`, not set here; CI runs them). Format, lint, contract, typecheck, skill tests and build passed.
 - No browser check: the markup only gains `readonly`/`disabled` while saving, and the screen tests cover the behavior.
+
+## Review round 1 (PR #308)
+
+- Approve, no blocking comments ([comment](https://github.com/sirloinbh/health-log/pull/308#issuecomment-7073882695)). Before the commit, `invalidate: [combosKey]` on the combo save was replaced by a non-awaited invalidation, because awaiting the list read kept the dialog busy and broke the #78 slow-reload focus test.
+- Nit, left as is: the picker shares the combos cache, so a list cached by the Combos page in the last few minutes shows for the moment its fresh read takes. Combo saves and deletes mark it stale, and recording a deleted combo is answered with "Combo not found".

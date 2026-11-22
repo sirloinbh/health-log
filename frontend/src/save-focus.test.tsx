@@ -10,6 +10,7 @@ import { HabitsCard } from './habits';
 import { MealCard } from './meals';
 import { SleepCard } from './sleep';
 import { findLive, queryLive } from './test/live';
+import { renderWithQuery } from './test/query';
 
 // #126: a save that fails must leave the keyboard focus on the button that was pressed, not on
 // the page. A disabled button loses focus in a browser, so the button must stay enabled.
@@ -149,7 +150,7 @@ test.each(cases)(
   '$name: pressing save from the keyboard keeps focus on it while saving and after a failure',
   async ({ ui, empty, fill }) => {
     const { writes, fail } = server(empty);
-    render(ui);
+    renderWithQuery(ui);
     const save = await fill();
     save.focus();
     fireEvent.click(save);
@@ -182,7 +183,7 @@ test.each(cases)(
   '$name: a submit while the form is saving does not send it again',
   async ({ ui, empty, fill }) => {
     const { writes } = server(empty);
-    render(ui);
+    renderWithQuery(ui);
     const save = await fill();
     fireEvent.click(save);
     await waitFor(() => expect(save).toHaveAttribute('aria-disabled', 'true'));

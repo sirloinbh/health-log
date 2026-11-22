@@ -52,11 +52,12 @@ The hand-written polling hook `useHealth` in `app.tsx` (an interval, a visibilit
 - `TEST_DATABASE_URL= npm run check` after merging `origin/main` (with #204): passed. Frontend vitest 72 files, 734 passed, 3 skipped. The backend DB integration tests skip locally (no `health_test`); CI runs them.
 - CI on the first push failed after #204 (PR #254) merged: its two new medication tests check the wait for the server's date, so they now render through `openAsking` (the real read), like the visits ones. Fixed after merging `origin/main`.
 
-## Sleep and daily check cards — 2026-11-22
+## Sleep, daily check, alcohol and tobacco, and body cards — 2026-11-22
 
-`SleepCard` and `ChecksCard` load with `useApiQuery` on `apiKey('/api/sleep/<date>')` / `apiKey('/api/checks/<date>')` and save and delete with `useApiMutation`. Their `useEffect` load loops, `live` refs, and `saving` state are gone; "Try again" is `refetch({ cancelRefetch: false })`, so pressing twice still sends one read.
+`SleepCard`, `ChecksCard`, `HabitsCard` and `BodyCard` load with `useApiQuery` on the day's path (`apiKey('/api/sleep/<date>')` and so on) and save and delete with `useApiMutation`. Their `useEffect` load loops, `live` refs, and `saving` state are gone; "Try again" is `refetch({ cancelRefetch: false })`, so pressing twice still sends one read.
 
-- **Writes update the cache.** A save's answer goes into the day's cached record from the mutation's own `onSuccess`, which runs even after the card is gone, so coming back within the 30 s `staleTime` shows the saved record without a read. Deleting a sleep record sets it to none; deleting a daily check resets the day's query, so the rates read again behind a skeleton, as before.
+- **Writes update the cache.** A save's answer goes into the day's cached record from the mutation's own `onSuccess`, which runs even after the card is gone, so coming back within the 30 s `staleTime` shows the saved record without a read. Deleting a sleep or body record sets it to none; deleting a daily check or a habit record resets the day's query, so the rates and totals read again behind a skeleton, as before.
+- **Body trend.** The trend is its own query, `apiKey('/api/body', from, to)`, waiting at mount for any body write on its way (`useReadAfterWrites('/api/body/')`), as `writesSettled(pathOf(''))` did. A body save or delete cancels trend reads still on its way and then invalidates every trend key: React Query would otherwise join the older read that left before the save, and the newer answer must win (the existing "slow older trend" tests). The save does not wait for the trend. The trend error is hidden while "Reload changes" is on its way, so a repeated failure is announced again.
 - **Reading after a write still on its way (#71)** is `useReadAfterWrites(path)` in the new `frontend/src/writes.ts`: writes pass `asRequest` as their request, so each mutation's variables carry its path, and `useIsMutating` with a path-prefix predicate tells whether one is pending. A card does not read until no write to its day is pending, then stays ready, so its own saves do not hide it.
 - **Transition:** each write is still wrapped in `trackWrite`, so the goals card, which reads through `pending-writes` until it moves too, keeps waiting for and re-judging after these saves. The wrapper goes when the last card moves (#220).
 - A failed refresh with a record on screen keeps the record; only a failed first read shows the error and "Try again".
@@ -64,6 +65,6 @@ The hand-written polling hook `useHealth` in `app.tsx` (an interval, a visibilit
 ### Tests
 
 - `src/test/query.tsx` (renamed from `.ts`): `renderWithQuery` renders inside one query client per test, so a card unmounted and mounted again shares the cache and pending writes, as moving between days does; `src/test/setup.ts` clears it after each test.
-- `sleep.test.tsx`, `checks.test.tsx` render through `renderWithQuery`. The "save fails after leaving the day" tests wait until the save is sent before answering it: React Query sends it a moment after the click.
+- `sleep.test.tsx`, `checks.test.tsx`, `habits.test.tsx`, `body.test.tsx`, `save-focus.test.tsx` render through `renderWithQuery`. `body.test.tsx` "coming back while a save is on its way" now expects one read of the day instead of two: the save's answer is the record. The "save fails after leaving the day" tests wait until the save is sent before answering it: React Query sends it a moment after the click.
 - New: `sleep.test.tsx` "coming back soon after a save shows the saved night from the cache, without reading again".
-- `vitest run src/sleep.test.tsx src/checks.test.tsx`: 38 passed.
+- `vitest run` on sleep, checks, habits, body, save-focus, daily and goals tests: all passed.

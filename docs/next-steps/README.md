@@ -23,7 +23,7 @@ Requirements are registered as GitHub issues. Choose later work with the selecti
 Notes for the deploy:
 
 - The next deploy applies migrations 019 (#197 sleep and body checks), 020 (#199, 13 seeded food rows) and 021 (#196 meal request keys).
-- A future backup restore (the old `chore/42` steps) must empty `meal_request_keys` in the same transaction.
+- **Restoring a backup by hand:** after you restore the meals, empty `meal_request_keys` in the same transaction (`DELETE FROM meal_request_keys;` before `COMMIT`). A key left from before the restore could replay an old meal POST answer for a meal that is no longer there (#196). health-log has no manual restore guide yet, and the restore tooling (`deploy/backup.sh`, `restore-check`) is a managed file, so do not edit it; raise a change to it in `sirloinbh/project-standards`.
 
 ## Choices to confirm
 

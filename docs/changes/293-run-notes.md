@@ -11,6 +11,7 @@
 
 - New [daily log for 2026-11-22](../daily/2026-11-22.md): what was merged (issue → PR), the epics closed, decisions, lessons (the shared check lock, the Orca terminal limit) and the files to read first. Listed in `docs/daily/README.md`.
 - Rewrote [Next steps](../next-steps/README.md) (Last updated 2026-11-22): in progress (no lanes assigned), user actions in order, choices to confirm (#204, #206, #207), central follow-ups (sirloinbh/project-standards#978, sirloinbh/project-standards#979 and sirloinbh/project-standards#980), issues that need the user, and the four open epics (#221, #88, #83, #82).
+- Next steps, deploy notes: a backup restored by hand must empty `meal_request_keys` in the same transaction, because a stale key could replay an old meal POST answer (#196). No health-log doc tells a person how to restore by hand (`docs/project-setup.md` is the generic setup handover, and `deploy/backup.sh verify` only restores into a throwaway container), so the note sits under the backup item, as the coordinator asked. `deploy/backup.sh` is a managed file and was not edited.
 - Dropped from Next steps: the old local branches `chore/3-agent-auto-merge` and `fix/1-vite-port` (no longer in `git branch --list`), and the 2026-11-08 to-do table, whose items are done or now listed under user actions.
 
 ## Verification

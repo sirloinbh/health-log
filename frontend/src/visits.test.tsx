@@ -6,6 +6,7 @@ import { App } from './app';
 import { toast } from './components/ui/sonner';
 import { trackWrite } from './pending-writes';
 import { nextTask } from './test/answered';
+import { testQueryClient } from './test/query';
 import { VisitsCard } from './visit-card';
 import type { Visit } from './visit-text';
 
@@ -44,9 +45,10 @@ const serve = (visits: Handler) => {
   return fetchMock;
 };
 
+// The page already knows the server's date, so pressing a button at once fills it in.
 const open = (path = '/visits') => {
   window.history.replaceState(null, '', path);
-  render(<App />);
+  render(<App queryClient={testQueryClient({ today: '2026-03-15' })} />);
 };
 
 const writes = (fetchMock: ReturnType<typeof serve>) =>
@@ -471,6 +473,12 @@ test('while a search is on its way, the next page waits, so two lists never mix'
   expect(await screen.findByText('1 visit')).toBeInTheDocument();
 });
 
+// For the tests about waiting for the server's date: the app asks for it as it does when it opens.
+const openAsking = (path: string) => {
+  window.history.replaceState(null, '', path);
+  render(<App />);
+};
+
 test('a daily link without a usable date waits for today, or opens blank if it cannot be had', async () => {
   let answerHealth = (_response: Response) => {};
   vi.stubGlobal(
@@ -481,7 +489,7 @@ test('a daily link without a usable date waits for today, or opens blank if it c
         : new Promise<Response>((resolve) => (answerHealth = resolve)),
     ),
   );
-  open('/visits?new=1985-07-01');
+  openAsking('/visits?new=1985-07-01');
   await screen.findByText('No clinic records');
   // Today is still being asked, so nothing opens on a blank date yet.
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -501,7 +509,7 @@ test('a daily link without a usable date still opens when the server cannot say 
       ),
     ),
   );
-  open('/visits?new=garbage');
+  openAsking('/visits?new=garbage');
   expect(await screen.findByRole('dialog', { name: 'Record clinic visit' })).toBeInTheDocument();
   expect(within(dialog()).getByLabelText('Visit date')).toHaveValue('');
 });

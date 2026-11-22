@@ -207,7 +207,7 @@ test('returning to the tab checks today again', async () => {
   await screen.findByRole('heading', { level: 2, name: 'Upcoming' });
 
   health({ today: '2026-03-16' });
-  fireEvent(document, new Event('visibilitychange'));
+  fireEvent(document, new Event('visibilitychange', { bubbles: true }));
   expect(await screen.findByRole('link', { name: 'Today' })).toHaveAttribute(
     'href',
     '/daily/2026-03-16',
@@ -216,28 +216,34 @@ test('returning to the tab checks today again', async () => {
 
 test('a slow older response does not overwrite a newer today', async () => {
   const respond = (today: string) => new Response(JSON.stringify({ today }));
-  let finishFirst = (_response: Response) => {};
-  let healthCalls = 0;
+  const checks: ((response: Response) => void)[] = [];
   vi.stubGlobal(
     'fetch',
-    vi.fn((url: string) => {
-      const card = dayCard(url);
-      if (card) return Promise.resolve(card);
-      healthCalls += 1;
-      return healthCalls === 1
-        ? new Promise((resolve) => (finishFirst = resolve))
-        : Promise.resolve(respond('2026-03-16'));
-    }),
+    vi.fn((url: string) =>
+      url === '/api/health'
+        ? new Promise<Response>((resolve) => checks.push(resolve))
+        : Promise.resolve(dayCard(url) ?? respond('2026-03-16')),
+    ),
   );
   open('/daily/2026-03-16');
-  fireEvent(document, new Event('visibilitychange'));
-  // The newer check is shown: Upcoming appears only on the server's today.
-  await screen.findByRole('heading', { level: 2, name: 'Upcoming' });
-
+  await waitFor(() => expect(checks).toHaveLength(1));
+  // Returning to the tab while a check is out starts none beside it: one check at a time (#220),
+  // so an older answer cannot land after a newer one.
+  fireEvent(document, new Event('visibilitychange', { bubbles: true }));
   const older = respond('2026-03-15');
-  finishFirst(older);
+  checks[0](older);
   await answered(older);
-  expect(screen.getByRole('heading', { level: 2, name: 'Upcoming' })).toBeInTheDocument();
+  expect(checks).toHaveLength(1);
+  expect(await screen.findByRole('link', { name: 'Today' })).toHaveAttribute(
+    'href',
+    '/daily/2026-03-15',
+  );
+
+  // The next check brings the newer today, and it is shown: Upcoming shows only on today.
+  fireEvent(document, new Event('visibilitychange', { bubbles: true }));
+  await waitFor(() => expect(checks).toHaveLength(2));
+  checks[1](respond('2026-03-16'));
+  expect(await screen.findByRole('heading', { level: 2, name: 'Upcoming' })).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'Today' })).not.toBeInTheDocument();
 });
 
@@ -546,7 +552,7 @@ test("one failed check of the server keeps today's coming-up card (#48)", async 
   open('/daily/2026-03-15');
   await screen.findByText('No clinic appointments or medication end dates in the next 7 days.');
   healthy = false;
-  fireEvent(document, new Event('visibilitychange'));
+  fireEvent(document, new Event('visibilitychange', { bubbles: true }));
   expect(await screen.findByText('Cannot reach the server')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Upcoming' })).toBeInTheDocument();
   expect(fetchMock.mock.calls.filter(([url]) => url === '/api/reminders')).toHaveLength(1);

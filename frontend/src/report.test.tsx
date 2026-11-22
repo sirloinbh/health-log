@@ -532,14 +532,15 @@ test('the week before the second week of 2000 is asked for by a day in range (#1
 
 test('a report still on its way does not land next to the word about a date out of range (#130 review)', async () => {
   let answer: (response: Response) => void = () => {};
-  serve(
+  const fetchMock = serve(
     () =>
       new Promise<Response>((resolve) => {
         answer = resolve;
       }),
   );
   render(<App />);
-  await screen.findByRole('status', { name: 'Loading report' });
+  // The week's report is on its way before the address moves out of range.
+  await waitFor(() => expect(reportCalls(fetchMock)).toHaveLength(1));
   window.history.pushState(null, '', '/?period=week&date=1999-06-01');
   fireEvent(window, new PopStateEvent('popstate'));
   await screen.findByText('Records can be kept from 2000-01-01 to 2099-12-31: 1999-06-01');
@@ -600,7 +601,9 @@ test('an answer for a period already left does not replace the one on screen', a
     );
   });
   render(<App />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Monthly' }));
+  // The week's report is on its way before the month is asked for.
+  await waitFor(() => expect(first).toBe(false));
+  fireEvent.click(screen.getByRole('button', { name: 'Monthly' }));
   expect(await screen.findByText('Nov 1 – Nov 30')).toBeInTheDocument();
   const late = json(
     reportOf({ current: { ...reportOf().current, sleep: { days: 1, averageMinutes: 60 } } }),
@@ -678,7 +681,7 @@ test('one failed check of the server keeps the report already on screen', async 
   await screen.findByText('Nov 2 – Nov 8');
   healthy = false;
   // Returning to the tab checks the server again.
-  document.dispatchEvent(new Event('visibilitychange'));
+  document.dispatchEvent(new Event('visibilitychange', { bubbles: true }));
   expect(await findLive('alert')).toHaveTextContent('Cannot reach the server');
   expect(screen.getByText('Nov 2 – Nov 8')).toBeInTheDocument();
   expect(stat('Average sleep')).toHaveTextContent('7 h 30 min');

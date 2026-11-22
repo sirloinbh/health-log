@@ -37,3 +37,5 @@ Permissive fakes let a test pass when the code sends a request the test did not 
 - `app.test.tsx` with unknown URLs failing first showed the dashboard's `/api/report` reads, which used to get the health body; they now have their own answer.
 
 ### Commands
+
+- `TEST_DATABASE_URL= npm run check` (under the shared check lock): passed (frontend 778 passed, 3 skipped; backend 156 passed, 137 DB tests skipped locally because `TEST_DATABASE_URL` was emptied; CI runs them).

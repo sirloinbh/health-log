@@ -1,4 +1,5 @@
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
 import { BusyButton } from './busy-button';
@@ -36,12 +37,16 @@ import {
   unknownReason,
   withoutChange,
 } from './goal-text';
-import { RequestError, requestJson } from './lib/api';
-import { errorText, useNotice } from './lib/use-notice';
+import { RequestError } from './lib/api';
+import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
+import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
 import { parseAmount, unreadableAmount } from './number-input';
-import { onWriteSettled, trackWrite, writesSettled } from './pending-writes';
+import { trackWrite } from './pending-writes';
+import { asRequest, onWriteSettled, putAnswer, useReadAfterWrites } from './writes';
 
 const goalsPath = '/api/goals';
+const goalsKey = apiKey(goalsPath);
+const dayKey = (date: string) => apiKey(`${goalsPath}/days`, date);
 
 const badgeVariant = {
   met: 'success',
@@ -77,7 +82,12 @@ function GoalForm({
     goal && isSleep ? sleepParts(goal.target).minutes : '',
   );
   const [from, setFrom] = useState(today);
-  const [saving, setSaving] = useState(false);
+  const client = useQueryClient();
+  // The answer is all the goals; it goes into the cache, over any read that left before it.
+  const write = useApiMutation<Goals, ApiRequest>(asRequest, {
+    onSuccess: (goals) => putAnswer(client, goalsKey, goals),
+  });
+  const saving = write.isPending;
   const { notice, error, clear } = useNotice();
   const id = `goal-${item}`;
 
@@ -95,18 +105,16 @@ function GoalForm({
     }
     // A repeated failure then appears anew and is announced again (as in #98).
     clear();
-    setSaving(true);
     try {
+      // trackWrite until every screen reads through React Query (#220).
       const goals = await trackWrite(
         goalsPath,
-        requestJson<Goals>(`${goalsPath}/${item}`, { method: 'PUT', body: { from, target } }),
+        write.mutateAsync({ path: `${goalsPath}/${item}`, method: 'PUT', body: { from, target } }),
       );
       toast.success(target === null ? 'Goal turned off' : 'Goal saved');
       onSaved(goals);
     } catch (cause) {
       error(cause);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -223,6 +231,7 @@ function GoalHistory({
   goals: Goals;
   onRemoved: (from: string) => void;
 }) {
+  const remover = useApiMutation<unknown, ApiRequest>(asRequest);
   const changes = goals.history.filter((change) => change.item === item);
   if (changes.length === 0) return null;
 
@@ -230,7 +239,7 @@ function GoalHistory({
     try {
       await trackWrite(
         goalsPath,
-        requestJson(`${goalsPath}/${item}/${from}`, { method: 'DELETE' }),
+        remover.mutateAsync({ path: `${goalsPath}/${item}/${from}`, method: 'DELETE' }),
       );
     } catch (cause) {
       // Already gone counts as removed; anything else keeps the dialog open with the reason.
@@ -284,9 +293,7 @@ function GoalHistory({
 }
 
 export function GoalsSettings() {
-  const [goals, setGoals] = useState<Goals | undefined>(undefined);
-  const { notice, error, clear } = useNotice();
-  const live = useRef(true);
+  const client = useQueryClient();
   // Where focus goes when the button that had it is gone: the section, or one goal's card.
   const [focusOn, setFocusOn] = useState<{ target: 'section' | GoalItem; count: number }>({
     target: 'section',
@@ -296,31 +303,18 @@ export function GoalsSettings() {
   const moveFocus = (target: 'section' | GoalItem) =>
     setFocusOn((current) => ({ target, count: current.count + 1 }));
 
-  // Each delete reads again, so reads can overlap; only the latest one may show its answer (#202).
-  const latest = useRef(0);
-
-  const load = useCallback(async () => {
-    const request = ++latest.current;
-    const current = () => live.current && request === latest.current;
-    clear();
-    try {
-      // A change from before leaving the page may still be on its way; read after it lands.
-      await writesSettled(goalsPath);
-      if (!current()) return;
-      const data = await requestJson<Goals>(goalsPath);
-      if (current()) setGoals(data);
-    } catch (cause) {
-      if (current()) error(cause);
-    }
-  }, [clear, error]);
-
-  useEffect(() => {
-    live.current = true;
-    void load();
-    return () => {
-      live.current = false;
-    };
-  }, [load]);
+  // A change from before leaving the page may still be on its way; read after it lands.
+  const ready = useReadAfterWrites(goalsPath);
+  const query = useApiQuery<Goals>(goalsKey, goalsPath, { enabled: ready });
+  const goals = ready ? query.data : undefined;
+  // A failed read after a delete keeps the goals on screen. Hidden while trying again, so a
+  // repeated failure is announced anew.
+  const notice: NoticeValue | undefined =
+    query.isError && !query.isFetching
+      ? { kind: 'error', text: errorText(query.error) }
+      : undefined;
+  // One read at a time: pressing again while it is on its way does not start another.
+  const load = () => void query.refetch({ cancelRefetch: false });
 
   // A save refills its form and a delete redraws its list, so the pressed button is gone by then.
   useEffect(() => {
@@ -392,11 +386,8 @@ export function GoalsSettings() {
                     item={item}
                     goal={goal}
                     today={goals.today}
-                    onSaved={(saved) => {
-                      // A read still on its way from a delete was asked before this save, so its
-                      // answer would undo it on screen.
-                      latest.current += 1;
-                      setGoals(saved);
+                    onSaved={() => {
+                      // The answer is in the cache already, over any read still on its way.
                       moveFocus(item);
                     }}
                   />
@@ -404,9 +395,13 @@ export function GoalsSettings() {
                     item={item}
                     goals={goals}
                     onRemoved={(from) => {
-                      setGoals((current) => current && withoutChange(current, item, from));
-                      // Then the server's own answer, in case anything else changed meanwhile.
-                      void load();
+                      client.setQueryData<Goals>(
+                        goalsKey,
+                        (current) => current && withoutChange(current, item, from),
+                      );
+                      // Then the server's own answer, in case anything else changed meanwhile. Each
+                      // delete reads again, and a newer read replaces an older one on its way (#202).
+                      void client.invalidateQueries({ queryKey: goalsKey });
                       moveFocus(item);
                     }}
                   />
@@ -461,54 +456,38 @@ const judgedPaths = (date: string) => {
   return [`/api/meals/${date}`, `/api/sleep/${date}`, `/api/checks/${date}`, ...week, goalsPath];
 };
 
-// A write under a path that starts with one of these, as writesSettled matches them.
+// A write under a path that starts with one of these, as useReadAfterWrites matches them.
 const judges = (date: string, path: string) =>
   judgedPaths(date).some((prefix) => path.startsWith(prefix));
 
 export function GoalsCard({ date }: { date: string }) {
-  const [day, setDay] = useState<GoalDay | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
+  const client = useQueryClient();
   // Only a read the person asked for says so. Saving each meal would otherwise have a screen reader
   // announce "Re-judging" from this card while they work in another one.
   const [asked, setAsked] = useState(false);
-  const { notice, error, clear } = useNotice();
-  const live = useRef(true);
-  // Reads can overlap once saves start them; only the latest one may show its answer.
-  const latest = useRef(0);
+  // Saves still on their way in the cards this judges, or to the goals, would be missed.
+  const ready = useReadAfterWrites(...judgedPaths(date));
+  const query = useApiQuery<GoalDay>(dayKey(date), `${goalsPath}/days/${date}`, {
+    enabled: ready,
+  });
+  const day = ready ? query.data : undefined;
+  const loading = !ready || query.isFetching;
+  // Hidden while reading again, so a repeated failure is announced anew.
+  const notice: NoticeValue | undefined =
+    query.isError && !query.isFetching
+      ? { kind: 'error', text: errorText(query.error) }
+      : undefined;
+  // A newer read replaces one still on its way, so a late answer from before a save is not shown.
+  const load = () => query.refetch();
 
-  const load = useCallback(async () => {
-    const request = ++latest.current;
-    const current = () => live.current && request === latest.current;
-    clear();
-    setLoading(true);
-    try {
-      // Saves still on their way in the cards this judges, or to the goals, would be missed.
-      await Promise.all(judgedPaths(date).map((prefix) => writesSettled(prefix)));
-      if (!current()) return;
-      const data = await requestJson<GoalDay>(`${goalsPath}/days/${date}`);
-      if (current()) setDay(data);
-    } catch (cause) {
-      if (current()) error(cause);
-    } finally {
-      if (current()) {
-        setLoading(false);
-        setAsked(false);
-      }
-    }
-  }, [clear, date, error]);
-
-  useEffect(() => {
-    live.current = true;
-    void load();
-    // A save in another card of this day, or of this week's drinks, changes what this judges.
-    const stop = onWriteSettled((path) => {
-      if (judges(date, path)) void load();
-    });
-    return () => {
-      live.current = false;
-      stop();
-    };
-  }, [date, load]);
+  // A save in another card of this day, or of this week's drinks, changes what this judges.
+  useEffect(
+    () =>
+      onWriteSettled(client, (path) => {
+        if (judges(date, path)) void client.invalidateQueries({ queryKey: dayKey(date) });
+      }),
+    [client, date],
+  );
 
   const byItem = new Map(day?.items.map((entry) => [entry.item, entry]));
   const noGoal = day ? day.items.every((entry) => entry.goal === null) : false;
@@ -577,7 +556,7 @@ export function GoalsCard({ date }: { date: string }) {
             // may have gone out before what they want to see, so pressing replaces it.
             if (loading && asked) return;
             setAsked(true);
-            void load();
+            void load().finally(() => setAsked(false));
           }}
         >
           {loading && asked && day ? <Spinner size="sm" label="Re-judging" /> : null}

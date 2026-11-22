@@ -46,3 +46,17 @@ export function putAnswer<T>(client: QueryClient, key: QueryKey, data: T) {
   void client.cancelQueries({ queryKey: key, exact: true });
   client.setQueryData<T>(key, data);
 }
+
+/**
+ * Calls `listener` with the path of every write made with `asRequest` that settles from now on, succeeded or not, so
+ * a card that adds up other cards' records can read again (#104). A failed write changes nothing, but reading again
+ * then costs one request and needs no guess about what reached the server. Returns the function that stops it.
+ */
+export function onWriteSettled(client: QueryClient, listener: (path: string) => void) {
+  return client.getMutationCache().subscribe((event) => {
+    if (event.type !== 'updated') return;
+    if (event.action.type !== 'success' && event.action.type !== 'error') return;
+    const path = pathOf(event.mutation.state.variables);
+    if (typeof path === 'string') listener(path);
+  });
+}

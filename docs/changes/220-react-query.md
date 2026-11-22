@@ -81,3 +81,15 @@ The hand-written polling hook `useHealth` in `app.tsx` (an interval, a visibilit
 ### Tests
 
 `meals.test.tsx` renders through `renderWithQuery`. The three "after leaving the day" tests and "focus follows the retry even when a read started by an add answers first" wait until the add is sent before answering it. "Coming back while an entry is being recorded" expects one read of the day instead of two: the add's answer is the day. `vitest run src/meals.test.tsx`: 66 passed.
+
+## Goals settings and the goal results card — 2026-11-22
+
+- **Settings** (`GoalsSettings`): one `useApiQuery` on `apiKey('/api/goals')` behind `useReadAfterWrites('/api/goals')`. A goal save puts the answer (all goals) with `putAnswer`, which replaces the old `latest` counter (#202). A deleted change disappears at once (`setQueryData` with `withoutChange`), then `invalidateQueries` reads the server's answer; a newer read replaces one still on its way. The error is hidden while "Try again" reads, so a repeated failure is announced anew.
+- **Goal results card** (`GoalsCard`): `useApiQuery` on `apiKey('/api/goals/days', date)`, reading only after writes to every judged path settle (`useReadAfterWrites(...judgedPaths(date))`). The `pending-writes` listener is replaced by `onWriteSettled(client, listener)` in `writes.ts`, a subscription to React Query's mutation cache that reports the path of every write that succeeds or fails; a judged path invalidates the day's verdicts. "Re-judge" is a plain `refetch()`, which replaces a quiet read still on its way, as before; only a read the person asked for shows "Re-judging".
+- All judged writers (meals, sleep, checks, habits, goals) are React Query mutations now, so nothing reads `pending-writes` on the daily page. The writes are still wrapped in `trackWrite` until the clinic and medication screens move; the last #220 PR removes the module.
+
+### Tests
+
+- `src/test/query.tsx` adds `write(path, answer)`: a write through the test's query client, as a card's `useApiMutation` with `asRequest` makes it. `goals.test.tsx` uses it instead of `trackWrite` and renders through `renderWithQuery`.
+- New: "saving in a real card of the same day judges again" renders `GoalsCard` and `SleepCard` in one client and checks that the sleep save reads the verdicts again.
+- `vitest run src/goals.test.tsx src/save-focus.test.tsx src/app.test.tsx`: all passed (24 goals tests).

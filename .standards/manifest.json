@@ -1,5 +1,5 @@
 {
-  "centralSha": "141a048a3050b3f082324d9ff60949d7656390d6",
+  "centralSha": "041ef58c426458478b30297db6a11f01e84655b9",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -504,7 +504,8 @@
         "devDependencies.tailwindcss": "4.3.3",
         "devDependencies.typescript": "5.9.3",
         "devDependencies.vite": "6.4.5",
-        "devDependencies.vitest": "5.0.3"
+        "devDependencies.vitest": "5.0.3",
+        "dependencies.@tanstack/react-query": "5.104.1"
       },
       "source": "templates/index.json"
     },
@@ -912,6 +913,16 @@
       "mode": "full",
       "sha256": "d79c53b94936cd62befd9a4cbd6304c558eaa2e6d1ba11eb8f00dfe2ba60e617",
       "source": "templates/ui/frontend/src/lib/auth-config.ts.tmpl"
+    },
+    "frontend/src/lib/query.test.tsx": {
+      "mode": "full",
+      "sha256": "7c67c3de1a1063271c9866f20bd0cbaaf479e1439d64ed733d6ac737fa4b7d53",
+      "source": "templates/query/frontend/src/lib/query.test.tsx"
+    },
+    "frontend/src/lib/query.ts": {
+      "mode": "full",
+      "sha256": "b49180e8daef5cdc5b5407f5ba28013c058e85685cdab56572cf273d66ebdeea",
+      "source": "templates/query/frontend/src/lib/query.ts"
     },
     "frontend/src/lib/theme-config.ts": {
       "mode": "full",

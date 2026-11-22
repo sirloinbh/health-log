@@ -555,5 +555,9 @@ test("one failed check of the server keeps today's coming-up card (#48)", async 
   fireEvent(document, new Event('visibilitychange', { bubbles: true }));
   expect(await screen.findByText('Cannot reach the server')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Upcoming' })).toBeInTheDocument();
-  expect(fetchMock.mock.calls.filter(([url]) => url === '/api/reminders')).toHaveLength(1);
+  // Coming back reads the list again in place; it stays on screen meanwhile.
+  expect(
+    screen.getByText('No clinic appointments or medication end dates in the next 7 days.'),
+  ).toBeInTheDocument();
+  expect(screen.queryByLabelText('Loading upcoming items')).not.toBeInTheDocument();
 });

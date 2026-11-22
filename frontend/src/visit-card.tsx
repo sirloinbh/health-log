@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
 import { Button } from './components/ui/button';
@@ -7,10 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Notice } from './components/ui/notice';
 import { SkeletonText } from './components/ui/skeleton';
 import { formatDate } from './daily-date';
-import { requestJson } from './lib/api';
-import { useNotice } from './lib/use-notice';
+import { apiKey, useApiQuery } from './lib/query';
+import { errorText, type NoticeValue } from './lib/use-notice';
 import { howText, type Medication, medicationsPagePath, medicationsPath } from './med-text';
-import { writesSettled } from './pending-writes';
 import {
   clinicText,
   procedureText,
@@ -19,43 +18,41 @@ import {
   visitsPath,
   wonText,
 } from './visit-text';
+import { useReadAfterWrites } from './writes';
 
 // The daily page gives this a key per date, so nothing here outlives the day it was loaded for.
 // Visits are written on the clinic page; this card shows the day's and links there (#39).
 export function VisitsCard({ date }: { date: string }) {
-  const [visits, setVisits] = useState<Visit[] | undefined>(undefined);
-  const [medications, setMedications] = useState<Medication[] | undefined>(undefined);
-  const { notice, error, clear } = useNotice();
   const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLDivElement>(null);
-  const live = useRef(true);
-
-  const load = useCallback(async () => {
-    clear();
-    try {
-      // A save from the clinic or medicine page may still be on its way; read after it lands (#71).
-      await Promise.all([writesSettled(`${visitsPath}/`), writesSettled(`${medicationsPath}/`)]);
-      // Left again while waiting: nothing would show the answer.
-      if (!live.current) return;
-      const [day, taken] = await Promise.all([
-        requestJson<{ visits: Visit[] }>(`${visitsPath}?date=${date}`),
-        requestJson<{ medications: Medication[] }>(`${medicationsPath}?date=${date}`),
-      ]);
-      if (!live.current) return;
-      setVisits(day.visits);
-      setMedications(taken.medications);
-    } catch (cause) {
-      if (live.current) error(cause);
+  // A save from the clinic or medicine page may still be on its way; read after it lands (#71).
+  const ready = useReadAfterWrites(visitsPath, medicationsPath);
+  // Read on every mount, as the clinic and medicine pages change these without telling this card.
+  const fresh = { enabled: ready, staleTime: 0 };
+  const day = useApiQuery<{ visits: Visit[] }>(
+    apiKey(visitsPath, date),
+    `${visitsPath}?date=${date}`,
+    fresh,
+  );
+  const taken = useApiQuery<{ medications: Medication[] }>(
+    apiKey(medicationsPath, date),
+    `${medicationsPath}?date=${date}`,
+    fresh,
+  );
+  // Both parts show together, as one read did before.
+  const both = ready && day.data && taken.data ? { day: day.data, taken: taken.data } : undefined;
+  const visits = both?.day.visits;
+  const medications = both?.taken.medications;
+  const failed = [day, taken].find((part) => part.isError && !part.isFetching);
+  const notice: NoticeValue | undefined = failed
+    ? { kind: 'error', text: errorText(failed.error) }
+    : undefined;
+  // One read of each part at a time; a part already read is not read again.
+  const load = () => {
+    for (const part of [day, taken]) {
+      if (part.isError) void part.refetch({ cancelRefetch: false });
     }
-  }, [clear, date, error]);
-
-  useEffect(() => {
-    live.current = true;
-    void load();
-    return () => {
-      live.current = false;
-    };
-  }, [load]);
+  };
 
   // The pressed button is gone by now.
   useEffect(() => {
@@ -78,7 +75,7 @@ export function VisitsCard({ date }: { date: string }) {
             variant="outline"
             className="self-start"
             onClick={() => {
-              void load();
+              load();
               // Trying again removes this button, which would drop keyboard focus to the page (#65).
               setMoveFocus((count) => count + 1);
             }}

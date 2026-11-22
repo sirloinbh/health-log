@@ -4,9 +4,8 @@ import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
 import { toast } from './components/ui/sonner';
-import { trackWrite } from './pending-writes';
 import { nextTask } from './test/answered';
-import { testQueryClient } from './test/query';
+import { renderWithQuery, testQueryClient, write } from './test/query';
 import { VisitsCard } from './visit-card';
 import type { Visit } from './visit-text';
 
@@ -350,7 +349,7 @@ test('a failed save keeps the dialog, what was typed and the focus inside it', a
 // The daily card.
 
 const renderCard = (date = '2026-03-10') =>
-  render(
+  renderWithQuery(
     <MemoryRouter>
       <VisitsCard date={date} />
     </MemoryRouter>,
@@ -405,7 +404,7 @@ test('the daily card reads only after a visit save still on its way', async () =
   let finish = () => {};
   // Set as the save settles, before the card can see it.
   let landed = false;
-  void trackWrite(
+  void write(
     '/api/visits/',
     new Promise<void>((resolve) => {
       finish = resolve;

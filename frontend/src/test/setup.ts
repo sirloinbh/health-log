@@ -5,7 +5,6 @@ import './standard-setup';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
-import { forgetPendingWrites } from '../pending-writes';
 import { forgetQueryClient } from './query';
 import { failOnUnexpectedRequests, unmockedFetch } from './requests';
 
@@ -43,7 +42,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   localStorage.clear();
-  forgetPendingWrites();
   forgetQueryClient();
   document.documentElement.className = '';
   // Pages are URLs; each test starts on the overview.

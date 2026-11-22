@@ -15,7 +15,6 @@ import { Spinner } from './components/ui/spinner';
 import { RequestError } from './lib/api';
 import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
-import { trackWrite } from './pending-writes';
 import {
   clockOf,
   dayOf,
@@ -91,11 +90,11 @@ function SleepForm({
     // A repeated failure then appears anew and is announced again (as in #98).
     clear();
     try {
-      // trackWrite until every card reads through React Query (#220).
-      const saved = await trackWrite(
-        pathOf(date),
-        save.mutateAsync({ path: pathOf(date), method: 'PUT', body: toInstants(date, bed, wake) }),
-      );
+      const saved = await save.mutateAsync({
+        path: pathOf(date),
+        method: 'PUT',
+        body: toInstants(date, bed, wake),
+      });
       onSaved(saved as SleepRecord);
     } catch (cause) {
       // Moving to another day removes this form, and the night still was not saved.
@@ -237,7 +236,7 @@ export function SleepCard({ date }: { date: string }) {
 
   const remove = async () => {
     try {
-      await trackWrite(pathOf(date), remover.mutateAsync({ path: pathOf(date), method: 'DELETE' }));
+      await remover.mutateAsync({ path: pathOf(date), method: 'DELETE' });
     } catch (cause) {
       // Already gone counts as deleted; anything else keeps the dialog open with the reason.
       if (!(cause instanceof RequestError && cause.status === 404)) {

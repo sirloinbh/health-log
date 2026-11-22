@@ -14,11 +14,11 @@ import { Input } from './components/ui/input';
 import { Label } from './components/ui/label';
 import { Notice } from './components/ui/notice';
 import { earliestDate, latestDate } from './daily-date';
-import { requestJson } from './lib/api';
+import { type ApiRequest, useApiMutation } from './lib/query';
 import { useNotice } from './lib/use-notice';
-import { trackWrite } from './pending-writes';
 import { type Draft, draftOf, type ProcedureDraft, procedureDraft, readDraft } from './visit-form';
 import { maxProcedures, type Visit, visitsPath } from './visit-text';
+import { asRequest } from './writes';
 
 /** Reads a typed value; one per field, so every input shares the same change handler shape. */
 type OnText = (event: { target: { value: string } }) => void;
@@ -277,6 +277,7 @@ export function VisitDialog({
 }) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(visit, date));
   const [saving, setSaving] = useState(false);
+  const write = useApiMutation<unknown, ApiRequest>(asRequest);
   const { notice, error, clear } = useNotice();
   const set =
     (key: DraftField): OnText =>
@@ -297,10 +298,7 @@ export function VisitDialog({
     setSaving(true);
     try {
       const path = visit ? `${visitsPath}/${visit.id}` : visitsPath;
-      await trackWrite(
-        `${visitsPath}/`,
-        requestJson<Visit>(path, { method: visit ? 'PUT' : 'POST', body }),
-      );
+      await write.mutateAsync({ path, method: visit ? 'PUT' : 'POST', body });
       onSaved();
     } catch (cause) {
       error(cause);

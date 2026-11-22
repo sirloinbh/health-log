@@ -25,7 +25,6 @@ import { spanText } from './habit-text';
 import { RequestError } from './lib/api';
 import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
-import { trackWrite } from './pending-writes';
 import { asRequest, putAnswer, useReadAfterWrites } from './writes';
 
 const pathOf = (date: string) => `/api/checks/${date}`;
@@ -82,16 +81,12 @@ function CheckForm({
     // A repeated failure then appears anew and is announced again (as in #98).
     clear();
     try {
-      // trackWrite until every card reads through React Query (#220).
       onSaved(
-        await trackWrite(
-          pathOf(date),
-          save.mutateAsync({
-            path: pathOf(date),
-            method: 'PUT',
-            body: { dietKept: form.dietKept, sleepGood: form.sleepGood, memo },
-          }),
-        ),
+        await save.mutateAsync({
+          path: pathOf(date),
+          method: 'PUT',
+          body: { dietKept: form.dietKept, sleepGood: form.sleepGood, memo },
+        }),
       );
     } catch (cause) {
       // Moving to another day removes this form, and the check still was not saved.
@@ -253,7 +248,7 @@ export function ChecksCard({ date }: { date: string }) {
 
   const remove = async () => {
     try {
-      await trackWrite(pathOf(date), remover.mutateAsync({ path: pathOf(date), method: 'DELETE' }));
+      await remover.mutateAsync({ path: pathOf(date), method: 'DELETE' });
     } catch (cause) {
       // Already gone counts as deleted; anything else keeps the dialog open with the reason.
       if (!(cause instanceof RequestError && cause.status === 404)) {

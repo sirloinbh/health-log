@@ -1,5 +1,6 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
 import { Button } from './components/ui/button';
@@ -7,10 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './com
 import { Notice } from './components/ui/notice';
 import { SkeletonText } from './components/ui/skeleton';
 import { formatDate } from './daily-date';
-import { RequestError, requestJson } from './lib/api';
-import { useNotice } from './lib/use-notice';
+import { RequestError } from './lib/api';
+import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
+import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
 import { medicationsPath } from './med-text';
-import { trackWrite, writesSettled } from './pending-writes';
 import { count as countText } from './plural';
 import {
   type Reminder,
@@ -23,6 +24,9 @@ import {
   whenText,
 } from './reminder-text';
 import { visitsPath } from './visit-text';
+import { asRequest, useReadAfterWrites } from './writes';
+
+const remindersKey = apiKey(remindersPath);
 
 /**
  * Clinic appointments and medicine end days coming up within the lead time (#48), shown on the
@@ -30,39 +34,37 @@ import { visitsPath } from './visit-text';
  * left open past midnight loads the new day's list.
  */
 export function RemindersCard() {
-  const [data, setData] = useState<Reminders | undefined>(undefined);
   const [marking, setMarking] = useState<string | null>(null);
   const { notice, status, error, clear } = useNotice();
   const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLDivElement>(null);
   const live = useRef(true);
-
-  const load = useCallback(async () => {
-    try {
-      // A day changed on the clinic or medicine page may still be on its way (#71).
-      await Promise.all([
-        writesSettled(`${visitsPath}/`),
-        writesSettled(`${medicationsPath}/`),
-        writesSettled(`${remindersPath}/`),
-      ]);
-      if (!live.current) return false;
-      const next = await requestJson<Reminders>(remindersPath);
-      if (!live.current) return false;
-      setData(next);
-      return true;
-    } catch (cause) {
-      if (live.current) error(cause);
-      return false;
-    }
-  }, [error]);
+  const client = useQueryClient();
+  const marker = useApiMutation<unknown, ApiRequest>(asRequest);
+  // A day changed on the clinic or medicine page may still be on its way (#71).
+  const ready = useReadAfterWrites(visitsPath, medicationsPath, remindersPath);
+  // Read on every mount: the card is keyed per service day, and the list changes with the day.
+  const query = useApiQuery<Reminders>(remindersKey, remindersPath, {
+    enabled: ready,
+    staleTime: 0,
+  });
+  const data = ready ? query.data : undefined;
+  // A failed read; hidden while reading again, so a repeated failure is announced anew. What a
+  // mark said comes first.
+  const loadNotice: NoticeValue | undefined =
+    query.isError && !query.isFetching
+      ? { kind: 'error', text: errorText(query.error) }
+      : undefined;
+  const shown = notice ?? loadNotice;
+  /** Resolves to whether the list could be read. */
+  const load = async () => !(await query.refetch({ cancelRefetch: false })).isError;
 
   useEffect(() => {
     live.current = true;
-    void load();
     return () => {
       live.current = false;
     };
-  }, [load]);
+  }, []);
 
   // The pressed button is gone by now.
   useEffect(() => {
@@ -78,15 +80,16 @@ export function RemindersCard() {
     clear();
     setMarking(key);
     try {
-      await trackWrite(
-        `${remindersPath}/done`,
-        requestJson<void>(`${remindersPath}/done`, {
-          method: 'POST',
-          body: { kind: item.kind, id: item.id, dueOn: item.dueOn },
-        }),
-      );
+      await marker.mutateAsync({
+        path: `${remindersPath}/done`,
+        method: 'POST',
+        body: { kind: item.kind, id: item.id, dueOn: item.dueOn },
+      });
       if (!live.current) return;
-      setData(
+      // A read still on its way left before the mark landed, and its list would bring it back.
+      void client.cancelQueries({ queryKey: remindersKey, exact: true });
+      client.setQueryData<Reminders>(
+        remindersKey,
         (current) =>
           current && {
             ...current,
@@ -129,8 +132,8 @@ export function RemindersCard() {
         ) : null}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <Notice notice={notice} />
-        {notice?.kind === 'error' && data === undefined ? (
+        <Notice notice={shown} />
+        {shown?.kind === 'error' && data === undefined ? (
           <Button
             variant="outline"
             className="self-start"
@@ -144,7 +147,7 @@ export function RemindersCard() {
             Try again
           </Button>
         ) : null}
-        {!notice && data === undefined ? (
+        {!shown && data === undefined ? (
           <div role="status" aria-busy="true" aria-label="Loading upcoming items">
             <SkeletonText lines={2} />
           </div>

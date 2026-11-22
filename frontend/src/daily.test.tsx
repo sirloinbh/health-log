@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
+import { answered } from './test/answered';
 import { findLive, getLive } from './test/live';
 
 const noSleep = () => new Response(JSON.stringify({ record: null }));
@@ -187,8 +188,8 @@ test('an app left open past midnight picks up the new today', async () => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  await screen.findByText('Sunday, March 15, 2026');
-  await act(() => Promise.resolve());
+  // Upcoming shows only on the server's today, so the page has today by now.
+  await screen.findByRole('heading', { level: 2, name: 'Upcoming' });
   expect(screen.queryByRole('link', { name: 'Today' })).not.toBeInTheDocument();
 
   health({ today: '2026-03-16' });
@@ -203,7 +204,7 @@ test('an app left open past midnight picks up the new today', async () => {
 test('returning to the tab checks today again', async () => {
   health({ today: '2026-03-15' });
   open('/daily/2026-03-15');
-  await act(() => Promise.resolve());
+  await screen.findByRole('heading', { level: 2, name: 'Upcoming' });
 
   health({ today: '2026-03-16' });
   fireEvent(document, new Event('visibilitychange', { bubbles: true }));
@@ -215,28 +216,34 @@ test('returning to the tab checks today again', async () => {
 
 test('a slow older response does not overwrite a newer today', async () => {
   const respond = (today: string) => new Response(JSON.stringify({ today }));
-  let finishFirst = (_response: Response) => {};
-  let healthCalls = 0;
+  const checks: ((response: Response) => void)[] = [];
   vi.stubGlobal(
     'fetch',
-    vi.fn((url: string) => {
-      const card = dayCard(url);
-      if (card) return Promise.resolve(card);
-      healthCalls += 1;
-      return healthCalls === 1
-        ? new Promise((resolve) => (finishFirst = resolve))
-        : Promise.resolve(respond('2026-03-16'));
-    }),
+    vi.fn((url: string) =>
+      url === '/api/health'
+        ? new Promise<Response>((resolve) => checks.push(resolve))
+        : Promise.resolve(dayCard(url) ?? respond('2026-03-16')),
+    ),
   );
   open('/daily/2026-03-16');
+  await waitFor(() => expect(checks).toHaveLength(1));
+  // Returning to the tab while a check is out starts none beside it: one check at a time (#220),
+  // so an older answer cannot land after a newer one.
   fireEvent(document, new Event('visibilitychange', { bubbles: true }));
-  await act(() => Promise.resolve());
+  const older = respond('2026-03-15');
+  checks[0](older);
+  await answered(older);
+  expect(checks).toHaveLength(1);
+  expect(await screen.findByRole('link', { name: 'Today' })).toHaveAttribute(
+    'href',
+    '/daily/2026-03-15',
+  );
 
-  await act(async () => {
-    finishFirst(respond('2026-03-15'));
-    await Promise.resolve();
-  });
-  await act(() => Promise.resolve());
+  // The next check brings the newer today, and it is shown: Upcoming shows only on today.
+  fireEvent(document, new Event('visibilitychange', { bubbles: true }));
+  await waitFor(() => expect(checks).toHaveLength(2));
+  checks[1](respond('2026-03-16'));
+  expect(await screen.findByRole('heading', { level: 2, name: 'Upcoming' })).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'Today' })).not.toBeInTheDocument();
 });
 
@@ -342,20 +349,19 @@ test('a slow reply for the day just left does not fill in the new day', async ()
 
   replies.get('/api/sleep/2026-03-16')?.(noSleep());
   await screen.findByLabelText('Bedtime');
-  replies.get('/api/sleep/2026-03-15')?.(
-    new Response(
-      JSON.stringify({
-        record: {
-          date: '2026-03-15',
-          bedAt: '2026-03-14T14:30:00.000Z',
-          wakeAt: '2026-03-14T22:00:00.000Z',
-          durationMinutes: 450,
-          source: 'manual',
-        },
-      }),
-    ),
+  const late = new Response(
+    JSON.stringify({
+      record: {
+        date: '2026-03-15',
+        bedAt: '2026-03-14T14:30:00.000Z',
+        wakeAt: '2026-03-14T22:00:00.000Z',
+        durationMinutes: 450,
+        source: 'manual',
+      },
+    }),
   );
-  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  replies.get('/api/sleep/2026-03-15')?.(late);
+  await answered(late);
   expect(screen.queryByText('7 h 30 min')).not.toBeInTheDocument();
   expect(screen.getByLabelText('Bedtime')).toHaveValue('');
 });
@@ -389,10 +395,11 @@ test('a slow meal reply for the day just left does not fill in the new day', asy
     calories: 300,
   };
   const body = (await noMeals().json()) as { totals: object; junk: object };
-  replies.get('/api/meals/2026-03-15')?.(
-    new Response(JSON.stringify({ entries: [eaten], totals: body.totals, junk: body.junk })),
+  const late = new Response(
+    JSON.stringify({ entries: [eaten], totals: body.totals, junk: body.junk }),
   );
-  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  replies.get('/api/meals/2026-03-15')?.(late);
+  await answered(late);
   expect(screen.queryByText('어제의 김밥')).not.toBeInTheDocument();
 });
 

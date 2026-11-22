@@ -3,6 +3,7 @@ import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
 import { toast } from './components/ui/sonner';
+import { answered } from './test/answered';
 import { findLive, getLive, queryLive } from './test/live';
 
 const food = {
@@ -105,8 +106,9 @@ test('a slow older search does not overwrite a newer one', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   await screen.findByRole('heading', { level: 2, name: '치즈버거' });
 
-  finishOld(json({ foods: [] }));
-  await new Promise((resolve) => setTimeout(resolve));
+  const old = json({ foods: [] });
+  finishOld(old);
+  await answered(old);
   expect(screen.getByRole('heading', { level: 2, name: '치즈버거' })).toBeInTheDocument();
 });
 
@@ -372,9 +374,10 @@ test('after the last page, focus moved elsewhere while waiting stays there', asy
   fireEvent.click(more);
   const search = screen.getByLabelText('Search foods');
   search.focus();
-  finish(json({ foods: [{ ...food, id: 2, name: '피자' }], nextOffset: null }));
-  await screen.findByRole('heading', { level: 2, name: '피자' });
-  await new Promise((resolve) => setTimeout(resolve));
+  const last = json({ foods: [{ ...food, id: 2, name: '피자' }], nextOffset: null });
+  finish(last);
+  await answered(last);
+  expect(screen.getByRole('heading', { level: 2, name: '피자' })).toBeInTheDocument();
   expect(search).toHaveFocus();
 });
 
@@ -492,7 +495,8 @@ test('a slow reload that drops the saved food still leaves focus on the page tit
 });
 
 test('once focus has moved on from the edit button, a later redraw leaves it alone', async () => {
-  serve((url) => json({ foods: url === '/api/foods?q=' ? [food] : [] }));
+  const searched = json({ foods: [] });
+  serve((url) => (url === '/api/foods?q=' ? json({ foods: [food] }) : searched));
   open();
   const { opener, dialog } = await openWith('Edit 치즈버거');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
@@ -505,8 +509,8 @@ test('once focus has moved on from the edit button, a later redraw leaves it alo
   fireEvent.change(field, { target: { value: '없는음식' } });
   field.blur();
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-  expect(await screen.findByText('No foods')).toBeInTheDocument();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await answered(searched);
+  expect(screen.getByText('No foods')).toBeInTheDocument();
   expect(screen.getByRole('heading', { level: 1, name: 'Foods' })).not.toHaveFocus();
 });
 

@@ -149,6 +149,22 @@ test('the totals say when an unknown value leaves them incomplete', async () => 
   expect(screen.getByText(/so these totals leave them out/)).toHaveTextContent('Sodium 1 food');
 });
 
+// #271: an entry's calories are rounded and grouped like the day's totals.
+test('an entry shows its calories rounded and grouped, like the totals', async () => {
+  server({ body: { ...oneEntry, entries: [{ ...entry, calories: 1234.5 }] } });
+  renderWithQuery(<MealCard date={date} />);
+  expect(await screen.findByText(/· 1,235kcal$/)).toBeInTheDocument();
+  expect(screen.queryByText(/1234\.5/)).not.toBeInTheDocument();
+});
+
+test('a searched food shows its calories per serving rounded, too', async () => {
+  server({ body: emptyDay }, { body: { foods: [{ ...food, calories: 412.5 }] } });
+  renderWithQuery(<MealCard date={date} />);
+  await screen.findByLabelText('Food name');
+  await searchFood();
+  expect(screen.getByText(/^Serving 120g · 413kcal$/)).toBeInTheDocument();
+});
+
 test('complete totals carry no such note, and a day with no value says so', async () => {
   server({ body: emptyDay });
   renderWithQuery(<MealCard date={date} />);

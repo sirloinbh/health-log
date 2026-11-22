@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { AddEntry } from './add-entry';
+import { calorieText } from './calorie-text';
 import { fullName } from './combo-text';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
@@ -135,7 +136,7 @@ function EntryRow({
         </span>
         <span className="text-caption text-muted-foreground">
           {count(entry.servings, 'serving')}
-          {serving} · {entry.calories === null ? 'No calorie value' : `${entry.calories}kcal`}
+          {serving} · {calorieText(entry.calories)}
         </span>
       </div>
       <ConfirmDialog

@@ -1,6 +1,6 @@
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 import { apiKey, createQueryClient } from '../lib/query';
 
@@ -41,4 +41,12 @@ export function write(path: string, answer: Promise<unknown> = Promise.resolve({
     .getMutationCache()
     .build(current, { mutationFn: () => answer })
     .execute({ path, method: 'PUT' });
+}
+
+/** A `renderHook` wrapper: the hook runs inside the test's query client. */
+export function queryWrapper() {
+  const client = (current ??= testQueryClient());
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  };
 }

@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { foodsUrl, resultText, useFoodSearch } from './food-search';
+import { queryWrapper } from './test/query';
 
 type Food = { id: number; name: string };
 
@@ -17,7 +18,9 @@ const serve = (reply: (url: string) => Response | Promise<Response>) => {
 
 const setup = (keepOnError = false) => {
   const onError = vi.fn();
-  const view = renderHook(() => useFoodSearch<Food>({ onError, keepOnError }));
+  const view = renderHook(() => useFoodSearch<Food>({ onError, keepOnError }), {
+    wrapper: queryWrapper(),
+  });
   return { onError, view };
 };
 
@@ -169,14 +172,16 @@ test('a next page runs its own callbacks, not the search ones, and says when it 
         : json({ foods: foodsFrom(1, 100), nextOffset: 100 }),
   );
   const calls: string[] = [];
-  const view = renderHook(() =>
-    useFoodSearch<Food>({
-      onStart: () => calls.push('start'),
-      onSuccess: () => calls.push('success'),
-      onError: () => calls.push('error'),
-      onMoreStart: () => calls.push('more-start'),
-      onMoreError: () => calls.push('more-error'),
-    }),
+  const view = renderHook(
+    () =>
+      useFoodSearch<Food>({
+        onStart: () => calls.push('start'),
+        onSuccess: () => calls.push('success'),
+        onError: () => calls.push('error'),
+        onMoreStart: () => calls.push('more-start'),
+        onMoreError: () => calls.push('more-error'),
+      }),
+    { wrapper: queryWrapper() },
   );
   await act(() => view.result.current.search(''));
   let last: boolean | undefined;
@@ -212,4 +217,28 @@ test('a second press while a page loads does not ask for it again', async () => 
   await act(async () => {
     expect(await first).toBe(true);
   });
+});
+
+test('a newer search stops the older request instead of only ignoring its answer (#282)', async () => {
+  const signals: AbortSignal[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string, init?: RequestInit) => {
+      signals.push(init!.signal!);
+      return url.includes('q=new')
+        ? Promise.resolve(json({ foods: [{ id: 900, name: 'New food' }], nextOffset: null }))
+        : new Promise<Response>(() => {});
+    }),
+  );
+  const { view } = setup();
+  let old: Promise<void> = Promise.resolve();
+  act(() => {
+    old = view.result.current.search('old');
+  });
+  await act(() => view.result.current.search('new'));
+  expect(signals[0].aborted).toBe(true);
+  expect(signals[1].aborted).toBe(false);
+  expect(view.result.current.foods).toEqual([{ id: 900, name: 'New food' }]);
+  expect(view.result.current.searching).toBe(false);
+  await act(() => old);
 });

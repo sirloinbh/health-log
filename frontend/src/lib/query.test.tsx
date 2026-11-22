@@ -1,6 +1,6 @@
 // Managed file. Edit it in sirloinbh/project-standards templates/query/frontend/src/lib/
 import { focusManager, QueryClientProvider } from '@tanstack/react-query';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, expect, test, vi } from 'vitest';
 
@@ -16,9 +16,17 @@ function setup(fetch: ReturnType<typeof vi.fn>, config = {}) {
   return { client, wrapper };
 }
 
-afterEach(() => {
-  vi.unstubAllGlobals();
+// Each test ends without a late request (#980). The rendered hooks unmount first: the app's own cleanup runs after
+// this hook, and a stale query still mounted would read again when focus resets below. A fetch that fails the test
+// stands in while focus resets, so a query left mounted shows up here instead of as a stray request in the app.
+afterEach(async () => {
+  cleanup();
+  const late = vi.fn(() => Promise.reject(new Error('request after the test ended')));
+  vi.stubGlobal('fetch', late);
   focusManager.setFocused(undefined);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  vi.unstubAllGlobals();
+  expect(late).not.toHaveBeenCalled();
 });
 
 test('shouldRetry allows one more try for network, timeout and 5xx failures only', () => {

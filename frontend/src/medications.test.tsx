@@ -7,6 +7,7 @@ import { toast } from './components/ui/sonner';
 import type { Medication, MedicationLists } from './med-text';
 import { trackWrite } from './pending-writes';
 import { findLive, getLive, queryLive } from './test/live';
+import { testQueryClient } from './test/query';
 import { VisitsCard } from './visit-card';
 import type { Visit } from './visit-text';
 
@@ -71,9 +72,10 @@ const serve = (medications: Handler) => {
   return fetchMock;
 };
 
+// The page already knows the server's date, so pressing a button at once fills it in.
 const open = (path = '/medications') => {
   window.history.replaceState(null, '', path);
-  render(<App />);
+  render(<App queryClient={testQueryClient({ today: '2026-03-15' })} />);
 };
 
 const writes = (fetchMock: ReturnType<typeof serve>) =>
@@ -136,6 +138,12 @@ test('a new medicine starts today, can be linked to a visit, and is sent as type
 });
 
 // #204: a new medicine never opens on a blank start date.
+// For the tests about waiting for the server's date: the app asks for it as it does when it opens.
+const openAsking = (path = '/medications') => {
+  window.history.replaceState(null, '', path);
+  render(<App />);
+};
+
 test('adding waits for the server’s today, then starts on it', async () => {
   let answerToday: (response: Response) => void = () => undefined;
   vi.stubGlobal(
@@ -150,7 +158,7 @@ test('adding waits for the server’s today, then starts on it', async () => {
             }),
     ),
   );
-  open();
+  openAsking();
   const add = await screen.findByRole('button', { name: 'Add medication' });
   await screen.findByRole('region', { name: 'Taking now 1' });
   expect(add).toHaveAttribute('aria-disabled', 'true');
@@ -185,7 +193,7 @@ test('when the server cannot say today, a new medicine starts on this device’s
         ),
       ),
     );
-    open();
+    openAsking();
     const add = await screen.findByRole('button', { name: 'Add medication' });
     await waitFor(() => expect(add).not.toHaveAttribute('aria-disabled'));
     fireEvent.click(add);

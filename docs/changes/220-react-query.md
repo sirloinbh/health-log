@@ -24,3 +24,30 @@ This repository has no `lockfiles:sync` script: the npm workspaces share the one
 - The existing `app.test.tsx` screen tests render `App` through the provider.
 - `TEST_DATABASE_URL= npm run check`: passed (format, lint, contract, typecheck, tests, skills, build). Frontend vitest: 67 files, 651 passed, 3 skipped. The backend DB integration tests skip locally because `health_test` is not set; CI runs them.
 - Local `knip`: no finding for `@tanstack/react-query`. It lists `e2e/smoke.spec.ts` and `@axe-core/playwright`, which this branch does not touch.
+
+## Shared client and the server health check — 2026-11-22
+
+The standards sync brought `frontend/src/lib/query.ts` (sync PR #257, after sirloinbh/project-standards#977 turned on the `query` feature). `App` now creates its client with the shared `createQueryClient()`.
+
+The hand-written polling hook `useHealth` in `app.tsx` (an interval, a visibility listener, and a request counter so an older answer could not overwrite a newer one) is replaced by `useServerHealth`, one `useQuery` on `apiKey('/api/health')` read through `requestJson` with the query's abort signal:
+
+- `refetchInterval: 60_000` keeps "today" current in an app left open past midnight, as before.
+- `refetchOnWindowFocus: 'always'` reads again when the page becomes visible, as the visibility listener did.
+- `retry: false`: an outage shows at once, and the next check is at most a minute away.
+- React Query runs one read at a time per key, which replaces the request counter.
+- A 200 answer without `today` still shows "Cannot check the server status". A network failure shows requestJson's "Cannot reach the server", the same text as before.
+- Differences found in review round 1: React Query does not run the one-minute refetch while the tab is hidden (`refetchIntervalInBackground` is off), and reads again the moment the tab becomes visible, so the date is current whenever it can be seen. An answer that is not JSON (a proxy's HTML page) now shows requestJson's "The server sent an unreadable answer" or "Could not process the request" instead of "Cannot reach the server". `/api/health` needs no sign-in, so requestJson's 401 handler never fires for it.
+
+### Tests
+
+`app.test.tsx` adds three behavior tests: the date changes after a minute (fake timers advance 60 s, two health reads), the page becoming visible reads again, and an answer without a date is an alert.
+
+### Test adjustments
+
+- React Query hands a result to the screen one task later than the old `fetch().then(setState)`, so tests that pressed "Add" on the visits and medications pages the moment the button appeared now beat the server's date and got a blank date field. A person cannot press that fast; the waiting itself is covered by the pages' own "waits for today" tests (and #204 / PR #254 for medications). `App` takes an optional `queryClient`, and the new `src/test/query.ts` `testQueryClient({ today })` gives these tests a client that already knows the date. The two visits tests about waiting for the date keep the real read (`openAsking`).
+- `daily.test.tsx`, `report.test.tsx`: the `visibilitychange` event is created with `bubbles: true`, as browsers fire it. React Query listens on the window, which a non-bubbling event at the document never reaches.
+
+### Verification (health check PR)
+
+- `TEST_DATABASE_URL= npm run check` after merging `origin/main` (with #204): passed. Frontend vitest 72 files, 734 passed, 3 skipped. The backend DB integration tests skip locally (no `health_test`); CI runs them.
+- CI on the first push failed after #204 (PR #254) merged: its two new medication tests check the wait for the server's date, so they now render through `openAsking` (the real read), like the visits ones. Fixed after merging `origin/main`.

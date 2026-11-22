@@ -88,6 +88,27 @@ test('other goals take whole numbers in their own ranges', () => {
   expect(toTarget('sober_days', 8)).toMatch('1 to 7 days');
 });
 
+// #279: the goal row reads calories like the meal entries and totals do.
+test('calories on the goal row are rounded and grouped; protein keeps its decimals', () => {
+  const day = (total: number, missing = 0) => ({
+    item: 'calories' as const,
+    goal: { from: '2026-11-01', target: 2000 },
+    status: 'met' as const,
+    actual: { entries: 3, total, missing },
+  });
+  expect(actualText(day(1234.5))).toBe('1,235kcal');
+  expect(actualText(day(1234.25, 1))).toBe('1,234kcal (excludes 1 food with unknown values)');
+  expect(targetText('calories', 2000)).toBe('Up to 2,000kcal a day');
+  expect(
+    actualText({
+      item: 'protein',
+      goal: null,
+      status: null,
+      actual: { entries: 2, total: 1234.5, missing: 0 },
+    }),
+  ).toBe('1,234.5g');
+});
+
 test('the actual side says when nothing was recorded, and what was left out', () => {
   const empty = { entries: 0, total: null, missing: 0 };
   expect(actualText({ item: 'calories', goal: null, status: null, actual: empty })).toBe(

@@ -80,6 +80,19 @@ const renderCard = () =>
     </MemoryRouter>,
   );
 
+// #279: the goal row reads "1,235kcal" like the meal card, not "1,234.5kcal".
+test('a fractional calorie day is rounded and grouped on the goal row', async () => {
+  server({
+    body: dayOf({
+      calories: { goal: { from, target: 2000 }, status: 'met', actual: meals(3, 1234.5) },
+    }),
+  });
+  renderCard();
+  const diet = await screen.findByRole('region', { name: 'Diet' });
+  expect(within(diet).getByText('1,235kcal · Goal: Up to 2,000kcal a day')).toBeInTheDocument();
+  expect(within(diet).queryByText(/1,234\.5/)).not.toBeInTheDocument();
+});
+
 test('each goal shows its verdict beside the day check of the same kind', async () => {
   const fetchMock = server({
     body: dayOf(

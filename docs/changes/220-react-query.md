@@ -49,5 +49,5 @@ The hand-written polling hook `useHealth` in `app.tsx` (an interval, a visibilit
 
 ### Verification (health check PR)
 
-- `TEST_DATABASE_URL= npm run check` after merging `origin/main`: passed. Frontend vitest 72 files, 732 passed, 3 skipped. The backend DB integration tests skip locally (no `health_test`); CI runs them.
+- `TEST_DATABASE_URL= npm run check` after merging `origin/main` (with #204): passed. Frontend vitest 72 files, 734 passed, 3 skipped. The backend DB integration tests skip locally (no `health_test`); CI runs them.
 - CI on the first push failed after #204 (PR #254) merged: its two new medication tests check the wait for the server's date, so they now render through `openAsking` (the real read), like the visits ones. Fixed after merging `origin/main`.

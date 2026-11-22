@@ -55,3 +55,15 @@ The screens that #220 left reading with their own load functions and stale-answe
 ### Review round 1 fix (combos PR)
 
 - The meal cards (#220), the combos page and the recent foods now use the 30-second cache instead of reading on every mount, so a food edited on the foods page could show its old name for up to half a minute there. A food save now invalidates every `/api/meals/<date>` key (by path, as each day is its own key), `apiKey('/api/combos')` and `apiKey('/api/foods/recent')`, so they read again the next time they are shown. New test "a saved food makes the meal cards, combos and recent foods read again next time (#282)"; foods tests: 43 passed.
+
+## Food search — 2026-11-22
+
+- **`useFoodSearch`** (`food-search.ts`, used by the meal card's add form, the combo dialog and the foods page) keeps its API and callbacks. Each page is read with `client.fetchQuery` under this hook's own key (`apiKey('/api/foods', 'search', useId(), words, offset)`, read fresh). A new search cancels this hook's reads still on their way, so their requests are aborted, not only ignored. The cancelled read rejects with React Query's `CancelledError`, which ends nothing: the newer search owns the list and the waiting state. The `latest` counter is gone.
+- With this, no screen reads through a hand-written load function with a stale-answer counter. What still calls `requestJson` directly is inside query functions, writes, and the combo picker's single read when asked for.
+
+### Tests
+
+- `food-search.test.ts` runs the hook in the test's query client (`queryWrapper()` in `test/query.tsx`). New: "a newer search stops the older request instead of only ignoring its answer (#282)".
+- `vitest run` on food-search (12), foods, combos and meals tests: all passed.
+- Full `npm run check` with `TEST_DATABASE_URL` empty, under the shared check lock: passed. Frontend: 76 files, 784 passed, 3 skipped.
+- No browser check: the markup is unchanged, and the screen tests cover the behavior.

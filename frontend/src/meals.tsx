@@ -1,5 +1,6 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { AddEntry } from './add-entry';
 import { fullName } from './combo-text';
@@ -13,11 +14,13 @@ import { JunkBadge } from './food-choices';
 import { spanText } from './habit-text';
 import { type JunkPeriod, junkText } from './junk-text';
 import { RequestError, requestJson } from './lib/api';
-import { errorText, useNotice } from './lib/use-notice';
+import { apiKey, type ApiRequest, useApiQuery } from './lib/query';
+import { errorText, type NoticeValue } from './lib/use-notice';
 import { type MealKey, meals } from './meal-entry';
-import { trackWrite, writesSettled } from './pending-writes';
+import { trackWrite } from './pending-writes';
 import { count } from './plural';
 import { createRetryKeys } from './retry-key';
+import { putAnswer, useReadAfterWrites } from './writes';
 
 const nutrients = [
   { key: 'calories', label: 'Calories', unit: 'kcal' },
@@ -49,6 +52,23 @@ type MealDay = {
 };
 
 const pathOf = (date: string) => `/api/meals/${date}`;
+const keyOf = (date: string) => apiKey(pathOf(date));
+
+type MealRequest = ApiRequest & { headers?: Record<string, string> };
+
+/**
+ * A change to one day's meals. Every change answers with the whole day, which goes into the cache even after the card
+ * is gone. It is useApiMutation with request headers, which the shared one does not pass yet (project-standards#979; the add sends an
+ * Idempotency-Key, #196); the variables are the request, as `asRequest` makes them, so useReadAfterWrites sees it.
+ */
+function useMealWrite(date: string) {
+  const client = useQueryClient();
+  return useMutation<MealDay, RequestError, MealRequest>({
+    mutationFn: ({ path, method = 'POST', body, headers }) =>
+      requestJson<MealDay>(path, { method, body, headers }),
+    onSuccess: (data) => putAnswer(client, keyOf(date), data),
+  });
+}
 
 function Totals({ totals }: { totals: MealDay['totals'] }) {
   const incomplete = nutrients.filter(({ key }) => totals[key].missing > 0);
@@ -141,43 +161,31 @@ function EntryRow({
 
 // The daily page gives this a key per date, so nothing here outlives the day it was loaded for.
 export function MealCard({ date }: { date: string }) {
-  const [day, setDay] = useState<MealDay | null>(null);
-  const [adding, setAdding] = useState(false);
-  const { notice, error, clear } = useNotice();
   const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLDivElement>(null);
   const live = useRef(true);
-  // Counts changes the server has answered, so a read started before one cannot undo it on screen.
-  const changes = useRef(0);
   // An add sent again after no answer reuses its key, so the server does not record it twice (#196).
   const [retryKeys] = useState(() => createRetryKeys());
-
-  /** Resolves to whether the day could be read. */
-  const load = useCallback(async () => {
-    clear();
-    const seen = changes.current;
-    const stillCurrent = () => live.current && seen === changes.current;
-    try {
-      // A meal added before leaving this day may still be on its way; read after it lands.
-      await writesSettled(pathOf(date));
-      // Left again while waiting: nothing would show the answer.
-      if (!live.current) return false;
-      const data = await requestJson<MealDay>(pathOf(date));
-      if (stillCurrent()) setDay(data);
-      return true;
-    } catch (cause) {
-      if (stillCurrent()) error(cause);
-      return false;
-    }
-  }, [clear, date, error]);
+  const write = useMealWrite(date);
+  const adding = write.isPending && write.variables?.method === 'POST';
+  // A meal added before leaving this day may still be on its way; read after it lands.
+  const ready = useReadAfterWrites(pathOf(date));
+  const query = useApiQuery<MealDay>(keyOf(date), pathOf(date), { enabled: ready });
+  const day = ready ? query.data : undefined;
+  // A failed read keeps the day on screen if there is one, and can be tried again. A change's answer replaces the
+  // failure, as it is the newer day.
+  const notice: NoticeValue | undefined = query.isError
+    ? { kind: 'error', text: errorText(query.error) }
+    : undefined;
+  /** One read at a time: pressing again while it is on its way does not start another. Resolves to whether it read. */
+  const load = async () => !(await query.refetch({ cancelRefetch: false })).isError;
 
   useEffect(() => {
     live.current = true;
-    void load();
     return () => {
       live.current = false;
     };
-  }, [load]);
+  }, []);
 
   // The delete button is gone by now, and a closing dialog restores focus on a timer first.
   useEffect(() => {
@@ -188,27 +196,24 @@ export function MealCard({ date }: { date: string }) {
 
   /** Resolves to whether it was added; a failure rejects so the form can show it next to its fields. */
   const add = async (body: object, path = '') => {
-    setAdding(true);
     const target = `${pathOf(date)}${path}`;
     const key = retryKeys.keyFor(JSON.stringify([target, body]));
     try {
-      const data = await trackWrite(
+      // trackWrite until every card reads through React Query (#220).
+      await trackWrite(
         pathOf(date),
-        requestJson<MealDay>(target, {
+        write.mutateAsync({
+          path: target,
           method: 'POST',
           body,
           headers: { 'Idempotency-Key': key },
         }),
       );
       retryKeys.answered();
-      changes.current += 1;
       if (!live.current) {
         toast.success(`Meal recorded for ${date}`);
         return false;
       }
-      setDay(data);
-      // What this answers replaces whatever an earlier failed read left on screen.
-      clear();
       toast.success('Recorded');
       return true;
     } catch (cause) {
@@ -221,19 +226,15 @@ export function MealCard({ date }: { date: string }) {
         `Could not ${unanswered ? 'confirm that the meal was recorded' : 'record the meal'} for ${date}: ${errorText(cause)}`,
       );
       return false;
-    } finally {
-      if (live.current) setAdding(false);
     }
   };
 
   const remove = async (id: number) => {
     try {
-      const data = await trackWrite(
+      await trackWrite(
         pathOf(date),
-        requestJson<MealDay>(`${pathOf(date)}/entries/${id}`, { method: 'DELETE' }),
+        write.mutateAsync({ path: `${pathOf(date)}/entries/${id}`, method: 'DELETE' }),
       );
-      changes.current += 1;
-      if (live.current) setDay(data);
     } catch (cause) {
       if (!(cause instanceof RequestError && cause.status === 404)) {
         // Keeps the dialog open with the reason.

@@ -70,3 +70,14 @@ The hand-written polling hook `useHealth` in `app.tsx` (an interval, a visibilit
 - `vitest run` on sleep, checks, habits, body, save-focus, daily and goals tests: all passed.
 - `origin/main` merged (with #205 body client checks; its new body tests render through `renderWithQuery`). `TEST_DATABASE_URL= npm run check`: passed. Frontend vitest 73 files, 760 passed, 3 skipped (761 after the review fix); the backend DB integration tests skip locally (no `health_test`); CI runs them. The build's existing chunk-size warning stays; the main chunk grew from 660.8 kB to 679.7 kB (gzip 199.9 to 206.0 kB), mostly React Query.
 - Review round 1 noted that a refetch on returning to the tab, still on its way while a save lands, could put the older answer over the saved record. Fixed in the same PR: writes put their answer with `putAnswer` (`writes.ts`), which cancels reads of that key on their way and then sets the data. React Query restores the pre-read state at once on cancel, and a manual set becomes that state, so the answer cannot be lost. New test in `sleep.test.tsx`: "a read from returning to the tab that is still on its way cannot undo a save" (fails with the cancel removed, passes with it).
+
+## Meals card — 2026-11-22
+
+`MealCard` loads with `useApiQuery` on `apiKey('/api/meals/<date>')` behind `useReadAfterWrites`, and adds and deletes through one mutation whose answer (the whole day) goes in with `putAnswer`. The `changes` counter that kept a read started before a change from undoing it on screen is replaced by `putAnswer`'s cancel-then-set; the `adding` state is the mutation's pending POST; the `live` ref stays only for the toasts after leaving the day.
+
+- The add sends an `Idempotency-Key` header (#196), and the shared `useApiMutation` passes no headers, so the card uses React Query's `useMutation` directly (`useMealWrite`) with the same `{ path, method, body }` variables plus `headers`. The central follow-up is sirloinbh/project-standards#979 (let `useApiMutation` pass request headers).
+- A failed read keeps the day on screen with the error and "Try again", as before; the next change's answer clears the error because it is the newer day.
+
+### Tests
+
+`meals.test.tsx` renders through `renderWithQuery`. The three "after leaving the day" tests and "focus follows the retry even when a read started by an add answers first" wait until the add is sent before answering it. "Coming back while an entry is being recorded" expects one read of the day instead of two: the add's answer is the day. `vitest run src/meals.test.tsx`: 66 passed.

@@ -114,8 +114,8 @@ function EntryRow({
           {entry.isJunk ? <JunkBadge /> : null}
         </span>
         <span className="text-caption text-muted-foreground">
-          {entry.servings} servings{serving} ·{' '}
-          {entry.calories === null ? 'No calorie value' : `${entry.calories}kcal`}
+          {count(entry.servings, 'serving')}
+          {serving} · {entry.calories === null ? 'No calorie value' : `${entry.calories}kcal`}
         </span>
       </div>
       <ConfirmDialog

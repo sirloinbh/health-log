@@ -66,10 +66,15 @@ const reads = (fetchMock: ReturnType<typeof serve>) =>
 
 test('words for the day and what each reminder is about', () => {
   expect([0, 1, 2, 7].map(whenText)).toEqual(['Today', 'Tomorrow', 'In 2 days', 'In 7 days']);
+  // #207: a date already past is not "In -1 days".
+  expect([-1, -3].map(whenText)).toEqual(['1 day ago', '3 days ago']);
   expect(reminderTitle(appointment)).toBe('가상피부과 · 피부과 appointment');
   expect(reminderTitle(later)).toBe('가상내과 appointment');
   expect(reminderTitle(lastPill)).toBe('가상정 ends');
   expect(reminderDetail(appointment)).toBe('Last procedures: 가상레이저, 가상주사');
+  expect(reminderDetail({ ...appointment, procedures: ['가상레이저'] })).toBe(
+    'Last procedure: 가상레이저',
+  );
   expect(reminderDetail(later)).toBeNull();
   expect(reminderDetail(lastPill)).toBeNull();
 });

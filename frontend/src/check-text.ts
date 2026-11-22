@@ -36,8 +36,5 @@ export const answerText = (value: boolean | null, yes: string, no: string) =>
 export const rateText = ({ days, yes }: Rate, word: string) =>
   days === 0 ? 'No records' : `${word} on ${yes}/${days} days (${Math.round((yes / days) * 100)}%)`;
 
-/**
- * Characters as the server and the database count them: an emoji is one, not the two UTF-16 units
- * that `string.length` and an input's `maxLength` count (#92).
- */
-export const charCount = (value: string) => [...value].length;
+// Characters as the server and the database count them, from the shared contract (#215).
+export { charCount } from '../../shared/contract';

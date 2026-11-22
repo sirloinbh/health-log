@@ -2,8 +2,8 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
+import { maxAmount, periodsOf } from './contract.js';
 import { isRealDate, parseDate } from './dates.js';
-import { periodsOf } from './day-records.js';
 import { type Db, inTransaction, snapshotRead } from './db.js';
 import { hasTwoDecimalsAtMost, optionalNumber } from './numbers.js';
 import { HttpError, parseId } from './standard/http.js';
@@ -53,7 +53,7 @@ export const entryInput = z
       calories: z
         .number({ error: 'Calories must be a number' })
         .min(0, 'Calories must be 0 or more')
-        .max(99_999, 'Calories are too large')
+        .max(maxAmount, 'Calories are too large')
         .refine(hasTwoDecimalsAtMost, 'Calories can have at most 2 decimal places')
         .optional(),
       // Typed-in food only: a stored food brings its own mark.

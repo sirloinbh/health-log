@@ -6,6 +6,9 @@
 // values are read only inside the table: from the amount they are given for (or the table's
 // heading) up to the first line that is not part of a table or the next basis on a later line.
 
+// The server's limit for any stored amount comes from the shared contract (#215).
+import { maxAmount } from '../../shared/contract';
+
 type LabelNutrient = 'calories' | 'carbs' | 'protein' | 'fat' | 'sugars' | 'sodium';
 type Size = { size: number; unit: 'g' | 'ml' };
 
@@ -22,9 +25,6 @@ export type LabelReading = {
   /** Numbers found but larger than a food can hold, left empty. */
   outOfRange: LabelNutrient[];
 };
-
-// The server's limit for any stored amount (backend/src/foods.ts).
-const maxAmount = 99_999;
 
 // Regular expression pieces used in more than one pattern below.
 /** An amount such as 30 or 2.5, not captured. */

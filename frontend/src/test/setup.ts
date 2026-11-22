@@ -3,7 +3,7 @@
 import './standard-setup';
 
 import { cleanup } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import { afterEach } from 'vitest';
 
 import { forgetQueryClient } from './query';
 import { failOnUnexpectedRequests, unmockedFetch } from './requests';
@@ -16,36 +16,14 @@ globalThis.fetch = unmockedFetch;
 // is still mounted, so the query reads /api/tags again after the test. Ignored until sirloinbh/project-standards#980 fixes it.
 const knownStrayRequests = ['unmocked fetch: GET /api/tags'];
 
-// jsdom has no matchMedia; the toaster and drawer read it to follow the system theme.
-window.matchMedia ??= (query: string) =>
-  ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-  }) as MediaQueryList;
-
-// jsdom has no ResizeObserver; a checkbox inside a form measures its hidden input with it.
-globalThis.ResizeObserver ??= class {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-};
-
+// What only health-log needs. The shared setup above brings the jsdom stand-ins and the resets every app needs
+// (cleanup, timers, stubbed globals, mocks, localStorage, the theme class and the URL).
 afterEach(() => {
+  // Vitest runs afterEach hooks in reverse order, so this one runs before the shared one. The cards must unmount
+  // before their query cache is forgotten, and before the requests are checked; the shared
+  // cleanup() that follows then finds nothing left to do.
   cleanup();
-  vi.useRealTimers();
-  vi.unstubAllGlobals();
-  vi.restoreAllMocks();
-  localStorage.clear();
   forgetQueryClient();
-  document.documentElement.className = '';
-  // Pages are URLs; each test starts on the overview.
-  window.history.replaceState(null, '', '/');
   // Last, so the resets above still run when it fails the test.
   failOnUnexpectedRequests(knownStrayRequests);
 });

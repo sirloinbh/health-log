@@ -40,6 +40,10 @@ Tests:
 - The migration was renamed from `020_meal_request_keys.sql` to `021_meal_request_keys.sql`, because the open PR for #199 (#263) adds `020_foods_serving_units.sql`. The runner stops when a new file sorts before an applied one, so this PR merges only after #263, and 020 is applied before 021.
 - Verified after the rename: on the temporary `health_test`, the old `020_meal_request_keys.sql` record was removed and `npm run db:migrate` applied `021_meal_request_keys.sql` again without error (`CREATE ... IF NOT EXISTS`). `meal-retry.integration` and `migrations.integration` tests: 13 passed. The file content did not change, so the full check above still holds.
 
+## Change — 2026-11-22 (main merged in)
+
+- #263 merged `020_foods_serving_units.sql` into main, and `origin/main` was merged into this branch. On the temporary `health_test` (where 021 had been applied first), the 021 record was removed and `npm run db:migrate` applied `020_foods_serving_units.sql, 021_meal_request_keys.sql` in order. The meal-retry, request-keys, migrations, foods, meals and openapi tests: 46 passed.
+
 ## Verification
 
 - `npm run db:migrate` on a temporary PostgreSQL 17 `health_test`: applied the file (then numbered 020).

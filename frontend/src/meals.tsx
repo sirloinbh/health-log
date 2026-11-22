@@ -17,6 +17,7 @@ import { errorText, useNotice } from './lib/use-notice';
 import { type MealKey, meals } from './meal-entry';
 import { trackWrite, writesSettled } from './pending-writes';
 import { count } from './plural';
+import { createRetryKeys } from './retry-key';
 
 const nutrients = [
   { key: 'calories', label: 'Calories', unit: 'kcal' },
@@ -148,6 +149,8 @@ export function MealCard({ date }: { date: string }) {
   const live = useRef(true);
   // Counts changes the server has answered, so a read started before one cannot undo it on screen.
   const changes = useRef(0);
+  // An add sent again after no answer reuses its key, so the server does not record it twice (#196).
+  const [retryKeys] = useState(() => createRetryKeys());
 
   /** Resolves to whether the day could be read. */
   const load = useCallback(async () => {
@@ -186,11 +189,18 @@ export function MealCard({ date }: { date: string }) {
   /** Resolves to whether it was added; a failure rejects so the form can show it next to its fields. */
   const add = async (body: object, path = '') => {
     setAdding(true);
+    const target = `${pathOf(date)}${path}`;
+    const key = retryKeys.keyFor(JSON.stringify([target, body]));
     try {
       const data = await trackWrite(
         pathOf(date),
-        requestJson<MealDay>(`${pathOf(date)}${path}`, { method: 'POST', body }),
+        requestJson<MealDay>(target, {
+          method: 'POST',
+          body,
+          headers: { 'Idempotency-Key': key },
+        }),
       );
+      retryKeys.answered();
       changes.current += 1;
       if (!live.current) {
         toast.success(`Meal recorded for ${date}`);
@@ -202,9 +212,11 @@ export function MealCard({ date }: { date: string }) {
       toast.success('Recorded');
       return true;
     } catch (cause) {
-      if (live.current) throw cause;
-      // Moving to another day removes the form. With no answer, the server may still have saved it.
+      // With no answer the server may still have saved it: the same request again keeps its key.
       const unanswered = cause instanceof RequestError && cause.status === undefined;
+      if (!unanswered) retryKeys.answered();
+      if (live.current) throw cause;
+      // Moving to another day removes the form.
       toast.error(
         `Could not ${unanswered ? 'confirm that the meal was recorded' : 'record the meal'} for ${date}: ${errorText(cause)}`,
       );

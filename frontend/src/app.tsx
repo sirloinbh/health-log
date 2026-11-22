@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { type QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import {
   CalendarDays,
   Layers,
@@ -8,7 +8,7 @@ import {
   Stethoscope,
   Utensils,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 
 import { CombosPage } from './combos';
@@ -20,6 +20,8 @@ import { FoodsPage } from './foods';
 import { goalSettingsPath } from './goal-text';
 import { GoalsSettings } from './goals';
 import { type Health, healthText } from './health';
+import { requestJson } from './lib/api';
+import { apiKey, createQueryClient } from './lib/query';
 import { medicationsPagePath } from './med-text';
 import { MedicationsPage } from './medications';
 import { ReportPage } from './report';
@@ -52,39 +54,25 @@ const nav: NavItem[] = [
 // An app left open past midnight must not keep yesterday as "today".
 const healthRefreshMs = 60_000;
 
-function useHealth() {
-  const [health, setHealth] = useState<Health>({ state: 'loading' });
-  useEffect(() => {
-    // A slow older response must not overwrite a newer one.
-    let latest = 0;
-    const check = () => {
-      const request = ++latest;
-      const report = (next: Health) => {
-        if (request === latest) setHealth(next);
-      };
-      fetch('/api/health')
-        .then(async (response) => {
-          const data = (await response.json()) as { today?: string; error?: string };
-          report(
-            response.ok && data.today
-              ? { state: 'ok', today: data.today }
-              : { state: 'error', message: data.error ?? 'Cannot check the server status' },
-          );
-        })
-        .catch(() => report({ state: 'error', message: 'Cannot reach the server' }));
-    };
-    const checkWhenVisible = () => {
-      if (document.visibilityState === 'visible') check();
-    };
-    check();
-    const timer = setInterval(check, healthRefreshMs);
-    document.addEventListener('visibilitychange', checkWhenVisible);
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener('visibilitychange', checkWhenVisible);
-    };
-  }, []);
-  return health;
+/**
+ * The server's state and date, read again every minute and whenever the page becomes visible again. React Query keeps
+ * one read at a time, so a slow older answer cannot overwrite a newer one.
+ */
+function useServerHealth(): Health {
+  const query = useQuery<string, Error>({
+    queryKey: apiKey('/api/health'),
+    queryFn: async ({ signal }) => {
+      const data = await requestJson<{ today?: string }>('/api/health', { signal });
+      if (!data.today) throw new Error('Cannot check the server status');
+      return data.today;
+    },
+    refetchInterval: healthRefreshMs,
+    refetchOnWindowFocus: 'always',
+    // The next check is a minute away at most, and an outage should show at once.
+    retry: false,
+  });
+  if (query.isError) return { state: 'error', message: query.error.message };
+  return query.data === undefined ? { state: 'loading' } : { state: 'ok', today: query.data };
 }
 
 function Page({
@@ -123,9 +111,10 @@ function Page({
   );
 }
 
-export function App() {
-  // One cache per mounted app; the shared createQueryClient() replaces it once lib/query.ts syncs (#220).
-  const [queryClient] = useState(() => new QueryClient());
+/** `queryClient` is for tests that start with data already loaded; the app makes its own. */
+export function App({ queryClient: given }: { queryClient?: QueryClient } = {}) {
+  // One cache per mounted app, with the shared defaults (ADR-0027).
+  const [queryClient] = useState(() => given ?? createQueryClient());
   return (
     <QueryClientProvider client={queryClient}>
       <Routed />
@@ -134,7 +123,7 @@ export function App() {
 }
 
 function Routed() {
-  const health = useHealth();
+  const health = useServerHealth();
   // Pages that start a record on today: undefined while asking, null when the server cannot say.
   const pageToday =
     health.state === 'ok' ? health.today : health.state === 'loading' ? undefined : null;

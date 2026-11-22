@@ -6,6 +6,7 @@ import { maxAmount, periodsOf } from './contract.js';
 import { isRealDate, parseDate } from './dates.js';
 import { type Db, inTransaction, snapshotRead } from './db.js';
 import { hasTwoDecimalsAtMost, optionalNumber } from './numbers.js';
+import { fingerprintOf, oncePerKey, requestKeyOf } from './request-keys.js';
 import { HttpError, parseId } from './standard/http.js';
 import { charCount } from './text.js';
 
@@ -187,30 +188,34 @@ export function mealsRouter(pool: Pool) {
 
   // Each change answers with the whole day, so the screen needs no second request. A change and the
   // answer about it succeed together in one transaction. Otherwise a saved entry could be reported
-  // as failed, and trying again would count the food twice.
+  // as failed, and trying again would count the food twice. The three adding routes also take an
+  // Idempotency-Key (#196): a retry whose answer was lost gets the first answer, not a second copy.
   router.post('/:date', async (req, res) => {
     const date = parseDate(req.params.date);
     const entry = entryInput.parse(req.body);
-    const answer = await inTransaction(pool, async (client) => {
-      if (entry.foodId !== undefined) {
-        const { rowCount } = await client.query(
-          `INSERT INTO meal_entries (entry_date, meal, servings, food_id, name, brand, serving_size,
+    const key = requestKeyOf(req);
+    const answer = await inTransaction(pool, (client) =>
+      oncePerKey(client, key, fingerprintOf(req, entry), async () => {
+        if (entry.foodId !== undefined) {
+          const { rowCount } = await client.query(
+            `INSERT INTO meal_entries (entry_date, meal, servings, food_id, name, brand, serving_size,
              serving_unit, calories, carbs, protein, fat, sugars, sodium, is_junk)
            SELECT $1, $2, $3, id, name, brand, serving_size, serving_unit, calories, carbs, protein,
              fat, sugars, sodium, is_junk
            FROM foods WHERE id = $4`,
-          [date, entry.meal, entry.servings, entry.foodId],
-        );
-        if (!rowCount) throw new HttpError(404, 'Food not found');
-      } else {
-        await client.query(
-          `INSERT INTO meal_entries (entry_date, meal, servings, name, calories, is_junk)
+            [date, entry.meal, entry.servings, entry.foodId],
+          );
+          if (!rowCount) throw new HttpError(404, 'Food not found');
+        } else {
+          await client.query(
+            `INSERT INTO meal_entries (entry_date, meal, servings, name, calories, is_junk)
            VALUES ($1, $2, $3, $4, $5, $6)`,
-          [date, entry.meal, entry.servings, entry.name, entry.calories, entry.isJunk ?? false],
-        );
-      }
-      return mealsOfDay(client, date);
-    });
+            [date, entry.meal, entry.servings, entry.name, entry.calories, entry.isJunk ?? false],
+          );
+        }
+        return mealsOfDay(client, date);
+      }),
+    );
     res.status(201).json(answer);
   });
 
@@ -219,27 +224,31 @@ export function mealsRouter(pool: Pool) {
     const date = parseDate(req.params.date);
     const comboId = parseId(req.params.id, 'combo');
     const { meal } = comboUse.parse(req.body);
-    const answer = await inTransaction(pool, async (client) => {
-      const { rowCount } = await client.query(
-        `INSERT INTO meal_entries (entry_date, meal, servings, food_id, name, brand, serving_size,
+    const key = requestKeyOf(req);
+    const answer = await inTransaction(pool, (client) =>
+      oncePerKey(client, key, fingerprintOf(req, { meal }), async () => {
+        const { rowCount } = await client.query(
+          `INSERT INTO meal_entries (entry_date, meal, servings, food_id, name, brand, serving_size,
            serving_unit, calories, carbs, protein, fat, sugars, sodium, is_junk)
          SELECT $1, $2, i.servings, f.id, f.name, f.brand, f.serving_size, f.serving_unit,
            f.calories, f.carbs, f.protein, f.fat, f.sugars, f.sodium, f.is_junk
          FROM meal_combo_items i JOIN foods f ON f.id = i.food_id
          WHERE i.combo_id = $3
          ORDER BY i.position`,
-        [date, meal, comboId],
-      );
-      if (!rowCount) {
-        const { rowCount: found } = await client.query('SELECT 1 FROM meal_combos WHERE id = $1', [
-          comboId,
-        ]);
-        throw found
-          ? new HttpError(400, 'The combo has no foods')
-          : new HttpError(404, 'Combo not found');
-      }
-      return mealsOfDay(client, date);
-    });
+          [date, meal, comboId],
+        );
+        if (!rowCount) {
+          const { rowCount: found } = await client.query(
+            'SELECT 1 FROM meal_combos WHERE id = $1',
+            [comboId],
+          );
+          throw found
+            ? new HttpError(400, 'The combo has no foods')
+            : new HttpError(404, 'Combo not found');
+        }
+        return mealsOfDay(client, date);
+      }),
+    );
     res.status(201).json(answer);
   });
 
@@ -249,20 +258,23 @@ export function mealsRouter(pool: Pool) {
     const date = parseDate(req.params.date);
     const { from, meal } = mealCopy.parse(req.body);
     if (from === date) throw new HttpError(400, 'Choose a different date');
-    const answer = await inTransaction(pool, async (client) => {
-      const { rowCount } = await client.query(
-        `INSERT INTO meal_entries (entry_date, meal, servings, food_id, name, brand, serving_size,
+    const key = requestKeyOf(req);
+    const answer = await inTransaction(pool, (client) =>
+      oncePerKey(client, key, fingerprintOf(req, { from, meal }), async () => {
+        const { rowCount } = await client.query(
+          `INSERT INTO meal_entries (entry_date, meal, servings, food_id, name, brand, serving_size,
            serving_unit, calories, carbs, protein, fat, sugars, sodium, is_junk)
          SELECT $1, meal, servings, food_id, name, brand, serving_size, serving_unit, calories,
            carbs, protein, fat, sugars, sodium, is_junk
          FROM meal_entries
          WHERE entry_date = $2 AND meal = $3
          ORDER BY id`,
-        [date, from, meal],
-      );
-      if (!rowCount) throw new HttpError(404, 'There are no records to copy');
-      return mealsOfDay(client, date);
-    });
+          [date, from, meal],
+        );
+        if (!rowCount) throw new HttpError(404, 'There are no records to copy');
+        return mealsOfDay(client, date);
+      }),
+    );
     res.status(201).json(answer);
   });
 

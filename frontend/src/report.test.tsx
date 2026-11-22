@@ -708,3 +708,32 @@ test('going back to a period just shown brings it back at once, without asking a
   expect(document.querySelector('[aria-busy="true"]')).toBeNull();
   expect(reportCalls(fetchMock)).toHaveLength(2);
 });
+
+test('a period cached a while ago is shown dimmed while it is read again (#282 review)', async () => {
+  const month = reportOf({
+    period: 'month',
+    current: { ...reportOf().current, from: '2026-11-01', to: '2026-11-30' },
+  });
+  let finishWeek: () => void = () => {};
+  let weeks = 0;
+  serve((url) =>
+    url.includes('period=month')
+      ? json(month)
+      : ++weeks === 1
+        ? json(reportOf())
+        : new Promise<Response>((resolve) => (finishWeek = () => resolve(json(reportOf())))),
+  );
+  renderApp();
+  await screen.findByText('Nov 2 – Nov 8');
+  fireEvent.click(screen.getByRole('button', { name: 'Monthly' }));
+  await screen.findByText('Nov 1 – Nov 30');
+  // Half a minute later the week in the cache is no longer fresh.
+  const now = Date.now();
+  vi.spyOn(Date, 'now').mockReturnValue(now + 31_000);
+  fireEvent.click(screen.getByRole('button', { name: 'Weekly' }));
+  await waitFor(() => expect(weeks).toBe(2));
+  expect(screen.getByText('Nov 2 – Nov 8')).toBeInTheDocument();
+  expect(stat('Average sleep').closest('[aria-busy="true"]')).not.toBeNull();
+  finishWeek();
+  await waitFor(() => expect(document.querySelector('[aria-busy="true"]')).toBeNull());
+});

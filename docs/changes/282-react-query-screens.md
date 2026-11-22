@@ -17,3 +17,7 @@ The screens that #220 left reading with their own load functions and stale-answe
 - `vitest run` on report, report-focus and app tests: all passed (27 report tests).
 - The full `npm run check` was not run locally: another lane held the shared check lock. Instead: `prettier --check` on the changed files, `eslint --max-warnings 0`, frontend `tsc --noEmit`, and `vitest run` on report, report-focus, app, reminders and daily tests (87 passed). CI runs the full check.
 - No browser check: the markup is unchanged, and the screen tests cover the behavior.
+
+### Review round 1 fix (report PR)
+
+- Going back to a period cached more than 30 seconds ago showed its older numbers undimmed while it was read again; the old page dimmed every load the person started. The report is now also dimmed while a read the person started (a move, "This week", or a retry) is on its way. A quiet read on returning to the tab still does not dim it. New test "a period cached a while ago is shown dimmed while it is read again" fails without the fix and passes with it (28 report tests pass).

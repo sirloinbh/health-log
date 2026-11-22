@@ -263,7 +263,6 @@ export function ReportPage({ health }: { health: Health }) {
     enabled: date !== null,
     placeholderData: keepPreviousData,
   });
-  const loading = query.isPlaceholderData;
   // A failed read; hidden while reading again, so a repeated failure is announced anew.
   const notice: NoticeValue | undefined =
     query.isError && !query.isFetching
@@ -274,6 +273,9 @@ export function ReportPage({ health }: { health: Health }) {
   // While a retry is on its way its button stays, so keyboard focus is not dropped to the page;
   // once the report is back, focus moves to the period it shows (#128).
   const retrying = focus.running === 'retry';
+  // Dimmed while the period shown is not the one asked for, or while a read the person started is on
+  // its way (a period cached a while ago is read again). A quiet read on returning to the tab is not.
+  const loading = query.isPlaceholderData || (query.isFetching && focus.running !== 'none');
   const span = useRef<HTMLParagraphElement>(null);
   const retryButton = useRef<HTMLButtonElement>(null);
 

@@ -26,8 +26,17 @@ export type LabelReading = {
 // The server's limit for any stored amount (backend/src/foods.ts).
 const maxAmount = 99_999;
 
-const number = String.raw`(\d+(?:\.\d+)?)`;
+// Regular expression pieces used in more than one pattern below.
+/** An amount such as 30 or 2.5, not captured. */
+const amount = String.raw`\d+(?:\.\d+)?`;
+/** An amount, captured. */
+const number = `(${amount})`;
+/** The unit of a size, captured. */
 const unit = String.raw`(g|ml)`;
+/** Words that start the energy row. */
+const energyWords = '열량|에너지|칼로리';
+/** Not a price after a basis: "100g당 2211원", "100g당 가격". */
+const notPrice = String.raw`(?!\s*(?:가격|${amount}\s*원))`;
 
 // Hangul before a name means another nutrient: 트랜스지방 (trans fat) and 포화지방 (saturated fat) are not 지방 (fat), nor are they
 // when written with a space.
@@ -44,7 +53,7 @@ const nutrientWords = nutrientNames.map(({ name }) => name).join('|');
  * Full-width digits and units such as ㎉, ㎎, ㎖ become plain text. "1,250" loses its comma, while
  * "2,5g" and "0,125g", written with a decimal comma, become 2.5 and 0.125.
  */
-const normalize = (text: string) =>
+export const normalize = (text: string) =>
   text
     .normalize('NFKC')
     .toLowerCase()
@@ -74,7 +83,7 @@ const sizeOf = (size: string, unitText: string): Size | null => {
 
 // Inside a table an energy value or a nutrient comes soon after the basis.
 const tableFollows = new RegExp(
-  String.raw`^[^\n]{0,15}(?:\n[^\n]{0,15})?(?:\d+(?:\.\d+)?\s*kcal|열량|에너지|${nutrientWords})`,
+  String.raw`^[^\n]{0,15}(?:\n[^\n]{0,15})?(?:${amount}\s*kcal|열량|에너지|${nutrientWords})`,
 );
 
 type Candidate = {
@@ -86,12 +95,11 @@ type Candidate = {
 };
 
 /** Every place that names the amount the values are for, in order. */
-function basisCandidates(text: string, total: Size | null): Candidate[] {
+export function basisCandidates(text: string, total: Size | null): Candidate[] {
   const found: Candidate[] = [];
-  // "100g당", "1봉지(45g)당", "100g당열량", but not 당류 or 당알코올, and not a price
-  // ("100g당 2211원", "100g당 가격").
+  // "100g당", "1봉지(45g)당", "100g당열량", but not 당류 or 당알코올, and not a price.
   const per = new RegExp(
-    String.raw`${number}\s*${unit}\s*\)?\s*당(?:(?=열량|에너지|칼로리|${nutrientWords})|(?![가-힣]))(?!\s*(?:가격|\d+(?:\.\d+)?\s*원))`,
+    String.raw`${number}\s*${unit}\s*\)?\s*당(?:(?=${energyWords}|${nutrientWords})|(?![가-힣]))${notPrice}`,
     'g',
   );
   for (const match of text.matchAll(per)) {
@@ -133,7 +141,7 @@ function basisCandidates(text: string, total: Size | null): Candidate[] {
 // A line that belongs to a nutrition table: a nutrient, energy, a percentage, the footer, a size,
 // or a value alone, as when a table is copied one cell per line ("나트륨\n300mg").
 const tableLine = new RegExp(
-  String.raw`열량|에너지|칼로리|kcal|kj|${nutrientWords}|당알코올|콜레스테롤|식이섬유|기준치|영양|내용량|제공량|섭취|\d\s*%|\d\s*(?:g|mg|ml)\s*\)?\s*당|^[\s|]*\d+(?:\.\d+)?\s*(?:mg|g|ml|kcal)\b`,
+  String.raw`${energyWords}|kcal|kj|${nutrientWords}|당알코올|콜레스테롤|식이섬유|기준치|영양|내용량|제공량|섭취|\d\s*%|\d\s*(?:g|mg|ml)\s*\)?\s*당|^[\s|]*${amount}\s*(?:mg|g|ml|kcal)\b`,
 );
 
 /**
@@ -226,7 +234,7 @@ const headGap =
  * separators between them. Text in between ("1개(30g) 총 내용량 60g 100g당") means one long line,
  * not a row of columns, so `followed` stands alone.
  */
-function headRow(text: string, followed: Candidate, candidates: Candidate[]) {
+export function headRow(text: string, followed: Candidate, candidates: Candidate[]) {
   const row = [followed];
   const sorted = [...candidates].sort((a, b) => a.index - b.index);
   const at = sorted.indexOf(followed);
@@ -273,7 +281,7 @@ function namesInOwnCell(lines: string[], heads: number) {
  * "당류 | | 5g" (an empty first cell) keeps only "당류", so the second column's value is never read
  * as the first's. "열량 900kcal | 300kcal" and "열량 | 900kcal | 300kcal" both keep 900kcal.
  */
-function firstColumn(line: string, heads: number, ownCell: boolean) {
+export function firstColumn(line: string, heads: number, ownCell: boolean) {
   if (!line.includes('|')) return line;
   const cells = rowCells(line);
   if (cells.length === 1) return cells[0];
@@ -295,28 +303,56 @@ const shareHead = /^(?:1일\s*)?영양\s*성분\s*기준치(?:에\s*대한\s*비
 const shareHeadAfter =
   /^[ ]*\|[ ]*(?:1일[ ]*)?영양[ ]*성분[ ]*기준치(?:에[ ]*대한[ ]*비율)?(?:[ ]*\(%\))?[ ]*/;
 
-export function readNutritionLabel(pasted: string): LabelReading {
-  const text = normalize(pasted);
+// The first cell of a head line that names the rows, not a column of values: "구분", "영양성분 (단위)".
+const nameHead =
+  /^(?:구분|항목|내용|영양\s*(?:성분|정보|소)(?:\s*명)?|성분(?:\s*명)?)?(?:\s*\(\s*단위\s*\))?$/;
+
+// Where a row's values start on a head line: what is before it is the head itself.
+const valueStart = new RegExp(String.raw`${energyWords}|\d\s*kcal|${nutrientWords}`);
+
+// A size in running text. It is a basis when marked "당" or "기준" (not a price), and the package
+// when "총 …" comes before it ("총 내용량 300g", "총 2회 제공량(60g)").
+const sizeMention = new RegExp(
+  String.raw`(?<package>총[^\n\d]{0,10}(?:\d+\s*회[^\n\d]{0,8})?)?(?<![\d.])${number}\s*${unit}(?![a-z])(\s*[\])]?\s*(?:당(?![가-힣])|기준)${notPrice})?`,
+  'g',
+);
+
+type Match = RegExpExecArray;
+
+/** Where the line holding `index` starts. */
+const lineStart = (text: string, index: number) => text.lastIndexOf('\n', index - 1) + 1;
+
+/**
+ * The table's heading and the package size. A shop's line above the heading may give the whole
+ * bundle ("총 내용량 500g (25g x 20봉)"), so a size from the heading on comes first.
+ */
+export function findTotals(text: string) {
   // The table's heading, not the footer's "1일 영양성분 기준치".
   const header = /(?<!1일\s*)영양\s*(?:정보|성분)(?!\s*기준)/.exec(text);
   const totals = [
     ...text.matchAll(new RegExp(String.raw`총\s*내용량\s*[:：]?\s*${number}\s*${unit}`, 'g')),
   ];
-  // A shop's line above the heading may give the whole bundle ("총 내용량 500g (25g x 20봉)").
   const tableTotals = header ? totals.filter((match) => match.index >= header.index) : totals;
-  const firstTotal = tableTotals[0] ?? totals[0];
-  const total = firstTotal ? sizeOf(firstTotal[1], firstTotal[2]) : null;
-  // The package size a "총 내용량당" head stands for: the nearest one in the table.
-  const nearestTotal = (index: number) =>
-    [...tableTotals].sort((a, b) => Math.abs(a.index - index) - Math.abs(b.index - index))[0];
+  const first = tableTotals[0] ?? totals[0];
+  return { header, total: first ? sizeOf(first[1], first[2]) : null, tableTotals };
+}
 
+/** The package size a "총 내용량당" head stands for: the nearest one in the table. */
+function nearestTotal(tableTotals: Match[], index: number): Match | undefined {
+  return [...tableTotals].sort((a, b) => Math.abs(a.index - index) - Math.abs(b.index - index))[0];
+}
+
+/**
+ * The head the values are read under. `all` has every basis in the text, `candidates` only those
+ * from the heading on: with a heading, nothing above it is the table, not a title ("닭가슴살 100g당
+ * 단백질 23g") nor a shop line ("무료배송 100g당 최저가").
+ */
+function chooseBasis(text: string, header: Match | null, tableTotals: Match[]) {
   const all = basisCandidates(text, null).map((candidate) => {
     if (candidate.kind !== 'total') return candidate;
-    const near = nearestTotal(candidate.index);
+    const near = nearestTotal(tableTotals, candidate.index);
     return { ...candidate, basis: near ? sizeOf(near[1], near[2]) : null };
   });
-  // With a heading, nothing above it is the table: not a title ("닭가슴살 100g당 단백질 23g"), nor
-  // a shop line ("무료배송 100g당 최저가") when the table itself names no basis.
   const candidates = header ? all.filter((candidate) => candidate.index >= header.index) : all;
   // The table's basis is the first one that values follow. A basis named but unreadable
   // ("1회 제공량당" with no size) is still the basis, so the package is not assumed instead.
@@ -329,139 +365,162 @@ export function readNutritionLabel(pasted: string): LabelReading {
   // A row of column heads ("총 내용량당 | 100g당"): values are read from the first column, so the
   // basis is that column's, whichever head the values seemed to follow (#120).
   const row = followed ? headRow(text, followed, candidates) : [];
-  const chosen = row[0] ?? null;
+  const chosen: Candidate | null = row[0] ?? null;
+  return { all, candidates, row, chosen };
+}
 
-  // The 2021 layout puts the package and its energy above the "총 내용량당" head:
-  // "총 내용량 30g / 130kcal / 총 내용량당 / 나트륨 …". That line belongs to the table too.
-  const near = chosen?.kind === 'total' ? nearestTotal(chosen.index) : undefined;
+/**
+ * Where the table lies. The 2021 layout puts the package and its energy above the "총 내용량당"
+ * head ("총 내용량 30g / 130kcal / 총 내용량당 / 나트륨 …"): that line belongs to the table too.
+ */
+function chosenTableRange(
+  text: string,
+  chosen: Candidate | null,
+  header: Match | null,
+  all: Candidate[],
+  tableTotals: Match[],
+) {
+  if (!chosen) return tableRange(text, header ? header.index : null, all, null);
+  const near = chosen.kind === 'total' ? nearestTotal(tableTotals, chosen.index) : undefined;
   const packageLine = near && near.index < chosen.index ? near.index : null;
-  const range = tableRange(
-    text,
-    packageLine ?? (chosen ? chosen.index : header ? header.index : null),
-    all,
-    chosen ? chosen.index : null,
+  return tableRange(text, packageLine ?? chosen.index, all, chosen.index);
+}
+
+/**
+ * Heads on two lines one above the other ("100g당\n1회 제공량(30g)당") with cells copied one per
+ * line cannot be told apart, so no basis is claimed for them.
+ */
+export function stackedHeads(text: string, chosen: Candidate, candidates: Candidate[]) {
+  const chosenLine = lineStart(text, chosen.index);
+  const lineAbove = lineStart(text, chosenLine - 1);
+  const previousLine = text.slice(lineAbove, chosenLine);
+  return candidates.some(
+    (candidate) =>
+      candidate.kind !== 'serving' &&
+      lineStart(text, candidate.index) < chosenLine &&
+      lineStart(text, candidate.index) === lineAbove &&
+      headGap.test(
+        previousLine.replace(text.slice(candidate.index, candidate.end), '').replace(/\n/g, ''),
+      ),
   );
+}
 
-  // Heads on two lines one above the other ("100g당\n1회 제공량(30g)당") with cells copied one per
-  // line cannot be told apart, so no basis is claimed for them.
-  const lineStart = (index: number) => text.lastIndexOf('\n', index - 1) + 1;
-  const previousLine = chosen
-    ? text.slice(lineStart(lineStart(chosen.index) - 1), lineStart(chosen.index))
-    : '';
-  const stackedHeads =
-    chosen !== null &&
-    candidates.some(
-      (candidate) =>
-        candidate.kind !== 'serving' &&
-        lineStart(candidate.index) < lineStart(chosen.index) &&
-        lineStart(candidate.index) === lineStart(lineStart(chosen.index) - 1) &&
-        headGap.test(
-          previousLine.replace(text.slice(candidate.index, candidate.end), '').replace(/\n/g, ''),
-        ),
-    );
-
-  // A head line with bars: its first cell may name the rows ("구분 | 100g당 | …"); the values read
-  // are the next cell's. When the chosen head sits in a later cell, the first value column has a
-  // head this reader did not recognise ("총 내용량 500ml | 100ml당", "1병 | 100ml당"), so the basis
-  // of the values read is unknown (#120).
-  const headLine = chosen
-    ? text.slice(lineStart(chosen.index), text.indexOf('\n', chosen.index) + 1 || text.length)
-    : '';
+/**
+ * The cells of the chosen head's line, when it has bars. Its first cell may name the rows ("구분 |
+ * 100g당 | …"); the values read are the next cell's. When the chosen head sits in a later cell, the
+ * first value column has a head this reader did not recognise ("총 내용량 500ml | 100ml당", "1병 |
+ * 100ml당"), so the basis of the values read is unknown (#120).
+ */
+export function headColumns(text: string, chosen: Candidate | null) {
+  if (!chosen) return { headCells: [], nameCell: false, headInLaterColumn: false };
+  const start = lineStart(text, chosen.index);
+  const headLine = text.slice(start, text.indexOf('\n', chosen.index) + 1 || text.length);
   const headCells = headLine.includes('|') ? headLine.split('|').map((cell) => cell.trim()) : [];
-  const nameCell =
-    headCells.length > 0 &&
-    /^(?:구분|항목|내용|영양\s*(?:성분|정보|소)(?:\s*명)?|성분(?:\s*명)?)?(?:\s*\(\s*단위\s*\))?$/.test(
-      headCells[0],
+  const nameCell = headCells.length > 0 && nameHead.test(headCells[0]);
+  const chosenCell = text.slice(start, chosen.index).split('|').length - 1;
+  return {
+    headCells,
+    nameCell,
+    headInLaterColumn: headCells.length > 0 && chosenCell > (nameCell ? 1 : 0),
+  };
+}
+
+/** The sizes written between `from` and `to`, each marked as a basis or as the package. */
+export function sizesIn(text: string, from: number, to: number) {
+  return [...text.slice(from, to).matchAll(sizeMention)].map((match) => ({
+    size: `${twoDecimals(Number(match[2]))}${match[3]}`,
+    unit: match[3],
+    isBasis: !!match[4],
+    isPackage: !!match.groups?.package,
+  }));
+}
+
+/**
+ * "1회 제공량 30g (100g당)", "1회 제공량 약 30g (100g 기준)": the serving is named, yet the same head
+ * says the values are for 100g. One column of values cannot be for both, so no basis is claimed.
+ * So for a heading "영양정보 (100g당)" above the serving, and for "1회 제공량 30g (총 내용량당)".
+ * "100g당 (1회 제공량 30g)" is fine: only the 100g has 당, and the bracket notes the serving size.
+ * A head row with bars is a row of columns, read from the first (#122).
+ */
+export function hasBracketedBasis(
+  text: string,
+  chosen: Candidate,
+  candidates: Candidate[],
+  header: Match | null,
+) {
+  if (chosen.kind !== 'serving') return false;
+  const chosenSize = chosen.basis ? `${chosen.basis.size}${chosen.basis.unit}` : null;
+  const lineEnd = text.indexOf('\n', chosen.index);
+  const head = text
+    .slice(chosen.index, lineEnd === -1 ? text.length : lineEnd)
+    .split(valueStart)[0];
+  if (head.includes('|')) return false;
+  const headEnd = chosen.index + head.length;
+  // Another size on the serving's head: "30g (100g당)", "30g (100g 중)", "약 30g (100g)". A weight
+  // beside a volume ("200ml (206g)"), "1개(30g)", the serving's own "30g당" and the package
+  // ("총 내용량 300g") name no other basis.
+  const otherSize = sizesIn(text, chosen.index, headEnd).some(
+    ({ size, unit: sizeUnit, isBasis, isPackage }) =>
+      !isPackage &&
+      size !== chosenSize &&
+      (isBasis || (chosenSize !== null && sizeUnit === chosen.basis?.unit)),
+  );
+  const packageHead = candidates.some(
+    (candidate) =>
+      candidate.kind === 'total' &&
+      candidate.index > chosen.index &&
+      candidate.index < headEnd &&
+      (candidate.basis === null || `${candidate.basis.size}${candidate.basis.unit}` !== chosenSize),
+  );
+  const headingBasis =
+    header !== null &&
+    lineStart(text, header.index) < lineStart(text, chosen.index) &&
+    sizesIn(text, header.index, text.indexOf('\n', header.index)).some(
+      ({ size, isBasis }) => isBasis && size !== chosenSize,
     );
-  const chosenCell = chosen
-    ? text.slice(lineStart(chosen.index), chosen.index).split('|').length - 1
-    : 0;
-  const headInLaterColumn = headCells.length > 0 && chosenCell > (nameCell ? 1 : 0);
+  return otherSize || packageHead || headingBasis;
+}
 
-  // "1회 제공량 30g (100g당)", "1회 제공량 약 30g (100g 기준)": the serving is named, yet the same
-  // head says the values are for 100g. One column of values cannot be for both, so no basis is
-  // claimed. So for a heading "영양정보 (100g당)" above the serving. "100g당 (1회 제공량 30g)" is
-  // fine: only the 100g has 당, and the bracket notes the serving size. A head row with bars is a
-  // row of columns, read from the first (#122).
-  // Sizes in a stretch of text. A basis is marked "당" or "기준", but not a price ("100g당 2211원").
-  // The package ("총 내용량 300g", "총 2회 제공량(60g)") is a note, not a basis.
-  const sizesIn = (from: number, to: number) =>
-    [
-      ...text
-        .slice(from, to)
-        .matchAll(
-          /(?<package>총[^\n\d]{0,10}(?:\d+\s*회[^\n\d]{0,8})?)?(?<![\d.])(\d+(?:\.\d+)?)\s*(g|ml)(?![a-z])(\s*[\])]?\s*(?:당(?![가-힣])|기준)(?!\s*(?:가격|\d+(?:\.\d+)?\s*원)))?/g,
-        ),
-    ].map((match) => ({
-      size: `${twoDecimals(Number(match[2]))}${match[3]}`,
-      unit: match[3],
-      isBasis: !!match[4],
-      isPackage: !!match.groups?.package,
-    }));
-  const chosenSize = chosen?.basis ? `${chosen.basis.size}${chosen.basis.unit}` : null;
-  // Another size on the serving's head: "30g (100g당)", "30g (100g 중)", "약 30g (100g)". Values
-  // for 30g or 100g cannot be told apart. A weight beside a volume ("200ml (206g)"), "1개(30g)",
-  // the serving's own "30g당" and the package ("총 내용량 300g") name no other basis.
-  const otherSize = (from: number, to: number) =>
-    sizesIn(from, to).some(
-      ({ size, unit, isBasis, isPackage }) =>
-        !isPackage &&
-        size !== chosenSize &&
-        (isBasis || (chosenSize !== null && unit === chosen?.basis?.unit)),
-    );
-  // A basis on the heading line above the serving ("영양정보 (100g당)") that is another size.
-  const otherBasis = (from: number, to: number) =>
-    sizesIn(from, to).some(({ size, isBasis }) => isBasis && size !== chosenSize);
-  const chosenLineEnd = chosen ? text.indexOf('\n', chosen.index) : -1;
-  const servingHead = chosen
-    ? text
-        .slice(chosen.index, chosenLineEnd === -1 ? text.length : chosenLineEnd)
-        .split(new RegExp(String.raw`열량|에너지|칼로리|\d\s*kcal|${nutrientWords}`))[0]
-    : '';
-  const bracketedBasis =
-    chosen?.kind === 'serving' &&
-    !servingHead.includes('|') &&
-    (otherSize(chosen.index, chosen.index + servingHead.length) ||
-      // "1회 제공량 30g (총 내용량당)": the package, another size than the serving.
-      candidates.some(
-        (candidate) =>
-          candidate.kind === 'total' &&
-          candidate.index > chosen.index &&
-          candidate.index < chosen.index + servingHead.length &&
-          (candidate.basis === null ||
-            `${candidate.basis.size}${candidate.basis.unit}` !== chosenSize),
-      ) ||
-      (header !== null &&
-        lineStart(header.index) < lineStart(chosen.index) &&
-        otherBasis(header.index, text.indexOf('\n', header.index))));
-
-  const basisFromTotal = candidates.length === 0 && total !== null;
-  const basis =
-    stackedHeads || headInLaterColumn || bracketedBasis
-      ? null
-      : chosen
-        ? (chosen.basis ??
-          borrowedServing(
-            chosen,
-            candidates,
-            text,
-            header ? header.index : servingLineAbove(text, range.begin),
-            range.end,
-          ))
-        : basisFromTotal
-          ? total
-          : null;
-
-  // Columns are counted on the head line itself when it has bars, so a head the row did not
-  // recognise still counts: a 2-cell row then holds the name and the first value, not two values.
-  // A name cell is not a value column.
+/**
+ * The table's lines cut to their name and first value column. Columns are counted on the head line
+ * itself when it has bars, so a head the row did not recognise still counts: a 2-cell row then
+ * holds the name and the first value, not two values. A name cell is not a value column.
+ */
+function firstColumns(
+  tableText: string,
+  columns: ReturnType<typeof headColumns>,
+  rowLength: number,
+) {
+  const { headCells, nameCell } = columns;
   const heads = headCells.length
     ? headCells.slice(nameCell ? 1 : 0).filter((cell) => cell && !shareHead.test(cell)).length
-    : Math.max(row.length, 1);
-  const lines = text.slice(range.begin, range.end).split('\n');
+    : Math.max(rowLength, 1);
+  const lines = tableText.split('\n');
   const ownCell = namesInOwnCell(lines, heads);
-  const table = lines.map((line) => firstColumn(line, heads, ownCell)).join('\n');
+  return lines.map((line) => firstColumn(line, heads, ownCell)).join('\n');
+}
 
+// An energy value; "2,000kcal 기준" in the footer is never one.
+const kcalValue = String.raw`${number}\s*kcal(?!\s*(?:을|를)?\s*기준)(\s*미만)?`;
+// Between a name and its value: spaces, a line break, a colon, and a share of the daily value
+// written first ("나트륨 15% 300mg"). Column bars are already resolved by `firstColumn`.
+const nameGap = String.raw`[\s:：]*(?:${amount}\s*%\s*)?`;
+const energyValue = new RegExp(String.raw`(?:열량|에너지)${nameGap}${kcalValue}`);
+const anyKcal = new RegExp(kcalValue);
+const nutrientValue = new Map(
+  nutrientNames.map(({ key, name }) => [
+    key,
+    new RegExp(
+      String.raw`(?<![가-힣])(?<!트랜스\s)(?<!포화\s)${name}${nameGap}${number}\s*(mg|g)(\s*미만)?`,
+    ),
+  ]),
+);
+
+/**
+ * The values in a table already cut to one column: an energy line wins over any other kcal,
+ * sodium is kept in mg and everything else in g, whichever the label used.
+ */
+export function readValues(table: string) {
   const values: LabelReading['values'] = {};
   const lessThan: LabelNutrient[] = [];
   const outOfRange: LabelNutrient[] = [];
@@ -470,40 +529,49 @@ export function readNutritionLabel(pasted: string): LabelReading {
     if (rounded > maxAmount) outOfRange.push(key);
     else values[key] = rounded;
   };
-
-  // An energy line wins over any other kcal; "2,000kcal 기준" in the footer is never a value.
-  const kcal = String.raw`${number}\s*kcal(?!\s*(?:을|를)?\s*기준)(\s*미만)?`;
-  // Between a name and its value: spaces, a line break, a colon, and a share of the daily value
-  // written first ("나트륨 15% 300mg"). Column bars are already resolved by `firstColumn`.
-  const gap = String.raw`[\s:：]*(?:\d+(?:\.\d+)?\s*%\s*)?`;
-  const energy =
-    new RegExp(String.raw`(?:열량|에너지)${gap}${kcal}`).exec(table) ??
-    new RegExp(kcal).exec(table);
+  const energy = energyValue.exec(table) ?? anyKcal.exec(table);
   if (energy) {
     if (energy[2]) lessThan.push('calories');
     else keep('calories', Number(energy[1]));
   }
-  for (const { key, name, mg } of nutrientNames) {
-    const found = new RegExp(
-      String.raw`(?<![가-힣])(?<!트랜스\s)(?<!포화\s)${name}${gap}${number}\s*(mg|g)(\s*미만)?`,
-    ).exec(table);
+  for (const { key, mg } of nutrientNames) {
+    const found = nutrientValue.get(key)!.exec(table);
     if (!found) continue;
     if (found[3]) {
       lessThan.push(key);
       continue;
     }
-    const amount = Number(found[1]);
-    // Sodium is kept in mg, everything else in g, whichever the label used.
-    const inUnit = mg
-      ? found[2] === 'g'
-        ? amount * 1000
-        : amount
-      : found[2] === 'mg'
-        ? amount / 1000
-        : amount;
-    keep(key, inUnit);
+    const written = Number(found[1]);
+    if (mg) keep(key, found[2] === 'g' ? written * 1000 : written);
+    else keep(key, found[2] === 'mg' ? written / 1000 : written);
   }
-  return { basis, basisFromTotal, total, values, lessThan, outOfRange };
+  return { values, lessThan, outOfRange };
+}
+
+export function readNutritionLabel(pasted: string): LabelReading {
+  const text = normalize(pasted);
+  const { header, total, tableTotals } = findTotals(text);
+  const { all, candidates, row, chosen } = chooseBasis(text, header, tableTotals);
+  const range = chosenTableRange(text, chosen, header, all, tableTotals);
+  const columns = headColumns(text, chosen);
+  // A basis that cannot be told from another one is not claimed at all.
+  const unclear =
+    chosen !== null &&
+    (stackedHeads(text, chosen, candidates) ||
+      columns.headInLaterColumn ||
+      hasBracketedBasis(text, chosen, candidates, header));
+
+  const basisFromTotal = candidates.length === 0 && total !== null;
+  let basis: Size | null = null;
+  if (chosen && !unclear) {
+    const from = header ? header.index : servingLineAbove(text, range.begin);
+    basis = chosen.basis ?? borrowedServing(chosen, candidates, text, from, range.end);
+  } else if (!chosen && basisFromTotal) {
+    basis = total;
+  }
+
+  const table = firstColumns(text.slice(range.begin, range.end), columns, row.length);
+  return { basis, basisFromTotal, total, ...readValues(table) };
 }
 
 /**

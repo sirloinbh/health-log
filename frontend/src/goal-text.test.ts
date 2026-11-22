@@ -31,8 +31,21 @@ test('sleep is typed in hours and minutes, so any whole minute can be a goal', (
   expect(toSleepTarget(24, 1)).toMatch('between 1 and 24 hours');
   expect(toSleepTarget(7, 60)).toMatch('from 0 to 59');
   expect(toSleepTarget(7.5, 0)).toMatch('whole number');
+  // #209: negative minutes are refused, not taken off the hours (8 h -30 min was 450).
+  expect(toSleepTarget(8, -30)).toMatch('from 0 to 59');
+  expect(toSleepTarget(Number.NaN, 0)).toMatch('whole number');
+  expect(toSleepTarget(8, Number.NaN)).toMatch('whole number');
   expect(sleepParts(430)).toEqual({ hours: '7', minutes: '10' });
   expect(sleepParts(445)).toEqual({ hours: '7', minutes: '25' });
+});
+
+test('a goal outside its range or not a number is refused with the range', () => {
+  expect(toTarget('protein', 100)).toBe(100);
+  expect(toTarget('protein', 0)).toBe('Daily protein minimum: enter 1 to 1000 g');
+  expect(toTarget('protein', 100.5)).toBe('Daily protein minimum: enter a whole number');
+  // #209: NaN fails every comparison, so it is named as out of range rather than passed on.
+  expect(toTarget('protein', Number.NaN)).toBe('Daily protein minimum: enter 1 to 1000 g');
+  expect(toTarget('sober_days', Number.NaN)).toBe('Alcohol-free days per week: enter 1 to 7 days');
 });
 
 test('deleting a change brings back the goal before it, as of today', () => {

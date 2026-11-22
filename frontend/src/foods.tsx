@@ -1,4 +1,3 @@
-import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -12,7 +11,6 @@ import { toast } from './components/ui/sonner';
 import { FoodDialog } from './food-dialog';
 import { type Food, nutrients, sourceLabels } from './food-form';
 import { useFoodSearch } from './food-search';
-import { apiKey } from './lib/query';
 import { useNotice } from './lib/use-notice';
 import { MoreFoodsButton } from './more-foods-button';
 import { useReturnFocus } from './return-focus';
@@ -72,20 +70,7 @@ function FoodCard({ food, onEdit }: { food: Food; onEdit: (opener: HTMLElement) 
   );
 }
 
-/**
- * A food's name, brand or values show in the meal cards, the combos and the recent foods, which read
- * through React Query; they read again the next time they are shown (#282).
- */
-function foodChanged(client: QueryClient) {
-  void client.invalidateQueries({
-    predicate: ({ queryKey: [path] }) => typeof path === 'string' && path.startsWith('/api/meals/'),
-  });
-  void client.invalidateQueries({ queryKey: apiKey('/api/combos') });
-  void client.invalidateQueries({ queryKey: apiKey('/api/foods/recent') });
-}
-
 export function FoodsPage() {
-  const client = useQueryClient();
   const [query, setQuery] = useState('');
   // null: closed, 'new': adding, a food: editing it.
   const [editing, setEditing] = useState<Food | 'new' | null>(null);
@@ -206,7 +191,6 @@ export function FoodsPage() {
             // The saved food may not match the current search, so the list alone cannot confirm it.
             toast.success('Saved');
             void load(applied.current);
-            foodChanged(client);
           }}
         />
       ) : null}

@@ -791,3 +791,54 @@ test('a saved food makes the meal cards, combos and recent foods read again next
   // A report holds no food names.
   expect(stale(others[2])).toBe(false);
 });
+
+test('the food cannot change while it is saved, so the save holds what is on screen (#302)', async () => {
+  let finish = (_response: Response) => {};
+  serve((_url, init) =>
+    init?.method === 'PUT'
+      ? new Promise<Response>((resolve) => (finish = resolve))
+      : json({ foods: [food] }),
+  );
+  open();
+  const { dialog } = await openWith('Edit 치즈버거');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  await within(dialog).findByRole('button', { name: 'Saving…' });
+  expect(within(dialog).getByLabelText('Food name')).toHaveAttribute('readonly');
+  expect(within(dialog).getByLabelText('Calories (kcal)')).toHaveAttribute('readonly');
+  expect(within(dialog).getByLabelText('Paste a nutrition table')).toHaveAttribute('readonly');
+  expect(within(dialog).getByRole('button', { name: 'Read the table and fill in' })).toBeDisabled();
+  expect(within(dialog).getByRole('combobox', { name: 'Source type' })).toBeDisabled();
+  expect(within(dialog).getByRole('checkbox', { name: 'Junk food' })).toBeDisabled();
+
+  // A failed save gives the fields back.
+  finish(json({ error: 'Server error occurred' }, 500));
+  expect(await findLive('alert', dialog)).toHaveTextContent('Server error occurred');
+  expect(within(dialog).getByLabelText('Food name')).not.toHaveAttribute('readonly');
+  expect(within(dialog).getByRole('checkbox', { name: 'Junk food' })).toBeEnabled();
+});
+
+test('a food save answered after leaving the foods page reads no list for it, yet marks the other screens stale (#302)', async () => {
+  let finish = () => {};
+  const fetchMock = serve((_url, init) =>
+    init?.method === 'PUT'
+      ? new Promise<Response>((resolve) => (finish = () => resolve(json(food))))
+      : json({ foods: [food] }),
+  );
+  const client = testQueryClient({ today: '2026-10-31' });
+  client.setQueryData(['/api/combos'], {});
+  window.history.replaceState(null, '', '/foods');
+  const page = render(<App queryClient={client} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit 치즈버거' }));
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Save' }));
+  await vi.waitFor(() =>
+    expect(foodCalls(fetchMock).filter(([, init]) => init?.method === 'PUT')).toHaveLength(1),
+  );
+  const calls = foodCalls(fetchMock).length;
+  // The page and its dialog are gone when the answer lands.
+  page.unmount();
+  finish();
+  await vi.waitFor(() => expect(client.getQueryState(['/api/combos'])?.isInvalidated).toBe(true));
+  await vi.waitFor(() => expect(client.isMutating()).toBe(0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(foodCalls(fetchMock)).toHaveLength(calls);
+});

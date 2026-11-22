@@ -66,37 +66,23 @@ export const dayQuery = z.object({
     .optional(),
 });
 
-type MedicationRow = {
+type Medication = {
   id: number;
   name: string;
   dose: string | null;
   directions: string | null;
-  start_on: string;
-  end_on: string | null;
+  startOn: string;
+  endOn: string | null;
   note: string | null;
-  visit_id: string | null;
-  visit_date: string | null;
-  clinic: string | null;
+  /** The visit it came from, named so the list can say where; null once that visit is gone. */
+  visit: { id: number; date: string; clinic: string } | null;
 };
 
-const toMedication = (row: MedicationRow) => ({
-  id: row.id,
-  name: row.name,
-  dose: row.dose,
-  directions: row.directions,
-  startOn: row.start_on,
-  endOn: row.end_on,
-  note: row.note,
-  // The visit it came from, named so the list can say where; null once that visit is gone.
-  visit:
-    row.visit_id === null
-      ? null
-      : { id: Number(row.visit_id), date: row.visit_date ?? '', clinic: row.clinic ?? '' },
-});
-
+// json_build_object writes a date as "YYYY-MM-DD" and an id as a JSON number, and pg parses json.
 const medicationSql = (where: string, order: string) => `
-  SELECT m.id, m.name, m.dose, m.directions, m.start_on, m.end_on, m.note, m.visit_id,
-    v.visit_date, v.clinic
+  SELECT m.id, m.name, m.dose, m.directions, m.start_on AS "startOn", m.end_on AS "endOn", m.note,
+    CASE WHEN v.id IS NULL THEN NULL
+      ELSE json_build_object('id', v.id, 'date', v.visit_date, 'clinic', v.clinic) END AS visit
   FROM medications m
   LEFT JOIN clinic_visits v ON v.id = m.visit_id
   ${where}
@@ -121,10 +107,8 @@ export function medicationsRouter(pool: Pool, today: () => string) {
   const router = Router();
 
   const read = async (id: number) => {
-    const { rows } = await pool.query<MedicationRow>(medicationSql('WHERE m.id = $1', 'm.id'), [
-      id,
-    ]);
-    return rows[0] ? toMedication(rows[0]) : undefined;
+    const { rows } = await pool.query<Medication>(medicationSql('WHERE m.id = $1', 'm.id'), [id]);
+    return rows[0];
   };
 
   const values = (item: MedicationInput) => [
@@ -153,28 +137,28 @@ export function medicationsRouter(pool: Pool, today: () => string) {
   router.get('/', async (req, res) => {
     const { date } = dayQuery.parse(req.query);
     if (date) {
-      const { rows } = await pool.query<MedicationRow>(
+      const { rows } = await pool.query<Medication>(
         medicationSql(`WHERE ${takenOn('$1')}`, 'm.start_on, m.id'),
         [date],
       );
-      res.json({ date, medications: rows.map(toMedication) });
+      res.json({ date, medications: rows });
       return;
     }
     const day = today();
     const [current, upcoming, past] = await Promise.all([
-      pool.query<MedicationRow>(medicationSql(`WHERE ${takenOn('$1')}`, 'm.start_on DESC, m.id'), [
+      pool.query<Medication>(medicationSql(`WHERE ${takenOn('$1')}`, 'm.start_on DESC, m.id'), [
         day,
       ]),
-      pool.query<MedicationRow>(medicationSql('WHERE m.start_on > $1', 'm.start_on, m.id'), [day]),
-      pool.query<MedicationRow>(medicationSql('WHERE m.end_on < $1', 'm.end_on DESC, m.id DESC'), [
+      pool.query<Medication>(medicationSql('WHERE m.start_on > $1', 'm.start_on, m.id'), [day]),
+      pool.query<Medication>(medicationSql('WHERE m.end_on < $1', 'm.end_on DESC, m.id DESC'), [
         day,
       ]),
     ]);
     res.json({
       today: day,
-      current: current.rows.map(toMedication),
-      upcoming: upcoming.rows.map(toMedication),
-      past: past.rows.map(toMedication),
+      current: current.rows,
+      upcoming: upcoming.rows,
+      past: past.rows,
     });
   });
 

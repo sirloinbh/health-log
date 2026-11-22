@@ -34,7 +34,7 @@ Vite http://localhost:5203, API http://localhost:3103/api/health, host DB port 1
 
 ## Repository layout
 
-This repository is an umbrella monorepo that holds all the source. `frontend`, `backend`, and `database` are synced with `git subtree split` to the private deploy repositories `health-log-frontend`, `health-log-backend`, and `health-log-db` (`scripts/push-repositories.ps1`, only on request). The AWS infrastructure is managed in the shared repository `shared-aws-infrastructure`.
+This repository is an umbrella monorepo that holds all the source, and it is the only deploy repository: the server deploys from it (project-standards ADR-0022). The split deploy repositories `health-log-frontend`, `health-log-backend`, and `health-log-db` are retired and archived, and nothing syncs to them. The AWS infrastructure is managed in the shared repository `shared-aws-infrastructure`.
 
 ## Docs
 

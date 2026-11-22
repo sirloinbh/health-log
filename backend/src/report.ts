@@ -5,7 +5,6 @@ import { z } from 'zod/v4';
 import { periodsOf } from './contract.js';
 import { isRealDate, shiftDay } from './dates.js';
 import { type Db, inTransaction, snapshotRead } from './db.js';
-import { optionalNumber } from './numbers.js';
 
 export const reportQuery = z.object({
   period: z.enum(['week', 'month'], { error: 'The period must be week or month' }),
@@ -25,20 +24,22 @@ const datesIn = ({ from, to }: Span) => {
 const rounded = (value: string | null, digits = 0) =>
   value === null ? null : Number(Number(value).toFixed(digits));
 
+// count() and sum() of an integer column are int8, which setInt8Parser already returns as a
+// number; avg() is NUMERIC, which stays a string until `rounded`.
 type SummaryRow = {
-  sleep_days: string;
-  sleep_average: string | null;
-  meal_days: string;
-  calorie_days: string;
-  calorie_average: string | null;
-  drink_recorded_days: string;
-  drinking_days: string;
-  smoking_days: string;
-  cigarettes: string | null;
-  diet_days: string;
-  diet_kept: string;
-  sleep_check_days: string;
-  sleep_good: string;
+  sleepDays: number;
+  sleepAverage: string | null;
+  mealDays: number;
+  calorieDays: number;
+  calorieAverage: string | null;
+  drinkRecordedDays: number;
+  drinkingDays: number;
+  smokingDays: number;
+  cigarettes: number | null;
+  dietDays: number;
+  dietKept: number;
+  sleepCheckDays: number;
+  sleepGood: number;
 };
 
 // Shared SQL pieces (#195). Only these constant placeholders and column names are put into the
@@ -66,23 +67,23 @@ const drankSql = (day: string) =>
 // calories are known; days with an unknown entry are counted apart.
 const summarySql = `
   WITH sleep AS (
-    SELECT count(*) AS sleep_days, avg(duration_minutes) AS sleep_average
+    SELECT count(*) AS "sleepDays", avg(duration_minutes) AS "sleepAverage"
     FROM sleep_records WHERE sleep_date BETWEEN $1 AND $2
   ), meal_days AS (${mealDaysSql('$1', '$2')}
   ), meals AS (
-    SELECT count(*) AS meal_days,
-      count(*) FILTER (WHERE complete) AS calorie_days,
-      avg(calories) FILTER (WHERE complete) AS calorie_average
+    SELECT count(*) AS "mealDays",
+      count(*) FILTER (WHERE complete) AS "calorieDays",
+      avg(calories) FILTER (WHERE complete) AS "calorieAverage"
     FROM meal_days
   ), habits AS (
-    SELECT count(*) FILTER (WHERE drinks_recorded) AS drink_recorded_days,
-      count(*) FILTER (WHERE ${drankSql('habit_days.record_date')}) AS drinking_days,
-      count(cigarettes) AS smoking_days,
+    SELECT count(*) FILTER (WHERE drinks_recorded) AS "drinkRecordedDays",
+      count(*) FILTER (WHERE ${drankSql('habit_days.record_date')}) AS "drinkingDays",
+      count(cigarettes) AS "smokingDays",
       sum(cigarettes) AS cigarettes
     FROM habit_days WHERE record_date BETWEEN $1 AND $2
   ), checks AS (
-    SELECT count(diet_kept) AS diet_days, count(*) FILTER (WHERE diet_kept) AS diet_kept,
-      count(sleep_good) AS sleep_check_days, count(*) FILTER (WHERE sleep_good) AS sleep_good
+    SELECT count(diet_kept) AS "dietDays", count(*) FILTER (WHERE diet_kept) AS "dietKept",
+      count(sleep_good) AS "sleepCheckDays", count(*) FILTER (WHERE sleep_good) AS "sleepGood"
     FROM day_checks WHERE record_date BETWEEN $1 AND $2
   )
   SELECT * FROM sleep, meals, habits, checks`;
@@ -90,29 +91,29 @@ const summarySql = `
 const readSummary = async (db: Db, span: Span) => {
   const { rows } = await db.query<SummaryRow>(summarySql, [span.from, span.to]);
   const row = rows[0];
-  const smokingDays = Number(row.smoking_days);
+  const { smokingDays, cigarettes } = row;
   return {
     ...span,
-    sleep: { days: Number(row.sleep_days), averageMinutes: rounded(row.sleep_average) },
+    sleep: { days: row.sleepDays, averageMinutes: rounded(row.sleepAverage) },
     calories: {
-      days: Number(row.calorie_days),
-      incompleteDays: Number(row.meal_days) - Number(row.calorie_days),
-      average: rounded(row.calorie_average),
+      days: row.calorieDays,
+      incompleteDays: row.mealDays - row.calorieDays,
+      average: rounded(row.calorieAverage),
     },
-    drinking: { days: Number(row.drink_recorded_days), drinkingDays: Number(row.drinking_days) },
+    drinking: { days: row.drinkRecordedDays, drinkingDays: row.drinkingDays },
     smoking: {
       days: smokingDays,
-      cigarettes: optionalNumber(row.cigarettes),
-      averagePerDay: smokingDays ? Number((Number(row.cigarettes) / smokingDays).toFixed(1)) : null,
+      cigarettes,
+      averagePerDay: smokingDays ? Number((Number(cigarettes) / smokingDays).toFixed(1)) : null,
     },
-    diet: { days: Number(row.diet_days), yes: Number(row.diet_kept) },
-    sleepGood: { days: Number(row.sleep_check_days), yes: Number(row.sleep_good) },
+    diet: { days: row.dietDays, yes: row.dietKept },
+    sleepGood: { days: row.sleepCheckDays, yes: row.sleepGood },
   };
 };
 
 type DayRow = {
   date: string;
-  sleep_minutes: number | null;
+  sleepMinutes: number | null;
   calories: string | null;
   drank: boolean | null;
 };
@@ -120,7 +121,7 @@ type DayRow = {
 // One row per calendar day of the span, so a day without a record is a gap, never a zero.
 const readDays = async (db: Db, span: Span) => {
   const { rows } = await db.query<DayRow>(
-    `SELECT d.date::text AS date, s.duration_minutes AS sleep_minutes,
+    `SELECT d.date::text AS date, s.duration_minutes AS "sleepMinutes",
        CASE WHEN m.complete THEN m.calories END AS calories,
        CASE WHEN h.drinks_recorded THEN ${drankSql('d.date')} END AS drank
      FROM unnest($1::date[]) AS d(date)
@@ -130,15 +131,11 @@ const readDays = async (db: Db, span: Span) => {
      ORDER BY d.date`,
     [datesIn(span), span.from, span.to],
   );
-  return rows.map((row) => ({
-    date: row.date,
-    sleepMinutes: row.sleep_minutes,
-    calories: rounded(row.calories),
-    drank: row.drank,
-  }));
+  // A day's calories are a NUMERIC sum, shown as a whole number like the summary's average.
+  return rows.map((row) => ({ ...row, calories: rounded(row.calories) }));
 };
 
-type AfterRow = { drank: boolean; nights: string; average: string | null };
+type AfterRow = { drank: boolean; nights: number; average: string | null };
 
 // Sleep is filed under the day of waking, so the night after day D is the sleep dated D + 1.
 // Only nights whose previous day's drinking was recorded take part.
@@ -155,7 +152,7 @@ const readSleepAfterDrinking = async (db: Db, span: Span) => {
   const group = (drank: boolean) => {
     const row = rows.find((each) => each.drank === drank);
     return {
-      nights: row ? Number(row.nights) : 0,
+      nights: row?.nights ?? 0,
       averageMinutes: row ? rounded(row.average) : null,
     };
   };

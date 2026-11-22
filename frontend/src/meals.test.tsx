@@ -1254,7 +1254,7 @@ test('junk food entries are marked, with the week and month counts below the tot
     'This week Mar 9 – Mar 15: 3 times · 2 days · 1,850kcal',
   );
   expect(within(summary).getByText(/This month/)).toHaveTextContent(
-    'This month Mar 1 – Mar 31: 4 times · 3 days · 2,100kcal (excludes 1 record with unknown calories)',
+    'This month Mar 1 – Mar 31: 4 times · 3 days · 2,100kcal or more (excludes 1 record with unknown calories)',
   );
   const lunch = screen.getByRole('region', { name: 'Lunch' });
   const items = within(lunch).getAllByRole('listitem');
@@ -1311,4 +1311,40 @@ test('sending an entry again after no answer reuses its retry key; the next entr
   expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/);
   expect(keys[1]).toBe(keys[0]);
   expect(keys[2]).not.toBe(keys[0]);
+});
+
+test('leaving the day while combos are read stops that request (#302)', async () => {
+  let combosSignal: AbortSignal | null | undefined;
+  stubFetch((url, init) => {
+    if (url !== '/api/combos') return Promise.resolve(new Response(JSON.stringify(emptyDay)));
+    combosSignal = init?.signal;
+    return new Promise<Response>(() => {});
+  });
+  const card = renderWithQuery(<MealCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Choose from combos' }));
+  await waitFor(() => expect(combosSignal).toBeDefined());
+  expect(combosSignal?.aborted).toBe(false);
+  card.unmount();
+  expect(combosSignal?.aborted).toBe(true);
+});
+
+test('asking for combos reads them, even when the shared list was read a moment ago (#302)', async () => {
+  const renamed = { ...combo, name: '저녁 세트' };
+  let answer = combo;
+  stubFetch((url) =>
+    Promise.resolve(
+      new Response(JSON.stringify(url === '/api/combos' ? { combos: [answer] } : emptyDay)),
+    ),
+  );
+  const first = renderWithQuery(<MealCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Choose from combos' }));
+  expect(await screen.findByRole('button', { name: 'Record 점심 세트' })).toBeInTheDocument();
+  first.unmount();
+
+  // The combos page saved a new name; the cached list is still under 30 seconds old.
+  answer = renamed;
+  renderWithQuery(<MealCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Choose from combos' }));
+  expect(await screen.findByRole('button', { name: 'Record 저녁 세트' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Record 점심 세트' })).not.toBeInTheDocument();
 });

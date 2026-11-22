@@ -108,31 +108,21 @@ type Procedure = {
   note: string | null;
 };
 
-type VisitRow = {
+type Visit = {
   id: number;
-  visit_date: string;
+  date: string;
   clinic: string;
   department: string | null;
   note: string | null;
   cost: number | null;
-  next_visit_on: string | null;
+  nextVisitOn: string | null;
   procedures: Procedure[];
 };
 
-const toVisit = (row: VisitRow) => ({
-  id: row.id,
-  date: row.visit_date,
-  clinic: row.clinic,
-  department: row.department,
-  note: row.note,
-  cost: row.cost,
-  nextVisitOn: row.next_visit_on,
-  procedures: row.procedures,
-});
-
 // One row per visit with its procedures in order; the newest visit first.
 const visitSql = (where: string, page = '') => `
-  SELECT v.id, v.visit_date, v.clinic, v.department, v.note, v.cost, v.next_visit_on,
+  SELECT v.id, v.visit_date AS date, v.clinic, v.department, v.note, v.cost,
+    v.next_visit_on AS "nextVisitOn",
     COALESCE(
       json_agg(
         json_build_object('name', p.name, 'area', p.area, 'amount', p.amount, 'cost', p.cost,
@@ -152,8 +142,8 @@ export function visitsRouter(pool: Pool) {
   const router = Router();
 
   const read = async (db: Pick<Pool, 'query'> | PoolClient, id: number) => {
-    const { rows } = await db.query<VisitRow>(visitSql('WHERE v.id = $1'), [id]);
-    return rows[0] ? toVisit(rows[0]) : undefined;
+    const { rows } = await db.query<Visit>(visitSql('WHERE v.id = $1'), [id]);
+    return rows[0];
   };
 
   // One statement per procedure keeps the order explicit; the transaction undoes them all on failure.
@@ -185,11 +175,11 @@ export function visitsRouter(pool: Pool) {
   router.get('/', async (req, res) => {
     const { q, date, offset } = listQuery.parse(req.query);
     if (date) {
-      const { rows } = await pool.query<VisitRow>(visitSql('WHERE v.visit_date = $1'), [date]);
-      res.json({ visits: rows.map(toVisit), more: false });
+      const { rows } = await pool.query<Visit>(visitSql('WHERE v.visit_date = $1'), [date]);
+      res.json({ visits: rows, more: false });
       return;
     }
-    const { rows } = await pool.query<VisitRow>(
+    const { rows } = await pool.query<Visit>(
       visitSql(
         `WHERE $1 = '' OR v.clinic ILIKE $2 OR EXISTS (
            SELECT 1 FROM clinic_procedures s WHERE s.visit_id = v.id AND s.name ILIKE $2)`,
@@ -198,7 +188,7 @@ export function visitsRouter(pool: Pool) {
       [q, likePattern(q), visitPageSize + 1, offset],
     );
     const more = rows.length > visitPageSize;
-    res.json({ visits: rows.slice(0, visitPageSize).map(toVisit), more });
+    res.json({ visits: rows.slice(0, visitPageSize), more });
   });
 
   router.post('/', async (req, res) => {

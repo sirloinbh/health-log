@@ -86,13 +86,12 @@ export const judgeSoberWeek = (target: number, { recordedDays, soberDays }: Week
   return drinkingDays > 7 - target ? 'missed' : 'unknown';
 };
 
-type GoalRow = { item: GoalItem; effective_from: string; target: number | null };
-const toGoal = (row: GoalRow) => ({ item: row.item, from: row.effective_from, target: row.target });
+type Goal = { item: GoalItem; from: string; target: number | null };
 
 /** The goal in force on `date` for each item, off ones included so callers can tell them apart. */
 const goalsOn = async (db: Db, date: string, soberDate: string) => {
-  const { rows } = await db.query<GoalRow>(
-    `SELECT DISTINCT ON (item) item, effective_from, target FROM goals
+  const { rows } = await db.query<Goal>(
+    `SELECT DISTINCT ON (item) item, effective_from AS "from", target FROM goals
      WHERE effective_from <= CASE WHEN item = 'sober_days' THEN $2::date ELSE $1::date END
      ORDER BY item, effective_from DESC`,
     [date, soberDate],
@@ -102,17 +101,14 @@ const goalsOn = async (db: Db, date: string, soberDate: string) => {
     goalItems.map((item) => {
       const row = found.get(item);
       // A goal turned off is no goal at all for judging.
-      return [
-        item,
-        row && row.target !== null ? { from: row.effective_from, target: row.target } : null,
-      ];
+      return [item, row && row.target !== null ? { from: row.from, target: row.target } : null];
     }),
   ) as Record<GoalItem, { from: string; target: number } | null>;
 };
 
 const readGoals = async (db: Db, today: string) => {
-  const { rows } = await db.query<GoalRow>(
-    'SELECT item, effective_from, target FROM goals ORDER BY item, effective_from DESC',
+  const { rows } = await db.query<Goal>(
+    'SELECT item, effective_from AS "from", target FROM goals ORDER BY item, effective_from DESC',
   );
   // Sober days are judged by the goal on the week's Sunday, so "current" for them is that one too:
   // the settings page then shows the number this week is judged by (#107).
@@ -121,18 +117,18 @@ const readGoals = async (db: Db, today: string) => {
     today,
     week,
     current: await goalsOn(db, today, week.to),
-    history: rows.map(toGoal),
+    history: rows,
   };
 };
 
-type MealRow = {
-  entries: string;
+// count() is int8, which setInt8Parser already returns as a number; a NUMERIC sum is a string.
+type MealSums = {
+  entries: number;
   calories: string | null;
-  calories_missing: string;
+  caloriesMissing: number;
   protein: string | null;
-  protein_missing: string;
+  proteinMissing: number;
 };
-type WeekRow = { recorded_days: string; sober_days: string };
 
 const readDay = async (db: Db, date: string) => {
   const { week } = periodsOf(date);
@@ -140,54 +136,46 @@ const readDay = async (db: Db, date: string) => {
   const goals = await goalsOn(db, date, week.to);
   // Rounded per entry like the meal list, so the total here is the total shown there.
   const meals = (
-    await db.query<MealRow>(
+    await db.query<MealSums>(
       `SELECT count(*) AS entries,
          sum(round(calories * servings, 2)) AS calories,
-         count(*) FILTER (WHERE calories IS NULL) AS calories_missing,
+         count(*) FILTER (WHERE calories IS NULL) AS "caloriesMissing",
          sum(round(protein * servings, 2)) AS protein,
-         count(*) FILTER (WHERE protein IS NULL) AS protein_missing
+         count(*) FILTER (WHERE protein IS NULL) AS "proteinMissing"
        FROM meal_entries WHERE entry_date = $1`,
       [date],
     )
   ).rows[0];
-  const sleep = await db.query<{ duration_minutes: number }>(
-    'SELECT duration_minutes FROM sleep_records WHERE sleep_date = $1',
+  const sleep = await db.query<{ minutes: number }>(
+    'SELECT duration_minutes AS minutes FROM sleep_records WHERE sleep_date = $1',
     [date],
   );
   // A sober day is one whose drinking was recorded with no drink in it.
   const habits = (
-    await db.query<WeekRow>(
-      `SELECT count(*) FILTER (WHERE drinks_recorded) AS recorded_days,
+    await db.query<Week>(
+      `SELECT count(*) FILTER (WHERE drinks_recorded) AS "recordedDays",
          count(*) FILTER (WHERE drinks_recorded AND NOT EXISTS (
            SELECT 1 FROM habit_drinks d WHERE d.record_date = habit_days.record_date
-         )) AS sober_days
+         )) AS "soberDays"
        FROM habit_days WHERE record_date BETWEEN $1 AND $2`,
       [week.from, week.to],
     )
   ).rows[0];
-  const checks = await db.query<{ diet_kept: boolean | null; sleep_good: boolean | null }>(
-    'SELECT diet_kept, sleep_good FROM day_checks WHERE record_date = $1',
+  const checks = await db.query<{ dietKept: boolean | null; sleepGood: boolean | null }>(
+    `SELECT diet_kept AS "dietKept", sleep_good AS "sleepGood"
+     FROM day_checks WHERE record_date = $1`,
     [date],
   );
 
-  const entries = Number(meals.entries);
+  const { entries } = meals;
   const calories = {
     entries,
     total: optionalNumber(meals.calories),
-    missing: Number(meals.calories_missing),
+    missing: meals.caloriesMissing,
   };
-  const protein = {
-    entries,
-    total: optionalNumber(meals.protein),
-    missing: Number(meals.protein_missing),
-  };
-  const minutes = sleep.rows[0]?.duration_minutes ?? null;
-  const sober = {
-    from: week.from,
-    to: week.to,
-    recordedDays: Number(habits.recorded_days),
-    soberDays: Number(habits.sober_days),
-  };
+  const protein = { entries, total: optionalNumber(meals.protein), missing: meals.proteinMissing };
+  const minutes = sleep.rows[0]?.minutes ?? null;
+  const sober = { from: week.from, to: week.to, ...habits };
   const judged = <T>(goal: { target: number } | null, judge: (target: number) => T) =>
     goal ? judge(goal.target) : null;
 
@@ -220,9 +208,7 @@ const readDay = async (db: Db, date: string) => {
       },
     ],
     // The day's own checks (#37), shown beside the automatic verdicts. null: not checked.
-    checks: checks.rows[0]
-      ? { dietKept: checks.rows[0].diet_kept, sleepGood: checks.rows[0].sleep_good }
-      : null,
+    checks: checks.rows[0] ?? null,
   };
 };
 

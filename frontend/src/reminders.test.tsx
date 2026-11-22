@@ -67,8 +67,8 @@ const reads = (fetchMock: ReturnType<typeof serve>) =>
 
 test('words for the day and what each reminder is about', () => {
   expect([0, 1, 2, 7].map(whenText)).toEqual(['Today', 'Tomorrow', 'In 2 days', 'In 7 days']);
-  // #207: a date already past is not "In -1 days".
-  expect([-1, -3].map(whenText)).toEqual(['1 day ago', '3 days ago']);
+  // #207: a date already past is not "In -1 days"; #306: it says it is overdue.
+  expect([-1, -3].map(whenText)).toEqual(['Overdue by 1 day', 'Overdue by 3 days']);
   expect(reminderTitle(appointment)).toBe('가상피부과 · 피부과 appointment');
   expect(reminderTitle(later)).toBe('가상내과 appointment');
   expect(reminderTitle(lastPill)).toBe('가상정 ends');

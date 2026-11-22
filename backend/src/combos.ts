@@ -43,28 +43,31 @@ export const comboInput = z.object(
 
 type ComboInput = z.infer<typeof comboInput>;
 
+// One row per food of a combo (or one row with no food), under the API's names. NUMERIC columns
+// are strings; ids and counts are int8, which setInt8Parser returns as numbers.
 type ComboRow = {
   id: number;
   name: string;
-  food_id: string | null;
-  food_name: string | null;
+  foodId: number | null;
+  foodName: string | null;
   brand: string | null;
   servings: string | null;
-  serving_size: string | null;
-  serving_unit: string | null;
+  servingSize: string | null;
+  servingUnit: string | null;
   calories: string | null;
-  calories_total: string | null;
-  calories_missing: string;
+  caloriesTotal: string | null;
+  caloriesMissing: number;
 };
 
 // Calories are multiplied and added in the database: NUMERIC is exact, so the total matches what
 // recording the combo would add to a day. LEFT JOIN keeps a combo whose foods were all removed.
 const comboSql = (where: string) => `
-  SELECT c.id, c.name, i.food_id, f.name AS food_name, f.brand, i.servings, f.serving_size,
-    f.serving_unit, round(f.calories * i.servings, 2) AS calories,
-    sum(round(f.calories * i.servings, 2)) OVER (PARTITION BY c.id) AS calories_total,
+  SELECT c.id, c.name, i.food_id AS "foodId", f.name AS "foodName", f.brand, i.servings,
+    f.serving_size AS "servingSize", f.serving_unit AS "servingUnit",
+    round(f.calories * i.servings, 2) AS calories,
+    sum(round(f.calories * i.servings, 2)) OVER (PARTITION BY c.id) AS "caloriesTotal",
     count(*) FILTER (WHERE i.food_id IS NOT NULL AND f.calories IS NULL)
-      OVER (PARTITION BY c.id) AS calories_missing
+      OVER (PARTITION BY c.id) AS "caloriesMissing"
   FROM meal_combos c
   LEFT JOIN meal_combo_items i ON i.combo_id = c.id
   LEFT JOIN foods f ON f.id = i.food_id
@@ -95,20 +98,17 @@ const toCombos = (rows: ComboRow[]) => {
       id: row.id,
       name: row.name,
       items: [],
-      calories: {
-        value: optionalNumber(row.calories_total),
-        missing: Number(row.calories_missing),
-      },
+      calories: { value: optionalNumber(row.caloriesTotal), missing: row.caloriesMissing },
     };
     combos.set(row.id, combo);
-    if (row.food_id === null) continue;
+    if (row.foodId === null) continue;
     combo.items.push({
-      foodId: Number(row.food_id),
-      name: row.food_name ?? '',
+      foodId: row.foodId,
+      name: row.foodName ?? '',
       brand: row.brand,
       servings: Number(row.servings),
-      servingSize: optionalNumber(row.serving_size),
-      servingUnit: row.serving_unit,
+      servingSize: optionalNumber(row.servingSize),
+      servingUnit: row.servingUnit,
       calories: optionalNumber(row.calories),
     });
   }

@@ -13,14 +13,17 @@ export type JunkPeriod = {
   calories: { value: number | null; missing: number };
 };
 
-/** "3 times · 2 days · 1,850kcal", saying when some calories are unknown as a combo does. */
+/**
+ * "3 times · 2 days · 1,850kcal". With some calories unknown the sum is a lower bound, so it says
+ * "or more" and how many records it leaves out (user decision on #206, #306).
+ */
 export function junkText({ times, days, calories }: JunkPeriod) {
   if (times === 0) return 'None';
   const kcal =
     calories.value === null
       ? 'No calorie value'
       : calories.missing > 0
-        ? `${kcalText(calories.value)} (excludes ${count(calories.missing, 'record')} with unknown calories)`
+        ? `${kcalText(calories.value)} or more (excludes ${count(calories.missing, 'record')} with unknown calories)`
         : kcalText(calories.value);
   return `${count(times, 'time')} · ${count(days, 'day')} · ${kcal}`;
 }

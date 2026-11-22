@@ -23,12 +23,15 @@ import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
 import { resultText, useFoodSearch } from './food-search';
 import { RequestError, requestJson } from './lib/api';
-import { apiKey, useApiQuery } from './lib/query';
+import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
 import { MoreFoodsButton } from './more-foods-button';
 import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
 import { count } from './plural';
 import { useReturnFocus } from './return-focus';
+import { asRequest } from './writes';
+
+const combosKey = apiKey('/api/combos');
 
 /** The most foods one combo holds; the server and database refuse more. */
 const maxItems = 20;
@@ -78,7 +81,14 @@ function ComboDialog({
     () => combo?.items.map((item) => ({ ...item, servings: String(item.servings) })) ?? [],
   );
   const [query, setQuery] = useState('');
-  const [saving, setSaving] = useState(false);
+  const client = useQueryClient();
+  // The combos list (this page's and the meal card's picker) reads again on every answer, even one
+  // that lands after the dialog is gone. Not awaited, so the dialog closes at once. Closing runs only
+  // for the latest save while the dialog is still there (#302).
+  const write = useApiMutation<Combo, ApiRequest>(asRequest, {
+    onSuccess: () => void client.invalidateQueries({ queryKey: combosKey }),
+  });
+  const saving = write.isPending;
   const { notice, error, clear } = useNotice();
   const { notice: searchNotice, error: searchError, clear: clearSearch } = useNotice();
   const { notice: pageNotice, error: pageError, clear: clearPage } = useNotice();
@@ -107,7 +117,7 @@ function ComboDialog({
 
   const addFood = (food: FoodOption) =>
     setItems((current) =>
-      current.some((item) => item.foodId === food.id) || current.length >= maxItems
+      saving || current.some((item) => item.foodId === food.id) || current.length >= maxItems
         ? current
         : [
             ...current,
@@ -122,7 +132,7 @@ function ComboDialog({
           ],
     );
 
-  const save = async () => {
+  const save = () => {
     // The button stays pressable while saving.
     if (saving) return;
     const body = readDraft(name, items);
@@ -132,17 +142,14 @@ function ComboDialog({
     }
     // Cleared first, so the same failure twice is announced again.
     clear();
-    setSaving(true);
-    try {
-      await requestJson<Combo>(combo ? `/api/combos/${combo.id}` : '/api/combos', {
+    write.mutate(
+      {
+        path: combo ? `/api/combos/${combo.id}` : '/api/combos',
         method: combo ? 'PUT' : 'POST',
         body,
-      });
-      onSaved();
-    } catch (cause) {
-      error(cause);
-      setSaving(false);
-    }
+      },
+      { onSuccess: () => onSaved(), onError: (cause) => error(cause) },
+    );
   };
 
   const full = items.length >= maxItems;
@@ -161,8 +168,10 @@ function ComboDialog({
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="combo-name">Combo name</Label>
+            {/* Read-only while saving: a change after Save would not be in the save on its way. */}
             <Input
               id="combo-name"
+              readOnly={saving}
               value={name}
               autoComplete="off"
               onChange={(event) => setName(event.target.value)}
@@ -188,6 +197,7 @@ function ComboDialog({
                       className="w-20"
                       inputMode="decimal"
                       autoComplete="off"
+                      readOnly={saving}
                       value={item.servings}
                       onChange={(event) =>
                         setItems((current) =>
@@ -205,6 +215,7 @@ function ComboDialog({
                       variant="ghost"
                       size="icon"
                       aria-label={`Remove ${fullName(item)}`}
+                      disabled={saving}
                       onClick={() =>
                         setItems((current) =>
                           current.filter((other) => other.foodId !== item.foodId),
@@ -271,7 +282,7 @@ function ComboDialog({
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={added || full}
+                      disabled={added || full || saving}
                       aria-label={`${fullName(food)} ${added ? 'added' : 'add'}`}
                       onClick={() => addFood(food)}
                     >
@@ -313,7 +324,7 @@ function ComboDialog({
             aria-disabled={saving || undefined}
             aria-busy={saving || undefined}
             className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
-            onClick={() => void save()}
+            onClick={save}
           >
             {saving ? 'Saving…' : 'Save'}
           </Button>
@@ -382,8 +393,6 @@ function ComboCard({
     </Card>
   );
 }
-
-const combosKey = apiKey('/api/combos');
 
 export function CombosPage() {
   const client = useQueryClient();
@@ -525,7 +534,8 @@ export function CombosPage() {
           onSaved={() => {
             closeDialog();
             toast.success('Saved');
-            reload();
+            // The save already asked for the list again.
+            clear();
           }}
         />
       ) : null}

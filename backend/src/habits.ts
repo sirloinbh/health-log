@@ -5,7 +5,7 @@ import { z } from 'zod/v4';
 import { periodsOf } from './contract.js';
 import { parseDate } from './dates.js';
 import { type Db, inTransaction, snapshotRead } from './db.js';
-import { hasTwoDecimalsAtMost } from './numbers.js';
+import { hasTwoDecimalsAtMost, withNumbers } from './numbers.js';
 import { HttpError } from './standard/http.js';
 
 const drinkKinds = ['soju', 'beer', 'wine', 'makgeolli', 'whisky', 'other'] as const;
@@ -55,44 +55,45 @@ export const habitInput = z
     }
   });
 
-type DayRow = { record_date: string; cigarettes: number | null; drinks_recorded: boolean };
+type DayRow = { date: string; cigarettes: number | null; drinksRecorded: boolean };
+// amount is NUMERIC, a string until withNumbers.
 type DrinkRow = { kind: string; unit: string; amount: string };
 
 const readRecord = async (db: Db, date: string) => {
   const { rows } = await db.query<DayRow>(
-    'SELECT record_date, cigarettes, drinks_recorded FROM habit_days WHERE record_date = $1',
+    `SELECT record_date AS date, cigarettes, drinks_recorded AS "drinksRecorded"
+     FROM habit_days WHERE record_date = $1`,
     [date],
   );
   if (!rows[0]) return null;
+  const { drinksRecorded, ...day } = rows[0];
   const drinks = await db.query<DrinkRow>(
     'SELECT kind, unit, amount FROM habit_drinks WHERE record_date = $1 ORDER BY position',
     [date],
   );
   return {
-    date: rows[0].record_date,
-    cigarettes: rows[0].cigarettes,
-    drinks: rows[0].drinks_recorded
-      ? drinks.rows.map((row) => ({ ...row, amount: Number(row.amount) }))
-      : null,
+    ...day,
+    drinks: drinksRecorded ? drinks.rows.map((row) => withNumbers(row, ['amount'])) : null,
   };
 };
 
+// count() and sum() of a smallint are int8, which setInt8Parser already returns as a number.
 type SummaryRow = {
-  smoking_days: string;
-  cigarettes: string | null;
-  drinking_recorded_days: string;
-  drinking_days: string;
+  smokingDays: number;
+  cigarettes: number | null;
+  drinkingRecordedDays: number;
+  drinkingDays: number;
 };
 
 const readSummary = async (db: Db, { from, to }: { from: string; to: string }) => {
   const { rows } = await db.query<SummaryRow>(
     `SELECT
-       count(*) FILTER (WHERE cigarettes IS NOT NULL) AS smoking_days,
+       count(*) FILTER (WHERE cigarettes IS NOT NULL) AS "smokingDays",
        sum(cigarettes) AS cigarettes,
-       count(*) FILTER (WHERE drinks_recorded) AS drinking_recorded_days,
+       count(*) FILTER (WHERE drinks_recorded) AS "drinkingRecordedDays",
        count(*) FILTER (WHERE EXISTS (
          SELECT 1 FROM habit_drinks d WHERE d.record_date = habit_days.record_date
-       )) AS drinking_days
+       )) AS "drinkingDays"
      FROM habit_days WHERE record_date BETWEEN $1 AND $2`,
     [from, to],
   );
@@ -108,14 +109,11 @@ const readSummary = async (db: Db, { from, to }: { from: string; to: string }) =
     from,
     to,
     // No recorded day leaves the total unknown, which is not the same as zero.
-    smoking: {
-      days: Number(row.smoking_days),
-      cigarettes: row.cigarettes === null ? null : Number(row.cigarettes),
-    },
+    smoking: { days: row.smokingDays, cigarettes: row.cigarettes },
     drinking: {
-      days: Number(row.drinking_recorded_days),
-      drinkingDays: Number(row.drinking_days),
-      totals: totals.rows.map((total) => ({ ...total, amount: Number(total.amount) })),
+      days: row.drinkingRecordedDays,
+      drinkingDays: row.drinkingDays,
+      totals: totals.rows.map((total) => withNumbers(total, ['amount'])),
     },
   };
 };

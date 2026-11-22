@@ -27,17 +27,17 @@ export function VisitsCard({ date }: { date: string }) {
   const heading = useRef<HTMLDivElement>(null);
   // A save from the clinic or medicine page may still be on its way; read after it lands (#71).
   const ready = useReadAfterWrites(visitsPath, medicationsPath);
-  // Read on every mount, as the clinic and medicine pages change these without telling this card.
-  const fresh = { enabled: ready, staleTime: 0 };
+  // The clinic and medicine pages invalidate these after each change (#282).
+  const options = { enabled: ready };
   const day = useApiQuery<{ visits: Visit[] }>(
     apiKey(visitsPath, date),
     `${visitsPath}?date=${date}`,
-    fresh,
+    options,
   );
   const taken = useApiQuery<{ medications: Medication[] }>(
     apiKey(medicationsPath, date),
     `${medicationsPath}?date=${date}`,
-    fresh,
+    options,
   );
   // Both parts show together, as one read did before.
   const both = ready && day.data && taken.data ? { day: day.data, taken: taken.data } : undefined;

@@ -1,5 +1,6 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Pill, Plus, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 
 import { Button } from './components/ui/button';
@@ -11,11 +12,12 @@ import { Notice } from './components/ui/notice';
 import { toast } from './components/ui/sonner';
 import { formatDate, inDailyRange, isValidDate } from './daily-date';
 import { RequestError, requestJson } from './lib/api';
-import { type ApiRequest, useApiMutation } from './lib/query';
-import { errorText, useNotice } from './lib/use-notice';
+import { apiKey, type ApiRequest, useApiMutation } from './lib/query';
+import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
 import { cn } from './lib/utils';
 import { medicationsPagePath } from './med-text';
 import { MoreFoodsButton } from './more-foods-button';
+import { remindersPath } from './reminder-text';
 import { useReturnFocus } from './return-focus';
 import { VisitDialog } from './visit-dialog';
 import { clinicText, procedureText, type Visit, visitsPath, wonText } from './visit-text';
@@ -114,24 +116,56 @@ function VisitCard({
 
 type Page = { visits: Visit[]; more: boolean };
 
+/** One search's list on the clinic page. Under `apiKey(visitsPath)`, so a change refreshes it with the daily card's. */
+const listKey = (words: string) => apiKey(visitsPath, 'list', words);
+
 /** `today` is undefined while the server is still being asked, and null if it could not say. */
 export function VisitsPage({ today }: { today: string | null | undefined }) {
   const remover = useApiMutation<unknown, ApiRequest>(asRequest);
   const [params, setParams] = useSearchParams();
+  const client = useQueryClient();
+  // The search box, and the words of the search last asked for.
   const [query, setQuery] = useState('');
-  const applied = useRef('');
-  const [visits, setVisits] = useState<Visit[] | null>(null);
-  const [more, setMore] = useState(false);
+  const [words, setWords] = useState('');
+  // A read of the list fetches pages up to this many visits: as many as are shown, so a save or a
+  // delete keeps the place of someone who loaded more (#208). A new search starts at one page.
+  const keep = useRef(0);
+  const list = useQuery<Page, RequestError>({
+    queryKey: listKey(words),
+    queryFn: async ({ signal }) => {
+      const path = `${visitsPath}?q=${encodeURIComponent(words)}`;
+      let page = await requestJson<Page>(path, { signal });
+      const read = [...page.visits];
+      while (page.more && read.length < keep.current) {
+        page = await requestJson<Page>(`${path}&offset=${read.length}`, { signal });
+        read.push(...page.visits);
+      }
+      return { visits: read, more: page.more };
+    },
+  });
+  // The list on screen and the words it was found by. It stays while the next search is on its way,
+  // and when that search fails.
+  const [shown, setShown] = useState<{ words: string; page: Page } | null>(null);
+  if (list.data && shown?.page !== list.data) setShown({ words, page: list.data });
+  const visits = shown?.page.visits ?? null;
+  const more = shown?.page.more ?? false;
+  const applied = shown?.words ?? '';
   const [loadingMore, setLoadingMore] = useState(false);
   // While a search or a reload runs, the next page would be read for the list being replaced.
-  const [searching, setSearching] = useState(false);
+  const searching = list.isFetching;
   // null: closed. Otherwise the visit being edited (null for a new one) and the date it starts on.
   const [editing, setEditing] = useState<{ visit: Visit | null; date: string } | null>(null);
-  const { notice, error, clear } = useNotice();
+  // Hidden while reading again, so a repeated failure is announced anew.
+  const notice: NoticeValue | undefined =
+    list.isError && !list.isFetching ? { kind: 'error', text: errorText(list.error) } : undefined;
   const { notice: pageNotice, error: pageError, clear: clearPage } = useNotice();
-  const latest = useRef(0);
+  // The words asked for now, for a page that arrives after another search was asked.
+  const askedWords = useRef(words);
+  useEffect(() => {
+    askedWords.current = words;
+  }, [words]);
   const heading = useRef<HTMLHeadingElement>(null);
-  const shown = useRef<HTMLParagraphElement>(null);
+  const status = useRef<HTMLParagraphElement>(null);
   const { remember, returnFocus } = useReturnFocus(heading);
   const [moveFocus, setMoveFocus] = useState(0);
 
@@ -142,42 +176,24 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
     return () => clearTimeout(timer);
   }, [moveFocus]);
 
-  /**
-   * Reads the list from the start. `keep` is how many visits were shown: after a save or a delete
-   * the pages are read again up to that many, so someone who loaded more keeps their place (#208).
-   */
-  const load = useCallback(
-    async (words: string, keep = 0) => {
-      // A slow older answer must not overwrite a newer one.
-      const request = ++latest.current;
-      clearPage();
-      setSearching(true);
-      try {
-        const path = `${visitsPath}?q=${encodeURIComponent(words)}`;
-        let page = await requestJson<Page>(path);
-        const list = [...page.visits];
-        while (page.more && list.length < keep) {
-          if (request !== latest.current) return;
-          page = await requestJson<Page>(`${path}&offset=${list.length}`);
-          list.push(...page.visits);
-        }
-        if (request !== latest.current) return;
-        applied.current = words;
-        clear();
-        setVisits(list);
-        setMore(page.more);
-      } catch (cause) {
-        if (request === latest.current) error(cause);
-      } finally {
-        if (request === latest.current) setSearching(false);
-      }
-    },
-    [clear, clearPage, error],
-  );
+  /** Reads the list for `next` from its first page; the same words read it again. */
+  const search = (next: string) => {
+    keep.current = 0;
+    clearPage();
+    setWords(next);
+    void client.invalidateQueries({ queryKey: listKey(next), exact: true });
+  };
 
-  useEffect(() => {
-    void load('');
-  }, [load]);
+  /**
+   * After a save or a delete: reads the list again up to `count` visits, and tells the daily card and
+   * the upcoming list, which show visits too.
+   */
+  const reload = (count: number) => {
+    keep.current = count;
+    clearPage();
+    void client.invalidateQueries({ queryKey: apiKey(visitsPath) });
+    void client.invalidateQueries({ queryKey: apiKey(remindersPath) });
+  };
 
   // The daily page links here with ?new=<date> to record a visit on that day.
   const asked = params.get('new');
@@ -192,19 +208,27 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
   }, [asked, setParams, today]);
 
   const loadMore = async () => {
-    const request = latest.current;
+    const before = list.data;
+    if (!before) return false;
+    const key = listKey(words);
+    // A search or a reload asked since replaces the list; a page read for the one before is dropped.
+    const current = () =>
+      askedWords.current === words &&
+      client.getQueryData(key) === before &&
+      client.isFetching({ queryKey: key, exact: true }) === 0;
     setLoadingMore(true);
     clearPage();
     try {
       const page = await requestJson<Page>(
-        `${visitsPath}?q=${encodeURIComponent(applied.current)}&offset=${visits?.length ?? 0}`,
+        `${visitsPath}?q=${encodeURIComponent(words)}&offset=${before.visits.length}`,
       );
-      if (request !== latest.current) return false;
-      setVisits((current) => [...(current ?? []), ...page.visits]);
-      setMore(page.more);
+      if (!current()) return false;
+      const next = { visits: [...before.visits, ...page.visits], more: page.more };
+      keep.current = next.visits.length;
+      client.setQueryData<Page>(key, next);
       return !page.more;
     } catch (cause) {
-      if (request === latest.current) pageError(cause);
+      if (current()) pageError(cause);
       return false;
     } finally {
       setLoadingMore(false);
@@ -232,9 +256,13 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
     }
     toast.success('Deleted');
     // Dropped now, so its delete button is not what the closing dialog hands focus back to.
-    setVisits((list) => list?.filter((item) => item.id !== visit.id) ?? list);
+    client.setQueryData<Page>(
+      listKey(words),
+      (current) =>
+        current && { ...current, visits: current.visits.filter((item) => item.id !== visit.id) },
+    );
     setMoveFocus((count) => count + 1);
-    void load(applied.current, (visits?.length ?? 0) - 1);
+    reload((visits?.length ?? 0) - 1);
   };
 
   return (
@@ -259,7 +287,7 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
           className="flex min-w-0 flex-1 basis-full gap-2 sm:basis-0"
           onSubmit={(event) => {
             event.preventDefault();
-            void load(query.trim());
+            search(query.trim());
           }}
         >
           <Input
@@ -286,10 +314,8 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
       ) : null}
       {visits?.length === 0 ? (
         <EmptyState
-          title={applied.current ? 'No matching records' : 'No clinic records'}
-          description={
-            applied.current ? 'Try a different search term.' : 'Record your first clinic visit.'
-          }
+          title={applied ? 'No matching records' : 'No clinic records'}
+          description={applied ? 'Try a different search term.' : 'Record your first clinic visit.'}
         />
       ) : null}
       {visits?.length ? (
@@ -306,7 +332,7 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
       ) : null}
       {/* Always in the page: a status region added along with its text may not be read out. */}
       <p
-        ref={shown}
+        ref={status}
         role="status"
         tabIndex={-1}
         className={cn(
@@ -321,7 +347,7 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
           : null}
       </p>
       {visits?.length && more ? (
-        <MoreFoodsButton loading={loadingMore || searching} onLoad={loadMore} afterLast={shown} />
+        <MoreFoodsButton loading={loadingMore || searching} onLoad={loadMore} afterLast={status} />
       ) : null}
       <Notice notice={pageNotice} />
       {editing ? (
@@ -333,7 +359,7 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
             closeDialog();
             toast.success('Saved');
             // A new visit takes a place in the list, so one more is read to keep the last one shown.
-            void load(applied.current, (visits?.length ?? 0) + (editing.visit ? 0 : 1));
+            reload((visits?.length ?? 0) + (editing.visit ? 0 : 1));
           }}
         />
       ) : null}

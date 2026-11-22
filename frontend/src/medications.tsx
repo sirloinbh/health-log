@@ -1,5 +1,6 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { charCount } from './check-text';
@@ -26,9 +27,9 @@ import {
   latestDate,
   serviceToday,
 } from './daily-date';
-import { RequestError, requestJson } from './lib/api';
-import { type ApiRequest, useApiMutation } from './lib/query';
-import { errorText, useNotice } from './lib/use-notice';
+import { RequestError } from './lib/api';
+import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
+import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
 import {
   howText,
   type Medication,
@@ -36,9 +37,14 @@ import {
   medicationsPath,
   periodText,
 } from './med-text';
+import { remindersPath } from './reminder-text';
 import { useReturnFocus } from './return-focus';
 import { type Visit, visitsPath } from './visit-text';
 import { asRequest } from './writes';
+
+// Under `apiKey(medicationsPath)` and `apiKey(visitsPath)`, so a change refreshes them with the daily card's.
+const listsKey = apiKey(medicationsPath, 'lists');
+const recentVisitsKey = apiKey(visitsPath, 'recent');
 
 type Draft = {
   name: string;
@@ -339,12 +345,23 @@ const sections = [
 export function MedicationsPage({ today }: { today: string | null | undefined }) {
   const remover = useApiMutation<unknown, ApiRequest>(asRequest);
   const [params, setParams] = useSearchParams();
-  const [lists, setLists] = useState<MedicationLists | null>(null);
-  const [visits, setVisits] = useState<Visit[]>([]);
+  const client = useQueryClient();
+  const query = useApiQuery<MedicationLists>(listsKey, medicationsPath);
+  // A failed read keeps the lists already shown.
+  const lists = query.data ?? null;
+  // The recent visits offered as where a medicine was prescribed; without them it can still be saved.
+  const recent = useApiQuery<{ visits: Visit[] }>(recentVisitsKey, visitsPath);
+  const visits = recent.data?.visits ?? [];
   // null: closed. Otherwise the medicine being edited (null for a new one) and where it starts.
   const [editing, setEditing] = useState<{ item: Medication | null; start: Start } | null>(null);
-  const { notice, status, error, clear } = useNotice();
-  const latest = useRef(0);
+  // The words about a read the person asked for. A failed read shows over them, hidden while
+  // reading again, so the same failure twice is announced again.
+  const { notice: said, status, clear } = useNotice();
+  const failed: NoticeValue | undefined =
+    query.isError && !query.isFetching
+      ? { kind: 'error', text: errorText(query.error) }
+      : undefined;
+  const notice = failed ?? said;
   const heading = useRef<HTMLHeadingElement>(null);
   const { remember, returnFocus } = useReturnFocus(heading);
   const [moveFocus, setMoveFocus] = useState(0);
@@ -356,35 +373,22 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
     return () => clearTimeout(timer);
   }, [moveFocus]);
 
-  /** `done`: what to say once the list is in, for a load the person asked for. */
-  const load = useCallback(
-    async (done?: string) => {
-      // A slow older answer must not overwrite a newer one.
-      const request = ++latest.current;
-      try {
-        const data = await requestJson<MedicationLists>(medicationsPath);
-        if (request !== latest.current) return;
-        if (done) status(done);
-        else clear();
-        setLists(data);
-      } catch (cause) {
-        if (request === latest.current) error(cause);
-      }
-    },
-    [clear, error, status],
-  );
+  /** After a save or a delete: the lists, the daily card and the upcoming list read again. */
+  const reload = () => {
+    clear();
+    void client.invalidateQueries({ queryKey: apiKey(medicationsPath) });
+    void client.invalidateQueries({ queryKey: apiKey(remindersPath) });
+  };
 
-  // The recent visits offered as where a medicine was prescribed; without them it can still be saved.
-  const loadVisits = useCallback(() => {
-    requestJson<{ visits: Visit[] }>(visitsPath)
-      .then((data) => setVisits(data.visits))
-      .catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    void load();
-    loadVisits();
-  }, [load, loadVisits]);
+  const retry = async () => {
+    // A word in its place: a list already on screen does not look fixed while the new one is on
+    // its way.
+    status('Reloading the list…');
+    if (recent.isError) void recent.refetch();
+    const result = await query.refetch({ cancelRefetch: false });
+    if (result.isError) clear();
+    else status('The list was reloaded.');
+  };
 
   // A visit links here with ?visit=<id>&date=<its date> to record what was prescribed there.
   const askedVisit = params.get('visit');
@@ -429,7 +433,7 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
     }
     toast.success('Deleted');
     // Dropped now, so its delete button is not what the closing dialog hands focus back to.
-    setLists((current) =>
+    client.setQueryData<MedicationLists>(listsKey, (current) =>
       current
         ? {
             ...current,
@@ -440,7 +444,7 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
         : current,
     );
     setMoveFocus((count) => count + 1);
-    void load();
+    reload();
   };
 
   return (
@@ -484,11 +488,7 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
           variant="outline"
           className="self-start"
           onClick={() => {
-            // A word in its place: the same failure twice is announced again, and a list already
-            // on screen does not look fixed while the new one is on its way.
-            status('Reloading the list…');
-            void load('The list was reloaded.');
-            loadVisits();
+            void retry();
             // Trying again removes this button, which would drop keyboard focus to the page (#65, #127).
             setMoveFocus((count) => count + 1);
           }}
@@ -537,7 +537,7 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
           onSaved={() => {
             closeDialog();
             toast.success('Saved');
-            void load();
+            reload();
           }}
         />
       ) : null}

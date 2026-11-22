@@ -4,7 +4,7 @@ import { z } from 'zod/v4';
 
 import { maxAmount } from './contract.js';
 import { isRealDate } from './dates.js';
-import { hasTwoDecimalsAtMost, optionalNumber } from './numbers.js';
+import { hasTwoDecimalsAtMost, withNumbers } from './numbers.js';
 import { HttpError, parseId } from './standard/http.js';
 import { charCount, likePattern } from './text.js';
 
@@ -127,46 +127,34 @@ export const searchQuery = z.object({
 /** How many foods one list or search request returns; the response says where the next page starts. */
 const foodPageSize = 100;
 
+// The columns come back under their API names; only the NUMERIC ones still need converting.
 type FoodRow = {
   id: number;
   name: string;
   brand: string | null;
   category: string | null;
-  serving_size: string;
-  serving_unit: string;
+  servingSize: string;
+  servingUnit: string;
   calories: string | null;
   carbs: string | null;
   protein: string | null;
   fat: string | null;
   sugars: string | null;
   sodium: string | null;
-  source_type: string;
-  source_url: string | null;
-  checked_on: string | null;
-  is_junk: boolean;
+  sourceType: string;
+  sourceUrl: string | null;
+  checkedOn: string | null;
+  isJunk: boolean;
 };
 
-const columns =
-  'id, name, brand, category, serving_size, serving_unit, calories, carbs, protein, fat, sugars, sodium, source_type, source_url, checked_on, is_junk';
+const columns = `id, name, brand, category, serving_size AS "servingSize",
+  serving_unit AS "servingUnit", calories, carbs, protein, fat, sugars, sodium,
+  source_type AS "sourceType", source_url AS "sourceUrl", checked_on AS "checkedOn",
+  is_junk AS "isJunk"`;
 
-const toFood = (row: FoodRow) => ({
-  id: row.id,
-  name: row.name,
-  brand: row.brand,
-  category: row.category,
-  servingSize: Number(row.serving_size),
-  servingUnit: row.serving_unit,
-  calories: optionalNumber(row.calories),
-  carbs: optionalNumber(row.carbs),
-  protein: optionalNumber(row.protein),
-  fat: optionalNumber(row.fat),
-  sugars: optionalNumber(row.sugars),
-  sodium: optionalNumber(row.sodium),
-  sourceType: row.source_type,
-  sourceUrl: row.source_url,
-  checkedOn: row.checked_on,
-  isJunk: row.is_junk,
-});
+const numeric = ['servingSize', 'calories', 'carbs', 'protein', 'fat', 'sugars', 'sodium'] as const;
+
+const toFood = (row: FoodRow) => withNumbers(row, numeric);
 
 const inputValues = (food: z.infer<typeof foodInput>) => [
   food.name,

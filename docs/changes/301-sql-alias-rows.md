@@ -35,6 +35,23 @@ The NUMERIC rule stays as it is: `standard/db.ts` keeps NUMERIC (type 1700) as a
 - CI `verify` failed in `npm run knip` (not part of `npm run check`): "Unused exported types (1) WithNumbers backend/src/numbers.ts". The type is only used inside `numbers.ts`, so it is no longer exported.
 - `npm run knip` (with `TEST_DATABASE_URL` set to the throwaway DB, which `playwright.config.ts` needs to load): exit 0; only the three configuration hints that main already prints remain.
 
+Merged as PR #307 (merge commit `c54d0c1`).
+
+## Change 2 – food, meal, habit and report routes (2026-11-22)
+
+- `foods.ts`: the columns are aliased (`serving_size AS "servingSize"`, ...); `toFood` is now `withNumbers` on the seven NUMERIC columns instead of a 17-line copy.
+- `meals.ts`: the day query aliases the entry columns and names the window columns `"caloriesTotal"`, `"caloriesMissing"`, and so on. `toEntry` and `toTotals` stay, because one row carries both an entry and the day's totals and they pick the two apart; they now read the API names, `foodId` (int8) and the `Missing` counts lose `Number(...)`/`optionalNumber`. The junk-food counts are aliased and typed as numbers.
+- `combos.ts`: the query aliases its columns; `toCombos` stays because it groups food rows into combos, and it drops `Number(...)` on the int8 food id and missing count.
+- `habits.ts`: the day and summary queries are aliased; counts and `sum(cigarettes)` (int8) lose `Number(...)`; drink amounts (NUMERIC) go through `withNumbers`.
+- `report.ts`: the summary CTEs, day rows and after-drinking rows are aliased; counts lose `Number(...)`; the averages and a day's calories still go through the local `rounded`, which rounds as well as converting; the `optionalNumber` import is gone.
+- Every row type left in `backend/src` now does real work: NUMERIC conversion (`body.ts`, `foods.ts`, `habits.ts`), picking an entry out of a row with totals (`meals.ts`), grouping (`combos.ts`), or rounding (`report.ts`).
+
+### Verification
+
+- Backend tests against the throwaway `health_test` after merging `origin/main` (`c54d0c1`): 300 tests, 300 passed, 0 failed, 0 skipped. The DB integration tests for foods, recent foods, meals, meal copy, meal retry, junk food, combos, habits and the report compare whole API responses.
+- `npm run knip` (with the throwaway `TEST_DATABASE_URL`): exit 0, only the three hints main already prints.
+- `TEST_DATABASE_URL= npm run check`: passed. Backend: 295 tests, 158 passed, 0 failed, 137 skipped (the DB tests, which ran in the throwaway run above; CI runs them too). Frontend: 76 files, 791 passed, 3 skipped. Format, lint, contract, typecheck, skill tests and build passed.
+
 ## Limits and follow-up
 
-- Food and meal routes (`foods.ts`, `meals.ts`, `combos.ts`, `habits.ts`, `report.ts`) are the next PR under the same issue.
+- None for this issue.

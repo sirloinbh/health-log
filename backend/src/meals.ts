@@ -80,86 +80,83 @@ export const entryInput = z
     }
   });
 
-type EntryRow = {
+type Nutrient = (typeof nutrients)[number];
+
+// Each row is one entry under its API names, plus the day's totals in the window columns.
+// NUMERIC columns are strings; ids and counts are int8, which setInt8Parser returns as numbers.
+type DayRow = {
   id: number;
   meal: string;
-  food_id: string | null;
+  foodId: number | null;
   name: string;
   brand: string | null;
   servings: string;
-  serving_size: string | null;
-  serving_unit: string | null;
-  is_junk: boolean;
-} & Record<
-  | (typeof nutrients)[number]
-  | `${(typeof nutrients)[number]}_total`
-  | `${(typeof nutrients)[number]}_missing`,
-  string | null
->;
+  servingSize: string | null;
+  servingUnit: string | null;
+  isJunk: boolean;
+} & Record<Nutrient | `${Nutrient}Total`, string | null> &
+  Record<`${Nutrient}Missing`, number>;
 
 // Multiplied in the database: NUMERIC is exact, so 1.5 × 123.45 cannot pick up binary float errors.
 const eaten = nutrients.map((key) => `round(${key} * servings, 2) AS ${key}`).join(', ');
 const totals = nutrients
   .map(
     (key) =>
-      `sum(${key}) OVER () AS ${key}_total, count(*) FILTER (WHERE ${key} IS NULL) OVER () AS ${key}_missing`,
+      `sum(${key}) OVER () AS "${key}Total", count(*) FILTER (WHERE ${key} IS NULL) OVER () AS "${key}Missing"`,
   )
   .join(', ');
 // One statement sees one snapshot, and the totals add up the rounded rows, so a day's list and its
 // totals always agree.
 const daySql = `WITH eaten AS (
-    SELECT id, meal, food_id, name, brand, servings, serving_size, serving_unit, is_junk, ${eaten}
+    SELECT id, meal, food_id AS "foodId", name, brand, servings, serving_size AS "servingSize",
+      serving_unit AS "servingUnit", is_junk AS "isJunk", ${eaten}
     FROM meal_entries WHERE entry_date = $1
   )
   SELECT *, ${totals} FROM eaten ORDER BY id`;
 
-const toEntry = (row: EntryRow) => ({
+// Picks the entry's own columns out of a row that also carries the day's totals.
+const toEntry = (row: DayRow) => ({
   id: row.id,
   meal: row.meal,
-  foodId: optionalNumber(row.food_id),
+  foodId: row.foodId,
   name: row.name,
   brand: row.brand,
   servings: Number(row.servings),
-  servingSize: optionalNumber(row.serving_size),
-  servingUnit: row.serving_unit,
-  isJunk: row.is_junk,
+  servingSize: optionalNumber(row.servingSize),
+  servingUnit: row.servingUnit,
+  isJunk: row.isJunk,
   ...Object.fromEntries(nutrients.map((key) => [key, optionalNumber(row[key])])),
 });
 
 // A day with no rows has no totals to read: no value, and nothing missing.
-const toTotals = (row: EntryRow | undefined) =>
+const toTotals = (row: DayRow | undefined) =>
   Object.fromEntries(
     nutrients.map((key) => [
       key,
       {
-        value: row ? optionalNumber(row[`${key}_total`]) : null,
-        missing: row ? Number(row[`${key}_missing`]) : 0,
+        value: row ? optionalNumber(row[`${key}Total`]) : null,
+        missing: row ? row[`${key}Missing`] : 0,
       },
     ]),
   );
 
-type JunkRow = {
-  times: string;
-  days: string;
-  calories: string | null;
-  calories_missing: string;
-};
+type JunkRow = { times: number; days: number; calories: string | null; caloriesMissing: number };
 
 // Junk food of a period (#38): each entry is one time eaten, whatever its servings, and a day with
 // several counts once among the days. Calories add up the entries as recorded, like a day's totals.
 const junkSql = `SELECT count(*) AS times, count(DISTINCT entry_date) AS days,
     sum(round(calories * servings, 2)) AS calories,
-    count(*) FILTER (WHERE calories IS NULL) AS calories_missing
+    count(*) FILTER (WHERE calories IS NULL) AS "caloriesMissing"
   FROM meal_entries WHERE is_junk AND entry_date BETWEEN $1 AND $2`;
 
 const junkOf = async (db: Db, period: { from: string; to: string }) => {
   const { rows } = await db.query<JunkRow>(junkSql, [period.from, period.to]);
-  const row = rows[0];
+  const { times, days, calories, caloriesMissing } = rows[0];
   return {
     ...period,
-    times: Number(row.times),
-    days: Number(row.days),
-    calories: { value: optionalNumber(row.calories), missing: Number(row.calories_missing) },
+    times,
+    days,
+    calories: { value: optionalNumber(calories), missing: caloriesMissing },
   };
 };
 
@@ -167,7 +164,7 @@ const junkOf = async (db: Db, period: { from: string; to: string }) => {
 // it in its own transaction, which sees the change; an entry another tab saves at that same moment
 // may show in the periods before the list, until the next read. The AI tool list_meals calls it too (#711).
 export const mealsOfDay = async (db: Db, date: string) => {
-  const { rows } = await db.query<EntryRow>(daySql, [date]);
+  const { rows } = await db.query<DayRow>(daySql, [date]);
   const { week, month } = periodsOf(date);
   return {
     entries: rows.map(toEntry),

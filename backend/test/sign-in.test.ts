@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 import { test } from 'node:test';
 
 import { createAuthMiddleware } from '@sirloinbh/auth-client';
 import type { Pool } from 'pg';
 
 import { createApp } from '../src/app.js';
+import { listenLocally } from './standard/api.js';
 
 // #167: the shared sign-in guards /api. A fake auth service stands in for sirloinbh/shared-auth
 // and a fake pool for PostgreSQL, so these run without either.
@@ -22,12 +24,10 @@ async function withApi(run: (base: string, sessionChecks: () => number) => Promi
     },
   });
   const pool = { query: async () => ({ rows: [] }) } as unknown as Pool;
-  const server = createApp(pool, { auth }).listen(0, '127.0.0.1');
-  await new Promise<void>((resolve) => server.once('listening', resolve));
-  const address = server.address();
-  assert.ok(address && typeof address !== 'string');
+  const server = createServer(createApp(pool, { auth }));
+  const port = await listenLocally(server);
   try {
-    await run(`http://127.0.0.1:${address.port}/api`, () => checks);
+    await run(`http://127.0.0.1:${port}/api`, () => checks);
   } finally {
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),

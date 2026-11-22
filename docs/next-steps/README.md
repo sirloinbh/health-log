@@ -11,14 +11,14 @@ Requirements are registered as GitHub issues. Choose later work with the selecti
 
 ## User actions
 
-| Order | Action                                                                                                                                                                                    | Issue                 |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| 1     | Before the next deploy, run the two queries in [the #197 change record](../changes/197-sleep-body-db-checks.md) on real data. A row that breaks a rule stops migration 019 and the deploy | #197                  |
-| 2     | First deploy and the checks after it ([checks](../access-protection.md#checks-after-a-deploy)). The web stays on `127.0.0.1:8103` behind the shared proxy                                 | #41, #74              |
-| 3     | After the deploy, check the shared sign-in on the server                                                                                                                                  | #167                  |
-| 4     | Merge the central change that marks health-log as using the shared contract (`features.contract=true`)                                                                                    | project-standards#978 |
-| 5     | Merge the workout-memo sync PR that the project-standards#982 sync opened (or let that repo's session do it)                                                                              | workout-memo PR #466  |
-| 6     | Garmin key, photo recognition, ESLint dependencies after the upstream fix, MFDS auth key                                                                                                  | #28, #47, #115, #118  |
+| Order | Action                                                                                                                                                                                    | Issue                           |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| 1     | Before the next deploy, run the two queries in [the #197 change record](../changes/197-sleep-body-db-checks.md) on real data. A row that breaks a rule stops migration 019 and the deploy | #197                            |
+| 2     | First deploy and the checks after it ([checks](../access-protection.md#checks-after-a-deploy)). The web stays on `127.0.0.1:8103` behind the shared proxy                                 | #41, #74                        |
+| 3     | After the deploy, check the shared sign-in on the server                                                                                                                                  | #167                            |
+| 4     | Get the central change done that marks health-log as using the shared contract (`features.contract=true`)                                                                                 | sirloinbh/project-standards#978 |
+| 5     | Merge the workout-memo sync PR that the sirloinbh/project-standards#982 sync opened (or let that repo's session do it)                                                                    | sirloinbh/workout-memo#466      |
+| 6     | Garmin key, photo recognition, ESLint dependencies after the upstream fix, MFDS auth key                                                                                                  | #28, #47, #115, #118            |
 
 Notes for the deploy:
 
@@ -36,11 +36,11 @@ These were decided without asking. If you want them different, open a follow-up 
 
 ## Central follow-ups
 
-Open in `sirloinbh/project-standards`:
+Open in the central repo:
 
-- **#978:** set `features.contract=true` for health-log (user action 4).
-- **#979:** `useApiMutation` cannot pass request headers. Until it can, meals use `useMutation` directly to send the `Idempotency-Key`.
-- **#980:** the managed `lib/query.test.tsx` sends `GET /api/tags` after it ends. Until it is fixed, health-log's test setup ignores that request by name.
+- **sirloinbh/project-standards#978:** set `features.contract=true` for health-log (user action 4).
+- **sirloinbh/project-standards#979:** `useApiMutation` cannot pass request headers. Until it can, meals use `useMutation` directly to send the `Idempotency-Key`.
+- **sirloinbh/project-standards#980:** the managed `lib/query.test.tsx` sends `GET /api/tags` after it ends. Until it is fixed, health-log's test setup ignores that request by name.
 
 ## Issues that need the user
 

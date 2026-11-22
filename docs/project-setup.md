@@ -54,27 +54,27 @@ Copy them as they are into the `AGENTS.md` of the new project.
 
 ### 3.1 [In use] Versions and roles
 
-| Area            | Choice                                              | Version (pinned or range)                                  | Role                                                     |
-| --------------- | --------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------- |
-| Runtime         | Node.js / npm                                       | `24.21.0` / `11.19.0` (pinned exactly)                     | Same in development, CI, and Docker                      |
-| Package layout  | npm workspaces                                      | Root + `frontend`, `backend`                               | One root lock file + lock files for the sub repositories |
-| Frontend        | React, React DOM                                    | `^19.1.0`                                                  | SPA                                                      |
-|                 | Vite                                                | `^6.3.5`                                                   | Dev server and build, `/api` proxy                       |
-|                 | TypeScript                                          | `^5.8.3`                                                   | `strict`                                                 |
-|                 | lucide-react                                        | `^0.468.0`                                                 | Icons                                                    |
-| Backend         | Express                                             | `^5.1.0`                                                   | REST API                                                 |
-|                 | pg (node-postgres)                                  | `^8.16.0`                                                  | SQL written by hand, no ORM                              |
-|                 | Zod                                                 | `^3.25.0`                                                  | Server input validation                                  |
-|                 | tsx                                                 | `^4.19.0`                                                  | Dev run (`watch`) and test run                           |
-| DB              | PostgreSQL                                          | `17` (`postgres:17-alpine`)                                | Single DB                                                |
-| Web server      | nginx                                               | `1.27-alpine`                                              | Static files + `/api` reverse proxy                      |
-| Code quality    | ESLint / typescript-eslint / react-hooks / Prettier | `10.12.0` / `8.71.2` / `7.1.1` / `3.9.10` (pinned exactly) | Warnings also fail                                       |
-|                 | `@eslint/js`, `eslint-config-prettier`, `globals`   | `10.0.1`, `10.1.8`, `16.5.0`                               |                                                          |
-| Dev convenience | concurrently                                        | `^9.2.0`                                                   | Run API and web together                                 |
-| Tests           | `node:test` + `tsx --test`                          | Built into Node                                            | Unit, DB integration, UI (chapter 6 below)               |
-| Containers      | Docker Compose                                      | —                                                          | 3 services: db, api, web                                 |
-| CI              | GitHub Actions                                      | —                                                          | All checks + DB integration + Docker build               |
-| Infrastructure  | Terraform / AWS provider                            | `>= 1.6.0` / `~> 5.0`                                      | ECR and budget alert (deploy not connected)              |
+| Area            | Choice                                              | Version (pinned or range)                                  | Role                                        |
+| --------------- | --------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------- |
+| Runtime         | Node.js / npm                                       | `24.21.0` / `11.19.0` (pinned exactly)                     | Same in development, CI, and Docker         |
+| Package layout  | npm workspaces                                      | Root + `frontend`, `backend`                               | One root lock file                          |
+| Frontend        | React, React DOM                                    | `^19.1.0`                                                  | SPA                                         |
+|                 | Vite                                                | `^6.3.5`                                                   | Dev server and build, `/api` proxy          |
+|                 | TypeScript                                          | `^5.8.3`                                                   | `strict`                                    |
+|                 | lucide-react                                        | `^0.468.0`                                                 | Icons                                       |
+| Backend         | Express                                             | `^5.1.0`                                                   | REST API                                    |
+|                 | pg (node-postgres)                                  | `^8.16.0`                                                  | SQL written by hand, no ORM                 |
+|                 | Zod                                                 | `^3.25.0`                                                  | Server input validation                     |
+|                 | tsx                                                 | `^4.19.0`                                                  | Dev run (`watch`) and test run              |
+| DB              | PostgreSQL                                          | `17` (`postgres:17-alpine`)                                | Single DB                                   |
+| Web server      | nginx                                               | `1.27-alpine`                                              | Static files + `/api` reverse proxy         |
+| Code quality    | ESLint / typescript-eslint / react-hooks / Prettier | `10.12.0` / `8.71.2` / `7.1.1` / `3.9.10` (pinned exactly) | Warnings also fail                          |
+|                 | `@eslint/js`, `eslint-config-prettier`, `globals`   | `10.0.1`, `10.1.8`, `16.5.0`                               |                                             |
+| Dev convenience | concurrently                                        | `^9.2.0`                                                   | Run API and web together                    |
+| Tests           | `node:test` + `tsx --test`                          | Built into Node                                            | Unit, DB integration, UI (chapter 6 below)  |
+| Containers      | Docker Compose                                      | —                                                          | 3 services: db, api, web                    |
+| CI              | GitHub Actions                                      | —                                                          | All checks + DB integration + Docker build  |
+| Infrastructure  | Terraform / AWS provider                            | `>= 1.6.0` / `~> 5.0`                                      | ECR and budget alert (deploy not connected) |
 
 ### 3.2 [Recommended, not adopted] Candidates to adopt when needed
 
@@ -91,24 +91,13 @@ Copy them as they are into the `AGENTS.md` of the new project.
 
 If you want to use the candidates above in a new project from the start, adopt them after you get the user confirmation as rule 1 of chapter 1 says. When you adopt one, keep the run commands, CI, and docs consistent in the same PR.
 
-## 4. Repository layout and splitting repositories
+## 4. Repository layout
 
-### 4.1 Umbrella monorepo + sub repositories for deploy
+### 4.1 One umbrella repository
 
-- All source is developed in **one umbrella monorepo `<owner>/<app>`.** Issues, branches, PRs, and reviews all happen here.
-- The 4 repositories per area are synced with `git subtree split` **only for deploy and sharing.** During everyday PR work, do not push to a sub repository or to `main` directly.
-
-| Prefix folder     | Sub repository (private)            | Content                                       |
-| ----------------- | ----------------------------------- | --------------------------------------------- |
-| `frontend/`       | `<owner>/<app>-frontend`            | React app, Dockerfile, nginx.conf, its own CI |
-| `backend/`        | `<owner>/<app>-backend`             | Express API, Dockerfile, its own CI           |
-| `database/`       | `<owner>/<app>-db`                  | SQL migrations, README                        |
-| `infrastructure/` | `<owner>/shared-aws-infrastructure` | Terraform shared by several apps, its own CI  |
-
-- First creation: `scripts/create-repositories.ps1 -Owner <owner>`. It creates 5 repositories, splits each prefix folder into an `export/<part>` branch, and pushes it to `main` of the sub repository.
-- Sync: `scripts/push-repositories.ps1`. Run it **only when the user asks for a sync** (it also pushes the umbrella `main`).
-- If someone fixed something directly in a sub repository, first bring it in with `git subtree pull --prefix=<part> <url> main --squash`.
-- So that a sub repository builds on its own, `frontend/` and `backend/` each keep their own `package-lock.json`, `.github/workflows/ci.yml`, `.gitignore`, and `.dockerignore`.
+- All source is developed in **one umbrella monorepo `<owner>/<app>`,** and the server deploys from it. Issues, branches, PRs, and reviews all happen here. Do not push to `main` directly.
+- There are no per-area sub repositories. project-standards ADR-0022 dropped the `git subtree split` deploy repositories (`<app>-frontend`, `<app>-backend`, `<app>-db`) together with `create-repositories.ps1` and `push-repositories.ps1`. `frontend/` and `backend/` have no lock file or CI of their own; the root lock file and `.github/workflows/ci.yml` cover them.
+- The Terraform shared by several apps lives in its own repository, `<owner>/shared-aws-infrastructure`.
 
 ### 4.2 Directory layout
 
@@ -547,11 +536,7 @@ jobs:
       - run: docker build -t <app>-backend:ci ./backend
 ```
 
-The `npm ci` inside a CI runner installs from the lock file in an isolated GitHub environment, so it is separate from the rule that forbids local installs. The CI for the sub repositories is as follows.
-
-- `frontend/.github/workflows/ci.yml`: `npm ci` → `npm run build` → `docker build`
-- `backend/.github/workflows/ci.yml`: `npm ci` → `npm run build` → `npm test` (unit tests without a DB, integration tests are skipped) → `docker build`
-- `infrastructure/.github/workflows/ci.yml`: `terraform init -backend=false && terraform validate`
+The `npm ci` inside a CI runner installs from the lock file in an isolated GitHub environment, so it is separate from the rule that forbids local installs. This one workflow is the only app CI; there is no per-area CI (project-standards ADR-0022).
 
 ## 8. Design system
 
@@ -655,7 +640,7 @@ For a request to add a feature, fix, refactor, change settings, docs, or skills,
 - Do not commit or record .env, tokens, real backups, or Terraform state.
 - Do not overwrite user changes, and stage only the files you need.
 - Install or remove npm packages only after the user reconfirms, --ignore-scripts first.
-- Sub repository sync (scripts/push-repositories.ps1) and AWS deploys only on a separate request.
+- AWS deploys only on a separate request.
 
 ## Verification commands
 
@@ -704,7 +689,7 @@ Pass the "Check" at the end of each step before you go to the next step.
 8. **Run the containers:** create `.env` and run `docker compose up --build -d`. Check: the screen at `http://localhost:<web-port>` and the `/api/health` response are normal.
 9. **AI instructions:** create `AGENTS.md`, `CLAUDE.md`, the 3 skills, and the `.claude/skills` sync script and its test of chapter 10. Check: `npm run check` includes `test:skills` and it passes.
 10. **Docs:** create the README (run, verification, repository layout), `docs/development-baseline.md`, `docs/changes/`, `docs/daily/`, and `docs/next-steps/`.
-11. **Create repositories:** after user approval, create the umbrella repository and the 4 sub repositories as private with `scripts/create-repositories.ps1 -Owner <owner>`. Check: the CI of each repository passes.
+11. **Create the repository:** after user approval, create the umbrella repository as private. There are no sub repositories (project-standards ADR-0022). Check: its CI passes.
 12. **Infrastructure draft:** put the Terraform of chapter 12 in `infrastructure/` and run `terraform init -backend=false && terraform validate`. Do a real `apply` only when the user asks for a deploy.
 13. **GitHub Flow from the first issue:** from here on, make every change with the steps of chapter 9.
 
@@ -761,7 +746,7 @@ When you take the settings over as they are, compare against the files below as 
 - Instructions: `AGENTS.md`, `skills/workout-implementation/SKILL.md`, `skills/workout-testing/SKILL.md`, `skills/workout-foundation/SKILL.md`, `skills/workout-foundation/references/stack.md`
 - Settings: `package.json`, `.npmrc`, `.editorconfig`, `.gitattributes`, `.prettierrc.json`, `.prettierignore`, `eslint.config.mjs`, `frontend/tsconfig.json`, `backend/tsconfig*.json`, `frontend/vite.config.ts`
 - Run: `compose.yaml`, `.env.example`, `frontend/Dockerfile`, `frontend/nginx.conf`, `backend/Dockerfile`
-- CI: `.github/workflows/ci.yml`, `frontend|backend|infrastructure/.github/workflows/ci.yml`
-- Repositories: `scripts/create-repositories.ps1`, `scripts/push-repositories.ps1`, `scripts/backup.ps1`, `scripts/claude-skills.mjs`
+- CI: `.github/workflows/ci.yml`
+- Repositories: `scripts/backup.ps1`, `scripts/claude-skills.mjs` (the sub-repo scripts were removed by project-standards ADR-0022)
 - Infrastructure: `infrastructure/main.tf`, `infrastructure/versions.tf`, `infrastructure/README.md`
 - Docs: `docs/development-baseline.md`, `docs/project-github-auth.md`, `docs/local-agent-workflow.md`, `docs/shared-hosting-costs.md`, `docs/agent-issue-template.md`

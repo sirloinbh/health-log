@@ -1,3 +1,3 @@
 # Meal, sleep, and health log backend
 
-This is a deploy repository synced as a subtree from `backend/` in the umbrella repository `sirloinbh/health-log`. Changes are made in the umbrella repository through issues and PRs.
+The Express API of the umbrella repository `sirloinbh/health-log`, which is the only source and deploy repository. Changes are made there through issues and PRs.

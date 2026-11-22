@@ -52,4 +52,4 @@ Requirements are registered as GitHub issues. Work in the order below, and choos
 
 ## Run boundaries
 
-Deploys, syncing sub repositories, and creating AWS resources are done only on a separate request. Add the ECR repository of the shared infrastructure to the list in `shared-aws-infrastructure` at the first deploy.
+Deploys and creating AWS resources are done only on a separate request. There are no sub repositories to sync (project-standards ADR-0022). Add the ECR repository of the shared infrastructure to the list in `shared-aws-infrastructure` at the first deploy.

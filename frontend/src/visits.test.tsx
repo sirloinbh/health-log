@@ -143,6 +143,7 @@ test('editing starts from the visit, can take a procedure out, and saves to its 
   ]);
 });
 
+// Each rule has its own case in visit-form.test.ts; this checks the dialog shows the reason.
 test('what cannot be sent is explained in the dialog before anything is sent', async () => {
   const fetchMock = serve(() => json({ visits: [], more: false }));
   open();
@@ -154,36 +155,15 @@ test('what cannot be sent is explained in the dialog before anything is sent', a
   save();
   await said('Enter the clinic name');
   fill('Clinic name', '가상의원');
-  fill('Visit cost (₩)', '1.5');
-  save();
-  await said('Visit cost: enter whole won');
-  fill('Visit cost (₩)', '');
   fill('Next appointment', '2026-03-14');
   save();
   await said('The next appointment date cannot be before the visit date');
-  fill('Next appointment', '2100-01-01');
-  save();
-  await said('Next appointment: Records can be kept from 2000-01-01 to 2099-12-31');
   fill('Next appointment', '');
-  fill('Visit date', '1999-12-31');
-  save();
-  await said('Visit date: Records can be kept from 2000-01-01 to 2099-12-31');
-  fill('Visit date', '2026-03-15');
-  fill('Visit cost (₩)', '100,000,001');
-  save();
-  await said('Visit cost must be 100 million won or less');
-  fill('Visit cost (₩)', '');
-  fill('Clinic name', '🏥'.repeat(101));
-  save();
-  await said('Clinic name must be 100 characters or fewer');
-  fill('Clinic name', '가상의원');
   fireEvent.click(within(dialog()).getByRole('button', { name: 'Add procedure' }));
-  save();
-  await said('Procedure 1: enter a name');
   fill('Procedure 1 name', '가상 시술');
-  fill('Procedure 1 note', '가'.repeat(501));
+  fill('Procedure 1 cost (₩)', '1.5');
   save();
-  await said('Procedure 1 note must be 500 characters or fewer');
+  await said('Procedure 1 cost: enter whole won');
   expect(writes(fetchMock)).toHaveLength(0);
 });
 

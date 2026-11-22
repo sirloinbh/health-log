@@ -3,13 +3,11 @@ import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { isRealDate } from './dates.js';
+import { hasTwoDecimalsAtMost, optionalNumber } from './numbers.js';
 import { HttpError, parseId } from './standard/http.js';
-import { charCount } from './text.js';
+import { charCount, likePattern } from './text.js';
 
 const maxAmount = 99_999;
-
-// The columns keep two decimals; anything finer would be rounded silently, even down to zero.
-export const hasTwoDecimalsAtMost = (value: number) => Number(value.toFixed(2)) === value;
 
 const amount = (label: string) =>
   z
@@ -152,9 +150,6 @@ type FoodRow = {
 const columns =
   'id, name, brand, category, serving_size, serving_unit, calories, carbs, protein, fat, sugars, sodium, source_type, source_url, checked_on, is_junk';
 
-// pg returns BIGINT and NUMERIC as strings.
-const optionalNumber = (value: string | null) => (value === null ? null : Number(value));
-
 const toFood = (row: FoodRow) => ({
   id: row.id,
   name: row.name,
@@ -194,9 +189,6 @@ const inputValues = (food: z.infer<typeof foodInput>) => [
 /** How many recently eaten foods the meal card offers before any search. */
 const recentLimit = 10;
 
-// A search for "100%" means those characters, not a LIKE wildcard.
-const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, '\\$&')}%`;
-
 export function foodsRouter(pool: Pool, today: () => string) {
   const router = Router();
 
@@ -214,9 +206,11 @@ export function foodsRouter(pool: Pool, today: () => string) {
     // One row past the page says whether another page exists, without counting every match.
     // Pages only add up if every food has one place in the order. A name and brand are already
     // unique; id keeps that true even if the rule is ever relaxed.
+    // The screens show a food as "brand name" (#198), so the search runs on that text: it also
+    // finds the name alone or the brand alone, and concat_ws drops a missing brand.
     const { rows } = await pool.query<FoodRow>(
       `SELECT ${columns} FROM foods
-       WHERE $1 = '' OR name ILIKE $2 OR brand ILIKE $2
+       WHERE $1 = '' OR concat_ws(' ', brand, name) ILIKE $2
        ORDER BY name, brand NULLS FIRST, id
        LIMIT $3 OFFSET $4`,
       [q, likePattern(q), foodPageSize + 1, offset],

@@ -3,8 +3,9 @@ import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { parseDate } from './dates.js';
-import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.js';
-import { hasTwoDecimalsAtMost } from './foods.js';
+import { periodsOf } from './day-records.js';
+import { type Db, inTransaction, snapshotRead } from './db.js';
+import { hasTwoDecimalsAtMost } from './numbers.js';
 import { HttpError } from './standard/http.js';
 
 const drinkKinds = ['soju', 'beer', 'wine', 'makgeolli', 'whisky', 'other'] as const;
@@ -135,7 +136,7 @@ export function habitsRouter(pool: Pool) {
     const date = parseDate(req.params.date);
     // One snapshot for the record and both totals, so a save landing between them cannot make
     // the answer disagree with itself.
-    res.json(await inTransaction(pool, (client) => readDay(client, date), snapshotRead));
+    res.json(await inTransaction(pool, (client) => readDay(client, date), { setup: snapshotRead }));
   });
 
   router.put('/:date', async (req, res) => {

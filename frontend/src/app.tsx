@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   CalendarDays,
   Layers,
@@ -123,6 +124,16 @@ function Page({
 }
 
 export function App() {
+  // One cache per mounted app; the shared createQueryClient() replaces it once lib/query.ts syncs (#220).
+  const [queryClient] = useState(() => new QueryClient());
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Routed />
+    </QueryClientProvider>
+  );
+}
+
+function Routed() {
   const health = useHealth();
   // Pages that start a record on today: undefined while asking, null when the server cannot say.
   const pageToday =

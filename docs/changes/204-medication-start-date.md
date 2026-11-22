@@ -13,7 +13,7 @@
 - While the server's today is still on its way, "Add medication" is `aria-disabled` (it keeps focus, #98), ignores presses, and is described by "Checking today's date…" shown under it.
 - When the health check fails, a new medicine starts on today in the service time zone (Asia/Seoul) by this device's clock. The start date field then says "The server's date could not be checked, so this is today on this device. Check it before saving." This also applies to a visit link without a usable date, which used to open with a blank start date.
 - The button and the add dialog title read "Add medication". The edit title stays "Edit medication record".
-- `serviceToday` (today in Asia/Seoul by the device clock) moved from `frontend/src/foods.tsx` to `frontend/src/daily-date.ts`, so the foods page and the medication page share one copy. The foods page behaves the same.
+- `serviceToday` (today in Asia/Seoul by the device clock) moved to `frontend/src/daily-date.ts`, so the food dialog and the medication page share one copy. It lived in `frontend/src/foods.tsx` when this branch started and in `frontend/src/food-dialog.tsx` after #200 split that file; the merge of `origin/main` moved it from there. The food dialog behaves the same.
 - `frontend/src/medications.test.tsx`:
   - New: "adding waits for the server's today, then starts on it" holds the health answer, checks the button is `aria-disabled`, keeps focus, opens nothing, then opens on the server's date once it arrives.
   - New: "when the server cannot say today, a new medicine starts on this device's today and says so" fakes the clock at 2026-03-15 23:30 UTC (already 2026-03-16 in Asia/Seoul) and checks the start date and its note.
@@ -37,3 +37,8 @@
 ## Review round 2
 
 - Approve, no blocking comments. The round 1 fix is in place; the final diff was re-read (editing an existing medicine never waits; both add paths share `startDate`).
+
+## Merge of origin/main
+
+- `frontend/src/foods.tsx` conflicted with #200, which split it; main's version was taken and the `serviceToday` copy now in `frontend/src/food-dialog.tsx` was replaced by the import from `daily-date.ts`.
+- `npm ci --ignore-scripts` (main added `@tanstack/react-query`), then `npm run check` with `TEST_DATABASE_URL` empty: passed. Backend 154 passed, 127 skipped (DB tests); frontend 701 passed, 3 skipped; skills 4 passed.

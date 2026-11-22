@@ -2,8 +2,10 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
-import { isRealDate } from './dates.js';
-import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.js';
+import { isRealDate, shiftDay } from './dates.js';
+import { periodsOf } from './day-records.js';
+import { type Db, inTransaction, snapshotRead } from './db.js';
+import { optionalNumber } from './numbers.js';
 
 export const reportQuery = z.object({
   period: z.enum(['week', 'month'], { error: 'The period must be week or month' }),
@@ -11,9 +13,6 @@ export const reportQuery = z.object({
 });
 
 type Span = { from: string; to: string };
-
-const shiftDay = (date: string, days: number) =>
-  new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 
 const spanOf = (period: 'week' | 'month', date: string) => periodsOf(date)[period];
 
@@ -23,8 +22,6 @@ const datesIn = ({ from, to }: Span) => {
   return dates;
 };
 
-// pg returns NUMERIC and bigint counts as strings.
-const toNumber = (value: string | null) => (value === null ? null : Number(value));
 const rounded = (value: string | null, digits = 0) =>
   value === null ? null : Number(Number(value).toFixed(digits));
 
@@ -91,7 +88,7 @@ const readSummary = async (db: Db, span: Span) => {
     drinking: { days: Number(row.drink_recorded_days), drinkingDays: Number(row.drinking_days) },
     smoking: {
       days: smokingDays,
-      cigarettes: toNumber(row.cigarettes),
+      cigarettes: optionalNumber(row.cigarettes),
       averagePerDay: smokingDays ? Number((Number(row.cigarettes) / smokingDays).toFixed(1)) : null,
     },
     diet: { days: Number(row.diet_days), yes: Number(row.diet_kept) },
@@ -178,7 +175,7 @@ export function reportRouter(pool: Pool) {
         days: await readDays(client, current),
         sleepAfterDrinking: await readSleepAfterDrinking(client, current),
       }),
-      snapshotRead,
+      { setup: snapshotRead },
     );
     res.json(report);
   });

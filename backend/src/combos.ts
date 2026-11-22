@@ -2,8 +2,9 @@ import { Router } from 'express';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
+import { inTransaction } from './db.js';
 import { servingsInput } from './meals.js';
-import { withTransaction } from './standard/db.js';
+import { optionalNumber } from './numbers.js';
 import { HttpError, parseId } from './standard/http.js';
 import { charCount } from './text.js';
 
@@ -55,9 +56,6 @@ type ComboRow = {
   calories_total: string | null;
   calories_missing: string;
 };
-
-// pg returns BIGINT and NUMERIC as strings.
-const optionalNumber = (value: string | null) => (value === null ? null : Number(value));
 
 // Calories are multiplied and added in the database: NUMERIC is exact, so the total matches what
 // recording the combo would add to a day. LEFT JOIN keeps a combo whose foods were all removed.
@@ -133,14 +131,11 @@ export function combosRouter(pool: Pool) {
   };
 
   // The combo and its foods change together, or not at all.
-  const inTransaction = async <T>(run: (client: PoolClient) => Promise<T>) => {
-    try {
-      return await withTransaction<T, PoolClient>(pool, run);
-    } catch (error) {
-      if (nameTaken(error)) throw new HttpError(409, 'A combo with that name already exists');
-      throw error;
-    }
-  };
+  const inComboTransaction = <T>(run: (client: PoolClient) => Promise<T>) =>
+    inTransaction(pool, run, {
+      mapError: (error) =>
+        nameTaken(error) ? new HttpError(409, 'A combo with that name already exists') : error,
+    });
 
   // Foods that do not exist are left out by the join, so a short count means one was missing.
   const putItems = async (client: PoolClient, comboId: number, items: ComboInput['items']) => {
@@ -161,7 +156,7 @@ export function combosRouter(pool: Pool) {
 
   router.post('/', async (req, res) => {
     const combo = comboInput.parse(req.body);
-    const created = await inTransaction(async (client) => {
+    const created = await inComboTransaction(async (client) => {
       const { rows } = await client.query<{ id: number }>(
         'INSERT INTO meal_combos (name) VALUES ($1) RETURNING id',
         [combo.name],
@@ -177,7 +172,7 @@ export function combosRouter(pool: Pool) {
   router.put('/:id', async (req, res) => {
     const id = parseId(req.params.id, 'combo');
     const combo = comboInput.parse(req.body);
-    const updated = await inTransaction(async (client) => {
+    const updated = await inComboTransaction(async (client) => {
       const { rowCount } = await client.query(
         'UPDATE meal_combos SET name = $1, updated_at = now() WHERE id = $2',
         [combo.name, id],

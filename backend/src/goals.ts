@@ -3,7 +3,9 @@ import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { isRealDate, parseDate } from './dates.js';
-import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.js';
+import { periodsOf } from './day-records.js';
+import { type Db, inTransaction, snapshotRead } from './db.js';
+import { optionalNumber } from './numbers.js';
 import { HttpError } from './standard/http.js';
 
 const goalItems = ['calories', 'protein', 'sleep', 'sober_days'] as const;
@@ -125,8 +127,6 @@ type MealRow = {
 };
 type WeekRow = { recorded_days: string; sober_days: string };
 
-const optionalNumber = (value: string | null) => (value === null ? null : Number(value));
-
 const readDay = async (db: Db, date: string) => {
   const { week } = periodsOf(date);
   // The week's goal is the one in force on its last day, so a whole week answers to one number.
@@ -223,13 +223,15 @@ export function goalsRouter(pool: Pool, today: () => string) {
   const router = Router();
 
   router.get('/', async (_req, res) => {
-    res.json(await inTransaction(pool, (client) => readGoals(client, today()), snapshotRead));
+    res.json(
+      await inTransaction(pool, (client) => readGoals(client, today()), { setup: snapshotRead }),
+    );
   });
 
   router.get('/days/:date', async (req, res) => {
     const date = parseDate(req.params.date);
     // One snapshot for the goals and every record they judge.
-    res.json(await inTransaction(pool, (client) => readDay(client, date), snapshotRead));
+    res.json(await inTransaction(pool, (client) => readDay(client, date), { setup: snapshotRead }));
   });
 
   // Setting a goal from a date that already has one replaces that one; other dates keep theirs.

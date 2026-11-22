@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
-import { isRealDate } from './dates.js';
+import { isRealDate, shiftDay } from './dates.js';
 import { HttpError } from './standard/http.js';
 
 // Reminders shown in the app (#48): the next visit day of a clinic visit (#39) and the last day of
@@ -45,13 +45,6 @@ const targets = {
 
 /** On the same day, the appointment comes before the medicine. */
 const kindOrder = { visit: 0, medication: 1 } as const;
-
-/** A calendar day `days` later; counted in UTC, where no day is ever 23 or 25 hours long. */
-const addDays = (day: string, days: number) => {
-  const date = new Date(`${day}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-};
 
 const isForeignKeyError = (error: unknown) => (error as { code?: unknown })?.code === '23503';
 
@@ -104,7 +97,7 @@ export function remindersRouter(pool: Pool, today: () => string) {
       (a, b) =>
         a.dueOn.localeCompare(b.dueOn) || kindOrder[a.kind] - kindOrder[b.kind] || a.id - b.id,
     );
-    res.json({ today: day, until: addDays(day, leadDays), leadDays, reminders });
+    res.json({ today: day, until: shiftDay(day, leadDays), leadDays, reminders });
   });
 
   // Marks one reminder done for the day it is due. The day must still be the record's: a reminder

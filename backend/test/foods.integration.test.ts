@@ -352,6 +352,36 @@ test('search matches name and brand and treats % as a character', { skip }, asyn
   });
 });
 
+// #198: the screens show "brand name", so typing it that way must find the food.
+test('search finds a food by the brand and name as the screen shows them', { skip }, async () => {
+  await withApi(pool, async (call) => {
+    const add = (body: object) => call('/api/foods', { method: 'POST', body });
+    assert.equal(
+      (await add({ ...base, name: `${prefix}shown-bulgogi`, brand: `${prefix}shown-brand` }))
+        .status,
+      201,
+    );
+    assert.equal((await add({ ...base, name: `${prefix}shown-no-brand` })).status, 201);
+
+    const names = async (q: string) => {
+      const { data } = await call(`/api/foods?q=${encodeURIComponent(q)}`);
+      return (data.foods as { name: string }[]).map((food) => food.name);
+    };
+    const shown = `${prefix}shown-brand ${prefix}shown-bulgogi`;
+    assert.deepEqual(await names(shown), [`${prefix}shown-bulgogi`]);
+    // The end of the brand and the start of the name, across the space, as typed mid-word.
+    assert.deepEqual(await names(`shown-brand ${prefix}shown-bul`), [`${prefix}shown-bulgogi`]);
+    // Upper case still matches, the name alone and the brand alone still match.
+    assert.deepEqual(await names(shown.toUpperCase()), [`${prefix}shown-bulgogi`]);
+    assert.deepEqual(await names(`${prefix}shown-bulgogi`), [`${prefix}shown-bulgogi`]);
+    assert.deepEqual(await names(`${prefix}shown-brand`), [`${prefix}shown-bulgogi`]);
+    // A food without a brand is found by its name, with no leading space needed.
+    assert.deepEqual(await names(`${prefix}shown-no-brand`), [`${prefix}shown-no-brand`]);
+    // The words in the other order are not what the screen shows.
+    assert.deepEqual(await names(`${prefix}shown-bulgogi ${prefix}shown-brand`), []);
+  });
+});
+
 test('editing replaces the food and returns numbers, not strings', { skip }, async () => {
   await withApi(pool, async (call) => {
     const created = await call('/api/foods', {

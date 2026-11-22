@@ -3,8 +3,9 @@ import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { isRealDate, parseDate } from './dates.js';
-import { type Db, inTransaction, periodsOf, snapshotRead } from './day-records.js';
-import { hasTwoDecimalsAtMost } from './foods.js';
+import { periodsOf } from './day-records.js';
+import { type Db, inTransaction, snapshotRead } from './db.js';
+import { hasTwoDecimalsAtMost, optionalNumber } from './numbers.js';
 import { HttpError, parseId } from './standard/http.js';
 import { charCount } from './text.js';
 
@@ -95,9 +96,6 @@ type EntryRow = {
   string | null
 >;
 
-// pg returns BIGINT and NUMERIC as strings.
-const optionalNumber = (value: string | null) => (value === null ? null : Number(value));
-
 // Multiplied in the database: NUMERIC is exact, so 1.5 × 123.45 cannot pick up binary float errors.
 const eaten = nutrients.map((key) => `round(${key} * servings, 2) AS ${key}`).join(', ');
 const totals = nutrients
@@ -182,7 +180,9 @@ export function mealsRouter(pool: Pool) {
 
   router.get('/:date', async (req, res) => {
     const date = parseDate(req.params.date);
-    res.json(await inTransaction(pool, (client) => mealsOfDay(client, date), snapshotRead));
+    res.json(
+      await inTransaction(pool, (client) => mealsOfDay(client, date), { setup: snapshotRead }),
+    );
   });
 
   // Each change answers with the whole day, so the screen needs no second request. A change and the

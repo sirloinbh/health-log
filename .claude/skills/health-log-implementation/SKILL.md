@@ -37,7 +37,7 @@ This skill applies to changes in `sirloinbh/health-log`. Do not apply this accou
 
 - Before you create or update the PR, run the related tests and the required checks on the final change. Record in the docs and the PR the test code you added or changed, the behavior verified, and the actual commands run with pass/fail/skip. Follow the project `AGENTS.md` for the required commands and the conditions of the DB integration tests. Do not add app tests that a plain docs or skill change does not need.
 - Fix failures, and separate in the docs and the PR the checks you could not run, the DB tests that were skipped, and the browser verification that is not finished. If a needed verification is blocked, make the PR a draft.
-- Push only the work branch. The PR target is `main` of `sirloinbh/health-log`. The subtree sync script pushes main and the sub repositories, so do not use it in this step.
+- Push only the work branch. The PR target is `main` of `sirloinbh/health-log`, the only source and deploy repository (project-standards ADR-0022); there are no sub repositories to sync.
 - If a PR for the same head branch exists, update it and do not create a duplicate.
 - Pass the PR body as a UTF-8 file. Include the problem and the behavior after the change, the main changes, the real check commands and results, the evidence that is possible for a screen change, and `Closes #<number>`. If there are no images, write why, and the limits of the verification.
 - Check the GitHub Actions results and fix the related failures. Say so for a check that is still running. If you changed code after creating the PR, run the affected checks again and update the results in the docs and the PR.

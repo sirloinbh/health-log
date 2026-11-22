@@ -42,3 +42,4 @@ Tests:
 
 - After #264 (#196) merged, `origin/main` was merged into this branch without conflicts. No local copy came back (the same `rg` finds only the contract), and `npm run contract:check` matches.
 - `npm run check` (foreground, under the shared check lock, `TEST_DATABASE_URL` on the temporary `health_test`): passed. Backend 298 passed, 0 skipped; frontend 764 passed, 3 skipped; contract 3, skills 4 passed; format, lint, typecheck and build passed.
+- Main moved again (#266, #270). The second merge conflicted only on an import line in `frontend/src/report.tsx`: both sides added one (`periodsOf` from the contract, `kcalText` from #270), and both were kept. `npm run check` on the result passed. Backend 298 passed, 0 skipped; frontend 768 passed, 3 skipped; contract 3, skills 4 passed; format, lint, typecheck and build passed.

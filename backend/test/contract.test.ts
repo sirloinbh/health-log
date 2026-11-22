@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { periodsOf } from '../src/day-records.js';
+import { charCount, hasTwoDecimalsAtMost, maxAmount, periodsOf } from '../src/contract.js';
 
 test('weeks run Monday to Sunday, and months end on their own last day', () => {
   // 2026-11-01 is a Sunday, so it closes the week that began on Monday 10-26.
@@ -28,4 +28,12 @@ test('the periods follow the calendar date, whatever the server time zone', () =
     if (zone === undefined) delete process.env.TZ;
     else process.env.TZ = zone;
   }
+});
+
+// #215: the limits the screens show come from the same file as the server's checks.
+test('the shared number and text rules', () => {
+  assert.equal(charCount('밥😀'), 2);
+  assert.equal(hasTwoDecimalsAtMost(1.25), true);
+  assert.equal(hasTwoDecimalsAtMost(1.255), false);
+  assert.equal(maxAmount, 99_999);
 });

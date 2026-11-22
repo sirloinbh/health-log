@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
+import { periodsOf } from '../../shared/contract';
 import { kcalText } from './calorie-text';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
@@ -21,7 +22,6 @@ import {
   fewNights,
   minutesText,
   type Period,
-  periodSpan,
   periodWords,
   type Report,
   type ReportSummary,
@@ -325,7 +325,7 @@ export function ReportPage({ health }: { health: Health }) {
 
   // The first and last periods holding a day the daily page opens (#130).
   // The period asked for, which the shown one may still trail while it loads (#138).
-  const target = date ? periodSpan(period, date) : null;
+  const target = date ? periodsOf(date)[period] : null;
   const atStart = target !== null && target.from <= earliestDate;
   const atEnd = target !== null && target.to >= latestDate;
 

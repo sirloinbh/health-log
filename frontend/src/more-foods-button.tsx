@@ -29,13 +29,17 @@ export function MoreFoodsButton({
       onClick={(event) => {
         if (loading) return;
         const button = event.currentTarget;
-        void onLoad().then((last) => {
-          // Only the focus the button had: someone who moved on while waiting stays where they are.
-          const active = document.activeElement;
-          if (last && (active === button || active === document.body || active === null)) {
-            afterLast.current?.focus();
-          }
-        });
+        onLoad()
+          .then((last) => {
+            // Only the focus the button had: someone who moved on while waiting stays where they are.
+            const active = document.activeElement;
+            if (last && (active === button || active === document.body || active === null)) {
+              afterLast.current?.focus();
+            }
+          })
+          // A failed read is the caller's to report and to end its `loading`; here it must not
+          // escape as an unhandled rejection, and the button stays where it is to try again (#209).
+          .catch(() => undefined);
       }}
     >
       {loading ? <Spinner size="sm" label="Loading" /> : null}

@@ -97,7 +97,10 @@ export const changeText = (item: GoalItem, target: number | null) =>
 /** A number typed in the form, as the API takes it; a string says why it cannot be. Not for sleep. */
 export function toTarget(item: Exclude<GoalItem, 'sleep'>, value: number): number | string {
   const { label, unit, min, max } = goalFields[item];
-  if (value < min || value > max) return `${label}: enter ${min} to ${max} ${unit}`;
+  // NaN fails every comparison, so it is refused by name rather than passed on (#209).
+  if (Number.isNaN(value) || value < min || value > max) {
+    return `${label}: enter ${min} to ${max} ${unit}`;
+  }
   return Number.isInteger(value) ? value : `${label}: enter a whole number`;
 }
 
@@ -109,7 +112,8 @@ export function toSleepTarget(hours: number, minutes: number): number | string {
   if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
     return 'Sleep time: enter hours and minutes as whole numbers';
   }
-  if (minutes > 59) return 'Sleep time: enter minutes from 0 to 59';
+  // Negative minutes would quietly shorten the hours: 8 h -30 min is not 7 h 30 min typed (#209).
+  if (minutes < 0 || minutes > 59) return 'Sleep time: enter minutes from 0 to 59';
   const total = hours * 60 + minutes;
   return total < 60 || total > 1440 ? 'Sleep time: enter between 1 and 24 hours' : total;
 }

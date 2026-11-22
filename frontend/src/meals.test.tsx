@@ -1,9 +1,11 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, expect, test, vi } from 'vitest';
 
 import { toast } from './components/ui/sonner';
 import { MealCard } from './meals';
+import { answered } from './test/answered';
 import { findLive, getLive, queryLive } from './test/live';
+import { renderWithQuery } from './test/query';
 
 const date = '2026-03-15';
 const noTotal = { value: null, missing: 0 };
@@ -118,7 +120,7 @@ test('a searched food is recorded with the chosen meal and quantity', async () =
     { body: { foods: [food] } },
     { status: 201, body: oneEntry },
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Search foods');
   fireEvent.click(screen.getByRole('button', { name: 'Lunch' }));
   expect(screen.getByRole('button', { name: 'Lunch' })).toHaveAttribute('aria-pressed', 'true');
@@ -138,7 +140,7 @@ test('a searched food is recorded with the chosen meal and quantity', async () =
 
 test('the totals say when an unknown value leaves them incomplete', async () => {
   server({ body: oneEntry });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   expect(await screen.findByText('450kcal')).toBeInTheDocument();
   expect(screen.getByText(/so these totals leave them out/)).toHaveTextContent('Sodium 1 food');
 });
@@ -161,7 +163,7 @@ test('a searched food shows its calories per serving rounded, too', async () => 
 
 test('complete totals carry no such note, and a day with no value says so', async () => {
   server({ body: emptyDay });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByText('No meals recorded yet.');
   expect(screen.queryByText(/so these totals leave them out/)).not.toBeInTheDocument();
   expect(screen.getAllByText('No value')).toHaveLength(6);
@@ -169,7 +171,7 @@ test('complete totals carry no such note, and a day with no value says so', asyn
 
 test('a food not in the store is recorded with just a name and calories', async () => {
   const fetchMock = server({ body: emptyDay }, { status: 201, body: oneEntry });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '떡볶이' } });
   fireEvent.change(screen.getByLabelText('Calories per serving (kcal)'), {
@@ -191,14 +193,14 @@ test('a food not in the store is recorded with just a name and calories', async 
 // #207: one serving reads as one.
 test('an entry of one serving says "1 serving"', async () => {
   server({ body: { ...oneEntry, entries: [{ ...entry, servings: 1, calories: 300 }] } });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   const lunch = await screen.findByRole('region', { name: 'Lunch' });
   expect(within(lunch).getByText('1 serving · Serving 120g · 300kcal')).toBeInTheDocument();
 });
 
 test('quick entry without its fields explains itself and sends nothing', async () => {
   const fetchMock = server({ body: emptyDay });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
   expect(await findLive('alert')).toHaveTextContent('Enter a food name');
@@ -216,7 +218,7 @@ test.each([
   ['1.5.1', 'Quantity: enter digits only. Use a period for the decimal point'],
 ])('a quantity of "%s" is refused before sending', async (value, message) => {
   const fetchMock = server({ body: emptyDay }, { body: { foods: [food] } });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Search foods');
   fireEvent.change(screen.getByLabelText('Quantity (in servings)'), { target: { value } });
   fireEvent.click(await searchFood());
@@ -229,7 +231,7 @@ test.each([
   ['Calories per serving (kcal)', 'Calories per serving'],
 ])('a comma decimal in %s is refused, never read as ten times the value', async (label, name) => {
   const fetchMock = server({ body: emptyDay });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '떡볶이' } });
   fireEvent.change(screen.getByLabelText('Calories per serving (kcal)'), {
@@ -250,7 +252,7 @@ test.each([
 
 test('a calorie with a decimal point is sent as that number', async () => {
   const fetchMock = server({ body: emptyDay }, { status: 201, body: oneEntry });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.change(screen.getByLabelText('Quantity (in servings)'), { target: { value: '0.5' } });
   fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '떡볶이' } });
@@ -271,7 +273,7 @@ test('a calorie with a decimal point is sent as that number', async () => {
 
 test('the server refusing an entry shows why and keeps what was typed', async () => {
   server({ body: emptyDay }, { status: 400, body: { error: 'Calories are too large' } });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '떡볶이' } });
   fireEvent.change(screen.getByLabelText('Calories per serving (kcal)'), {
@@ -291,7 +293,7 @@ test('an entry in flight cannot be sent twice', async () => {
     .mockResolvedValueOnce(new Response(JSON.stringify({ foods: [food] })))
     .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
   stubFetch(fetchMock);
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Search foods');
   const add = await searchFood();
   fireEvent.click(add);
@@ -309,7 +311,7 @@ test('the typed form also waits for its request, and shows that it is working', 
     .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
     .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
   stubFetch(fetchMock);
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '떡볶이' } });
   fireEvent.change(screen.getByLabelText('Calories per serving (kcal)'), {
@@ -339,7 +341,7 @@ test('a junk food mark changed while waiting belongs to the next entry', async (
       .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
       .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve))),
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '감자칩' } });
   fireEvent.change(screen.getByLabelText('Calories per serving (kcal)'), {
@@ -367,7 +369,7 @@ test('the delete buttons wait while an entry is being recorded', async () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(oneEntry)))
       .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve))),
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   const remove = await screen.findByRole('button', { name: 'Delete 버거집 치즈버거' });
   fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '떡볶이' } });
   fireEvent.change(screen.getByLabelText('Calories per serving (kcal)'), {
@@ -381,7 +383,7 @@ test('the delete buttons wait while an entry is being recorded', async () => {
 
 test('the next attempt clears the last error', async () => {
   server({ body: emptyDay }, { body: { foods: [food] } }, { status: 201, body: oneEntry });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
   await findLive('alert');
@@ -398,7 +400,7 @@ test('a slower older search does not replace a newer one', async () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
       .mockImplementation(() => new Promise((resolve) => replies.push(resolve))),
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   const box = await screen.findByLabelText('Search foods');
   const form = box.closest('form')!;
   fireEvent.submit(form);
@@ -406,8 +408,9 @@ test('a slower older search does not replace a newer one', async () => {
   await waitFor(() => expect(replies).toHaveLength(2));
   replies[1](new Response(JSON.stringify({ foods: [food] })));
   await screen.findByRole('button', { name: 'Add 버거집 치즈버거' });
-  replies[0](new Response(JSON.stringify({ foods: [] })));
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  const stale = new Response(JSON.stringify({ foods: [] }));
+  replies[0](stale);
+  await answered(stale);
   expect(screen.getByRole('button', { name: 'Add 버거집 치즈버거' })).toBeInTheDocument();
 });
 
@@ -417,7 +420,7 @@ test('a failed search removes results that would read as its answer', async () =
     { body: { foods: [food] } },
     { status: 500, body: { error: 'Server error occurred' } },
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Search foods');
   await searchFood();
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
@@ -427,7 +430,7 @@ test('a failed search removes results that would read as its answer', async () =
 
 test('searching with no match points to direct entry', async () => {
   server({ body: emptyDay }, { body: { foods: [] } });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Search foods');
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   expect(await screen.findByText(/type a name and calories below/)).toBeInTheDocument();
@@ -435,7 +438,7 @@ test('searching with no match points to direct entry', async () => {
 
 test('a failed search says why', async () => {
   server({ body: emptyDay }, { status: 500, body: { error: 'Server error occurred' } });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Search foods');
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   expect(await findLive('alert')).toHaveTextContent('Server error occurred');
@@ -444,7 +447,7 @@ test('a failed search says why', async () => {
 
 test('deleting asks first, updates the totals, and returns focus to the card', async () => {
   const fetchMock = server({ body: oneEntry }, { body: emptyDay });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete 버거집 치즈버거' }));
   expect(fetchMock).toHaveBeenCalledTimes(1);
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
@@ -460,7 +463,7 @@ test('deleting asks first, updates the totals, and returns focus to the card', a
 
 test('cancelling a delete returns focus to its own button', async () => {
   server({ body: oneEntry });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   const remove = await screen.findByRole('button', { name: 'Delete 버거집 치즈버거' });
   remove.focus();
   fireEvent.click(remove);
@@ -478,7 +481,7 @@ test('an entry gone but the day unreadable does not claim success, and offers an
     { status: 500, body: { error: 'Server error occurred' } },
     { body: emptyDay },
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete 버거집 치즈버거' }));
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
   expect(await findLive('alert')).toHaveTextContent('Server error occurred');
@@ -495,7 +498,7 @@ test('an entry already gone counts as deleted and the day is read again', async 
     { status: 404, body: { error: 'Meal record not found' } },
     { body: emptyDay },
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete 버거집 치즈버거' }));
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
   expect(await screen.findByText('No meals recorded yet.')).toBeInTheDocument();
@@ -505,7 +508,7 @@ test('an entry already gone counts as deleted and the day is read again', async 
 test('a failed delete says why and keeps the entry and the dialog', async () => {
   const shown = vi.spyOn(toast, 'error');
   server({ body: oneEntry }, { status: 500, body: { error: 'Server error occurred' } });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete 버거집 치즈버거' }));
   const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' });
   fireEvent.click(confirm);
@@ -517,7 +520,7 @@ test('a failed delete says why and keeps the entry and the dialog', async () => 
 
 test('a failed load offers another try, with no form to record into an unseen day', async () => {
   server({ status: 500, body: { error: 'Server error occurred' } }, { body: oneEntry });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   expect(screen.queryByLabelText('Search foods')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
@@ -527,7 +530,7 @@ test('a failed load offers another try, with no form to record into an unseen da
 
 test('each form shows its errors next to its own buttons', async () => {
   server({ body: emptyDay }, { body: { foods: [food] } });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   const typedForm = (await screen.findByLabelText('Food name')).closest('form')!;
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
   expect(getLive('alert', typedForm)).toHaveTextContent('Enter a food name');
@@ -548,7 +551,7 @@ test('a searched food the server refuses says why and can be tried again', async
     { body: { foods: [food] } },
     { status: 500, body: { error: 'Server error occurred' } },
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Search foods');
   const add = await searchFood();
   fireEvent.click(add);
@@ -558,7 +561,7 @@ test('a searched food the server refuses says why and can be tried again', async
 
 test('a search says how many it found', async () => {
   server({ body: emptyDay }, { body: { foods: [food] } });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Search foods');
   await searchFood();
   expect(screen.getByText('1 result')).toHaveAttribute('role', 'status');
@@ -572,7 +575,7 @@ test('a search in progress shows that it is working', async () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
       .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve))),
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Search foods');
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   expect(await screen.findByRole('status', { name: 'Searching' })).toBeInTheDocument();
@@ -584,7 +587,7 @@ test('a search in progress shows that it is working', async () => {
 
 test('the delete question names the brand, as two entries can differ only by it', async () => {
   server({ body: oneEntry });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete 버거집 치즈버거' }));
   expect(
     within(screen.getByRole('dialog')).getByText(/'버거집 치즈버거' will be deleted/),
@@ -615,7 +618,7 @@ test('a read started before an entry was recorded does not undo it on screen', a
   stubFetch((_url, init) =>
     init?.method === 'GET' ? reads.shift()!() : Promise.resolve(writes.shift()!),
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete 버거집 치즈버거' }));
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
   await findLive('alert');
@@ -628,14 +631,15 @@ test('a read started before an entry was recorded does not undo it on screen', a
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
   expect(await screen.findByRole('button', { name: 'Delete 떡볶이' })).toBeInTheDocument();
 
-  finishRead(new Response(JSON.stringify(oneEntry)));
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  const late = new Response(JSON.stringify(oneEntry));
+  finishRead(late);
+  await answered(late);
   expect(screen.getByRole('button', { name: 'Delete 떡볶이' })).toBeInTheDocument();
 });
 
 test('trying again moves focus to the card, as the button it was on goes away', async () => {
   server({ status: 500, body: { error: 'Server error occurred' } }, { body: oneEntry });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   const again = await screen.findByRole('button', { name: 'Try again' });
   again.focus();
   fireEvent.click(again);
@@ -646,13 +650,12 @@ test('trying again moves focus to the card, as the button it was on goes away', 
 test('recording that succeeds after leaving the day still says so', async () => {
   const shown = vi.spyOn(toast, 'success');
   let finish = (_response: Response) => {};
-  stubFetch(
-    vi
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
-      .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve))),
-  );
-  const { unmount } = render(<MealCard date={date} />);
+  const inner = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
+    .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+  stubFetch(inner);
+  const { unmount } = renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '떡볶이' } });
   fireEvent.change(screen.getByLabelText('Calories per serving (kcal)'), {
@@ -660,6 +663,8 @@ test('recording that succeeds after leaving the day still says so', async () => 
   });
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
   unmount();
+  // React Query sends the add a moment after the click.
+  await waitFor(() => expect(inner).toHaveBeenCalledTimes(2));
   finish(new Response(JSON.stringify(oneEntry), { status: 201 }));
   await waitFor(() => expect(shown).toHaveBeenCalledWith('Meal recorded for 2026-03-15'));
   shown.mockRestore();
@@ -668,13 +673,12 @@ test('recording that succeeds after leaving the day still says so', async () => 
 test('losing the answer after leaving the day does not claim it was not recorded', async () => {
   const shown = vi.spyOn(toast, 'error');
   let lose = (_cause: Error) => {};
-  stubFetch(
-    vi
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
-      .mockImplementationOnce(() => new Promise((_resolve, reject) => (lose = reject))),
-  );
-  const { unmount } = render(<MealCard date={date} />);
+  const inner = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
+    .mockImplementationOnce(() => new Promise((_resolve, reject) => (lose = reject)));
+  stubFetch(inner);
+  const { unmount } = renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '떡볶이' } });
   fireEvent.change(screen.getByLabelText('Calories per serving (kcal)'), {
@@ -682,6 +686,8 @@ test('losing the answer after leaving the day does not claim it was not recorded
   });
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
   unmount();
+  // React Query sends the add a moment after the click.
+  await waitFor(() => expect(inner).toHaveBeenCalledTimes(2));
   lose(new TypeError('Failed to fetch'));
   await waitFor(() =>
     expect(shown).toHaveBeenCalledWith(
@@ -694,13 +700,12 @@ test('losing the answer after leaving the day does not claim it was not recorded
 test('recording that fails after leaving the day still says so', async () => {
   const shown = vi.spyOn(toast, 'error');
   let finish = (_response: Response) => {};
-  stubFetch(
-    vi
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
-      .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve))),
-  );
-  const { unmount } = render(<MealCard date={date} />);
+  const inner = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
+    .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+  stubFetch(inner);
+  const { unmount } = renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '떡볶이' } });
   fireEvent.change(screen.getByLabelText('Calories per serving (kcal)'), {
@@ -708,6 +713,8 @@ test('recording that fails after leaving the day still says so', async () => {
   });
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
   unmount();
+  // React Query sends the add a moment after the click.
+  await waitFor(() => expect(inner).toHaveBeenCalledTimes(2));
   finish(new Response(JSON.stringify({ error: 'Server error occurred' }), { status: 500 }));
   await waitFor(() =>
     expect(shown).toHaveBeenCalledWith(
@@ -740,7 +747,7 @@ test('a combo is read only when asked for, then recorded into the chosen meal', 
     { body: { combos: [combo] } },
     { status: 201, body: oneEntry },
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   expect(fetchMock).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole('button', { name: 'Lunch' }));
@@ -761,7 +768,7 @@ test('a combo is read only when asked for, then recorded into the chosen meal', 
 
 test('with no combos saved, the card says where to make one', async () => {
   server({ body: emptyDay }, { body: { combos: [] } });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Choose from combos' }));
   expect(
     await screen.findByText('No saved combos. You can create them on the Combos page in the menu.'),
@@ -773,7 +780,7 @@ test('a combo with no foods left cannot be recorded', async () => {
     { body: emptyDay },
     { body: { combos: [{ ...combo, items: [], calories: { value: null, missing: 0 } }] } },
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Choose from combos' }));
   const list = await screen.findByRole('list', { name: 'Combo list' });
   expect(within(list).getByText('No foods')).toBeInTheDocument();
@@ -782,7 +789,7 @@ test('a combo with no foods left cannot be recorded', async () => {
 
 test('combos that cannot be read say why next to their button', async () => {
   server({ body: emptyDay }, { status: 500, body: { error: 'Server error occurred' } });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Choose from combos' }));
   const section = screen.getByRole('region', { name: 'Combos' });
   expect(await findLive('alert', section)).toHaveTextContent('Server error occurred');
@@ -795,7 +802,7 @@ test('a combo the server refuses says why and records nothing on screen', async 
     { body: { combos: [combo] } },
     { status: 404, body: { error: 'Combo not found' } },
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Choose from combos' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Record 점심 세트' }));
   const section = screen.getByRole('region', { name: 'Combos' });
@@ -808,7 +815,7 @@ const copyForm = () => screen.getByRole('form', { name: 'Copy from another day' 
 
 test('the chosen meal of the day before is copied by default', async () => {
   const fetchMock = server({ body: emptyDay }, { status: 201, body: oneEntry });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.click(screen.getByRole('button', { name: 'Lunch' }));
   const form = copyForm();
@@ -826,7 +833,7 @@ test('the chosen meal of the day before is copied by default', async () => {
 
 test('any other day can be the one copied', async () => {
   const fetchMock = server({ body: emptyDay }, { status: 201, body: oneEntry });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   const form = copyForm();
   fireEvent.change(within(form).getByLabelText('Date to copy from'), {
@@ -842,7 +849,7 @@ test.each([
   [date, 'Choose a different date'],
 ])('copy from %j is refused before sending', async (from, message) => {
   const fetchMock = server({ body: emptyDay });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   const form = copyForm();
   fireEvent.change(within(form).getByLabelText('Date to copy from'), { target: { value: from } });
@@ -853,7 +860,7 @@ test.each([
 
 test('a meal with nothing to copy says which day and meal were empty', async () => {
   server({ body: emptyDay }, { status: 404, body: { error: 'There are no records to copy' } });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.click(screen.getByRole('button', { name: 'Dinner' }));
   const form = copyForm();
@@ -869,7 +876,7 @@ test('a meal with nothing to copy says which day and meal were empty', async () 
 
 test('another failure to copy shows the server message next to the copy button', async () => {
   server({ body: emptyDay }, { status: 500, body: { error: 'Server error occurred' } });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   const form = copyForm();
   fireEvent.click(within(form).getByRole('button', { name: 'Copy breakfast' }));
@@ -883,7 +890,7 @@ test('while a copy is on its way the button says so and cannot copy twice', asyn
     .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
     .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
   stubFetch(fetchMock);
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   const button = within(copyForm()).getByRole('button', { name: 'Copy breakfast' });
   expect(button).toHaveAccessibleDescription(/as they are/);
@@ -915,7 +922,7 @@ const answerRecent = (...lists: object[][]) => {
 test('recently eaten foods are offered before any search and add with the chosen meal', async () => {
   answerRecent([recentRice, food], [recentRice, food]);
   const fetchMock = server({ body: emptyDay }, { status: 201, body: oneEntry });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   const list = await screen.findByRole('list', { name: 'Recently eaten foods list' });
   expect(
     within(list)
@@ -939,7 +946,7 @@ test('recently eaten foods are offered before any search and add with the chosen
 
 test('with nothing eaten from the store yet, there is no recent list', async () => {
   server({ body: emptyDay });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   await waitFor(() => expect(recentCalls).toHaveLength(1));
   expect(screen.queryByRole('region', { name: 'Recently eaten foods' })).not.toBeInTheDocument();
@@ -948,7 +955,7 @@ test('with nothing eaten from the store yet, there is no recent list', async () 
 test('a recent food refused shows why next to the recent list', async () => {
   answerRecent([recentRice]);
   server({ body: emptyDay }, { status: 404, body: { error: 'Food not found' } });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   const section = await screen.findByRole('region', { name: 'Recently eaten foods' });
   fireEvent.change(screen.getByLabelText('Quantity (in servings)'), { target: { value: '0' } });
   fireEvent.click(within(section).getByRole('button', { name: 'Add 샘플 햇반' }));
@@ -969,7 +976,7 @@ test('recent foods that cannot be read say why and can be read again', async () 
       ? new Response(JSON.stringify({ error: 'Server error occurred' }), { status: 500 })
       : new Response(JSON.stringify({ foods: [recentRice] }));
   server({ body: emptyDay }, { body: { foods: [] } });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   const section = await screen.findByRole('region', { name: 'Recently eaten foods' });
   expect(await findLive('alert', section)).toHaveTextContent(
     'Could not load recently eaten foods: Server error occurred',
@@ -1001,7 +1008,7 @@ test('recording a combo or a copy reads the recent foods again; typed food does 
     { body: { combos: [combo] } },
     { status: 201, body: oneEntry },
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '떡볶이' } });
   fireEvent.change(screen.getByLabelText('Calories per serving (kcal)'), {
@@ -1036,7 +1043,7 @@ test('a retry that finds nothing moves focus to the search instead', async () =>
       ? new Response(JSON.stringify({ error: 'Server error occurred' }), { status: 500 })
       : new Response(JSON.stringify({ foods: [] }));
   server({ body: emptyDay });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   const section = await screen.findByRole('region', { name: 'Recently eaten foods' });
   fail = false;
   fireEvent.click(within(section).getByRole('button', { name: 'Reload' }));
@@ -1057,18 +1064,19 @@ test('focus follows the retry even when a read started by an add answers first',
   ];
   recentReply = () => replies.shift()!();
   let finishAdd = (_response: Response) => {};
-  stubFetch(
-    vi
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ foods: [food] })))
-      .mockImplementationOnce(() => new Promise((resolve) => (finishAdd = resolve))),
-  );
-  render(<MealCard date={date} />);
+  const inner = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(emptyDay)))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ foods: [food] })))
+    .mockImplementationOnce(() => new Promise((resolve) => (finishAdd = resolve)));
+  stubFetch(inner);
+  renderWithQuery(<MealCard date={date} />);
   const section = await screen.findByRole('region', { name: 'Recently eaten foods' });
   fireEvent.click(await searchFood());
   // While the add waits, the retry starts a read; the add's own read starts after it and wins.
   fireEvent.click(within(section).getByRole('button', { name: 'Reload' }));
+  // React Query sends the add a moment after the click.
+  await waitFor(() => expect(inner).toHaveBeenCalledTimes(3));
   finishAdd(new Response(JSON.stringify(oneEntry), { status: 201 }));
   expect(await within(section).findByRole('button', { name: 'Add 샘플 햇반' })).toBeInTheDocument();
   finishRetry(fail());
@@ -1084,7 +1092,7 @@ test('search results say when more are waiting, and the next page joins the list
     { body: { foods: [food], nextOffset: 100 } },
     { body: { foods: [food, { ...food, id: 8, name: '불고기버거' }], nextOffset: null } },
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Search foods');
   await searchFood();
   expect(screen.getByText('Showing 1 result, more are available')).toBeInTheDocument();
@@ -1106,7 +1114,7 @@ test('a next page clears only its own message, not the other forms', async () =>
     { status: 500, body: { error: 'Server error occurred' } },
     { body: { foods: [{ ...food, id: 8, name: '불고기버거' }], nextOffset: 200 } },
   );
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   const typedForm = (await screen.findByLabelText('Food name')).closest('form')!;
   await searchFood();
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
@@ -1145,26 +1153,30 @@ test('coming back while an entry is being recorded shows it, not the day without
     return Promise.resolve(new Response(JSON.stringify(saved ? added : emptyDay)));
   });
   stubFetch(inner);
-  const first = render(<MealCard date={date} />);
+  const first = renderWithQuery(<MealCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Food name'), { target: { value: '떡볶이' } });
   fireEvent.change(screen.getByLabelText('Calories per serving (kcal)'), {
     target: { value: '480' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
   first.unmount();
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
 
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  // The add is sent a moment after the press. Only the first card has read; the second waits for it.
+  await waitFor(() =>
+    expect(inner.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1),
+  );
   expect(inner.mock.calls.filter(([, init]) => init?.method === 'GET')).toHaveLength(1);
   finishAdd();
   expect(await screen.findByRole('button', { name: 'Delete 떡볶이' })).toBeInTheDocument();
-  expect(inner.mock.calls.filter(([, init]) => init?.method === 'GET')).toHaveLength(2);
+  // The add's own answer is the day, so it is not read again (#220).
+  expect(inner.mock.calls.filter(([, init]) => init?.method === 'GET')).toHaveLength(1);
 });
 
 // #38
 test('a typed-in food can be marked junk food, and the mark clears after it is recorded', async () => {
   const fetchMock = server({ body: emptyDay }, { status: 201, body: oneEntry });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '감자칩' } });
   fireEvent.change(screen.getByLabelText('Calories per serving (kcal)'), {
@@ -1189,7 +1201,7 @@ test('a typed-in food can be marked junk food, and the mark clears after it is r
 test('a stored food is recorded without a mark of its own; it brings the food mark', async () => {
   recentReply = () => new Response(JSON.stringify({ foods: [{ ...food, isJunk: true }] }));
   const fetchMock = server({ body: emptyDay }, { status: 201, body: oneEntry });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   const recent = await screen.findByRole('list', { name: 'Recently eaten foods list' });
   expect(within(recent).getByText('Junk food')).toBeVisible();
   fireEvent.click(within(recent).getByRole('button', { name: 'Add 버거집 치즈버거' }));
@@ -1211,7 +1223,7 @@ test('junk food entries are marked, with the week and month counts below the tot
       },
     },
   });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   const summary = await screen.findByRole('region', { name: 'Junk food' });
   expect(within(summary).getByRole('heading', { level: 3, name: 'Junk food' })).toBeVisible();
   expect(within(summary).getByText(/This week/)).toHaveTextContent(
@@ -1228,7 +1240,7 @@ test('junk food entries are marked, with the week and month counts below the tot
 
 test('a day without junk food says none for the week and the month', async () => {
   server({ body: emptyDay });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   const summary = await screen.findByRole('region', { name: 'Junk food' });
   expect(within(summary).getByText(/This week/)).toHaveTextContent(
     'This week Mar 9 – Mar 15: None',
@@ -1253,7 +1265,7 @@ test('sending an entry again after no answer reuses its retry key; the next entr
     }
     return replies.shift()!();
   });
-  render(<MealCard date={date} />);
+  renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   const typeEntry = () => {
     fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '떡볶이' } });

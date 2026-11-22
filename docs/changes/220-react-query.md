@@ -70,3 +70,38 @@ The hand-written polling hook `useHealth` in `app.tsx` (an interval, a visibilit
 - `vitest run` on sleep, checks, habits, body, save-focus, daily and goals tests: all passed.
 - `origin/main` merged (with #205 body client checks; its new body tests render through `renderWithQuery`). `TEST_DATABASE_URL= npm run check`: passed. Frontend vitest 73 files, 760 passed, 3 skipped (761 after the review fix); the backend DB integration tests skip locally (no `health_test`); CI runs them. The build's existing chunk-size warning stays; the main chunk grew from 660.8 kB to 679.7 kB (gzip 199.9 to 206.0 kB), mostly React Query.
 - Review round 1 noted that a refetch on returning to the tab, still on its way while a save lands, could put the older answer over the saved record. Fixed in the same PR: writes put their answer with `putAnswer` (`writes.ts`), which cancels reads of that key on their way and then sets the data. React Query restores the pre-read state at once on cancel, and a manual set becomes that state, so the answer cannot be lost. New test in `sleep.test.tsx`: "a read from returning to the tab that is still on its way cannot undo a save" (fails with the cancel removed, passes with it).
+
+## Meals card — 2026-11-22
+
+`MealCard` loads with `useApiQuery` on `apiKey('/api/meals/<date>')` behind `useReadAfterWrites`, and adds and deletes through one mutation whose answer (the whole day) goes in with `putAnswer`. The `changes` counter that kept a read started before a change from undoing it on screen is replaced by `putAnswer`'s cancel-then-set; the `adding` state is the mutation's pending POST; the `live` ref stays only for the toasts after leaving the day.
+
+- The add sends an `Idempotency-Key` header (#196), and the shared `useApiMutation` passes no headers, so the card uses React Query's `useMutation` directly (`useMealWrite`) with the same `{ path, method, body }` variables plus `headers`. The central follow-up is sirloinbh/project-standards#979 (let `useApiMutation` pass request headers).
+- A failed read keeps the day on screen with the error and "Try again", as before; the next change's answer clears the error because it is the newer day.
+
+### Tests
+
+`meals.test.tsx` renders through `renderWithQuery`. The three "after leaving the day" tests and "focus follows the retry even when a read started by an add answers first" wait until the add is sent before answering it. "Coming back while an entry is being recorded" expects one read of the day instead of two: the add's answer is the day. `vitest run src/meals.test.tsx`: 66 passed.
+
+## Goals settings and the goal results card — 2026-11-22
+
+- **Settings** (`GoalsSettings`): one `useApiQuery` on `apiKey('/api/goals')` behind `useReadAfterWrites('/api/goals')`. A goal save puts the answer (all goals) with `putAnswer`, which replaces the old `latest` counter (#202). A deleted change disappears at once (`setQueryData` with `withoutChange`), then `invalidateQueries` reads the server's answer; a newer read replaces one still on its way. The error is hidden while "Try again" reads, so a repeated failure is announced anew.
+- **Goal results card** (`GoalsCard`): `useApiQuery` on `apiKey('/api/goals/days', date)`, reading only after writes to every judged path settle (`useReadAfterWrites(...judgedPaths(date))`). The `pending-writes` listener is replaced by `onWriteSettled(client, listener)` in `writes.ts`, a subscription to React Query's mutation cache that reports the path of every write that succeeds or fails; a judged path invalidates the day's verdicts. "Re-judge" is a plain `refetch()`, which replaces a quiet read still on its way, as before; only a read the person asked for shows "Re-judging".
+- All judged writers (meals, sleep, checks, habits, goals) are React Query mutations now, so nothing reads `pending-writes` on the daily page. The writes are still wrapped in `trackWrite` until the clinic and medication screens move; the last #220 PR removes the module.
+
+### Tests
+
+- `src/test/query.tsx` adds `write(path, answer)`: a write through the test's query client, as a card's `useApiMutation` with `asRequest` makes it. `goals.test.tsx` uses it instead of `trackWrite` and renders through `renderWithQuery`.
+- New: "saving in a real card of the same day judges again" renders `GoalsCard` and `SleepCard` in one client and checks that the sleep save reads the verdicts again.
+- `vitest run src/goals.test.tsx src/save-focus.test.tsx src/app.test.tsx`: all passed (24 goals tests).
+
+### Verification (meals and goals PR)
+
+- The full `npm run check` was not run locally for this PR: the PC ran critically low on memory while several lanes shared it, and the wait for the shared check lock was stopped. Following the coordinator's rule for that case, after merging `origin/main`: `prettier --check` and `eslint --max-warnings 0` on every changed file, `tsc --noEmit` for the frontend, and `vitest run` on meals, goals, save-focus and daily tests (131 passed). CI runs the full check, the backend tests, and the build.
+- `onWriteSettled` in `pending-writes.ts` has no caller now (only its own test); it goes with the module in the last #220 PR.
+
+### Merge with main (#213 test rewrite)
+
+- `goals.test.tsx` conflicted with #213, which made the tests wait for a positive signal (a read log, `answered`) before negative checks. Took #213's version and reapplied this PR's changes: `write` for `trackWrite`, `renderWithQuery`, and the real `SleepCard` test.
+- #213's "a card that is gone stops listening" showed that a `GoalsCard` mounted again within the 30-second fresh time would show the cached verdict without reading, though saves made while no card listened may have changed it. The verdict query now has `staleTime: 0`, so it reads on every mount as before.
+- `meals.test.tsx`: #213 removed a zero-delay wait in "coming back while an entry is being recorded"; the test now waits until the add is sent (a mutation sends a moment after the press) before finishing it. The new #207 test renders through `renderWithQuery`.
+- `vitest run` on meals, goals, save-focus, daily, sleep, body, checks and habits tests: 234 passed. `tsc --noEmit` and `eslint` clean.

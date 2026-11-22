@@ -12,10 +12,6 @@ import { failOnUnexpectedRequests, unmockedFetch } from './requests';
 // vi.stubGlobal, so that vi.unstubAllGlobals() after a test brings back this stand-in, not the real fetch.
 globalThis.fetch = unmockedFetch;
 
-// The shared React Query test (lib/query.test.tsx, a managed file) resets focus in its own afterEach while its query
-// is still mounted, so the query reads /api/tags again after the test. Ignored until sirloinbh/project-standards#980 fixes it.
-const knownStrayRequests = ['unmocked fetch: GET /api/tags'];
-
 // What only health-log needs. The shared setup above brings the jsdom stand-ins and the resets every app needs
 // (cleanup, timers, stubbed globals, mocks, localStorage, the theme class and the URL).
 afterEach(() => {
@@ -25,5 +21,5 @@ afterEach(() => {
   cleanup();
   forgetQueryClient();
   // Last, so the resets above still run when it fails the test.
-  failOnUnexpectedRequests(knownStrayRequests);
+  failOnUnexpectedRequests();
 });

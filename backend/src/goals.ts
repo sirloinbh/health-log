@@ -2,8 +2,8 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
+import { periodsOf } from './contract.js';
 import { isRealDate, parseDate } from './dates.js';
-import { periodsOf } from './day-records.js';
 import { type Db, inTransaction, snapshotRead } from './db.js';
 import { optionalNumber } from './numbers.js';
 import { HttpError } from './standard/http.js';

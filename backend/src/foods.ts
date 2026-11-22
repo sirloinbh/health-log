@@ -2,12 +2,11 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
+import { maxAmount } from './contract.js';
 import { isRealDate } from './dates.js';
 import { hasTwoDecimalsAtMost, optionalNumber } from './numbers.js';
 import { HttpError, parseId } from './standard/http.js';
 import { charCount, likePattern } from './text.js';
-
-const maxAmount = 99_999;
 
 const amount = (label: string) =>
   z

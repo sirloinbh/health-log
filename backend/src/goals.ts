@@ -2,8 +2,8 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
+import { periodsOf } from './contract.js';
 import { isRealDate, parseDate } from './dates.js';
-import { periodsOf } from './day-records.js';
 import { type Db, inTransaction, snapshotRead } from './db.js';
 import { optionalNumber } from './numbers.js';
 import { HttpError } from './standard/http.js';
@@ -11,13 +11,20 @@ import { HttpError } from './standard/http.js';
 const goalItems = ['calories', 'protein', 'sleep', 'sober_days'] as const;
 type GoalItem = (typeof goalItems)[number];
 
-// The same ranges as the database's goals_target_range.
-const ranges: Record<GoalItem, { label: string; min: number; max: number; unit: string }> = {
+// The same ranges as the database's goals_target_range. `units` is the plural when it differs.
+const ranges: Record<
+  GoalItem,
+  { label: string; min: number; max: number; unit: string; units?: string }
+> = {
   calories: { label: 'Calorie goal', min: 100, max: 10_000, unit: 'kcal' },
   protein: { label: 'Protein goal', min: 1, max: 1000, unit: 'g' },
   sleep: { label: 'Sleep goal', min: 60, max: 1440, unit: 'min' },
-  sober_days: { label: 'Alcohol-free goal', min: 1, max: 7, unit: 'days' },
+  sober_days: { label: 'Alcohol-free goal', min: 1, max: 7, unit: 'day', units: 'days' },
 };
+
+/** "1 day", "7 days", "100 kcal" (#207). */
+const amountText = (value: number, unit: string, units = unit) =>
+  `${value} ${value === 1 ? unit : units}`;
 
 const parseItem = (value: unknown) => {
   const parsed = z.enum(goalItems).safeParse(value);
@@ -26,7 +33,7 @@ const parseItem = (value: unknown) => {
 };
 
 const goalInput = (item: GoalItem) => {
-  const { label, min, max, unit } = ranges[item];
+  const { label, min, max, unit, units } = ranges[item];
   return z.object(
     {
       from: z
@@ -36,8 +43,8 @@ const goalInput = (item: GoalItem) => {
       target: z
         .number({ error: `${label} must be a number` })
         .int(`${label} must be a whole number`)
-        .min(min, `${label} must be at least ${min} ${unit}`)
-        .max(max, `${label} must be at most ${max} ${unit}`)
+        .min(min, `${label} must be at least ${amountText(min, unit, units)}`)
+        .max(max, `${label} must be at most ${amountText(max, unit, units)}`)
         .nullable(),
     },
     { error: 'The request body is not valid' },

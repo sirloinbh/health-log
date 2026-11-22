@@ -3,6 +3,7 @@ import { beforeEach, expect, test, vi } from 'vitest';
 
 import { toast } from './components/ui/sonner';
 import { MealCard } from './meals';
+import { answered } from './test/answered';
 import { findLive, getLive, queryLive } from './test/live';
 import { renderWithQuery } from './test/query';
 
@@ -171,6 +172,14 @@ test('a food not in the store is recorded with just a name and calories', async 
     calories: 480,
     isJunk: false,
   });
+});
+
+// #207: one serving reads as one.
+test('an entry of one serving says "1 serving"', async () => {
+  server({ body: { ...oneEntry, entries: [{ ...entry, servings: 1, calories: 300 }] } });
+  renderWithQuery(<MealCard date={date} />);
+  const lunch = await screen.findByRole('region', { name: 'Lunch' });
+  expect(within(lunch).getByText('1 serving · Serving 120g · 300kcal')).toBeInTheDocument();
 });
 
 test('quick entry without its fields explains itself and sends nothing', async () => {
@@ -383,8 +392,9 @@ test('a slower older search does not replace a newer one', async () => {
   await waitFor(() => expect(replies).toHaveLength(2));
   replies[1](new Response(JSON.stringify({ foods: [food] })));
   await screen.findByRole('button', { name: 'Add 버거집 치즈버거' });
-  replies[0](new Response(JSON.stringify({ foods: [] })));
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  const stale = new Response(JSON.stringify({ foods: [] }));
+  replies[0](stale);
+  await answered(stale);
   expect(screen.getByRole('button', { name: 'Add 버거집 치즈버거' })).toBeInTheDocument();
 });
 
@@ -605,8 +615,9 @@ test('a read started before an entry was recorded does not undo it on screen', a
   fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
   expect(await screen.findByRole('button', { name: 'Delete 떡볶이' })).toBeInTheDocument();
 
-  finishRead(new Response(JSON.stringify(oneEntry)));
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  const late = new Response(JSON.stringify(oneEntry));
+  finishRead(late);
+  await answered(late);
   expect(screen.getByRole('button', { name: 'Delete 떡볶이' })).toBeInTheDocument();
 });
 
@@ -1135,7 +1146,10 @@ test('coming back while an entry is being recorded shows it, not the day without
   first.unmount();
   renderWithQuery(<MealCard date={date} />);
 
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  // The add is sent a moment after the press. Only the first card has read; the second waits for it.
+  await waitFor(() =>
+    expect(inner.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1),
+  );
   expect(inner.mock.calls.filter(([, init]) => init?.method === 'GET')).toHaveLength(1);
   finishAdd();
   expect(await screen.findByRole('button', { name: 'Delete 떡볶이' })).toBeInTheDocument();

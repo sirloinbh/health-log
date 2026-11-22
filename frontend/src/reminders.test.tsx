@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { expect, test, vi } from 'vitest';
 
@@ -7,6 +7,7 @@ import { trackWrite } from './pending-writes';
 import type { Reminder, Reminders } from './reminder-text';
 import { reminderDetail, reminderTitle, whenText } from './reminder-text';
 import { RemindersCard } from './reminders';
+import { nextTask } from './test/answered';
 import { findLive, queryLive } from './test/live';
 
 // Made-up values only: no real appointment or prescription belongs in tests.
@@ -66,10 +67,15 @@ const reads = (fetchMock: ReturnType<typeof serve>) =>
 
 test('words for the day and what each reminder is about', () => {
   expect([0, 1, 2, 7].map(whenText)).toEqual(['Today', 'Tomorrow', 'In 2 days', 'In 7 days']);
+  // #207: a date already past is not "In -1 days".
+  expect([-1, -3].map(whenText)).toEqual(['1 day ago', '3 days ago']);
   expect(reminderTitle(appointment)).toBe('가상피부과 · 피부과 appointment');
   expect(reminderTitle(later)).toBe('가상내과 appointment');
   expect(reminderTitle(lastPill)).toBe('가상정 ends');
   expect(reminderDetail(appointment)).toBe('Last procedures: 가상레이저, 가상주사');
+  expect(reminderDetail({ ...appointment, procedures: ['가상레이저'] })).toBe(
+    'Last procedure: 가상레이저',
+  );
   expect(reminderDetail(later)).toBeNull();
   expect(reminderDetail(lastPill)).toBeNull();
 });
@@ -242,14 +248,26 @@ test('a failed load can be tried again, and focus stays in the card', async () =
 
 test('a visit just saved elsewhere is waited for before the list is read', async () => {
   let land: () => void = () => {};
-  void trackWrite('/api/visits/', new Promise<void>((resolve) => (land = resolve)));
-  const fetchMock = serve(() => json(listOf([])));
+  // Set as the save settles, before the card can see it.
+  let landed = false;
+  void trackWrite(
+    '/api/visits/',
+    new Promise<void>((resolve) => (land = resolve)).then(() => {
+      landed = true;
+    }),
+  );
+  const landedAtRead: boolean[] = [];
+  const fetchMock = serve(() => {
+    landedAtRead.push(landed);
+    return json(listOf([]));
+  });
   show();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  expect(reads(fetchMock)).toHaveLength(0);
+  // A card that did not wait would have read by the next task.
+  await act(nextTask);
   land();
   await screen.findByText('No clinic appointments or medication end dates in the next 7 days.');
   expect(reads(fetchMock)).toHaveLength(1);
+  expect(landedAtRead).toEqual([true]);
 });
 
 // Only the dashboard here; the daily page is in daily.test.tsx with its other cards.

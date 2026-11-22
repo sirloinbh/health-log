@@ -1,5 +1,6 @@
 // Reminders as the API sends them (#48), and how they read on screen.
 import { medicationsPagePath } from './med-text';
+import { count } from './plural';
 import { clinicText, visitsPagePath } from './visit-text';
 
 type Due = {
@@ -31,18 +32,24 @@ export type Reminders = {
 /** Path every reminder write goes under, so a reload waits for it (#71). */
 export const remindersPath = '/api/reminders';
 
-/** "Today", "Tomorrow", "In 3 days". */
+/** "Today", "Tomorrow", "In 3 days", and "1 day ago" for a date already past (#207). */
 export const whenText = (daysLeft: number) =>
-  daysLeft === 0 ? 'Today' : daysLeft === 1 ? 'Tomorrow' : `In ${daysLeft} days`;
+  daysLeft === 0
+    ? 'Today'
+    : daysLeft === 1
+      ? 'Tomorrow'
+      : daysLeft < 0
+        ? `${count(-daysLeft, 'day')} ago`
+        : `In ${count(daysLeft, 'day')}`;
 
 /** "Sample Clinic · Dermatology appointment", "Sample tablet ends". */
 export const reminderTitle = (item: Reminder) =>
   item.kind === 'visit' ? `${clinicText(item)} appointment` : `${item.name} ends`;
 
-/** What came before, when it helps: "Last procedures: laser, injection". */
+/** What came before, when it helps: "Last procedure: laser", "Last procedures: laser, injection". */
 export const reminderDetail = (item: Reminder) =>
   item.kind === 'visit' && item.procedures.length
-    ? `Last procedures: ${item.procedures.join(', ')}`
+    ? `${item.procedures.length === 1 ? 'Last procedure' : 'Last procedures'}: ${item.procedures.join(', ')}`
     : null;
 
 /** The page the record is written on. */

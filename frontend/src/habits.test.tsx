@@ -6,6 +6,10 @@ import { HabitsCard } from './habits';
 import { findLive } from './test/live';
 import { renderWithQuery } from './test/query';
 
+/** Whether a save (PUT) has gone out, for a test that must land it after it is sent. */
+const saveSent = (fetchMock: { mock: { calls: unknown[][] } }) =>
+  fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PUT');
+
 // jsdom lacks pointer capture and scrolling, which Radix Select calls.
 beforeAll(() => {
   Element.prototype.hasPointerCapture ??= () => false;
@@ -363,11 +367,16 @@ test('coming back while a save is on its way shows the saved day, not a blank fo
   first.unmount();
   renderWithQuery(<HabitsCard date={date} />);
 
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  // The save is on its way (it is sent a moment after the press).
+  await waitFor(() => expect(saveSent(fetchMock)).toBe(true));
+  // Only the first card has read; the second waits for the save.
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(screen.queryByLabelText('Cigarettes')).not.toBeInTheDocument();
   finishSave();
   expect(await screen.findByText('3 cigarettes')).toBeInTheDocument();
+  // The first card's read and the save: the save's own answer is the record, so the day is not read
+  // again (#220).
+  expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(screen.queryByLabelText('Cigarettes')).not.toBeInTheDocument();
 });
 
@@ -411,9 +420,8 @@ test('a retry cannot be started twice, so no older answer can land after a newer
   const before = fetchMock.mock.calls.length;
   fireEvent.click(again);
   fireEvent.click(again);
-  await new Promise((resolve) => setTimeout(resolve, 0));
   // The button goes with the first press; the second reaches nothing.
-  expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+  await waitFor(() => expect(again).not.toBeInTheDocument());
   expect(fetchMock.mock.calls.length - before).toBe(1);
   for (const finish of finishers) {
     finish(new Response(JSON.stringify({ error: 'x' }), { status: 500 }));

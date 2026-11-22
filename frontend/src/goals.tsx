@@ -467,8 +467,10 @@ export function GoalsCard({ date }: { date: string }) {
   const [asked, setAsked] = useState(false);
   // Saves still on their way in the cards this judges, or to the goals, would be missed.
   const ready = useReadAfterWrites(...judgedPaths(date));
+  // Read on every mount: saves made while no card listened (another day open, say) change this too.
   const query = useApiQuery<GoalDay>(dayKey(date), `${goalsPath}/days/${date}`, {
     enabled: ready,
+    staleTime: 0,
   });
   const day = ready ? query.data : undefined;
   const loading = !ready || query.isFetching;

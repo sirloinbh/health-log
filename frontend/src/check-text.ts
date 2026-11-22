@@ -1,3 +1,5 @@
+import { count } from './plural';
+
 /** null: not checked. It is never read as a no. */
 export type DayCheck = {
   date: string;
@@ -32,12 +34,14 @@ export const unchecked = 'Not checked';
 export const answerText = (value: boolean | null, yes: string, no: string) =>
   value === null ? unchecked : value ? yes : no;
 
-/** "Kept on 4/5 days (80%)". The share is of the days answered, so an unchecked day changes nothing. */
-export const rateText = ({ days, yes }: Rate, word: string) =>
-  days === 0 ? 'No records' : `${word} on ${yes}/${days} days (${Math.round((yes / days) * 100)}%)`;
-
 /**
- * Characters as the server and the database count them: an emoji is one, not the two UTF-16 units
- * that `string.length` and an input's `maxLength` count (#92).
+ * "Kept on 4/5 days (80%)", "Kept on 1/1 day (100%)". The share is of the days answered, so an
+ * unchecked day changes nothing.
  */
-export const charCount = (value: string) => [...value].length;
+export const rateText = ({ days, yes }: Rate, word: string) =>
+  days === 0
+    ? 'No records'
+    : `${word} on ${yes}/${count(days, 'day')} (${Math.round((yes / days) * 100)}%)`;
+
+// Characters as the server and the database count them, from the shared contract (#215).
+export { charCount } from '../../shared/contract';

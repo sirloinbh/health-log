@@ -2,11 +2,8 @@ import type { NextFunction, Request, Response } from 'express';
 
 import { sendError } from './standard/http.js';
 
-/**
- * Length as PostgreSQL's char_length counts it: one per character, so an emoji is one, not the two
- * UTF-16 units of `string.length` (#92). Screens and server use this for the limits they show.
- */
-export const charCount = (value: string) => [...value].length;
+// Text length as the database counts it, shared with the screens (#215).
+export { charCount } from './contract.js';
 
 /**
  * An ILIKE pattern that finds `text` anywhere. `\`, `%` and `_` are escaped, so a search for "100%"

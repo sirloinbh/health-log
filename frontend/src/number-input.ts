@@ -14,5 +14,5 @@ export function parseAmount(text: string) {
 export const unreadableAmount = (label: string) =>
   `${label}: enter digits only. Use a period for the decimal point (for example 70.5)`;
 
-/** Amounts are stored with two decimals; anything finer would be rounded without a word. */
-export const hasTwoDecimalsAtMost = (value: number) => Number(value.toFixed(2)) === value;
+// The two-decimal rule of the server, from the shared contract (#215).
+export { hasTwoDecimalsAtMost } from '../../shared/contract';

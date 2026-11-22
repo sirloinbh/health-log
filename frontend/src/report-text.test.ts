@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest';
 
+import { periodsOf } from '../../shared/contract';
 import {
   changeText,
   minutesText,
-  periodSpan,
   periodWords,
   shareOf,
   shiftPeriod,
@@ -61,10 +61,11 @@ test('a span of another year, or across one, names the year (#129)', () => {
   expect(spanLabel({ from: '2026-11-02', to: '2026-11-08' }, null)).toBe('Nov 2 – Nov 8, 2026');
 });
 
-test('the period holding a date matches the server: Monday to Sunday, or the calendar month', () => {
-  expect(periodSpan('week', '2026-11-05')).toEqual({ from: '2026-11-02', to: '2026-11-08' });
-  expect(periodSpan('week', '2026-11-08')).toEqual({ from: '2026-11-02', to: '2026-11-08' });
-  expect(periodSpan('week', '2000-01-01')).toEqual({ from: '1999-12-27', to: '2000-01-02' });
-  expect(periodSpan('month', '2024-02-10')).toEqual({ from: '2024-02-01', to: '2024-02-29' });
-  expect(periodSpan('month', '2099-12-31')).toEqual({ from: '2099-12-01', to: '2099-12-31' });
+// The screen and the server read periods from the same shared contract (#215).
+test('the period holding a date is Monday to Sunday, or the calendar month', () => {
+  expect(periodsOf('2026-11-05').week).toEqual({ from: '2026-11-02', to: '2026-11-08' });
+  expect(periodsOf('2026-11-08').week).toEqual({ from: '2026-11-02', to: '2026-11-08' });
+  expect(periodsOf('2000-01-01').week).toEqual({ from: '1999-12-27', to: '2000-01-02' });
+  expect(periodsOf('2024-02-10').month).toEqual({ from: '2024-02-01', to: '2024-02-29' });
+  expect(periodsOf('2099-12-31').month).toEqual({ from: '2099-12-01', to: '2099-12-31' });
 });

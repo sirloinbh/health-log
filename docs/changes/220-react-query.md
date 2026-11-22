@@ -98,3 +98,10 @@ The hand-written polling hook `useHealth` in `app.tsx` (an interval, a visibilit
 
 - The full `npm run check` was not run locally for this PR: the PC ran critically low on memory while several lanes shared it, and the wait for the shared check lock was stopped. Following the coordinator's rule for that case, after merging `origin/main`: `prettier --check` and `eslint --max-warnings 0` on every changed file, `tsc --noEmit` for the frontend, and `vitest run` on meals, goals, save-focus and daily tests (131 passed). CI runs the full check, the backend tests, and the build.
 - `onWriteSettled` in `pending-writes.ts` has no caller now (only its own test); it goes with the module in the last #220 PR.
+
+### Merge with main (#213 test rewrite)
+
+- `goals.test.tsx` conflicted with #213, which made the tests wait for a positive signal (a read log, `answered`) before negative checks. Took #213's version and reapplied this PR's changes: `write` for `trackWrite`, `renderWithQuery`, and the real `SleepCard` test.
+- #213's "a card that is gone stops listening" showed that a `GoalsCard` mounted again within the 30-second fresh time would show the cached verdict without reading, though saves made while no card listened may have changed it. The verdict query now has `staleTime: 0`, so it reads on every mount as before.
+- `meals.test.tsx`: #213 removed a zero-delay wait in "coming back while an entry is being recorded"; the test now waits until the add is sent (a mutation sends a moment after the press) before finishing it. The new #207 test renders through `renderWithQuery`.
+- `vitest run` on meals, goals, save-focus, daily, sleep, body, checks and habits tests: 234 passed. `tsc --noEmit` and `eslint` clean.

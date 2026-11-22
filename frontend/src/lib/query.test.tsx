@@ -47,9 +47,14 @@ test('apiKey puts the path first and the parts after it', () => {
 
 test('useApiQuery loads the path, and leaving the screen aborts the request', async () => {
   let signal: AbortSignal | undefined;
-  const fetch = vi.fn((_path: string, init?: RequestInit) => {
+  // /api/slow never answers on its own, so it is still in flight when the screen goes away; it ends only
+  // when its signal aborts. A timed answer could arrive before the unmount on a busy machine (#981).
+  const fetch = vi.fn((path: string, init?: RequestInit) => {
+    if (path !== '/api/slow') return Promise.resolve(json(200, [{ id: 1 }]));
     signal = init?.signal ?? undefined;
-    return new Promise<Response>((resolve) => setTimeout(() => resolve(json(200, [{ id: 1 }])), 20));
+    return new Promise<Response>((_resolve, reject) =>
+      signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))),
+    );
   });
   const { wrapper } = setup(fetch);
   const done = renderHook(() => useApiQuery<{ id: number }[]>(apiKey('/api/goals'), '/api/goals'), { wrapper });

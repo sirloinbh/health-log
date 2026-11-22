@@ -5,6 +5,7 @@ import { App } from './app';
 import type { Combo } from './combo-text';
 import { toast } from './components/ui/sonner';
 import { findLive, getLive, queryLive } from './test/live';
+import { testQueryClient } from './test/query';
 
 const rice = {
   id: 3,
@@ -69,9 +70,10 @@ const serve = (combos: Handler) => {
   return fetchMock;
 };
 
+// Without the app's one retry after a server error, so each failure a test serves shows at once.
 const open = () => {
   window.history.replaceState(null, '', '/combos');
-  render(<App />);
+  render(<App queryClient={testQueryClient()} />);
 };
 
 const writes = (fetchMock: ReturnType<typeof serve>) =>

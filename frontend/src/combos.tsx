@@ -1,5 +1,6 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 
 import { calorieText } from './calorie-text';
 import { type Combo, type ComboItem, comboSummary, fullName } from './combo-text';
@@ -22,7 +23,8 @@ import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
 import { resultText, useFoodSearch } from './food-search';
 import { RequestError, requestJson } from './lib/api';
-import { errorText, useNotice } from './lib/use-notice';
+import { apiKey, useApiQuery } from './lib/query';
+import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
 import { MoreFoodsButton } from './more-foods-button';
 import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
 import { count } from './plural';
@@ -381,12 +383,23 @@ function ComboCard({
   );
 }
 
+const combosKey = apiKey('/api/combos');
+
 export function CombosPage() {
-  const [combos, setCombos] = useState<Combo[] | null>(null);
+  const client = useQueryClient();
+  const query = useApiQuery<{ combos: Combo[] }>(combosKey, '/api/combos');
+  // A failed read keeps the combos already shown.
+  const combos = query.data?.combos ?? null;
   // null: closed, 'new': adding, a combo: editing it.
   const [editing, setEditing] = useState<Combo | 'new' | null>(null);
-  const { notice, status, error, clear } = useNotice();
-  const latestLoad = useRef(0);
+  // The words about a read the person asked for. A failed read shows over them, hidden while
+  // reading again, so the same failure twice is announced again.
+  const { notice: said, status, clear } = useNotice();
+  const failed: NoticeValue | undefined =
+    query.isError && !query.isFetching
+      ? { kind: 'error', text: errorText(query.error) }
+      : undefined;
+  const notice = failed ?? said;
   const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLHeadingElement>(null);
   const { remember, returnFocus } = useReturnFocus(heading);
@@ -407,27 +420,20 @@ export function CombosPage() {
     return () => clearTimeout(timer);
   }, [moveFocus]);
 
-  /** `done`: what to say once the list is in, for a load the person asked for. */
-  const load = useCallback(
-    async (done?: string) => {
-      // A slow older read must not overwrite a newer one.
-      const request = ++latestLoad.current;
-      try {
-        const data = await requestJson<{ combos: Combo[] }>('/api/combos');
-        if (request !== latestLoad.current) return;
-        if (done) status(done);
-        else clear();
-        setCombos(data.combos);
-      } catch (cause) {
-        if (request === latestLoad.current) error(cause);
-      }
-    },
-    [clear, error, status],
-  );
+  /** After a save or a delete: the list reads again, with the add form's combos. */
+  const reload = () => {
+    clear();
+    void client.invalidateQueries({ queryKey: combosKey });
+  };
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const retry = async () => {
+    // A word in its place: a list already on screen does not look fixed while the new one is on
+    // its way.
+    status('Reloading the list…');
+    const result = await query.refetch({ cancelRefetch: false });
+    if (result.isError) clear();
+    else status('The list was reloaded.');
+  };
 
   const remove = async (combo: Combo) => {
     try {
@@ -443,9 +449,12 @@ export function CombosPage() {
     toast.success('Deleted');
     // Drop the card now: if it stayed until the reload, the closing dialog would hand focus back
     // to its delete button, and focus would fall to the body when the reload removes it.
-    setCombos((list) => list?.filter((item) => item.id !== combo.id) ?? list);
+    client.setQueryData<{ combos: Combo[] }>(
+      combosKey,
+      (current) => current && { combos: current.combos.filter((item) => item.id !== combo.id) },
+    );
     setMoveFocus((count) => count + 1);
-    void load();
+    reload();
   };
 
   return (
@@ -478,8 +487,7 @@ export function CombosPage() {
           onClick={() => {
             // A word in its place: the same failure twice is announced again, and a list already
             // on screen does not look fixed while the new one is on its way.
-            status('Reloading the list…');
-            void load('The list was reloaded.');
+            void retry();
             // Trying again removes this button, which would drop keyboard focus to the page (#65, #127).
             setMoveFocus((count) => count + 1);
           }}
@@ -517,7 +525,7 @@ export function CombosPage() {
           onSaved={() => {
             closeDialog();
             toast.success('Saved');
-            void load();
+            reload();
           }}
         />
       ) : null}

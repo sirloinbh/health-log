@@ -38,3 +38,20 @@ The screens that #220 left reading with their own load functions and stale-answe
 ### Review round 1 (clinic lists PR)
 
 - Checked whether the daily card could keep a cached day after a save that lands once the clinic page is gone (the card no longer reads on every mount). It cannot: the dialog's submit keeps running after the page unmounts, as `mutateAsync` still resolves, so its `onSaved` reload invalidates the day. New guard test "a visit save that lands after leaving the clinic page still refreshes the daily card (#282)"; visits and medications tests: 42 passed.
+
+## Combos page and recently eaten foods — 2026-11-22
+
+- **Combos page** (`CombosPage`): `useApiQuery` on `apiKey('/api/combos')`, with the same words as the medicine page. "Try again" says "Reloading the list…", then "The list was reloaded." or the failure (#127); a failed read shows over those words and is hidden while reading again. A delete drops the combo from the cached list, then the list reads again. The `latestLoad` counter is gone.
+- **Recently eaten foods** (`useRecentFoods` in `use-add-entry.ts`): `useApiQuery` on `apiKey('/api/foods/recent')`. After a food is recorded, the list is cancelled and invalidated, so a newer read replaces one still on its way. With no list yet, React Query would join that read instead; the test "focus follows the retry even when a read started by an add answers first" fails without the cancel. The failure stays, with its retry button, until a read succeeds, as React Query puts a query with no data back to `pending` while it reads. Focus moves when whichever read clears it, as before. The `latestRecent` counter is gone.
+- **Left as they are:** the combo picker's read when asked for (one read, no stale-answer guard) and the food and combo dialogs' saves (writes). They hold no hand-written stale guard, which is what #282 removes.
+
+### Tests
+
+- `combos.test.tsx` renders the app with `testQueryClient()`, so a served 500 shows at once.
+- `vitest run` on meals, combos and save-focus tests: 111 passed.
+- Full `npm run check` with `TEST_DATABASE_URL` empty, under the shared check lock: passed. Frontend: 76 files, 782 passed, 3 skipped.
+- No browser check: the markup is unchanged, and the screen tests cover the behavior.
+
+### Review round 1 fix (combos PR)
+
+- The meal cards (#220), the combos page and the recent foods now use the 30-second cache instead of reading on every mount, so a food edited on the foods page could show its old name for up to half a minute there. A food save now invalidates every `/api/meals/<date>` key (by path, as each day is its own key), `apiKey('/api/combos')` and `apiKey('/api/foods/recent')`, so they read again the next time they are shown. New test "a saved food makes the meal cards, combos and recent foods read again next time (#282)"; foods tests: 43 passed.

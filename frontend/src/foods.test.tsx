@@ -5,6 +5,7 @@ import { App } from './app';
 import { toast } from './components/ui/sonner';
 import { answered } from './test/answered';
 import { findLive, getLive, queryLive } from './test/live';
+import { testQueryClient } from './test/query';
 
 const food = {
   id: 1,
@@ -772,4 +773,21 @@ test('a basis read without any value changes nothing', async () => {
   expect(within(dialog).getByRole('combobox', { name: 'Source type' })).toHaveTextContent(
     'Official data',
   );
+});
+
+test('a saved food makes the meal cards, combos and recent foods read again next time (#282)', async () => {
+  serve((_url, init) => (init?.method === 'PUT' ? json(food) : json({ foods: [food] })));
+  const client = testQueryClient({ today: '2026-10-31' });
+  const day = ['/api/meals/2026-10-31'];
+  const others = [['/api/combos'], ['/api/foods/recent'], ['/api/report', 'week', '2026-10-31']];
+  for (const key of [day, ...others]) client.setQueryData(key, {});
+  window.history.replaceState(null, '', '/foods');
+  render(<App queryClient={client} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit 치즈버거' }));
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Save' }));
+  await screen.findByText('Saved');
+  const stale = (key: string[]) => client.getQueryState(key)?.isInvalidated;
+  expect([day, ...others.slice(0, 2)].map(stale)).toEqual([true, true, true]);
+  // A report holds no food names.
+  expect(stale(others[2])).toBe(false);
 });

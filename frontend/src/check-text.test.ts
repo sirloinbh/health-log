@@ -11,6 +11,8 @@ test('unchecked, yes and no read differently', () => {
 test('a rate is out of the days answered, and no answered day is not 0%', () => {
   expect(rateText({ days: 0, yes: 0 }, 'Kept')).toBe('No records');
   expect(rateText({ days: 5, yes: 4 }, 'Kept')).toBe('Kept on 4/5 days (80%)');
+  // #207: one day reads as one.
+  expect(rateText({ days: 1, yes: 1 }, 'Kept')).toBe('Kept on 1/1 day (100%)');
   expect(rateText({ days: 3, yes: 0 }, 'Slept well')).toBe('Slept well on 0/3 days (0%)');
   expect(rateText({ days: 3, yes: 2 }, 'Kept')).toBe('Kept on 2/3 days (67%)');
 });

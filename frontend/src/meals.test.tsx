@@ -188,6 +188,14 @@ test('a food not in the store is recorded with just a name and calories', async 
   });
 });
 
+// #207: one serving reads as one.
+test('an entry of one serving says "1 serving"', async () => {
+  server({ body: { ...oneEntry, entries: [{ ...entry, servings: 1, calories: 300 }] } });
+  render(<MealCard date={date} />);
+  const lunch = await screen.findByRole('region', { name: 'Lunch' });
+  expect(within(lunch).getByText('1 serving · Serving 120g · 300kcal')).toBeInTheDocument();
+});
+
 test('quick entry without its fields explains itself and sends nothing', async () => {
   const fetchMock = server({ body: emptyDay });
   render(<MealCard date={date} />);

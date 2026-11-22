@@ -25,6 +25,7 @@ import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
 import { MoreFoodsButton } from './more-foods-button';
 import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
+import { count } from './plural';
 import { useReturnFocus } from './return-focus';
 
 /** The most foods one combo holds; the server and database refuse more. */
@@ -346,7 +347,7 @@ function ComboCard({
           <ul className="flex flex-col gap-1 text-body-sm">
             {combo.items.map((item) => (
               <li key={item.foodId} className="wrap-anywhere">
-                {fullName(item)} · {item.servings} servings · {calorieText(item.calories)}
+                {fullName(item)} · {count(item.servings, 'serving')} · {calorieText(item.calories)}
               </li>
             ))}
           </ul>

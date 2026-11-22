@@ -1,4 +1,5 @@
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 
 import { BusyButton } from './busy-button';
 import {
@@ -21,11 +22,14 @@ import { SkeletonText } from './components/ui/skeleton';
 import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
 import { spanText } from './habit-text';
-import { RequestError, requestJson } from './lib/api';
-import { errorText, useNotice } from './lib/use-notice';
-import { trackWrite, writesSettled } from './pending-writes';
+import { RequestError } from './lib/api';
+import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
+import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
+import { trackWrite } from './pending-writes';
+import { asRequest, useReadAfterWrites } from './writes';
 
 const pathOf = (date: string) => `/api/checks/${date}`;
+const keyOf = (date: string) => apiKey(pathOf(date));
 const maxMemo = 200;
 
 type Form = { dietKept: boolean | null; sleepGood: boolean | null; memo: string };
@@ -46,7 +50,12 @@ function CheckForm({
     sleepGood: record?.sleepGood ?? null,
     memo: record?.memo ?? '',
   }));
-  const [saving, setSaving] = useState(false);
+  const client = useQueryClient();
+  // The answer is the whole day with its new rates; it goes into the cache even after the card is gone.
+  const save = useApiMutation<CheckDay, ApiRequest>(asRequest, {
+    onSuccess: (saved) => client.setQueryData(keyOf(date), saved),
+  });
+  const saving = save.isPending;
   const { notice, error, clear } = useNotice();
   const mounted = useRef(true);
 
@@ -72,12 +81,13 @@ function CheckForm({
     }
     // A repeated failure then appears anew and is announced again (as in #98).
     clear();
-    setSaving(true);
     try {
+      // trackWrite until every card reads through React Query (#220).
       onSaved(
         await trackWrite(
           pathOf(date),
-          requestJson<CheckDay>(pathOf(date), {
+          save.mutateAsync({
+            path: pathOf(date),
             method: 'PUT',
             body: { dietKept: form.dietKept, sleepGood: form.sleepGood, memo },
           }),
@@ -90,7 +100,6 @@ function CheckForm({
         return;
       }
       error(cause);
-      setSaving(false);
     }
   };
 
@@ -213,34 +222,22 @@ function PeriodRates({ title, summary }: { title: string; summary: CheckSummary 
 
 // The daily page gives this a key per date, so nothing here outlives the day it was loaded for.
 export function ChecksCard({ date }: { date: string }) {
-  const [day, setDay] = useState<CheckDay | undefined>(undefined);
   const [editing, setEditing] = useState(false);
-  const { notice, error, clear } = useNotice();
   const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLDivElement>(null);
-  const live = useRef(true);
-
-  const load = useCallback(async () => {
-    clear();
-    try {
-      // A save from before leaving this day may still be on its way; read after it lands.
-      await writesSettled(pathOf(date));
-      // Left again while waiting: nothing would show the answer.
-      if (!live.current) return;
-      const data = await requestJson<CheckDay>(pathOf(date));
-      if (live.current) setDay(data);
-    } catch (cause) {
-      if (live.current) error(cause);
-    }
-  }, [clear, date, error]);
-
-  useEffect(() => {
-    live.current = true;
-    void load();
-    return () => {
-      live.current = false;
-    };
-  }, [load]);
+  const client = useQueryClient();
+  const remover = useApiMutation<unknown, ApiRequest>(asRequest);
+  // A save from before leaving this day may still be on its way; read after it lands.
+  const ready = useReadAfterWrites(pathOf(date));
+  const query = useApiQuery<CheckDay>(keyOf(date), pathOf(date), { enabled: ready });
+  const day = ready ? query.data : undefined;
+  // A failed read with nothing to show; a failed refresh keeps the day on screen.
+  const notice: NoticeValue | undefined =
+    query.isError && day === undefined
+      ? { kind: 'error', text: errorText(query.error) }
+      : undefined;
+  // One read at a time: pressing again while it is on its way does not start another.
+  const load = () => void query.refetch({ cancelRefetch: false });
 
   // The button that was pressed is gone by now, and a closing dialog restores focus on a timer first.
   useEffect(() => {
@@ -249,15 +246,14 @@ export function ChecksCard({ date }: { date: string }) {
     return () => clearTimeout(timer);
   }, [moveFocus]);
 
-  const finish = (next: CheckDay) => {
-    setDay(next);
+  const finish = () => {
     setEditing(false);
     setMoveFocus((count) => count + 1);
   };
 
   const remove = async () => {
     try {
-      await trackWrite(pathOf(date), requestJson(pathOf(date), { method: 'DELETE' }));
+      await trackWrite(pathOf(date), remover.mutateAsync({ path: pathOf(date), method: 'DELETE' }));
     } catch (cause) {
       // Already gone counts as deleted; anything else keeps the dialog open with the reason.
       if (!(cause instanceof RequestError && cause.status === 404)) {
@@ -269,8 +265,7 @@ export function ChecksCard({ date }: { date: string }) {
     setEditing(false);
     setMoveFocus((count) => count + 1);
     // The rates changed too; until they arrive the old ones would be wrong.
-    setDay(undefined);
-    void load();
+    void client.resetQueries({ queryKey: keyOf(date) });
   };
 
   const record = day?.record;
@@ -289,7 +284,7 @@ export function ChecksCard({ date }: { date: string }) {
             variant="outline"
             className="self-start"
             onClick={() => {
-              void load();
+              load();
               // Trying again removes this button, which would drop keyboard focus to the page.
               setMoveFocus((count) => count + 1);
             }}
@@ -306,11 +301,11 @@ export function ChecksCard({ date }: { date: string }) {
           <CheckForm
             date={date}
             record={record ?? null}
-            onSaved={(saved) => {
+            onSaved={() => {
               toast.success('Saved');
-              finish(saved);
+              finish();
             }}
-            onCancel={record ? () => finish(day) : undefined}
+            onCancel={record ? finish : undefined}
           />
         ) : null}
         {record && !editing ? (

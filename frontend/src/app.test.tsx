@@ -3,6 +3,7 @@ import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
 import { findLive } from './test/live';
+import { unexpectedRequest } from './test/requests';
 
 // The settings page loads the goals along with it.
 const noGoals = {
@@ -15,18 +16,49 @@ const noGoals = {
 // The dashboard also shows what is coming up (#48).
 const noReminders = { today: '2026-10-26', until: '2026-11-02', leadDays: 7, reminders: [] };
 
+// The overview's report of the week of 2026-10-26, with nothing recorded.
+const none = {
+  sleep: { days: 0, averageMinutes: null },
+  calories: { days: 0, incompleteDays: 0, average: null },
+  drinking: { days: 0, drinkingDays: 0 },
+  smoking: { days: 0, cigarettes: null, averagePerDay: null },
+  diet: { days: 0, yes: 0 },
+  sleepGood: { days: 0, yes: 0 },
+};
+const noReport = {
+  period: 'week',
+  current: { from: '2026-10-26', to: '2026-11-01', ...none },
+  previous: { from: '2026-10-19', to: '2026-10-25', ...none },
+  days: [],
+  sleepAfterDrinking: {
+    afterDrinking: { nights: 0, averageMinutes: null },
+    afterNoDrinking: { nights: 0, averageMinutes: null },
+  },
+};
+
+// The other reads the pages make. Anything else fails the test (#214).
+const otherRead = (url: string) =>
+  url === '/api/goals'
+    ? noGoals
+    : url === '/api/reminders'
+      ? noReminders
+      : url.startsWith('/api/report?period=week&date=2026-10-2')
+        ? noReport
+        : null;
+
+const answerOther = (url: string, init?: RequestInit) => {
+  const body = otherRead(url);
+  return body ? Promise.resolve(new Response(JSON.stringify(body))) : unexpectedRequest(url, init);
+};
+
+// Answers /api/health with `body` and `status`; the status is the server's alone, not the other reads'.
 const health = (body: object, status = 200) =>
   vi.stubGlobal(
     'fetch',
-    vi.fn((url: string) =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify(
-            url === '/api/goals' ? noGoals : url === '/api/reminders' ? noReminders : body,
-          ),
-          { status },
-        ),
-      ),
+    vi.fn((url: string, init?: RequestInit) =>
+      url === '/api/health'
+        ? Promise.resolve(new Response(JSON.stringify(body), { status }))
+        : answerOther(url, init),
     ),
   );
 
@@ -71,12 +103,11 @@ const days = (...todays: string[]) => {
   const healthCalls: string[] = [];
   vi.stubGlobal(
     'fetch',
-    vi.fn((url: string) => {
-      if (url === '/api/health') healthCalls.push(url);
+    vi.fn((url: string, init?: RequestInit) => {
+      if (url !== '/api/health') return answerOther(url, init);
+      healthCalls.push(url);
       const today = todays[Math.min(healthCalls.length, todays.length) - 1];
-      const body =
-        url === '/api/goals' ? noGoals : url === '/api/reminders' ? noReminders : { today };
-      return Promise.resolve(new Response(JSON.stringify(body)));
+      return Promise.resolve(new Response(JSON.stringify({ today })));
     }),
   );
   return healthCalls;

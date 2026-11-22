@@ -7,10 +7,6 @@ import { answered } from './test/answered';
 import { findLive, queryLive } from './test/live';
 import { renderWithQuery } from './test/query';
 
-/** Whether a save (PUT) has gone out, for a test that must land it after it is sent. */
-const saveSent = (fetchMock: { mock: { calls: unknown[][] } }) =>
-  fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PUT');
-
 const date = '2026-03-15';
 const record = {
   date,
@@ -43,13 +39,29 @@ const server = ({
   return fetchMock;
 };
 
-const sent = (fetchMock: ReturnType<typeof server>, method: string) => {
-  const call = fetchMock.mock.calls.find(
-    (args) => (args as unknown as [string, RequestInit])[1]?.method === method,
-  ) as unknown as [string, RequestInit];
+type FetchMock = { mock: { calls: unknown[][] } };
+
+const requests = (fetchMock: FetchMock) =>
+  fetchMock.mock.calls.map(([url, init]) => ({
+    url: String(url),
+    init: init as RequestInit | undefined,
+  }));
+
+/** Whether any request with `method` was sent. */
+const didSend = (fetchMock: FetchMock, method: string) =>
+  requests(fetchMock).some(({ init }) => init?.method === method);
+
+/** The first request sent with `method`; without one, the test fails saying what was sent (#214). */
+const sent = (fetchMock: FetchMock, method: string) => {
+  const all = requests(fetchMock);
+  const found = all.find(({ init }) => init?.method === method);
+  if (!found) {
+    const list = all.map(({ url, init }) => `${init?.method ?? 'GET'} ${url}`).join(', ');
+    throw new Error(`No ${method} request was sent; sent: ${list || 'nothing'}`);
+  }
   return {
-    url: call[0],
-    body: call[1].body ? (JSON.parse(String(call[1].body)) as unknown) : null,
+    url: found.url,
+    body: found.init?.body ? (JSON.parse(String(found.init.body)) as unknown) : null,
   };
 };
 
@@ -226,11 +238,7 @@ test('a value too long to read is refused and the stored value stays', async () 
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
   expect(await findLive('alert')).toHaveTextContent('enter digits only');
-  expect(
-    fetchMock.mock.calls.some(
-      (args) => (args as unknown as [string, RequestInit])[1]?.method === 'PUT',
-    ),
-  ).toBe(false);
+  expect(didSend(fetchMock, 'PUT')).toBe(false);
 });
 
 test('when both fail, one retry brings back the record and the trend', async () => {
@@ -414,11 +422,7 @@ test.each([
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
   expect(await findLive('alert')).toHaveTextContent(message);
-  expect(
-    fetchMock.mock.calls.some(
-      (args) => (args as unknown as [string, RequestInit])[1]?.method === 'PUT',
-    ),
-  ).toBe(false);
+  expect(didSend(fetchMock, 'PUT')).toBe(false);
 });
 
 test('values at the edges the server takes are sent', async () => {
@@ -474,11 +478,7 @@ test('a comma decimal is refused, never read as ten times the value', async () =
     'Weight (kg): enter digits only. Use a period for the decimal point',
   );
   expect(weight).toHaveValue('49,5');
-  expect(
-    fetchMock.mock.calls.some(
-      (args) => (args as unknown as [string, RequestInit])[1]?.method === 'PUT',
-    ),
-  ).toBe(false);
+  expect(didSend(fetchMock, 'PUT')).toBe(false);
 });
 
 test('editing starts from the record and cancel changes nothing', async () => {
@@ -496,11 +496,7 @@ test('editing starts from the record and cancel changes nothing', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
   expect(await screen.findByText('70.5kg')).toBeInTheDocument();
-  expect(
-    fetchMock.mock.calls.some(
-      (args) => (args as unknown as [string, RequestInit])[1]?.method === 'PUT',
-    ),
-  ).toBe(false);
+  expect(didSend(fetchMock, 'PUT')).toBe(false);
 });
 
 test('deleting asks first, then offers the form again and reloads the trend', async () => {
@@ -512,11 +508,7 @@ test('deleting asks first, then offers the form again and reloads the trend', as
   renderWithQuery(<BodyCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   const dialog = screen.getByRole('dialog', { name: 'Delete this body record?' });
-  expect(
-    fetchMock.mock.calls.some(
-      (args) => (args as unknown as [string, RequestInit])[1]?.method === 'DELETE',
-    ),
-  ).toBe(false);
+  expect(didSend(fetchMock, 'DELETE')).toBe(false);
   fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
   expect(await screen.findByLabelText('Weight (kg)')).toHaveValue('');
@@ -573,7 +565,7 @@ test('coming back while a save is on its way shows the saved record, not a blank
   renderWithQuery(<BodyCard date={date} />);
 
   // The save is on its way (it is sent a moment after the press).
-  await waitFor(() => expect(saveSent(fetchMock)).toBe(true));
+  await waitFor(() => expect(didSend(fetchMock, 'PUT')).toBe(true));
   // No form while the save is out: the server would still answer with the empty day.
   expect(screen.getByRole('status', { name: 'Loading body records' })).toBeInTheDocument();
   expect(reads()).toBe(1);

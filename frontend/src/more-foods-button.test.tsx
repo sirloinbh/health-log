@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createRef } from 'react';
 import { expect, test, vi } from 'vitest';
 
 import { MoreFoodsButton } from './more-foods-button';
+import { nextTask } from './test/answered';
 
 function renderButton(onLoad: () => Promise<boolean>) {
   const afterLast = createRef<HTMLParagraphElement>();
@@ -31,8 +32,9 @@ test('a load that rejects is caught, and focus stays on the button to try again'
   const { button } = renderButton(onLoad);
   fireEvent.click(button);
   await waitFor(() => expect(onLoad).toHaveBeenCalledTimes(1));
-  // Let the rejection settle; an unhandled one would fail this file.
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  // The button handles the failed read in promise steps only, so by the next task it is done
+  // (#213); an unhandled rejection would fail this file.
+  await act(nextTask);
   expect(button).toHaveFocus();
   fireEvent.click(button);
   expect(onLoad).toHaveBeenCalledTimes(2);

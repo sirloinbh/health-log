@@ -49,3 +49,5 @@ The screens that #220 left reading with their own load functions and stale-answe
 
 - `combos.test.tsx` renders the app with `testQueryClient()`, so a served 500 shows at once.
 - `vitest run` on meals, combos and save-focus tests: 111 passed.
+- Full `npm run check` with `TEST_DATABASE_URL` empty, under the shared check lock: passed. Frontend: 76 files, 782 passed, 3 skipped.
+- No browser check: the markup is unchanged, and the screen tests cover the behavior.

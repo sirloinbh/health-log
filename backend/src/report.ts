@@ -41,6 +41,26 @@ type SummaryRow = {
   sleep_good: string;
 };
 
+// Shared SQL pieces (#195). Only these constant placeholders and column names are put into the
+// text, never a value from the request.
+
+/**
+ * One row per day with meals from `from` to `to` (the query's placeholders): the day's calories,
+ * each entry rounded as the day screen adds them, and whether every entry's calories are known. The
+ * summary and the chart both read their days from here, so the average and the bars cannot
+ * disagree. The span limit sits inside: Postgres would not push a join's date into the grouped
+ * query, and the whole history would be summed on every request.
+ */
+const mealDaysSql = (from: string, to: string) => `
+  SELECT entry_date, sum(round(calories * servings, 2)) AS calories,
+    bool_and(calories IS NOT NULL) AS complete
+  FROM meal_entries WHERE entry_date BETWEEN ${from} AND ${to}
+  GROUP BY entry_date`;
+
+/** Whether any drink is recorded on the day in the column `day` of the outer query. */
+const drankSql = (day: string) =>
+  `EXISTS (SELECT 1 FROM habit_drinks x WHERE x.record_date = ${day})`;
+
 // Every average and rate is over the days that have that record, so a day with nothing recorded
 // never pulls an average down. A day of meals counts for calories only when every entry's
 // calories are known; days with an unknown entry are counted apart.
@@ -48,11 +68,7 @@ const summarySql = `
   WITH sleep AS (
     SELECT count(*) AS sleep_days, avg(duration_minutes) AS sleep_average
     FROM sleep_records WHERE sleep_date BETWEEN $1 AND $2
-  ), meal_days AS (
-    SELECT entry_date, sum(round(calories * servings, 2)) AS calories,
-      bool_and(calories IS NOT NULL) AS complete
-    FROM meal_entries WHERE entry_date BETWEEN $1 AND $2
-    GROUP BY entry_date
+  ), meal_days AS (${mealDaysSql('$1', '$2')}
   ), meals AS (
     SELECT count(*) AS meal_days,
       count(*) FILTER (WHERE complete) AS calorie_days,
@@ -60,9 +76,7 @@ const summarySql = `
     FROM meal_days
   ), habits AS (
     SELECT count(*) FILTER (WHERE drinks_recorded) AS drink_recorded_days,
-      count(*) FILTER (WHERE EXISTS (
-        SELECT 1 FROM habit_drinks d WHERE d.record_date = habit_days.record_date
-      )) AS drinking_days,
+      count(*) FILTER (WHERE ${drankSql('habit_days.record_date')}) AS drinking_days,
       count(cigarettes) AS smoking_days,
       sum(cigarettes) AS cigarettes
     FROM habit_days WHERE record_date BETWEEN $1 AND $2
@@ -108,20 +122,12 @@ const readDays = async (db: Db, span: Span) => {
   const { rows } = await db.query<DayRow>(
     `SELECT d.date::text AS date, s.duration_minutes AS sleep_minutes,
        CASE WHEN m.complete THEN m.calories END AS calories,
-       CASE WHEN h.drinks_recorded THEN EXISTS (
-         SELECT 1 FROM habit_drinks x WHERE x.record_date = d.date
-       ) END AS drank
+       CASE WHEN h.drinks_recorded THEN ${drankSql('d.date')} END AS drank
      FROM unnest($1::date[]) AS d(date)
      LEFT JOIN sleep_records s ON s.sleep_date = d.date
-     LEFT JOIN (
-       SELECT entry_date, sum(round(calories * servings, 2)) AS calories,
-         bool_and(calories IS NOT NULL) AS complete
-       FROM meal_entries WHERE entry_date BETWEEN $2 AND $3 GROUP BY entry_date
-     ) m ON m.entry_date = d.date
+     LEFT JOIN (${mealDaysSql('$2', '$3')}) m ON m.entry_date = d.date
      LEFT JOIN habit_days h ON h.record_date = d.date
      ORDER BY d.date`,
-    // The meal totals are limited to the span: Postgres would not push the join's date into the
-    // grouped subquery, and the whole history would be summed on every request.
     [datesIn(span), span.from, span.to],
   );
   return rows.map((row) => ({
@@ -138,9 +144,7 @@ type AfterRow = { drank: boolean; nights: string; average: string | null };
 // Only nights whose previous day's drinking was recorded take part.
 const readSleepAfterDrinking = async (db: Db, span: Span) => {
   const { rows } = await db.query<AfterRow>(
-    `SELECT EXISTS (
-         SELECT 1 FROM habit_drinks x WHERE x.record_date = h.record_date
-       ) AS drank,
+    `SELECT ${drankSql('h.record_date')} AS drank,
        count(*) AS nights, avg(s.duration_minutes) AS average
      FROM sleep_records s
      JOIN habit_days h ON h.record_date = s.sleep_date - 1 AND h.drinks_recorded

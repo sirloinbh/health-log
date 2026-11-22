@@ -1194,10 +1194,10 @@ test('junk food entries are marked, with the week and month counts below the tot
   const summary = await screen.findByRole('region', { name: 'Junk food' });
   expect(within(summary).getByRole('heading', { level: 3, name: 'Junk food' })).toBeVisible();
   expect(within(summary).getByText(/This week/)).toHaveTextContent(
-    'This week Mar 9 – Mar 15: 3 times · 2 days · 1850kcal',
+    'This week Mar 9 – Mar 15: 3 times · 2 days · 1,850kcal',
   );
   expect(within(summary).getByText(/This month/)).toHaveTextContent(
-    'This month Mar 1 – Mar 31: 4 times · 3 days · 2100kcal or more (excludes 1 record with unknown calories)',
+    'This month Mar 1 – Mar 31: 4 times · 3 days · 2,100kcal (excludes 1 record with unknown calories)',
   );
   const lunch = screen.getByRole('region', { name: 'Lunch' });
   const items = within(lunch).getAllByRole('listitem');

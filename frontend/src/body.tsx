@@ -1,4 +1,5 @@
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 
 import {
   type BodyRecord,
@@ -19,12 +20,43 @@ import { SkeletonText } from './components/ui/skeleton';
 import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
 import { shiftDate } from './daily-date';
-import { RequestError, requestJson } from './lib/api';
-import { errorText, useNotice } from './lib/use-notice';
+import { RequestError } from './lib/api';
+import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
+import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
 import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
-import { trackWrite, writesSettled } from './pending-writes';
+import { trackWrite } from './pending-writes';
+import { asRequest, putAnswer, useReadAfterWrites } from './writes';
 
 const pathOf = (date: string) => `/api/body/${date}`;
+const keyOf = (date: string) => apiKey(pathOf(date));
+// Every trend read starts with this key, whatever its window.
+const historyKey = apiKey('/api/body');
+
+type BodyDay = { record: BodyRecord | null };
+
+/**
+ * Reads every trend again after a write. A trend read still on its way may have left before the write landed, and
+ * React Query would join it instead of starting a new one, so it is cancelled first: the answer that includes the
+ * write is the one that stays. Not awaited by the write, so a save does not wait for the trend.
+ */
+const refreshHistory = (client: QueryClient) =>
+  void client
+    .cancelQueries({ queryKey: historyKey })
+    .then(() => client.invalidateQueries({ queryKey: historyKey }));
+
+/**
+ * A write to one day's body record. Its answer goes into that day's cached record, and every trend is read again,
+ * even after the card is gone.
+ */
+function useBodyWrite(date: string, recordAfter: (data: unknown) => BodyRecord | null) {
+  const client = useQueryClient();
+  return useApiMutation<unknown, ApiRequest>(asRequest, {
+    onSuccess: (data) => {
+      putAnswer<BodyDay>(client, keyOf(date), { record: recordAfter(data) });
+      refreshHistory(client);
+    },
+  });
+}
 
 // `name`, `min` and `max` follow the server's checks in `backend/src/body.ts`, so its messages
 // appear before anything is sent (#205). Measures are above 0 with up to 2 decimals; blood
@@ -116,7 +148,8 @@ function BodyForm({
   onCancel?: () => void;
 }) {
   const [form, setForm] = useState(() => formOf(record));
-  const [saving, setSaving] = useState(false);
+  const save = useBodyWrite(date, (data) => data as BodyRecord);
+  const saving = save.isPending;
   const { notice, error, clear } = useNotice();
   const mounted = useRef(true);
 
@@ -138,14 +171,13 @@ function BodyForm({
     }
     // A repeated failure then appears anew and is announced again (as in #98).
     clear();
-    setSaving(true);
     try {
-      onSaved(
-        await trackWrite(
-          pathOf(date),
-          requestJson<BodyRecord>(pathOf(date), { method: 'PUT', body }),
-        ),
+      // trackWrite until every card reads through React Query (#220).
+      const saved = await trackWrite(
+        pathOf(date),
+        save.mutateAsync({ path: pathOf(date), method: 'PUT', body }),
       );
+      onSaved(saved as BodyRecord);
     } catch (cause) {
       // Moving to another day removes this form, and the record still was not saved.
       if (!mounted.current) {
@@ -153,7 +185,6 @@ function BodyForm({
         return;
       }
       error(cause);
-      setSaving(false);
     }
   };
 
@@ -313,63 +344,44 @@ function BodyChanges({ date, records }: { date: string; records: BodyRecord[] })
 
 // The daily page gives this a key per date, so nothing here outlives the day it was loaded for.
 export function BodyCard({ date }: { date: string }) {
-  const [record, setRecord] = useState<BodyRecord | null | undefined>(undefined);
-  const [history, setHistory] = useState<BodyRecord[]>([]);
   const [editing, setEditing] = useState(false);
-  const { notice, error, clear } = useNotice();
-  const { notice: changesNotice, error: changesError, clear: changesClear } = useNotice();
   const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLDivElement>(null);
-  const live = useRef(true);
-  const latestHistory = useRef(0);
   const [retryingChanges, setRetryingChanges] = useState(false);
+  const client = useQueryClient();
+  const remover = useBodyWrite(date, () => null);
 
-  const load = useCallback(async () => {
-    clear();
-    try {
-      // A save from before leaving this day may still be on its way; read after it lands.
-      await writesSettled(pathOf(date));
-      // Left again while waiting: nothing would show the answer.
-      if (!live.current) return;
-      const data = await requestJson<{ record: BodyRecord | null }>(pathOf(date));
-      if (live.current) setRecord(data.record);
-    } catch (cause) {
-      if (live.current) error(cause);
-    }
-  }, [clear, date, error]);
+  // A save from before leaving this day may still be on its way; read after it lands.
+  const ready = useReadAfterWrites(pathOf(date));
+  const query = useApiQuery<BodyDay>(keyOf(date), pathOf(date), { enabled: ready });
+  const record = ready ? query.data?.record : undefined;
+  const notice: NoticeValue | undefined =
+    query.isError && record === undefined
+      ? { kind: 'error', text: errorText(query.error) }
+      : undefined;
 
-  // Kept apart from the record: failing to load the trend must not hide today's form.
-  const loadHistory = useCallback(async () => {
-    // A slow older answer must not overwrite the one that includes the latest save.
-    const request = ++latestHistory.current;
-    const from = shiftDate(date, 1 - Math.max(...changeWindows));
-    try {
-      // A save to a day in the window changes the trend; waiting for every body write is simplest.
-      await writesSettled(pathOf(''));
-      // Left again while waiting: nothing would show the answer.
-      if (!live.current) return;
-      const data = await requestJson<{ records?: BodyRecord[] }>(
-        `/api/body?from=${from}&to=${date}`,
-      );
-      if (!live.current || request !== latestHistory.current) return;
-      changesClear();
-      setHistory(data.records ?? []);
-    } catch {
-      // Says which part failed: the record above has its own message for the same outage.
-      if (live.current && request === latestHistory.current) {
-        changesError('Could not load the changes over time');
-      }
-    }
-  }, [changesClear, changesError, date]);
+  // Kept apart from the record: failing to load the trend must not hide today's form. A save to a day in the window
+  // changes the trend; waiting for every body write is simplest.
+  const historyReady = useReadAfterWrites(pathOf(''));
+  const from = shiftDate(date, 1 - Math.max(...changeWindows));
+  const historyQuery = useApiQuery<{ records?: BodyRecord[] }>(
+    apiKey('/api/body', from, date),
+    `/api/body?from=${from}&to=${date}`,
+    { enabled: historyReady },
+  );
+  const history = (historyReady ? historyQuery.data?.records : undefined) ?? [];
+  // Says which part failed: the record above has its own message for the same outage. Hidden while a retry is on
+  // its way, so a repeated failure appears anew and is announced again.
+  const changesNotice: NoticeValue | undefined =
+    historyQuery.isError && !retryingChanges
+      ? { kind: 'error', text: 'Could not load the changes over time' }
+      : undefined;
 
-  useEffect(() => {
-    live.current = true;
-    void load();
-    void loadHistory();
-    return () => {
-      live.current = false;
-    };
-  }, [load, loadHistory]);
+  // One read at a time: pressing again while it is on its way does not start another.
+  const load = () => {
+    void query.refetch({ cancelRefetch: false });
+    void historyQuery.refetch({ cancelRefetch: false });
+  };
 
   // The button that was pressed is gone by now, and a closing dialog restores focus on a timer first.
   useEffect(() => {
@@ -379,34 +391,32 @@ export function BodyCard({ date }: { date: string }) {
   }, [moveFocus]);
 
   const retryChanges = async () => {
-    // Clearing first means a repeated failure appears anew and is announced again.
-    changesClear();
     setRetryingChanges(true);
-    await loadHistory();
+    await historyQuery.refetch({ cancelRefetch: false });
     setRetryingChanges(false);
     // The pressed button was disabled and may be gone, which would drop keyboard focus.
     setMoveFocus((count) => count + 1);
   };
 
-  const finish = (next: BodyRecord | null) => {
-    setRecord(next);
+  const finish = () => {
     setEditing(false);
     setMoveFocus((count) => count + 1);
   };
 
   const remove = async () => {
     try {
-      await trackWrite(pathOf(date), requestJson(pathOf(date), { method: 'DELETE' }));
+      await trackWrite(pathOf(date), remover.mutateAsync({ path: pathOf(date), method: 'DELETE' }));
     } catch (cause) {
       // Already gone counts as deleted; anything else keeps the dialog open with the reason.
       if (!(cause instanceof RequestError && cause.status === 404)) {
         toast.error(errorText(cause));
         throw cause;
       }
+      putAnswer<BodyDay>(client, keyOf(date), { record: null });
+      refreshHistory(client);
     }
     toast.success('Deleted');
-    finish(null);
-    void loadHistory();
+    finish();
   };
 
   return (
@@ -423,8 +433,7 @@ export function BodyCard({ date }: { date: string }) {
             variant="outline"
             className="self-start"
             onClick={() => {
-              void load();
-              void loadHistory();
+              load();
               // Trying again removes this button, which would drop keyboard focus to the page.
               setMoveFocus((count) => count + 1);
             }}
@@ -441,12 +450,11 @@ export function BodyCard({ date }: { date: string }) {
           <BodyForm
             date={date}
             record={record}
-            onSaved={(saved) => {
+            onSaved={() => {
               toast.success('Saved');
-              finish(saved);
-              void loadHistory();
+              finish();
             }}
-            onCancel={record ? () => finish(record) : undefined}
+            onCancel={record ? finish : undefined}
           />
         ) : null}
         {record && !editing ? (

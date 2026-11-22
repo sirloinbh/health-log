@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { ChecksCard } from './checks';
 import { toast } from './components/ui/sonner';
 import { findLive } from './test/live';
+import { renderWithQuery } from './test/query';
 
 const date = '2026-11-04';
 type Rate = { days: number; yes: number };
@@ -41,7 +42,7 @@ const group = (name: string) => screen.getByRole('group', { name });
 
 test('a day with no check starts with both questions unchecked and no rate', async () => {
   const fetchMock = server({ body: dayOf(null) });
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   const diet = await screen.findByRole('group', { name: 'Did you keep your diet?' });
   expect(within(diet).getByRole('button', { name: 'Not checked' })).toHaveAttribute(
     'aria-pressed',
@@ -60,7 +61,7 @@ test('a day with no check starts with both questions unchecked and no rate', asy
 test('one answered question is sent with the other left unchecked, not as a no', async () => {
   const saved = { date, dietKept: true, sleepGood: null, memo: null };
   const fetchMock = server({ body: dayOf(null) }, { body: dayOf(saved, { days: 1, yes: 1 }) });
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   fireEvent.click(
     within(await screen.findByRole('group', { name: 'Did you keep your diet?' })).getByRole(
       'button',
@@ -93,7 +94,7 @@ test('no answers and a memo are saved as they are, the memo trimmed', async () =
     { body: dayOf(null) },
     { body: dayOf(saved, { days: 1, yes: 0 }, { days: 1, yes: 0 }) },
   );
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   fireEvent.click(
     within(await screen.findByRole('group', { name: 'Did you keep your diet?' })).getByRole(
       'button',
@@ -121,7 +122,7 @@ test('no answers and a memo are saved as they are, the memo trimmed', async () =
 
 test('nothing checked and no memo is refused before anything is sent', async () => {
   const fetchMock = server({ body: dayOf(null) });
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Note'), { target: { value: '   ' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   expect(await findLive('alert')).toHaveTextContent('Enter at least one check or a note');
@@ -134,7 +135,7 @@ test('a saved day opens its own answers for editing, and an answer can be taken 
     { body: dayOf(record, { days: 1, yes: 1 }, { days: 1, yes: 0 }) },
     { body: dayOf({ ...record, sleepGood: null }, { days: 1, yes: 1 }) },
   );
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   expect(await screen.findByText('Kept')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
   expect(
@@ -157,7 +158,7 @@ test('a saved day opens its own answers for editing, and an answer can be taken 
 
 test('cancelling an edit keeps the saved answers', async () => {
   server({ body: dayOf({ date, dietKept: true, sleepGood: null, memo: null }) });
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
   fireEvent.click(
     within(group('Did you keep your diet?')).getByRole('button', { name: 'Not kept' }),
@@ -172,7 +173,7 @@ test('deleting asks first, then reloads the rates without the day', async () => 
     { status: 204 },
     { body: dayOf(null) },
   );
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   const dialog = await screen.findByRole('dialog', { name: 'Delete this daily check?' });
   expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -195,7 +196,7 @@ test('a server refusal is shown and the answers stay', async () => {
     { body: dayOf(null) },
     { status: 400, body: { error: 'The note must be 200 characters or fewer' } },
   );
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   fireEvent.click(
     within(await screen.findByRole('group', { name: 'Did you keep your diet?' })).getByRole(
       'button',
@@ -214,7 +215,7 @@ test('a server refusal is shown and the answers stay', async () => {
 
 test('a failed load can be tried again', async () => {
   server({ status: 500, body: { error: 'Server error occurred' } }, { body: dayOf(null) });
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   expect(screen.queryByRole('region', { name: 'This week' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
@@ -231,7 +232,7 @@ test('while saving, the answers and the memo cannot change under the save', asyn
         : Promise.resolve(new Response(JSON.stringify(dayOf(null)))),
     ),
   );
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   const diet = await screen.findByRole('group', { name: 'Did you keep your diet?' });
   fireEvent.click(within(diet).getByRole('button', { name: 'Kept' }));
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -247,7 +248,7 @@ test('while saving, the answers and the memo cannot change under the save', asyn
 
 test('the memo field says how long it may be', async () => {
   server({ body: dayOf(null) });
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   const memo = await screen.findByLabelText('Note');
   expect(memo).toHaveAccessibleDescription('Up to 200 characters.');
   // A maxLength would count an emoji twice and stop typing at 100 of them.
@@ -260,7 +261,7 @@ test('200 emoji are sent as the hint says, and one more is refused before sendin
     { body: dayOf(null) },
     { body: dayOf({ date, dietKept: null, sleepGood: null, memo }) },
   );
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   const field = await screen.findByLabelText('Note');
 
   fireEvent.change(field, { target: { value: memo + '🍙' } });
@@ -277,15 +278,13 @@ test('200 emoji are sent as the hint says, and one more is refused before sendin
 test('a save that fails after leaving the day still says so', async () => {
   const shown = vi.spyOn(toast, 'error');
   let failSave = (_response: Response) => {};
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((_url: string, init?: RequestInit) =>
-      init?.method === 'PUT'
-        ? new Promise((resolve) => (failSave = resolve))
-        : Promise.resolve(new Response(JSON.stringify(dayOf(null)))),
-    ),
+  const fetchMock = vi.fn((_url: string, init?: RequestInit) =>
+    init?.method === 'PUT'
+      ? new Promise((resolve) => (failSave = resolve))
+      : Promise.resolve(new Response(JSON.stringify(dayOf(null)))),
   );
-  const { unmount } = render(<ChecksCard date={date} />);
+  vi.stubGlobal('fetch', fetchMock);
+  const { unmount } = renderWithQuery(<ChecksCard date={date} />);
   fireEvent.click(
     within(await screen.findByRole('group', { name: 'Did you keep your diet?' })).getByRole(
       'button',
@@ -296,6 +295,8 @@ test('a save that fails after leaving the day still says so', async () => {
   );
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   unmount();
+  // React Query sends the save a moment after the click.
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
 
   failSave(new Response(JSON.stringify({ error: 'Server error occurred' }), { status: 500 }));
   await waitFor(() =>
@@ -307,7 +308,7 @@ test('a save that fails after leaving the day still says so', async () => {
 
 test('pressing Enter in the memo keeps the focus there when the save fails', async () => {
   server({ body: dayOf(null) }, { status: 500, body: { error: 'Server error occurred' } });
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   const memo = await screen.findByLabelText('Note');
   fireEvent.change(memo, { target: { value: 'Note' } });
   memo.focus();
@@ -332,11 +333,11 @@ test('coming back while a save is on its way shows the saved check, not a blank 
     return Promise.resolve(new Response(JSON.stringify(dayOf(saved ? check : null))));
   });
   vi.stubGlobal('fetch', fetchMock);
-  const first = render(<ChecksCard date={date} />);
+  const first = renderWithQuery(<ChecksCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Note'), { target: { value: '야식 참음' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   first.unmount();
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
 
   // Only the first card has read; the second waits for the save (and reads once, below).
   expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -354,7 +355,7 @@ test('a failed delete says why and keeps the check and the dialog', async () => 
     { body: dayOf({ date, dietKept: true, sleepGood: null, memo: '야식 참음' }) },
     { status: 500, body: { error: 'Server error occurred' } },
   );
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' });
   fireEvent.click(confirm);
@@ -367,7 +368,7 @@ test('a failed delete says why and keeps the check and the dialog', async () => 
 
 test('trying again moves focus to the card, as the button it was on goes away', async () => {
   server({ status: 500, body: { error: 'Server error occurred' } }, { body: dayOf(null) });
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   const again = await screen.findByRole('button', { name: 'Try again' });
   again.focus();
   fireEvent.click(again);
@@ -380,7 +381,7 @@ test('trying again moves focus to the card, as the button it was on goes away', 
 test('a retry cannot be started twice, so no older answer can land after a newer one', async () => {
   const finishers: ((response: Response) => void)[] = [];
   const fetchMock = server({ status: 500, body: { error: 'Server error occurred' } });
-  render(<ChecksCard date={date} />);
+  renderWithQuery(<ChecksCard date={date} />);
   const again = await screen.findByRole('button', { name: 'Try again' });
   fetchMock.mockImplementation(() => new Promise<Response>((resolve) => finishers.push(resolve)));
   const before = fetchMock.mock.calls.length;

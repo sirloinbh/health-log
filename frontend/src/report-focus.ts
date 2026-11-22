@@ -8,7 +8,7 @@
  * - `retry`: "Try again", which stays while it waits and keeps its focus if it fails again (#128).
  * - `none`: the first load, or an address the page did not change itself.
  */
-export type LoadCause = 'none' | 'move' | 'arrival' | 'retry';
+type LoadCause = 'none' | 'move' | 'arrival' | 'retry';
 
 export type ReportFocus = {
   /** Asked for by the last move, until the load for the new address starts. */

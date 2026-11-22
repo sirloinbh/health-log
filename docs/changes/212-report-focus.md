@@ -41,3 +41,11 @@ Temporary local DB, API (3984) and Vite (5284), Playwright on `/?period=week&dat
 
 - `TEST_DATABASE_URL= npm run check` (under the shared check lock): passed. Frontend 741 passed, 3 skipped; backend 154 passed, 127 DB tests skipped because `TEST_DATABASE_URL` was emptied (CI runs them); skill checks 3 passed.
 - `npm ci --ignore-scripts` was run first: main had added `@tanstack/react-query` (#252), and the old `node_modules` failed the typecheck.
+
+## First review — 2026-11-22
+
+Self-review of the whole diff, plus the first CI run. One finding, fixed in this PR.
+
+- **CI `knip` failed: `LoadCause` was exported but used only inside `report-focus.ts`.** It is now a local type. `npm run knip` had not been run locally for this PR.
+- No other findings: each old flag maps to a reducer field (`moved` → `asked`, `focusOnArrival` → `arrival`, `focusSpan`/`focusRetry` → `target`, `retrying` → `running === 'retry'`), and a stale answer still sends nothing.
+- After the fix: `E2E_DATABASE_URL=<temporary local DB> npm run knip` passed (configuration hints only); `TEST_DATABASE_URL= npm run check` (under the shared check lock) passed with the same counts as above.

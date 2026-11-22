@@ -83,7 +83,7 @@ test('one answered question is sent with the other left unchecked, not as a no',
     body: { dietKept: true, sleepGood: null, memo: null },
   });
   const week = screen.getByRole('region', { name: 'This week' });
-  expect(within(week).getByText('Diet: Kept on 1/1 days (100%)')).toBeInTheDocument();
+  expect(within(week).getByText('Diet: Kept on 1/1 day (100%)')).toBeInTheDocument();
   expect(within(week).getByText('Sleep: No records')).toBeInTheDocument();
 });
 
@@ -114,7 +114,7 @@ test('no answers and a memo are saved as they are, the memo trimmed', async () =
   expect(request(fetchMock, 1).body).toEqual({ dietKept: false, sleepGood: false, memo: '야근' });
   expect(
     within(screen.getByRole('region', { name: 'This week' })).getByText(
-      'Diet: Kept on 0/1 days (0%)',
+      'Diet: Kept on 0/1 day (0%)',
     ),
   ).toBeInTheDocument();
 });

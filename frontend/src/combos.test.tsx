@@ -104,7 +104,7 @@ test('a combo shows its foods and says when a calorie is unknown', async () => {
   expect(
     within(card).getByText('2 foods · 300kcal (excludes 1 food with unknown calories)'),
   ).toBeInTheDocument();
-  expect(within(card).getByText('샘플 햇반 · 1 servings · 300kcal')).toBeInTheDocument();
+  expect(within(card).getByText('샘플 햇반 · 1 serving · 300kcal')).toBeInTheDocument();
   expect(within(card).getByText('삶은 달걀 · 2 servings · No calorie value')).toBeInTheDocument();
 });
 

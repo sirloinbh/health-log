@@ -83,6 +83,8 @@ test('each goal takes a whole number in its own range, or null to turn it off', 
   await rejects('/api/goals/sleep', { from, target: 59 }, 400, 'at least 60 min');
   await rejects('/api/goals/sleep', { from, target: 1441 }, 400, 'at most 1440 min');
   await rejects('/api/goals/sober_days', { from, target: 8 }, 400, 'at most 7 days');
+  // #207: one day reads as one.
+  await rejects('/api/goals/sober_days', { from, target: 0 }, 400, 'at least 1 day$');
   await rejects('/api/goals/sober_days', { from, target: '5' }, 400, 'must be a number');
   await rejects('/api/goals/sober_days', { from }, 400, 'must be a number');
 });

@@ -6,23 +6,19 @@ Requirements are registered as GitHub issues. Choose later work with the selecti
 
 ## In progress
 
-- **Lanes:** none assigned now. No health-log PR is open.
+- **Lanes:** none assigned now.
+- **Deploy:** health-log has run on the shared server since 2026-11-20 and deploys itself from `main` (`health-autodeploy.timer`), so a merge to `main` reaches the server. Migrations 019, 020 and 021 already ran on the real data. The after-deploy check of 2026-11-22 is in the [#74 change record](../changes/74-proxy-access.md#after-deploy-check-2026-11-22).
 - **Recently finished (2026-11-22 run):** about 50 PRs from five Orca lanes, listed issue by issue in the [daily log](../daily/2026-11-22.md#what-was-done). Epics #188, #189, #190, #191 and #216 are closed.
 
 ## User actions
 
-| Order | Action                                                                                                                                                                                    | Issue                           |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| 1     | Before the next deploy, run the two queries in [the #197 change record](../changes/197-sleep-body-db-checks.md) on real data. A row that breaks a rule stops migration 019 and the deploy | #197                            |
-| 2     | First deploy and the checks after it ([checks](../access-protection.md#checks-after-a-deploy)). The web stays on `127.0.0.1:8103` behind the shared proxy                                 | #41, #74                        |
-| 3     | After the deploy, check the shared sign-in on the server                                                                                                                                  | #167                            |
-| 4     | Get the central change done that marks health-log as using the shared contract (`features.contract=true`)                                                                                 | sirloinbh/project-standards#978 |
-| 5     | Merge the workout-memo sync PR that the sirloinbh/project-standards#982 sync opened (or let that repo's session do it)                                                                    | sirloinbh/workout-memo#466      |
-| 6     | Garmin key, photo recognition, ESLint dependencies after the upstream fix, MFDS auth key                                                                                                  | #28, #47, #115, #118            |
+| Order | Action                                                                                                                        | Issue                |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| 1     | Sign in at `https://health-log.daysofme.com` and check that `/api/me` returns your user. The signed-out checks already passed | #167                 |
+| 2     | Garmin key, photo recognition, ESLint dependencies after the upstream fix, MFDS auth key                                      | #28, #47, #115, #118 |
 
-Notes for the deploy:
+Backups:
 
-- The next deploy applies migrations 019 (#197 sleep and body checks), 020 (#199, 13 seeded food rows) and 021 (#196 meal request keys).
 - **Restoring a backup by hand:** after you restore the meals, empty `meal_request_keys` in the same transaction (`DELETE FROM meal_request_keys;` before `COMMIT`). A key left from before the restore could replay an old meal POST answer for a meal that is no longer there (#196). health-log has no manual restore guide yet, and the restore tooling (`deploy/backup.sh`, `restore-check`) is a managed file, so do not edit it; raise a change to it in `sirloinbh/project-standards`.
 
 ## Choices to confirm
@@ -36,32 +32,30 @@ These were decided without asking. If you want them different, open a follow-up 
 
 ## Central follow-ups
 
-Open in the central repo:
+None open. The three filed during the run are closed:
 
-- **sirloinbh/project-standards#978:** set `features.contract=true` for health-log (user action 4).
-- **sirloinbh/project-standards#979:** `useApiMutation` cannot pass request headers. Until it can, meals use `useMutation` directly to send the `Idempotency-Key`.
-- **sirloinbh/project-standards#980:** the managed `lib/query.test.tsx` sends `GET /api/tags` after it ends. Until it is fixed, health-log's test setup ignores that request by name.
+- **sirloinbh/project-standards#978 (closed as completed):** health-log is marked as using the shared contract (`features.contract`).
+- **sirloinbh/project-standards#979:** `useApiMutation` can pass request headers; meals now save through it with the `Idempotency-Key` (#299, PR #300).
+- **sirloinbh/project-standards#980:** the managed query test no longer sends `GET /api/tags` after it ends; health-log's test setup stopped ignoring it (#296, PR #298).
 
 ## Issues that need the user
 
-| Issue | What is needed                                                             |
-| ----- | -------------------------------------------------------------------------- |
-| #41   | Access protection: the first deploy and the checks after it                |
-| #74   | Allowed IPs on the shared server: the first deploy and the checks after it |
-| #167  | Shared sign-in: a server check after the deploy                            |
-| #28   | Garmin sleep import: a key from Garmin Connect and agreeing to the terms   |
-| #47   | Food drafts from label photos                                              |
-| #115  | ESLint dependencies: update once the minimatch warning is fixed upstream   |
-| #118  | MFDS processed-food values: an auth key                                    |
+| Issue | What is needed                                                           |
+| ----- | ------------------------------------------------------------------------ |
+| #167  | Shared sign-in: the signed-in check on the server (user action 1)        |
+| #28   | Garmin sleep import: a key from Garmin Connect and agreeing to the terms |
+| #47   | Food drafts from label photos                                            |
+| #115  | ESLint dependencies: update once the minimatch warning is fixed upstream |
+| #118  | MFDS processed-food values: an auth key                                  |
 
 ## Open epics
 
-| Epic                                    | Open sub-issues | Waiting for                       |
-| --------------------------------------- | --------------- | --------------------------------- |
-| #221 Shared platform adoption           | #167            | the server check after the deploy |
-| #88 Make deployment and operations safe | #41, #74, #115  | the deploy and the upstream fix   |
-| #83 Build food nutrition data           | #47, #118       | the user                          |
-| #82 Record sleep                        | #28             | the Garmin key                    |
+| Epic                                    | Open sub-issues | Waiting for         |
+| --------------------------------------- | --------------- | ------------------- |
+| #221 Shared platform adoption           | #167            | the signed-in check |
+| #88 Make deployment and operations safe | #115            | the upstream fix    |
+| #83 Build food nutrition data           | #47, #118       | the user            |
+| #82 Record sleep                        | #28             | the Garmin key      |
 
 ## User decisions
 
@@ -83,4 +77,4 @@ Open in the central repo:
 
 ## Run boundaries
 
-Deploys, syncing sub repositories, and creating AWS resources are done only on a separate request. Add the ECR repository of the shared infrastructure to the list in `shared-aws-infrastructure` at the first deploy.
+`main` deploys itself, so merge only what is ready to run on the server. Manual deploy actions, syncing sub repositories, and creating or changing AWS resources are done only on a separate request.

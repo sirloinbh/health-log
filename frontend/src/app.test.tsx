@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
@@ -64,4 +64,47 @@ test('an unknown address falls back to the overview', async () => {
   render(<App />);
   expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
   expect(window.location.pathname).toBe('/');
+});
+
+// Answers /api/health with each date in turn (the last one repeats), and the other pages' reads as above.
+const days = (...todays: string[]) => {
+  const healthCalls: string[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) => {
+      if (url === '/api/health') healthCalls.push(url);
+      const today = todays[Math.min(healthCalls.length, todays.length) - 1];
+      const body =
+        url === '/api/goals' ? noGoals : url === '/api/reminders' ? noReminders : { today };
+      return Promise.resolve(new Response(JSON.stringify(body)));
+    }),
+  );
+  return healthCalls;
+};
+
+test('an app left open past midnight shows the new date within a minute', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const healthCalls = days('2026-10-26', '2026-10-27');
+  render(<App />);
+  expect(await screen.findByText('Server connected · 2026-10-26')).toBeInTheDocument();
+  await act(() => vi.advanceTimersByTimeAsync(60_000));
+  expect(await screen.findByText('Server connected · 2026-10-27')).toBeInTheDocument();
+  expect(healthCalls).toHaveLength(2);
+});
+
+test('coming back to the page checks the server again', async () => {
+  const healthCalls = days('2026-10-26', '2026-10-27');
+  render(<App />);
+  expect(await screen.findByText('Server connected · 2026-10-26')).toBeInTheDocument();
+  act(() => {
+    window.dispatchEvent(new Event('visibilitychange'));
+  });
+  expect(await screen.findByText('Server connected · 2026-10-27')).toBeInTheDocument();
+  expect(healthCalls).toHaveLength(2);
+});
+
+test('an answer without a date is reported instead of a blank date', async () => {
+  health({});
+  render(<App />);
+  expect(await findLive('alert')).toHaveTextContent('Cannot check the server status');
 });

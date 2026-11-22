@@ -57,7 +57,7 @@ We confirmed that the 5 first findings were applied correctly. We applied the 4 
 
 ## What is left
 
-This PR does not close #41. These three are left.
+This PR does not close #41. These three are left. Update 2026-11-22: all three are done. The allowed IPs are applied, the web opens only through the shared proxy (#74), and the after-deploy check, including the records API returning 401 with no data when signed out, is in the [#74 change record](74-proxy-access.md#after-deploy-check-2026-11-22). #293 closes #41.
 
 - [User] Put the office and home public IPs in `allowed_cidrs` and run plan/apply.
 - Open the web only to the allowed IPs (#74).

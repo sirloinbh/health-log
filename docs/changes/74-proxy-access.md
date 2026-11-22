@@ -18,6 +18,25 @@
 
 - Docs only. Prettier check on the changed files.
 
+## After-deploy check (2026-11-22)
+
+Checked from an allowed IP by the coordinator, and posted on #74, #41 and #167. Recorded here by #293 as the done-when of #74 and #41 asks.
+
+health-log has been deployed on the shared server since 2026-11-20 and deploys itself from `main` (`health-autodeploy.timer`). The deployed commit (`.deployed`) was `8ee8e82` (PR #298), so migrations 019, 020 and 021 ran on the real data without a failed deploy.
+
+| Check                                                     | Result                                                                                                                |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `https://health-log.daysofme.com/`                        | 200, behind the shared proxy (nginx, HSTS)                                                                            |
+| `GET /api/health`                                         | 200 `{"ok":true,"service":"health-log",...}`                                                                          |
+| `GET /api/me` signed out                                  | 401                                                                                                                   |
+| `GET /api/meals?date=2026-11-22` signed out (records API) | 401, no data                                                                                                          |
+| Signed-out visitor in a browser                           | sent to `https://auth.daysofme.com/sign-in?returnTo=https://health-log.daysofme.com/`                                 |
+| Plain HTTP to the server on 8103                          | no answer (port not open)                                                                                             |
+| Lightsail firewall                                        | 22, 80 and 443 open only to 2 `/32` ranges (`allowed_cidrs`); none open to all; no browser-SSH aliases; 8103 not open |
+| Containers                                                | `health-log-api-1` healthy, `health-log-db-1` healthy, `health-log-web-1` up                                          |
+
+Not checked: the signed-in path (`/api/me` returns the user after sign-in), which needs the user's own sign-in (#167, left open), and a request from a network that is not allowed. The firewall allows only the two `allowed_cidrs` ranges, and without a session the records API returns no data.
+
 ## Merge of main and review round 1 (2026-11-22)
 
 - Merged `origin/main` into the branch (no conflicts).

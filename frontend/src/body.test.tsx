@@ -3,6 +3,7 @@ import { expect, test, vi } from 'vitest';
 
 import { BodyCard } from './body';
 import { toast } from './components/ui/sonner';
+import { answered } from './test/answered';
 import { findLive, queryLive } from './test/live';
 
 const date = '2026-03-15';
@@ -272,8 +273,9 @@ test('a slow older trend does not overwrite the one that includes a save', async
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await screen.findByRole('row', { name: /Weight.*−1\.5kg/ });
 
-  finishFirst(new Response(JSON.stringify({ records: [earlier] })));
-  await new Promise((resolve) => setTimeout(resolve));
+  const late = new Response(JSON.stringify({ records: [earlier] }));
+  finishFirst(late);
+  await answered(late);
   expect(screen.getByRole('row', { name: /Weight.*−1\.5kg/ })).toBeInTheDocument();
 });
 
@@ -449,7 +451,6 @@ test('coming back while a save is on its way shows the saved record, not a blank
 
   // No form while the save is out: the server would still answer with the empty day.
   expect(screen.getByRole('status', { name: 'Loading body records' })).toBeInTheDocument();
-  await new Promise((resolve) => setTimeout(resolve, 0));
   expect(reads()).toBe(1);
   expect(screen.queryByLabelText('Weight (kg)')).not.toBeInTheDocument();
 
@@ -512,8 +513,9 @@ test('a slow older trend failure does not replace the one that includes a save',
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await screen.findByRole('row', { name: /Weight.*−1\.5kg/ });
 
-  failFirst(new Response(JSON.stringify({ error: 'Server error occurred' }), { status: 500 }));
-  await new Promise((resolve) => setTimeout(resolve));
+  const late = new Response(JSON.stringify({ error: 'Server error occurred' }), { status: 500 });
+  failFirst(late);
+  await answered(late);
   expect(screen.queryByText('Could not load the changes over time')).not.toBeInTheDocument();
   expect(screen.getByRole('row', { name: /Weight.*−1\.5kg/ })).toBeInTheDocument();
 });
@@ -546,10 +548,9 @@ test('a retry cannot be started twice, so no older answer can land after a newer
   const before = fetchMock.mock.calls.length;
   fireEvent.click(again);
   fireEvent.click(again);
-  await new Promise((resolve) => setTimeout(resolve, 0));
   // The button goes with the first press; the second reaches nothing. (The body card also
   // reloads its trend, hence two requests there.)
-  expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+  await waitFor(() => expect(again).not.toBeInTheDocument());
   expect(fetchMock.mock.calls.length - before).toBe(2);
   for (const finish of finishers) {
     finish(new Response(JSON.stringify({ error: 'x' }), { status: 500 }));

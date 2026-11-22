@@ -338,11 +338,13 @@ test('coming back while a save is on its way shows the saved check, not a blank 
   first.unmount();
   render(<ChecksCard date={date} />);
 
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  // Only the first card has read; the second waits for the save (and reads once, below).
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(screen.queryByLabelText('Note')).not.toBeInTheDocument();
   finishSave();
   expect(await screen.findByText('야식 참음')).toBeInTheDocument();
+  // The first card's read, the save, and the second card's one read after it landed.
+  expect(fetchMock).toHaveBeenCalledTimes(3);
   expect(screen.queryByLabelText('Note')).not.toBeInTheDocument();
 });
 
@@ -384,9 +386,8 @@ test('a retry cannot be started twice, so no older answer can land after a newer
   const before = fetchMock.mock.calls.length;
   fireEvent.click(again);
   fireEvent.click(again);
-  await new Promise((resolve) => setTimeout(resolve, 0));
   // The button goes with the first press; the second reaches nothing.
-  expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+  await waitFor(() => expect(again).not.toBeInTheDocument());
   expect(fetchMock.mock.calls.length - before).toBe(1);
   for (const finish of finishers) {
     finish(new Response(JSON.stringify({ error: 'x' }), { status: 500 }));

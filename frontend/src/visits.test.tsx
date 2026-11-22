@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
 import { toast } from './components/ui/sonner';
 import { trackWrite } from './pending-writes';
+import { nextTask } from './test/answered';
 import { VisitsCard } from './visit-card';
 import type { Visit } from './visit-text';
 
@@ -400,20 +401,29 @@ test('trying again after a failed load moves focus to the card', async () => {
 
 test('the daily card reads only after a visit save still on its way', async () => {
   let finish = () => {};
+  // Set as the save settles, before the card can see it.
+  let landed = false;
   void trackWrite(
     '/api/visits/',
     new Promise<void>((resolve) => {
       finish = resolve;
+    }).then(() => {
+      landed = true;
     }),
   );
-  const fetchMock = serve(() => json({ visits: [visit], more: false }));
+  const landedAtRead: boolean[] = [];
+  serve(() => {
+    landedAtRead.push(landed);
+    return json({ visits: [visit], more: false });
+  });
   renderCard();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  expect(fetchMock).not.toHaveBeenCalled();
+  // A card that did not wait would have read by the next task.
+  await act(nextTask);
   finish();
   expect(
     await screen.findByRole('list', { name: 'Clinic visits on this day' }),
   ).toBeInTheDocument();
+  expect(landedAtRead).toEqual([true]);
 });
 
 test('removing a procedure row moves focus to the add button, not the page', async () => {

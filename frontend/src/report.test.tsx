@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
+import { answered } from './test/answered';
 import { findLive, getLive } from './test/live';
 
 const today = '2026-11-05';
@@ -321,19 +322,22 @@ test('a move whose report fails puts focus on Try again (#138 review)', async ()
 });
 
 test('a failed "This week" does not move focus on a later report (#138 review)', async () => {
+  const month = json(
+    reportOf({
+      period: 'month',
+      current: { ...reportOf().current, from: '2026-11-01', to: '2026-11-30' },
+    }),
+  );
   serve((url) =>
     url.endsWith(`date=${today}`) && url.includes('period=week')
       ? json({ error: 'Server error occurred' }, 500)
-      : json(
-          url.includes('period=month')
-            ? reportOf({
-                period: 'month',
-                current: { ...reportOf().current, from: '2026-11-01', to: '2026-11-30' },
-              })
-            : reportOf({
-                current: { ...reportOf().current, from: '2026-10-26', to: '2026-11-01' },
-              }),
-        ),
+      : url.includes('period=month')
+        ? month
+        : json(
+            reportOf({
+              current: { ...reportOf().current, from: '2026-10-26', to: '2026-11-01' },
+            }),
+          ),
   );
   window.history.replaceState(null, '', '/?period=week&date=2026-10-28');
   render(<App />);
@@ -346,9 +350,8 @@ test('a failed "This week" does not move focus on a later report (#138 review)',
   outside.focus();
   fireEvent.click(screen.getByRole('button', { name: 'Monthly' }));
   outside.remove();
-  const span = await screen.findByText('Nov 1 – Nov 30');
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  expect(span).not.toHaveFocus();
+  await answered(month);
+  expect(screen.getByText('Nov 1 – Nov 30')).not.toHaveFocus();
 });
 
 test('a failed report can be tried again', async () => {
@@ -417,8 +420,9 @@ test('a retry for a period already left does not end a newer retry (#128 review)
   await waitFor(() => expect(answers).toHaveLength(4));
 
   // The week's late answer must not take the month's retry button, and its focus, away.
-  answers[1](json(reportOf()));
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  const late = json(reportOf());
+  answers[1](late);
+  await answered(late);
   expect(monthRetry).toBeInTheDocument();
   expect(monthRetry).toHaveFocus();
   answers[3](failure());
@@ -442,9 +446,10 @@ test('focus moved elsewhere during a retry stays there (#128 review)', async () 
   await waitFor(() => expect(calls).toBe(2));
   const weekly = screen.getByRole('button', { name: 'Weekly' });
   weekly.focus();
-  answer(json(reportOf()));
-  await screen.findByText('Nov 2 – Nov 8');
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  const week = json(reportOf());
+  answer(week);
+  await answered(week);
+  expect(screen.getByText('Nov 2 – Nov 8')).toBeInTheDocument();
   expect(weekly).toHaveFocus();
 });
 
@@ -538,8 +543,9 @@ test('a report still on its way does not land next to the word about a date out 
   window.history.pushState(null, '', '/?period=week&date=1999-06-01');
   fireEvent(window, new PopStateEvent('popstate'));
   await screen.findByText('Records can be kept from 2000-01-01 to 2099-12-31: 1999-06-01');
-  answer(json(reportOf()));
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  const late = json(reportOf());
+  answer(late);
+  await answered(late);
   expect(screen.queryByText('Nov 2 – Nov 8')).not.toBeInTheDocument();
 });
 
@@ -596,10 +602,11 @@ test('an answer for a period already left does not replace the one on screen', a
   render(<App />);
   fireEvent.click(await screen.findByRole('button', { name: 'Monthly' }));
   expect(await screen.findByText('Nov 1 – Nov 30')).toBeInTheDocument();
-  finishWeek(
-    json(reportOf({ current: { ...reportOf().current, sleep: { days: 1, averageMinutes: 60 } } })),
+  const late = json(
+    reportOf({ current: { ...reportOf().current, sleep: { days: 1, averageMinutes: 60 } } }),
   );
-  await new Promise((resolve) => setTimeout(resolve));
+  finishWeek(late);
+  await answered(late);
   expect(screen.getByText('Nov 1 – Nov 30')).toBeInTheDocument();
   expect(stat('Average sleep')).toHaveTextContent('7 h 30 min');
 });

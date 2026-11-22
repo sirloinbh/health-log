@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { expect, test, vi } from 'vitest';
 
@@ -7,6 +7,7 @@ import { trackWrite } from './pending-writes';
 import type { Reminder, Reminders } from './reminder-text';
 import { reminderDetail, reminderTitle, whenText } from './reminder-text';
 import { RemindersCard } from './reminders';
+import { nextTask } from './test/answered';
 import { findLive, queryLive } from './test/live';
 
 // Made-up values only: no real appointment or prescription belongs in tests.
@@ -242,14 +243,26 @@ test('a failed load can be tried again, and focus stays in the card', async () =
 
 test('a visit just saved elsewhere is waited for before the list is read', async () => {
   let land: () => void = () => {};
-  void trackWrite('/api/visits/', new Promise<void>((resolve) => (land = resolve)));
-  const fetchMock = serve(() => json(listOf([])));
+  // Set as the save settles, before the card can see it.
+  let landed = false;
+  void trackWrite(
+    '/api/visits/',
+    new Promise<void>((resolve) => (land = resolve)).then(() => {
+      landed = true;
+    }),
+  );
+  const landedAtRead: boolean[] = [];
+  const fetchMock = serve(() => {
+    landedAtRead.push(landed);
+    return json(listOf([]));
+  });
   show();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  expect(reads(fetchMock)).toHaveLength(0);
+  // A card that did not wait would have read by the next task.
+  await act(nextTask);
   land();
   await screen.findByText('No clinic appointments or medication end dates in the next 7 days.');
   expect(reads(fetchMock)).toHaveLength(1);
+  expect(landedAtRead).toEqual([true]);
 });
 
 // Only the dashboard here; the daily page is in daily.test.tsx with its other cards.

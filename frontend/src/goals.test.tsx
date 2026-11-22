@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { expect, test, vi } from 'vitest';
 
 import { GoalsCard, GoalsSettings } from './goals';
 import { trackWrite } from './pending-writes';
+import { answered, nextTask } from './test/answered';
 
 const date = '2026-11-04';
 const week = { from: '2026-11-02', to: '2026-11-08' };
@@ -21,6 +22,24 @@ const server = (...replies: Reply[]) => {
   });
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
+};
+
+/** Answers a request that was left waiting, and hands back the answer for `answered`. */
+const answer = (resolve: (response: Response) => void, body: unknown) => {
+  const response = new Response(JSON.stringify(body));
+  resolve(response);
+  return response;
+};
+
+/** Writes 'read' to the returned log at each request, in order with what the test writes there. */
+const logReads = (fetchMock: ReturnType<typeof server>) => {
+  const log: string[] = [];
+  const reply = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(() => {
+    log.push('read');
+    return reply();
+  });
+  return log;
 };
 
 const request = (fetchMock: ReturnType<typeof server>, call: number) => {
@@ -240,20 +259,23 @@ test('a sleep goal is typed in hours and minutes and sent in minutes from the ch
 });
 
 test('the card reads only after a save of the same day has landed', async () => {
+  const fetchMock = server({ body: dayOf() });
+  const log = logReads(fetchMock);
   let land: (value: unknown) => void = () => undefined;
+  // 'landed' is logged as the save settles, before the card can see it.
   const save = trackWrite(
     `/api/meals/${date}`,
     new Promise((resolve) => {
       land = resolve;
-    }),
+    }).then(() => log.push('landed')),
   );
-  const fetchMock = server({ body: dayOf() });
   renderCard();
-  await new Promise((resolve) => setTimeout(resolve, 20));
-  expect(fetchMock).not.toHaveBeenCalled();
+  // A card that did not wait would have read by the next task.
+  await act(nextTask);
   land(undefined);
   await save;
   expect(await screen.findByRole('region', { name: 'Diet' })).toBeInTheDocument();
+  expect(log).toEqual(['landed', 'read']);
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
@@ -281,39 +303,46 @@ test('a save in another card of the same day judges again without a button', asy
 });
 
 test('only saves that can change this day read again', async () => {
-  // The first read, then one for each of the three saves below that count.
-  const fetchMock = server(...Array.from({ length: 4 }, () => ({ body: dayOf() })));
+  // The first read, one for each of the three saves below that count, and one for the last check.
+  const fetchMock = server(...Array.from({ length: 5 }, () => ({ body: dayOf() })));
+  const log = logReads(fetchMock);
   renderCard();
   await screen.findByRole('region', { name: 'Diet' });
-  const settle = async (path: string) => {
+  const expected = ['read'];
+  const save = async (path: string) => {
+    log.push(path);
+    expected.push(path);
     await trackWrite(path, Promise.resolve({}));
-    await new Promise((resolve) => setTimeout(resolve, 20));
   };
   // Another day's meals and sleep, drinks outside this Monday-to-Sunday week, and a food edit.
-  await settle('/api/meals/2026-11-05');
-  await settle('/api/sleep/2026-11-03');
-  await settle('/api/habits/2026-11-09');
-  await settle('/api/habits/2026-11-01');
-  await settle('/api/foods/12');
-  expect(fetchMock).toHaveBeenCalledTimes(1);
+  await save('/api/meals/2026-11-05');
+  await save('/api/sleep/2026-11-03');
+  await save('/api/habits/2026-11-09');
+  await save('/api/habits/2026-11-01');
+  await save('/api/foods/12');
   // Any day of this week's drinks counts toward sober days; so do this day's checks and the goals.
-  await settle('/api/habits/2026-11-08');
-  await settle('/api/checks/2026-11-04');
-  await settle('/api/goals');
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
-  // Exactly one read each, not more after a while.
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  expect(fetchMock).toHaveBeenCalledTimes(4);
+  // Each read is waited for before the next save, so a read that nothing should start shows up out
+  // of place in the log. The last save checks that no earlier one reads again later.
+  for (const path of [
+    '/api/habits/2026-11-08',
+    '/api/checks/2026-11-04',
+    '/api/goals',
+    '/api/goals',
+  ]) {
+    await save(path);
+    expected.push('read');
+    await waitFor(() => expect(log).toEqual(expected));
+  }
 });
 
 test('a read started by a save is quiet; one asked for with the button says so', async () => {
-  const replies: ((body: unknown) => void)[] = [];
+  const replies: ((body: unknown) => Response)[] = [];
   vi.stubGlobal(
     'fetch',
     vi.fn(
       () =>
         new Promise<Response>((resolve) => {
-          replies.push((body) => resolve(new Response(JSON.stringify(body))));
+          replies.push((body) => answer(resolve, body));
         }),
     ),
   );
@@ -341,13 +370,13 @@ test('a read started by a save is quiet; one asked for with the button says so',
 });
 
 test('pressing the button during a quiet read asks again and says so', async () => {
-  const replies: ((body: unknown) => void)[] = [];
+  const replies: ((body: unknown) => Response)[] = [];
   vi.stubGlobal(
     'fetch',
     vi.fn(
       () =>
         new Promise<Response>((resolve) => {
-          replies.push((body) => resolve(new Response(JSON.stringify(body))));
+          replies.push((body) => answer(resolve, body));
         }),
     ),
   );
@@ -365,20 +394,19 @@ test('pressing the button during a quiet read asks again and says so', async () 
   replies[2](over);
   expect(await screen.findByText('Missed')).toBeInTheDocument();
   // The quiet read's late answer is dropped.
-  replies[1](dayOf());
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await answered(replies[1](dayOf()));
   expect(screen.getByText('Missed')).toBeInTheDocument();
   expect(screen.queryByRole('status', { name: 'Re-judging' })).not.toBeInTheDocument();
 });
 
 test('when reads overlap, a late answer to the older one is not shown', async () => {
-  const replies: ((body: unknown) => void)[] = [];
+  const replies: ((body: unknown) => Response)[] = [];
   vi.stubGlobal(
     'fetch',
     vi.fn(
       () =>
         new Promise<Response>((resolve) => {
-          replies.push((body) => resolve(new Response(JSON.stringify(body))));
+          replies.push((body) => answer(resolve, body));
         }),
     ),
   );
@@ -394,24 +422,31 @@ test('when reads overlap, a late answer to the older one is not shown', async ()
   replies[2](over);
   expect(await screen.findByText('Missed')).toBeInTheDocument();
   // The first save's read answers last, with what was true before the second save.
-  replies[1](
-    dayOf({
-      calories: { goal: { from, target: 2000 }, status: 'met', actual: meals(1, 900) },
-    }),
+  await answered(
+    replies[1](
+      dayOf({
+        calories: { goal: { from, target: 2000 }, status: 'met', actual: meals(1, 900) },
+      }),
+    ),
   );
-  await new Promise((resolve) => setTimeout(resolve, 20));
   expect(screen.getByText('Missed')).toBeInTheDocument();
   expect(screen.queryByText('Met')).not.toBeInTheDocument();
 });
 
 test('a card that is gone stops listening', async () => {
-  const fetchMock = server({ body: dayOf() });
+  const fetchMock = server({ body: dayOf() }, { body: dayOf() });
+  const log = logReads(fetchMock);
   const { unmount } = renderCard();
   await screen.findByRole('region', { name: 'Diet' });
   unmount();
+  log.push('save');
   await trackWrite(`/api/meals/${date}`, Promise.resolve({}));
-  await new Promise((resolve) => setTimeout(resolve, 20));
-  expect(fetchMock).toHaveBeenCalledTimes(1);
+  // A new card reads once it has waited for the save, as a gone card's read would; the log shows
+  // only the new card's.
+  log.push('new card');
+  renderCard();
+  await screen.findByRole('region', { name: 'Diet' });
+  expect(log).toEqual(['read', 'save', 'new card', 'read']);
 });
 
 test('a value the goal cannot take is refused before sending', async () => {
@@ -583,14 +618,14 @@ test('when two deletes read again out of order, the older answer does not bring 
     { item: 'protein', from: '2026-11-20', target: 120 },
     { item: 'protein', from, target: 100 },
   ];
-  const reads: ((body: unknown) => void)[] = [];
+  const reads: ((body: unknown) => Response)[] = [];
   vi.stubGlobal(
     'fetch',
     vi.fn((_url: string, init?: RequestInit) => {
       // Deletes answer at once; the reads after them wait until the test answers them.
       if (init?.method === 'DELETE') return Promise.resolve(new Response(null, { status: 204 }));
       return new Promise<Response>((resolve) => {
-        reads.push((body) => resolve(new Response(JSON.stringify(body))));
+        reads.push((body) => answer(resolve, body));
       });
     }),
   );
@@ -615,8 +650,7 @@ test('when two deletes read again out of order, the older answer does not bring 
 
   // The second delete's read answers first, then the first one's, from before the second delete.
   reads[2](goalsOf({ protein: { from, target: 100 } }, [history[2]]));
-  reads[1](goalsOf({ protein: { from, target: 100 } }, history.slice(1)));
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await answered(reads[1](goalsOf({ protein: { from, target: 100 } }, history.slice(1))));
   expect(within(changes).queryByText(/From 2026-11-20/)).not.toBeInTheDocument();
   expect(within(changes).queryByText(/From 2026-12-01/)).not.toBeInTheDocument();
   expect(within(changes).getByText('From 2026-11-01 At least 100g a day')).toBeInTheDocument();
@@ -627,7 +661,7 @@ test('a save after a delete is not undone by the read the delete started', async
     { item: 'protein', from: '2026-11-20', target: 120 },
     { item: 'protein', from, target: 100 },
   ];
-  const reads: ((body: unknown) => void)[] = [];
+  const reads: ((body: unknown) => Response)[] = [];
   const saved = goalsOf(
     { calories: { from: '2026-11-06', target: 1800 }, protein: { from, target: 100 } },
     [{ item: 'calories', from: '2026-11-06', target: 1800 }, history[1]],
@@ -638,7 +672,7 @@ test('a save after a delete is not undone by the read the delete started', async
       if (init?.method === 'DELETE') return Promise.resolve(new Response(null, { status: 204 }));
       if (init?.method === 'PUT') return Promise.resolve(new Response(JSON.stringify(saved)));
       return new Promise<Response>((resolve) => {
-        reads.push((body) => resolve(new Response(JSON.stringify(body))));
+        reads.push((body) => answer(resolve, body));
       });
     }),
   );
@@ -665,8 +699,7 @@ test('a save after a delete is not undone by the read the delete started', async
     ).toBeInTheDocument(),
   );
   // The delete's read answers after the save, without the saved calorie goal.
-  reads[1](goalsOf({ protein: { from, target: 100 } }, [history[1]]));
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await answered(reads[1](goalsOf({ protein: { from, target: 100 } }, [history[1]])));
   expect(
     within(cardOf('Calories')).getByText('Current goal: Up to 1,800kcal a day (from 2026-11-06)'),
   ).toBeInTheDocument();

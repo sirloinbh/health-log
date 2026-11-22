@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { expect, test, vi } from 'vitest';
 
@@ -6,6 +6,7 @@ import { App } from './app';
 import { toast } from './components/ui/sonner';
 import type { Medication, MedicationLists } from './med-text';
 import { trackWrite } from './pending-writes';
+import { nextTask } from './test/answered';
 import { findLive, getLive, queryLive } from './test/live';
 import { VisitsCard } from './visit-card';
 import type { Visit } from './visit-text';
@@ -404,20 +405,29 @@ test('when the day’s medicines fail to load, trying again brings both parts ba
 
 test('the daily card waits for a medicine save still on its way', async () => {
   let finish = () => {};
+  // Set as the save settles, before the card can see it.
+  let landed = false;
   void trackWrite(
     '/api/medications/',
     new Promise<void>((resolve) => {
       finish = resolve;
+    }).then(() => {
+      landed = true;
     }),
   );
-  const fetchMock = serve(() => json({ date: '2026-03-12', medications: [prescribed] }));
+  const landedAtRead: boolean[] = [];
+  serve(() => {
+    landedAtRead.push(landed);
+    return json({ date: '2026-03-12', medications: [prescribed] });
+  });
   renderCard();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  expect(fetchMock).not.toHaveBeenCalled();
+  // A card that did not wait would have read by the next task.
+  await act(nextTask);
   finish();
   expect(
     await screen.findByRole('region', { name: 'Medication taken this day' }),
   ).toBeInTheDocument();
+  expect(landedAtRead).toEqual([true]);
 });
 
 test('a list that failed to load can be tried again, and focus stays on the page (#127)', async () => {

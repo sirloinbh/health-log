@@ -49,7 +49,7 @@ test('a serving written as "1회 제공량 1개(30g)" or "1봉지(45g)당" is th
 
 test('with only a package size, the values are for the whole package', () => {
   const reading = readNutritionLabel('총 내용량 250ml 135kcal 단백질 6g 나트륨 120mg');
-  expect(reading.basis).toEqual({ size: 250, unit: 'ml' });
+  expect(reading.basis).toEqual({ size: 250, unit: 'mL' });
   expect(reading.values).toEqual({ calories: 135, protein: 6, sodium: 120 });
 });
 
@@ -460,7 +460,7 @@ test('"1회 제공량 30g (100g당)" claims no basis: one column cannot be for b
   // A weight beside a volume names the same serving: the size written first is kept.
   expect(readNutritionLabel('영양정보\n1회 제공량 200ml (206g)\n열량 100kcal').basis).toEqual({
     size: 200,
-    unit: 'ml',
+    unit: 'mL',
   });
   expect(readNutritionLabel('영양정보\n1회 제공량(30g)당\n열량 75kcal').basis).toEqual({
     size: 30,

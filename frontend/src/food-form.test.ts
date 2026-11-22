@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { bodyOf, emptyForm, fillFromLabel, type Form, formOf, unreadableField } from './food-form';
-import type { LabelReading } from './nutrition-label';
+import { type LabelReading, readNutritionLabel } from './nutrition-label';
 
 const today = '2026-11-22';
 
@@ -142,15 +142,29 @@ describe('fillFromLabel', () => {
   });
 
   test('a basis without any value, or no table at all, changes nothing', () => {
-    const basisOnly = fillFromLabel(official, reading({ basis: { size: 100, unit: 'ml' } }), today);
+    const basisOnly = fillFromLabel(official, reading({ basis: { size: 100, unit: 'mL' } }), today);
     expect(basisOnly.kind).toBe('error');
     expect(basisOnly.lines[0]).toBe(
-      'Found the basis amount (100ml) but could not read the nutrition values, so no field was changed.',
+      'Found the basis amount (100mL) but could not read the nutrition values, so no field was changed.',
     );
     const nothing = fillFromLabel(official, reading({}), today);
     expect(nothing.kind).toBe('error');
     expect(nothing.lines[0]).toBe(
       'Could not find a nutrition table. Only tables in text can be read.',
+    );
+  });
+
+  // #260: the seeded foods write milliliters as mL, so a pasted "100ml당" table fills mL too.
+  test('a pasted table in milliliters fills the unit as mL, and its package line says mL', () => {
+    const result = fillFromLabel(
+      emptyForm,
+      readNutritionLabel('총 내용량 500ml\n100ml당 40kcal\n당류 9g\n나트륨 10mg'),
+      today,
+    );
+    if (result.kind !== 'status') throw new Error('expected a fill');
+    expect(result.form).toMatchObject({ servingSize: '100', servingUnit: 'mL', calories: '40' });
+    expect(result.lines.join(' ')).toContain(
+      'The total amount of 500mL is 5 times the serving size (100mL)',
     );
   });
 

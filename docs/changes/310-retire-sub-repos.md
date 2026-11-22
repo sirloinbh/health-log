@@ -37,3 +37,9 @@ No central change was needed, so no project-standards issue or PR and no sync PR
 
 - Deleting the archived GitHub sub-repos is optional and left to the user.
 - `docs/project-setup.md` chapter 12 still describes an in-repo `infrastructure/` folder from the workout-memo days; that is about the shared infrastructure repo, not the sub-repos, and is out of scope here.
+
+## Review round 1
+
+- `nitpick (blocking)`: two more stale lines in `docs/project-setup.md`: the `scripts/` comment in the directory layout said "Scripts for creating and syncing repositories", and bootstrap step 5 expected "the lock file of each workspace". Fixed in "docs: drop the last sub-repo traces from project-setup (#310)".
+- Checked with no finding: the README, the area READMEs, next steps and the skill sentence read correctly, and the skill copy matches its source.
+- After the fix: `prettier --check` on the changed files passed, and the `git grep` above still finds only "retired" statements. Docs only, so `npm run check` was not repeated; CI runs it.

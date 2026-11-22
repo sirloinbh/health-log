@@ -115,7 +115,7 @@ If you want to use the candidates above in a new project from the start, adopt t
 ├─ compose.yaml
 ├─ .github/workflows/ci.yml  # Integrated CI
 ├─ frontend/  backend/  database/  infrastructure/
-├─ scripts/                  # Scripts for creating and syncing repositories, backup, and checks
+├─ scripts/                  # Scripts for backup and checks
 ├─ skills/<app>-*/SKILL.md   # Source of the AI work steps
 ├─ .claude/skills/           # Copy for Claude Code (npm run skills:sync)
 └─ docs/  changes/  daily/  next-steps/
@@ -677,7 +677,7 @@ Pass the "Check" at the end of each step before you go to the next step.
 2. **Account and remote:** confirm the GitHub account to use, and prepare the wrapper in 10.3 if needed. Check: `api user --jq .login` = `<owner>`.
 3. **Runtime:** choose Node 24.21.0 / npm 11.19.0 (with a user tool such as nvm or Volta; do not change the system Node on your own). Check: `node -v`, `npm -v`.
 4. **Skeleton files:** create the layout of 4.2, the settings files of chapter 5, `.env.example`, `compose.yaml`, the Dockerfiles, nginx.conf, and `database/migrations/001_initial.sql` (a minimal table).
-5. **Install dependencies (user confirmation required):** show the package list of 3.1, get approval with the procedure of rule 1 in chapter 1, and then install. Check: `package-lock.json` and the lock file of each workspace were created.
+5. **Install dependencies (user confirmation required):** show the package list of 3.1, get approval with the procedure of rule 1 in chapter 1, and then install. Check: the root `package-lock.json` was created (the workspaces have no lock file of their own).
 6. **Minimal feature:** create `createApp(pool)`, `GET /api/health`, one baseline screen, one unit test, one DB integration test, and one UI test.
 7. **Local verification:**
    - Start the DB with `docker compose up -d db`.

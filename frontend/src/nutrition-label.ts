@@ -10,15 +10,18 @@
 import { maxAmount } from '../../shared/contract';
 
 type LabelNutrient = 'calories' | 'carbs' | 'protein' | 'fat' | 'sugars' | 'sodium';
+// Inside the reader a size keeps the text's lower case unit, so sizes compare as written.
 type Size = { size: number; unit: 'g' | 'ml' };
+/** A size as the app stores it: milliliters are written mL, as in the seeded foods (#260). */
+type Amount = { size: number; unit: 'g' | 'mL' };
 
 export type LabelReading = {
   /** The amount the values are given for, such as "100g당" or "1회 제공량 30g". */
-  basis: Size | null;
+  basis: Amount | null;
   /** True when no basis is written and the values are taken to be for the whole package. */
   basisFromTotal: boolean;
   /** The whole package, from "총 내용량" (total content). */
-  total: Size | null;
+  total: Amount | null;
   values: Partial<Record<LabelNutrient, number>>;
   /** Written as "N미만" (less than N): not a number to store, so left empty. */
   lessThan: LabelNutrient[];
@@ -548,6 +551,9 @@ export function readValues(table: string) {
   return { values, lessThan, outOfRange };
 }
 
+const stored = (size: Size | null): Amount | null =>
+  size && { size: size.size, unit: size.unit === 'ml' ? 'mL' : 'g' };
+
 export function readNutritionLabel(pasted: string): LabelReading {
   const text = normalize(pasted);
   const { header, total, tableTotals } = findTotals(text);
@@ -571,7 +577,7 @@ export function readNutritionLabel(pasted: string): LabelReading {
   }
 
   const table = firstColumns(text.slice(range.begin, range.end), columns, row.length);
-  return { basis, basisFromTotal, total, ...readValues(table) };
+  return { basis: stored(basis), basisFromTotal, total: stored(total), ...readValues(table) };
 }
 
 /**

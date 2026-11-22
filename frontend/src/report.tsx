@@ -3,6 +3,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { periodsOf } from '../../shared/contract';
+import { kcalText } from './calorie-text';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
 import { Notice } from './components/ui/notice';
@@ -88,9 +89,7 @@ function Stats({
       <Stat
         label="Average daily calories"
         value={
-          current.calories.average === null
-            ? 'No records'
-            : `${current.calories.average.toLocaleString('en-US')}kcal`
+          current.calories.average === null ? 'No records' : kcalText(current.calories.average)
         }
         sample={
           daysText(current.calories.days) +
@@ -103,7 +102,7 @@ function Stats({
           previous.calories.average,
           previous.calories.days,
           words,
-          (value) => `${value.toLocaleString('en-US')}kcal`,
+          kcalText,
         )}
       />
       <Stat
@@ -492,7 +491,7 @@ export function ReportPage({ health }: { health: Health }) {
               <DailyBars
                 title="Calories"
                 bars={shown.days.map((day) => ({ date: day.date, value: day.calories }))}
-                format={(value) => `${value.toLocaleString('en-US')}kcal`}
+                format={kcalText}
               />
             </CardContent>
           </Card>

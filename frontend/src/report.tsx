@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { Button } from './components/ui/button';
@@ -13,6 +13,7 @@ import { requestJson } from './lib/api';
 import { useNotice } from './lib/use-notice';
 import { count } from './plural';
 import { RemindersCard } from './reminders';
+import { initialReportFocus, reportFocus } from './report-focus';
 import {
   changeText,
   daysText,
@@ -250,16 +251,12 @@ export function ReportPage({ health }: { health: Health }) {
   const [loading, setLoading] = useState(false);
   const { notice, error, clear } = useNotice();
   const latest = useRef(0);
+  // Where focus goes as reports load: one state for what started the load on its way (#212).
+  const [focus, dispatch] = useReducer(reportFocus, initialReportFocus);
   // While a retry is on its way its button stays, so keyboard focus is not dropped to the page;
   // once the report is back, focus moves to the period it shows (#128).
-  const [retrying, setRetrying] = useState(false);
-  const focusSpan = useRef(false);
-  // "Go to this week" goes with the word about a date out of range; its report takes the focus too.
-  const focusOnArrival = useRef(false);
+  const retrying = focus.running === 'retry';
   const span = useRef<HTMLParagraphElement>(null);
-  // A move whose report fails takes its row away; focus goes to "Try again" instead (#138).
-  const moved = useRef(false);
-  const [focusRetry, setFocusRetry] = useState(0);
   const retryButton = useRef<HTMLButtonElement>(null);
 
   const load = useCallback(async (): Promise<'ok' | 'failed' | 'stale'> => {
@@ -283,40 +280,34 @@ export function ReportPage({ health }: { health: Health }) {
       if (request !== latest.current) return 'stale';
       setReport(null);
       setLoading(false);
-      // Nothing arrives, so a focus waiting for the report must not fire on a later one.
-      focusOnArrival.current = false;
       error(cause);
       return 'failed';
     }
   }, [clear, date, error, period]);
 
+  // An answer for a period already left ends nothing: the period change ended that load, and a
+  // newer retry may be on its way, whose button must stay.
+  const settle = useCallback((outcome: 'ok' | 'failed' | 'stale') => {
+    if (outcome !== 'stale') dispatch({ type: 'done', outcome });
+  }, []);
+
   const retry = async () => {
-    setRetrying(true);
-    const outcome = await load();
-    // A retry for a period already left is over: the period change ended it, and a newer retry
-    // may be on its way, whose button must stay.
-    if (outcome === 'stale') return;
-    focusSpan.current = outcome === 'ok';
-    setRetrying(false);
+    dispatch({ type: 'retry' });
+    settle(await load());
   };
 
   useEffect(() => {
-    // A retry for the period left is over: the one now asked for is not a retry.
-    setRetrying(false);
-    focusSpan.current = false;
-    const fromMove = moved.current;
-    moved.current = false;
-    void load().then((outcome) => {
-      if (outcome === 'failed' && fromMove) setFocusRetry((count) => count + 1);
-    });
-  }, [load]);
+    dispatch({ type: 'load' });
+    void load().then(settle);
+  }, [load, settle]);
 
+  // Only focus that a gone button dropped; somewhere the person moved to meanwhile stays.
   useEffect(() => {
-    if (!focusRetry) return;
+    if (!focus.target) return;
     if (document.activeElement === document.body || document.activeElement === null) {
-      retryButton.current?.focus();
+      (focus.target.to === 'span' ? span : retryButton).current?.focus();
     }
-  }, [focusRetry]);
+  }, [focus.target]);
 
   // `arrival`: the pressed button goes once the period asked for is shown, so its focus moves to
   // the period then. Any other move drops a focus still waiting from an earlier one.
@@ -325,28 +316,13 @@ export function ReportPage({ health }: { health: Health }) {
     const nextDate = next.date ?? date ?? '';
     // The same period and date ask for nothing: no load follows to clear the marks set here.
     if (nextPeriod === period && nextDate === (date ?? '')) return;
-    focusOnArrival.current = arrival;
-    moved.current = true;
+    dispatch({ type: 'move', arrival });
     setParams({ period: nextPeriod, date: nextDate });
   };
 
   const words = periodWords[period];
   // The last report, even for the period just left while the next one is on its way.
   const shown = report && report.period in periodWords ? report : null;
-
-  useEffect(() => {
-    if (!shown) return;
-    if (focusOnArrival.current) {
-      focusOnArrival.current = false;
-      focusSpan.current = true;
-    }
-    if (retrying || !focusSpan.current) return;
-    focusSpan.current = false;
-    // Only focus that the gone button dropped; somewhere the person moved to meanwhile stays.
-    if (document.activeElement === document.body || document.activeElement === null) {
-      span.current?.focus();
-    }
-  }, [retrying, shown]);
 
   // The first and last periods holding a day the daily page opens (#130).
   // The period asked for, which the shown one may still trail while it loads (#138).

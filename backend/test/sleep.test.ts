@@ -76,11 +76,12 @@ test('a sleep is filed under the day of waking in the service time zone', async 
       queries.push(values);
       return {
         rows: [
+          // The columns come back under their API names (SQL aliases, #301).
           {
-            sleep_date: date,
-            bed_at: new Date('2026-03-14T14:30:00Z'),
-            wake_at: new Date('2026-03-14T22:30:00Z'),
-            duration_minutes: 480,
+            date,
+            bedAt: new Date('2026-03-14T14:30:00Z'),
+            wakeAt: new Date('2026-03-14T22:30:00Z'),
+            durationMinutes: 480,
             source: 'manual',
           },
         ],
@@ -94,6 +95,9 @@ test('a sleep is filed under the day of waking in the service time zone', async 
     });
     assert.equal(status, 200);
     assert.equal(data.durationMinutes, 480);
+    // res.json writes the Date the way the old mapper's toISOString did.
+    assert.equal(data.bedAt, '2026-03-14T14:30:00.000Z');
+    assert.equal(data.wakeAt, '2026-03-14T22:30:00.000Z');
   });
   assert.equal(queries[0]?.[3], 480);
 });

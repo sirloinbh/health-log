@@ -26,16 +26,23 @@ export const doneInput = z.object(
   { error: 'The request body is not valid' },
 );
 
-type VisitRow = {
+type VisitReminder = {
+  kind: 'visit';
   id: number;
-  due_on: string;
-  days_left: number;
+  dueOn: string;
+  daysLeft: number;
   clinic: string;
   department: string | null;
   procedures: string[];
 };
 
-type MedicationRow = { id: number; due_on: string; days_left: number; name: string };
+type MedicationReminder = {
+  kind: 'medication';
+  id: number;
+  dueOn: string;
+  daysLeft: number;
+  name: string;
+};
 
 // Each kind's date column and the column its done marks are kept under.
 const targets = {
@@ -56,9 +63,9 @@ export function remindersRouter(pool: Pool, today: () => string) {
   router.get('/', async (_req, res) => {
     const day = today();
     const [visits, medications] = await Promise.all([
-      pool.query<VisitRow>(
-        `SELECT v.id, v.next_visit_on AS due_on, v.next_visit_on - $1::date AS days_left, v.clinic,
-           v.department,
+      pool.query<VisitReminder>(
+        `SELECT 'visit' AS kind, v.id, v.next_visit_on AS "dueOn",
+           v.next_visit_on - $1::date AS "daysLeft", v.clinic, v.department,
            ARRAY(SELECT p.name FROM clinic_procedures p WHERE p.visit_id = v.id ORDER BY p.position)
              AS procedures
          FROM clinic_visits v
@@ -67,8 +74,9 @@ export function remindersRouter(pool: Pool, today: () => string) {
              SELECT 1 FROM reminders_done d WHERE d.visit_id = v.id AND d.due_on = v.next_visit_on)`,
         [day, leadDays],
       ),
-      pool.query<MedicationRow>(
-        `SELECT m.id, m.end_on AS due_on, m.end_on - $1::date AS days_left, m.name
+      pool.query<MedicationReminder>(
+        `SELECT 'medication' AS kind, m.id, m.end_on AS "dueOn", m.end_on - $1::date AS "daysLeft",
+           m.name
          FROM medications m
          WHERE m.end_on BETWEEN $1::date AND $1::date + $2::int
            AND NOT EXISTS (
@@ -76,24 +84,7 @@ export function remindersRouter(pool: Pool, today: () => string) {
         [day, leadDays],
       ),
     ]);
-    const reminders = [
-      ...visits.rows.map((row) => ({
-        kind: 'visit' as const,
-        id: row.id,
-        dueOn: row.due_on,
-        daysLeft: row.days_left,
-        clinic: row.clinic,
-        department: row.department,
-        procedures: row.procedures,
-      })),
-      ...medications.rows.map((row) => ({
-        kind: 'medication' as const,
-        id: row.id,
-        dueOn: row.due_on,
-        daysLeft: row.days_left,
-        name: row.name,
-      })),
-    ].sort(
+    const reminders = [...visits.rows, ...medications.rows].sort(
       (a, b) =>
         a.dueOn.localeCompare(b.dueOn) || kindOrder[a.kind] - kindOrder[b.kind] || a.id - b.id,
     );

@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { daysBetween, parseDate } from './dates.js';
-import { hasTwoDecimalsAtMost, optionalNumber } from './numbers.js';
+import { hasTwoDecimalsAtMost, withNumbers } from './numbers.js';
 import { HttpError } from './standard/http.js';
 import { charCount } from './text.js';
 
@@ -61,28 +61,21 @@ export const bodyInput = z
     }
   });
 
+// The columns come back under their API names; only the NUMERIC ones still need converting.
 type BodyRow = {
-  record_date: string;
-  weight_kg: string | null;
-  body_fat_percent: string | null;
-  waist_cm: string | null;
-  systolic_mmhg: number | null;
-  diastolic_mmhg: number | null;
+  date: string;
+  weightKg: string | null;
+  bodyFatPercent: string | null;
+  waistCm: string | null;
+  systolicMmhg: number | null;
+  diastolicMmhg: number | null;
   memo: string | null;
 };
 
-const columns =
-  'record_date, weight_kg, body_fat_percent, waist_cm, systolic_mmhg, diastolic_mmhg, memo';
+const columns = `record_date AS date, weight_kg AS "weightKg", body_fat_percent AS "bodyFatPercent",
+  waist_cm AS "waistCm", systolic_mmhg AS "systolicMmhg", diastolic_mmhg AS "diastolicMmhg", memo`;
 
-const toRecord = (row: BodyRow) => ({
-  date: row.record_date,
-  weightKg: optionalNumber(row.weight_kg),
-  bodyFatPercent: optionalNumber(row.body_fat_percent),
-  waistCm: optionalNumber(row.waist_cm),
-  systolicMmhg: row.systolic_mmhg,
-  diastolicMmhg: row.diastolic_mmhg,
-  memo: row.memo,
-});
+const toRecord = (row: BodyRow) => withNumbers(row, ['weightKg', 'bodyFatPercent', 'waistCm']);
 
 export function bodyRouter(pool: Pool) {
   const router = Router();

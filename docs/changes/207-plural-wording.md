@@ -31,3 +31,7 @@ Counts of one read as plurals: a meal entry said "1 servings", the alcohol-free 
 ## Limits
 
 - No browser check at 390×844 and 1440×900: running the app locally needs the `health` database, which this worktree does not have. The visible changes are single words in existing text lines.
+
+## Review round 1
+
+- Approve, no blocking comments. Other count texts in the frontend and backend were checked; none show a count of one in the plural.

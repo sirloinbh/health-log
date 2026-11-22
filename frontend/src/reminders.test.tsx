@@ -3,12 +3,12 @@ import { MemoryRouter } from 'react-router';
 import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
-import { trackWrite } from './pending-writes';
 import type { Reminder, Reminders } from './reminder-text';
 import { reminderDetail, reminderTitle, whenText } from './reminder-text';
 import { RemindersCard } from './reminders';
 import { nextTask } from './test/answered';
 import { findLive, queryLive } from './test/live';
+import { renderWithQuery, testQueryClient, write } from './test/query';
 
 // Made-up values only: no real appointment or prescription belongs in tests.
 const appointment: Reminder = {
@@ -56,7 +56,7 @@ const serve = (handler: Handler) => {
 };
 
 const show = () =>
-  render(
+  renderWithQuery(
     <MemoryRouter>
       <RemindersCard />
     </MemoryRouter>,
@@ -133,8 +133,10 @@ test('marking one done sends its day, takes it off and keeps focus in the card',
   });
   expect(other).toHaveAttribute('aria-disabled', 'true');
   fireEvent.click(other);
-  const posts = fetchMock.mock.calls.filter(([url]) => url === '/api/reminders/done');
-  expect(posts).toHaveLength(1);
+  const sent = () => fetchMock.mock.calls.filter(([url]) => url === '/api/reminders/done');
+  // The mark is sent a moment after the press.
+  await waitFor(() => expect(sent()).toHaveLength(1));
+  const posts = sent();
   expect(posts[0][1]).toMatchObject({ method: 'POST' });
   expect(JSON.parse(String(posts[0][1]?.body))).toEqual({
     kind: 'medication',
@@ -250,7 +252,7 @@ test('a visit just saved elsewhere is waited for before the list is read', async
   let land: () => void = () => {};
   // Set as the save settles, before the card can see it.
   let landed = false;
-  void trackWrite(
+  void write(
     '/api/visits/',
     new Promise<void>((resolve) => (land = resolve)).then(() => {
       landed = true;
@@ -306,7 +308,8 @@ test('reminders failing to load leave the rest of the dashboard alone', async ()
     ),
   );
   window.history.replaceState(null, '', '/');
-  render(<App />);
+  // Without the app's one retry after a server error, so the failure shows at once.
+  render(<App queryClient={testQueryClient()} />);
   // Each keeps its own word and its own retry.
   expect(await screen.findByText('Cannot reach the server')).toBeInTheDocument();
   expect(await screen.findByText('No report')).toBeInTheDocument();

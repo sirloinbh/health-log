@@ -5,10 +5,9 @@ import { expect, test, vi } from 'vitest';
 import { App } from './app';
 import { toast } from './components/ui/sonner';
 import type { Medication, MedicationLists } from './med-text';
-import { trackWrite } from './pending-writes';
 import { nextTask } from './test/answered';
 import { findLive, getLive, queryLive } from './test/live';
-import { testQueryClient } from './test/query';
+import { renderWithQuery, testQueryClient, write } from './test/query';
 import { VisitsCard } from './visit-card';
 import type { Visit } from './visit-text';
 
@@ -314,7 +313,7 @@ test('a visit card links to recording what was prescribed there', async () => {
 // The daily card's medicine part.
 
 const renderCard = (date = '2026-03-12') =>
-  render(
+  renderWithQuery(
     <MemoryRouter>
       <VisitsCard date={date} />
     </MemoryRouter>,
@@ -415,7 +414,7 @@ test('the daily card waits for a medicine save still on its way', async () => {
   let finish = () => {};
   // Set as the save settles, before the card can see it.
   let landed = false;
-  void trackWrite(
+  void write(
     '/api/medications/',
     new Promise<void>((resolve) => {
       finish = resolve;

@@ -11,14 +11,15 @@ import { Notice } from './components/ui/notice';
 import { toast } from './components/ui/sonner';
 import { formatDate, inDailyRange, isValidDate } from './daily-date';
 import { RequestError, requestJson } from './lib/api';
+import { type ApiRequest, useApiMutation } from './lib/query';
 import { errorText, useNotice } from './lib/use-notice';
 import { cn } from './lib/utils';
 import { medicationsPagePath } from './med-text';
 import { MoreFoodsButton } from './more-foods-button';
-import { trackWrite } from './pending-writes';
 import { useReturnFocus } from './return-focus';
 import { VisitDialog } from './visit-dialog';
 import { clinicText, procedureText, type Visit, visitsPath, wonText } from './visit-text';
+import { asRequest } from './writes';
 
 function VisitCard({
   visit,
@@ -115,6 +116,7 @@ type Page = { visits: Visit[]; more: boolean };
 
 /** `today` is undefined while the server is still being asked, and null if it could not say. */
 export function VisitsPage({ today }: { today: string | null | undefined }) {
+  const remover = useApiMutation<unknown, ApiRequest>(asRequest);
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const applied = useRef('');
@@ -220,10 +222,7 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
 
   const remove = async (visit: Visit) => {
     try {
-      await trackWrite(
-        `${visitsPath}/`,
-        requestJson(`${visitsPath}/${visit.id}`, { method: 'DELETE' }),
-      );
+      await remover.mutateAsync({ path: `${visitsPath}/${visit.id}`, method: 'DELETE' });
     } catch (cause) {
       // Already gone counts as deleted; anything else keeps the dialog open with the reason.
       if (!(cause instanceof RequestError && cause.status === 404)) {

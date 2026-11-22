@@ -43,3 +43,7 @@ No central change was needed, so no project-standards issue or PR and no sync PR
 - `nitpick (blocking)`: two more stale lines in `docs/project-setup.md`: the `scripts/` comment in the directory layout said "Scripts for creating and syncing repositories", and bootstrap step 5 expected "the lock file of each workspace". Fixed in "docs: drop the last sub-repo traces from project-setup (#310)".
 - Checked with no finding: the README, the area READMEs, next steps and the skill sentence read correctly, and the skill copy matches its source.
 - After the fix: `prettier --check` on the changed files passed, and the `git grep` above still finds only "retired" statements. Docs only, so `npm run check` was not repeated; CI runs it.
+
+## Review round 2
+
+- Approve, no blocking comments. The round 1 fix is in place and the whole diff was re-read. Chapter 12 of `docs/project-setup.md` stays as noted under Limits.

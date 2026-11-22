@@ -113,3 +113,9 @@ The hand-written polling hook `useHealth` in `app.tsx` (an interval, a visibilit
 - **Upcoming card** (`RemindersCard`): `useApiQuery` on `apiKey('/api/reminders')` behind `useReadAfterWrites` of visits, medicines, and reminders, with `staleTime: 0` (it is keyed per service day). A mark is a mutation; on success the item is dropped from the cached list, and on 404 the list is read again before focus moves. The load error and a mark's error share one notice; a mark's word comes first.
 - **Behavior change:** returning to the tab now reads the upcoming list again in place (React Query's focus refetch, with the list kept on screen). `daily.test.tsx` "one failed check of the server keeps today's coming-up card" checks that the list stays without a loading state instead of counting one read.
 - **Tests:** the card tests render through `renderWithQuery` and use `write` for a save on its way. "marking one done" waits until the mark is sent. "reminders failing to load leave the rest of the dashboard alone" renders the app with `testQueryClient()`, as the real client retries a 503 once after a second.
+
+## Removing the hand-made tracker — 2026-11-22
+
+- Every writer is a React Query mutation now, so the transitional `trackWrite` wrappers in the sleep, checks, habits, body, meal, and goal cards are gone, and `pending-writes.ts` with its test is deleted. `test/setup.ts` no longer calls `forgetPendingWrites`.
+- Read-after-write (#71) is `useReadAfterWrites`, and re-judging (#104) is `onWriteSettled`, both in `writes.ts` and built on the mutation cache.
+- The report, the clinic and medicine page lists, food search, and combos still read with their own load functions; that move is #282.

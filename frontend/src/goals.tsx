@@ -41,7 +41,6 @@ import { RequestError } from './lib/api';
 import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
 import { parseAmount, unreadableAmount } from './number-input';
-import { trackWrite } from './pending-writes';
 import { asRequest, onWriteSettled, putAnswer, useReadAfterWrites } from './writes';
 
 const goalsPath = '/api/goals';
@@ -106,11 +105,11 @@ function GoalForm({
     // A repeated failure then appears anew and is announced again (as in #98).
     clear();
     try {
-      // trackWrite until every screen reads through React Query (#220).
-      const goals = await trackWrite(
-        goalsPath,
-        write.mutateAsync({ path: `${goalsPath}/${item}`, method: 'PUT', body: { from, target } }),
-      );
+      const goals = await write.mutateAsync({
+        path: `${goalsPath}/${item}`,
+        method: 'PUT',
+        body: { from, target },
+      });
       toast.success(target === null ? 'Goal turned off' : 'Goal saved');
       onSaved(goals);
     } catch (cause) {
@@ -237,10 +236,7 @@ function GoalHistory({
 
   const remove = async (from: string) => {
     try {
-      await trackWrite(
-        goalsPath,
-        remover.mutateAsync({ path: `${goalsPath}/${item}/${from}`, method: 'DELETE' }),
-      );
+      await remover.mutateAsync({ path: `${goalsPath}/${item}/${from}`, method: 'DELETE' });
     } catch (cause) {
       // Already gone counts as removed; anything else keeps the dialog open with the reason.
       if (!(cause instanceof RequestError && cause.status === 404)) {

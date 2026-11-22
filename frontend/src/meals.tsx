@@ -17,7 +17,6 @@ import { RequestError, requestJson } from './lib/api';
 import { apiKey, type ApiRequest, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue } from './lib/use-notice';
 import { type MealKey, meals } from './meal-entry';
-import { trackWrite } from './pending-writes';
 import { count } from './plural';
 import { createRetryKeys } from './retry-key';
 import { putAnswer, useReadAfterWrites } from './writes';
@@ -199,16 +198,12 @@ export function MealCard({ date }: { date: string }) {
     const target = `${pathOf(date)}${path}`;
     const key = retryKeys.keyFor(JSON.stringify([target, body]));
     try {
-      // trackWrite until every card reads through React Query (#220).
-      await trackWrite(
-        pathOf(date),
-        write.mutateAsync({
-          path: target,
-          method: 'POST',
-          body,
-          headers: { 'Idempotency-Key': key },
-        }),
-      );
+      await write.mutateAsync({
+        path: target,
+        method: 'POST',
+        body,
+        headers: { 'Idempotency-Key': key },
+      });
       retryKeys.answered();
       if (!live.current) {
         toast.success(`Meal recorded for ${date}`);
@@ -231,10 +226,7 @@ export function MealCard({ date }: { date: string }) {
 
   const remove = async (id: number) => {
     try {
-      await trackWrite(
-        pathOf(date),
-        write.mutateAsync({ path: `${pathOf(date)}/entries/${id}`, method: 'DELETE' }),
-      );
+      await write.mutateAsync({ path: `${pathOf(date)}/entries/${id}`, method: 'DELETE' });
     } catch (cause) {
       if (!(cause instanceof RequestError && cause.status === 404)) {
         // Keeps the dialog open with the reason.

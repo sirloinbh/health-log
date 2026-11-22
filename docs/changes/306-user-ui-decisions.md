@@ -49,3 +49,7 @@ The user reviewed three choices made in earlier fixes and chose differently:
 - `suggestion (blocking)`: the visit-link path (`?visit=<id>` without a usable date) now also starts on the device date, but its test could not tell the device date from the server's, since both were 2026-03-15. Fixed in "test: tell the device date from the server's on a visit link (#306)": that test fixes the clock at 2026-03-15 23:30 UTC (2026-03-16 in Asia/Seoul) while the server's date stays 2026-03-15, and expects 2026-03-16. Against the old `medications.tsx` it fails; with the change it passes.
 - Otherwise no findings: editing still starts from the medicine's own date (`draftOf` uses `item.startOn`), the visits page still gets the server's date, and no other code used `fromDevice` or the wait.
 - `vitest run src/medications.test.tsx`: 18 passed. `eslint` and `prettier --check` on the changed files: passed. Only a test and this record changed after the full `npm run check`, so it was not repeated.
+
+## Review round 2
+
+- Approve, no blocking comments. The round 1 fix is in place; the whole diff was re-read. "Overdue by N days" shows in the same muted badge as "In N days" on the reminders card. One `nit` left as is: the `open` test helper still seeds the server's date, which the app shell and the visits page still use.

@@ -30,6 +30,11 @@ Tests:
   - Meal card entry row: "1 serving · 1,235kcal".
   - No horizontal scroll at either size. The test rows were deleted afterwards.
 
+## Review round 1 — 2026-11-22
+
+- nit, fixed: the combo test matched "1.5 servings?" with a pattern because it was written before #207 (`count()`) reached main. It now expects the exact text "샘플 햇반 · 1.5 servings · 619kcal". `vitest run src/combos.test.tsx`: 29 passed.
+- No other findings: the four inline null-or-kcal choices are gone (`rg "calories === null ? 'No calorie value'"` finds none outside tests), and the API values are unchanged.
+
 ## Follow-up
 
 - The browser check showed one more place outside this issue's three files: the daily goal row reads "1,234.5kcal" (`goal-text.ts` keeps two decimals). Filed as #279 under #189.

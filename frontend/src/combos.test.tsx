@@ -119,7 +119,7 @@ test('a combo food row shows its calories rounded, like the total', async () => 
   open();
   const heading = await screen.findByRole('heading', { level: 2, name: '아침 세트' });
   const card = heading.closest<HTMLElement>('[data-slot=card]')!;
-  expect(within(card).getByText(/^샘플 햇반 · 1\.5 servings? · 619kcal$/)).toBeInTheDocument();
+  expect(within(card).getByText('샘플 햇반 · 1.5 servings · 619kcal')).toBeInTheDocument();
   expect(within(card).queryByText(/618\.75/)).not.toBeInTheDocument();
 });
 

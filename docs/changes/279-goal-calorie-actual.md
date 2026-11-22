@@ -31,3 +31,7 @@ The goal results card on the daily page built its calorie text with `actualText`
 ## Merge of origin/main
 
 - Merged `origin/main` after the commit (it brought #276, React Query for meals and goals, which changed `goals.tsx` and `goals.test.tsx`); no conflict. `vitest run src/goal-text.test.ts src/goals.test.tsx`: 34 passed. CI runs the full check on the merged head.
+
+## Review round 1
+
+- Approve, no blocking comments. The meal card daily total is left to #281.

@@ -51,3 +51,7 @@ The screens that #220 left reading with their own load functions and stale-answe
 - `vitest run` on meals, combos and save-focus tests: 111 passed.
 - Full `npm run check` with `TEST_DATABASE_URL` empty, under the shared check lock: passed. Frontend: 76 files, 782 passed, 3 skipped.
 - No browser check: the markup is unchanged, and the screen tests cover the behavior.
+
+### Review round 1 fix (combos PR)
+
+- The meal cards (#220), the combos page and the recent foods now use the 30-second cache instead of reading on every mount, so a food edited on the foods page could show its old name for up to half a minute there. A food save now invalidates every `/api/meals/<date>` key (by path, as each day is its own key), `apiKey('/api/combos')` and `apiKey('/api/foods/recent')`, so they read again the next time they are shown. New test "a saved food makes the meal cards, combos and recent foods read again next time (#282)"; foods tests: 43 passed.

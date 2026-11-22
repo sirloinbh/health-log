@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -14,13 +14,13 @@ import { toast } from './components/ui/sonner';
 import { JunkBadge } from './food-choices';
 import { spanText } from './habit-text';
 import { type JunkPeriod, junkText } from './junk-text';
-import { RequestError, requestJson } from './lib/api';
-import { apiKey, type ApiRequest, useApiQuery } from './lib/query';
+import { RequestError } from './lib/api';
+import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue } from './lib/use-notice';
 import { type MealKey, meals } from './meal-entry';
 import { count } from './plural';
 import { createRetryKeys } from './retry-key';
-import { putAnswer, useReadAfterWrites } from './writes';
+import { asRequest, putAnswer, useReadAfterWrites } from './writes';
 
 const nutrients = [
   { key: 'calories', label: 'Calories', unit: 'kcal' },
@@ -54,18 +54,13 @@ type MealDay = {
 const pathOf = (date: string) => `/api/meals/${date}`;
 const keyOf = (date: string) => apiKey(pathOf(date));
 
-type MealRequest = ApiRequest & { headers?: Record<string, string> };
-
 /**
  * A change to one day's meals. Every change answers with the whole day, which goes into the cache even after the card
- * is gone. It is useApiMutation with request headers, which the shared one does not pass yet (project-standards#979; the add sends an
- * Idempotency-Key, #196); the variables are the request, as `asRequest` makes them, so useReadAfterWrites sees it.
+ * is gone. The add sends its Idempotency-Key in the request's headers (#196, project-standards#979).
  */
 function useMealWrite(date: string) {
   const client = useQueryClient();
-  return useMutation<MealDay, RequestError, MealRequest>({
-    mutationFn: ({ path, method = 'POST', body, headers }) =>
-      requestJson<MealDay>(path, { method, body, headers }),
+  return useApiMutation<MealDay, ApiRequest>(asRequest, {
     onSuccess: (data) => putAnswer(client, keyOf(date), data),
   });
 }

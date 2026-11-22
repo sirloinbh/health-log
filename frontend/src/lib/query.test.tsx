@@ -1,6 +1,6 @@
 // Managed file. Edit it in sirloinbh/project-standards templates/query/frontend/src/lib/
 import { focusManager, QueryClientProvider } from '@tanstack/react-query';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, expect, test, vi } from 'vitest';
 
@@ -16,9 +16,17 @@ function setup(fetch: ReturnType<typeof vi.fn>, config = {}) {
   return { client, wrapper };
 }
 
-afterEach(() => {
-  vi.unstubAllGlobals();
+// Each test ends without a late request (#980). The rendered hooks unmount first: the app's own cleanup runs after
+// this hook, and a stale query still mounted would read again when focus resets below. A fetch that fails the test
+// stands in while focus resets, so a query left mounted shows up here instead of as a stray request in the app.
+afterEach(async () => {
+  cleanup();
+  const late = vi.fn(() => Promise.reject(new Error('request after the test ended')));
+  vi.stubGlobal('fetch', late);
   focusManager.setFocused(undefined);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  vi.unstubAllGlobals();
+  expect(late).not.toHaveBeenCalled();
 });
 
 test('shouldRetry allows one more try for network, timeout and 5xx failures only', () => {
@@ -127,6 +135,22 @@ test('a mutation sends its request, then refetches the invalidated keys before i
   expect(fetch).toHaveBeenCalledWith('/api/goals', expect.objectContaining({ method: 'POST', body: '{"name":"Run"}' }));
   expect(onSuccess).toHaveBeenCalledWith({ id: 2 }, { name: 'Run' });
   await waitFor(() => expect(list.result.current.data).toEqual(['a', 'b']));
+});
+
+test('a mutation sends the request headers it is given, next to the JSON content type', async () => {
+  const fetch = vi.fn(() => Promise.resolve(json(201, { id: 3 })));
+  const { wrapper } = setup(fetch);
+  const { result } = renderHook(
+    () => useApiMutation<{ id: number }, string>((key) => ({ path: '/api/meals', body: { name: 'Rice' }, headers: { 'Idempotency-Key': key } })),
+    { wrapper },
+  );
+  await act(async () => {
+    await result.current.mutateAsync('add-1');
+  });
+  expect(fetch).toHaveBeenCalledWith(
+    '/api/meals',
+    expect.objectContaining({ method: 'POST', headers: expect.objectContaining({ 'Idempotency-Key': 'add-1', 'content-type': 'application/json' }) as unknown }),
+  );
 });
 
 test('a failed mutation is not retried and reports the error', async () => {

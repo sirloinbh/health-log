@@ -1,5 +1,5 @@
 {
-  "centralSha": "47f744dddb5f3aee1fba602f7013166b879e3efa",
+  "centralSha": "755bc9d993990fa3c181ff217ea248a20e6542b0",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -916,12 +916,12 @@
     },
     "frontend/src/lib/query.test.tsx": {
       "mode": "full",
-      "sha256": "bf3fe9cb6d10fb0b7517c1da4dd2820dedab65e0bc2d3f8de42eea2c5ab05b64",
+      "sha256": "ffdf0cc2d11577b84e6dda4ae2518cc96bfca498a212771d6582ad8c3707429f",
       "source": "templates/query/frontend/src/lib/query.test.tsx"
     },
     "frontend/src/lib/query.ts": {
       "mode": "full",
-      "sha256": "b49180e8daef5cdc5b5407f5ba28013c058e85685cdab56572cf273d66ebdeea",
+      "sha256": "2f1a83e3d4856a31cbb75c01d64f7afe449f600bd003cb444d5812ad18e5b9cf",
       "source": "templates/query/frontend/src/lib/query.ts"
     },
     "frontend/src/lib/theme-config.ts": {

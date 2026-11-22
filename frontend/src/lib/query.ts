@@ -56,7 +56,8 @@ export function useApiQuery<T>(key: QueryKey, path: string, options: { enabled?:
   });
 }
 
-export type ApiRequest = { path: string; method?: string; body?: unknown };
+/** One write: `method` defaults to POST, `body` is sent as JSON, and `headers` go with the request (an `Idempotency-Key`, say). */
+export type ApiRequest = { path: string; method?: string; body?: unknown; headers?: Record<string, string> };
 
 /**
  * A write. `request` turns the variables into the call. After it succeeds the `invalidate` keys are refetched, and the
@@ -69,8 +70,8 @@ export function useApiMutation<TData = unknown, TVariables = void>(
   const client = useQueryClient();
   return useMutation<TData, RequestError, TVariables>({
     mutationFn: (variables) => {
-      const { path, method = 'POST', body } = request(variables);
-      return requestJson<TData>(path, { method, body });
+      const { path, method = 'POST', body, headers } = request(variables);
+      return requestJson<TData>(path, { method, body, headers });
     },
     onSuccess: async (data, variables) => {
       await Promise.all((options.invalidate ?? []).map((queryKey) => client.invalidateQueries({ queryKey })));

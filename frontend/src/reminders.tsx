@@ -86,6 +86,8 @@ export function RemindersCard() {
         body: { kind: item.kind, id: item.id, dueOn: item.dueOn },
       });
       if (!live.current) return;
+      // A read still on its way left before the mark landed, and its list would bring it back.
+      void client.cancelQueries({ queryKey: remindersKey, exact: true });
       client.setQueryData<Reminders>(
         remindersKey,
         (current) =>

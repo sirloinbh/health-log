@@ -124,3 +124,7 @@ The hand-written polling hook `useHealth` in `app.tsx` (an interval, a visibilit
 
 - The full `npm run check` was not run locally: another lane held the shared check lock and memory was low. Instead, on the rebuilt branch over `origin/main`: `prettier --check` on the changed files, `eslint --max-warnings 0 frontend/src`, frontend `tsc --noEmit`, and the whole frontend suite with `vitest run --maxWorkers=2` (75 files, 769 passed, 3 skipped). `knip` finds nothing in `frontend/src`; locally it cannot load the Playwright config without a test DB, so CI's run is the one that counts. CI runs the full check.
 - No browser check: the markup is unchanged, and the screen tests cover the behavior.
+
+### Review round 1 fix (clinic and tracker PR)
+
+- Returning to the tab now reads the upcoming list again, which the old card never did. A read that left before a "Done" landed could then bring the marked item back. The mark now cancels a read of the list still on its way before dropping the item, as `putAnswer` does. New test "a read from returning to the tab, still on its way, does not bring back one marked done" fails without the cancel and passes with it; reminders, daily and report tests: 67 passed.

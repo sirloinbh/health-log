@@ -6,7 +6,7 @@ import { App } from './app';
 import type { Reminder, Reminders } from './reminder-text';
 import { reminderDetail, reminderTitle, whenText } from './reminder-text';
 import { RemindersCard } from './reminders';
-import { nextTask } from './test/answered';
+import { answered, nextTask } from './test/answered';
 import { findLive, queryLive } from './test/live';
 import { renderWithQuery, testQueryClient, write } from './test/query';
 
@@ -315,4 +315,30 @@ test('reminders failing to load leave the rest of the dashboard alone', async ()
   expect(await screen.findByText('No report')).toBeInTheDocument();
   expect(screen.getAllByRole('button', { name: 'Try again' })).toHaveLength(2);
   expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
+});
+
+test('a read from returning to the tab, still on its way, does not bring back one marked done', async () => {
+  const reads: ((response: Response) => void)[] = [];
+  let finish: (response: Response) => void = () => {};
+  serve((url) =>
+    url === '/api/reminders/done'
+      ? new Promise((resolve) => (finish = resolve))
+      : new Promise((resolve) => reads.push(resolve)),
+  );
+  show();
+  await waitFor(() => expect(reads).toHaveLength(1));
+  reads[0](json(listOf([appointment, lastPill])));
+  fireEvent.click(await screen.findByRole('button', { name: '가상정 ends reminder done' }));
+  // Coming back to the tab while the mark is on its way reads the list again.
+  fireEvent(document, new Event('visibilitychange', { bubbles: true }));
+  await waitFor(() => expect(reads).toHaveLength(2));
+  finish(json(null, 204));
+  expect(await findLive('status')).toHaveTextContent('가상정 ends reminder marked as done.');
+  // That read left before the mark landed, so its list still has the medicine.
+  const late = json(listOf([appointment, lastPill]));
+  reads[1](late);
+  await answered(late);
+  const list = screen.getByRole('list', { name: 'Upcoming' });
+  expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+  expect(within(list).queryByText('가상정 ends')).not.toBeInTheDocument();
 });

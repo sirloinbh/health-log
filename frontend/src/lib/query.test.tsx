@@ -137,6 +137,22 @@ test('a mutation sends its request, then refetches the invalidated keys before i
   await waitFor(() => expect(list.result.current.data).toEqual(['a', 'b']));
 });
 
+test('a mutation sends the request headers it is given, next to the JSON content type', async () => {
+  const fetch = vi.fn(() => Promise.resolve(json(201, { id: 3 })));
+  const { wrapper } = setup(fetch);
+  const { result } = renderHook(
+    () => useApiMutation<{ id: number }, string>((key) => ({ path: '/api/meals', body: { name: 'Rice' }, headers: { 'Idempotency-Key': key } })),
+    { wrapper },
+  );
+  await act(async () => {
+    await result.current.mutateAsync('add-1');
+  });
+  expect(fetch).toHaveBeenCalledWith(
+    '/api/meals',
+    expect.objectContaining({ method: 'POST', headers: expect.objectContaining({ 'Idempotency-Key': 'add-1', 'content-type': 'application/json' }) as unknown }),
+  );
+});
+
 test('a failed mutation is not retried and reports the error', async () => {
   const fetch = vi.fn(() => Promise.resolve(json(400, { error: 'Name is required' })));
   const { wrapper } = setup(fetch);

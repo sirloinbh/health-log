@@ -30,5 +30,5 @@ A throwaway probe test read `getConfig().asyncUtilTimeout`: 1000 before the chan
 ## Verification
 
 - `daily.test.tsx` and `report.test.tsx` together, after merging `origin/main` (with #220): 54 passed. Frontend typecheck clean.
-- **Not done yet: `npm test -w frontend`, 5 full runs in a row** (the done criterion). On 2026-11-22 the 5-run loop waited for the shared check lock while other lanes ran their checks, and Claude Code stopped it because the PC ran low on memory (about 1.9 GB of 16 GB free). No run had started. It needs to run again when the PC is free.
-- `npm run check` was not run for the same reason. CI `verify` runs the same lint, typecheck and tests.
+- `npm test -w frontend`, 5 full runs in a row (the done criterion), 2026-11-22 10:32–10:40 under the shared check lock with at least 4 GB free: all 5 passed, each with 75 files and 770 passed, 3 skipped (64–90 s per run). A first attempt earlier that morning was stopped by Claude Code for low memory before any run started.
+- `npm run check` under the same lock, `TEST_DATABASE_URL` empty (no backend change): passed. Frontend 770 passed, 3 skipped. Backend 293 tests, 0 failed, 137 skipped without a `health_test`.

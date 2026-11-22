@@ -36,6 +36,7 @@ The hand-written polling hook `useHealth` in `app.tsx` (an interval, a visibilit
 - `retry: false`: an outage shows at once, and the next check is at most a minute away.
 - React Query runs one read at a time per key, which replaces the request counter.
 - A 200 answer without `today` still shows "Cannot check the server status". A network failure shows requestJson's "Cannot reach the server", the same text as before.
+- Differences found in review round 1: React Query does not run the one-minute refetch while the tab is hidden (`refetchIntervalInBackground` is off), and reads again the moment the tab becomes visible, so the date is current whenever it can be seen. An answer that is not JSON (a proxy's HTML page) now shows requestJson's "The server sent an unreadable answer" or "Could not process the request" instead of "Cannot reach the server". `/api/health` needs no sign-in, so requestJson's 401 handler never fires for it.
 
 ### Tests
 

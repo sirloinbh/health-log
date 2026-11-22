@@ -15,3 +15,5 @@ The screens that #220 left reading with their own load functions and stale-answe
 - `report.test.tsx` renders the app with `testQueryClient()` (no automatic retry), so each failure a test serves shows at once and the hand-counted request order holds.
 - New: "going back to a period just shown brings it back at once, without asking again (#282)".
 - `vitest run` on report, report-focus and app tests: all passed (27 report tests).
+- The full `npm run check` was not run locally: another lane held the shared check lock. Instead: `prettier --check` on the changed files, `eslint --max-warnings 0`, frontend `tsc --noEmit`, and `vitest run` on report, report-focus, app, reminders and daily tests (87 passed). CI runs the full check.
+- No browser check: the markup is unchanged, and the screen tests cover the behavior.

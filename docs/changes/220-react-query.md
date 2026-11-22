@@ -119,3 +119,8 @@ The hand-written polling hook `useHealth` in `app.tsx` (an interval, a visibilit
 - Every writer is a React Query mutation now, so the transitional `trackWrite` wrappers in the sleep, checks, habits, body, meal, and goal cards are gone, and `pending-writes.ts` with its test is deleted. `test/setup.ts` no longer calls `forgetPendingWrites`.
 - Read-after-write (#71) is `useReadAfterWrites`, and re-judging (#104) is `onWriteSettled`, both in `writes.ts` and built on the mutation cache.
 - The report, the clinic and medicine page lists, food search, and combos still read with their own load functions; that move is #282.
+
+### Verification (clinic and tracker PR)
+
+- The full `npm run check` was not run locally: another lane held the shared check lock and memory was low. Instead, on the rebuilt branch over `origin/main`: `prettier --check` on the changed files, `eslint --max-warnings 0 frontend/src`, frontend `tsc --noEmit`, and the whole frontend suite with `vitest run --maxWorkers=2` (75 files, 769 passed, 3 skipped). `knip` finds nothing in `frontend/src`; locally it cannot load the Playwright config without a test DB, so CI's run is the one that counts. CI runs the full check.
+- No browser check: the markup is unchanged, and the screen tests cover the behavior.

@@ -30,3 +30,15 @@ export function forgetQueryClient() {
   current?.clear();
   current = undefined;
 }
+
+/**
+ * Runs a write to `path` through the test's query client, as a card's useApiMutation with `asRequest` does, and
+ * resolves or rejects with `answer`. Other screens see it on its way and when it settles.
+ */
+export function write(path: string, answer: Promise<unknown> = Promise.resolve({})) {
+  current ??= testQueryClient();
+  return current
+    .getMutationCache()
+    .build(current, { mutationFn: () => answer })
+    .execute({ path, method: 'PUT' });
+}

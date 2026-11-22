@@ -65,3 +65,5 @@ The screens that #220 left reading with their own load functions and stale-answe
 
 - `food-search.test.ts` runs the hook in the test's query client (`queryWrapper()` in `test/query.tsx`). New: "a newer search stops the older request instead of only ignoring its answer (#282)".
 - `vitest run` on food-search (12), foods, combos and meals tests: all passed.
+- Full `npm run check` with `TEST_DATABASE_URL` empty, under the shared check lock: passed. Frontend: 76 files, 784 passed, 3 skipped.
+- No browser check: the markup is unchanged, and the screen tests cover the behavior.

@@ -1,3 +1,4 @@
+import { kcalText } from './calorie-text';
 import { spanText } from './habit-text';
 import { count } from './plural';
 import { minutesText } from './report-text';
@@ -76,11 +77,11 @@ export const goalFields: Record<
 
 const number = (value: number) => value.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
-/** "Up to 2,000 kcal a day" */
+/** "Up to 2,000kcal a day" */
 export function targetText(item: GoalItem, target: number) {
   switch (item) {
     case 'calories':
-      return `Up to ${number(target)}kcal a day`;
+      return `Up to ${kcalText(target)} a day`;
     case 'protein':
       return `At least ${number(target)}g a day`;
     case 'sleep':
@@ -171,8 +172,9 @@ export function actualText(day: GoalDayItem) {
       if (entries === 0) return 'No meal records';
       // Nothing known to add up is not zero.
       if (total === null) return `${count(missing, 'food')} with unknown values`;
-      const unit = day.item === 'calories' ? 'kcal' : 'g';
-      const sum = `${number(total ?? 0)}${unit}`;
+      // Calories read like every other calorie amount, rounded (#279); protein keeps its decimals,
+      // as the meal card shows them.
+      const sum = day.item === 'calories' ? kcalText(total) : `${number(total)}g`;
       return missing ? `${sum} (excludes ${count(missing, 'food')} with unknown values)` : sum;
     }
     case 'sleep':

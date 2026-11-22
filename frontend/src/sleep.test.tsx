@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { toast } from './components/ui/sonner';
 import { SleepCard } from './sleep';
 import { findLive, queryLive } from './test/live';
+import { renderWithQuery } from './test/query';
 
 const date = '2026-03-15';
 const record = {
@@ -40,7 +41,7 @@ const typeTimes = (bed: string, wake: string) => {
 
 test('a day without a record asks for times and files a night under the day of waking', async () => {
   const fetchMock = server({ body: { record: null } }, { body: record });
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
   await screen.findByLabelText('Bedtime');
 
   typeTimes('23:30', '07:00');
@@ -62,7 +63,7 @@ test('a day without a record asks for times and files a night under the day of w
 
 test('the preview region is there before it has anything to say, so it gets announced', async () => {
   server({ body: { record: null } });
-  const { container } = render(<SleepCard date={date} />);
+  const { container } = renderWithQuery(<SleepCard date={date} />);
   await screen.findByLabelText('Bedtime');
   const region = container.querySelector('form [aria-live="polite"]');
   expect(region).toBeEmptyDOMElement();
@@ -73,7 +74,7 @@ test('the preview region is there before it has anything to say, so it gets anno
 
 test('saving without both times explains itself and sends nothing', async () => {
   const fetchMock = server({ body: { record: null } });
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
   await screen.findByLabelText('Bedtime');
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   expect(await findLive('alert')).toHaveTextContent('Enter a bedtime and a wake-up time');
@@ -85,7 +86,7 @@ test('the server refusing the times shows its reason and keeps what was typed', 
     { body: { record: null } },
     { status: 400, body: { error: 'The wake-up time must be after the bedtime' } },
   );
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
   await screen.findByLabelText('Bedtime');
   typeTimes('07:00', '07:00');
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -96,7 +97,7 @@ test('the server refusing the times shows its reason and keeps what was typed', 
 
 test('editing starts from the saved times and cancel changes nothing', async () => {
   server({ body: { record } });
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
   expect(screen.getByLabelText('Bedtime')).toHaveValue('23:30');
   expect(screen.getByLabelText('Wake-up time')).toHaveValue('07:00');
@@ -108,7 +109,7 @@ test('editing starts from the saved times and cancel changes nothing', async () 
 
 test('deleting asks first, then the form returns with focus on the card', async () => {
   const fetchMock = server({ body: { record } }, { status: 204 });
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   expect(fetchMock).toHaveBeenCalledTimes(1);
   const dialog = screen.getByRole('dialog', { name: 'Delete this sleep record?' });
@@ -124,7 +125,7 @@ test('deleting asks first, then the form returns with focus on the card', async 
 
 test('a record already gone counts as deleted', async () => {
   server({ body: { record } }, { status: 404, body: { error: 'Sleep record not found' } });
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
   expect(await screen.findByLabelText('Bedtime')).toBeInTheDocument();
@@ -133,7 +134,7 @@ test('a record already gone counts as deleted', async () => {
 test('a failed delete says why and keeps the record and the dialog', async () => {
   const shown = vi.spyOn(toast, 'error');
   server({ body: { record } }, { status: 500, body: { error: 'Server error occurred' } });
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' });
   fireEvent.click(confirm);
@@ -146,13 +147,13 @@ test('a failed delete says why and keeps the record and the dialog', async () =>
 
 test('an imported sleep says where it came from', async () => {
   server({ body: { record: { ...record, source: 'garmin' } } });
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
   expect(await screen.findByText('Garmin')).toBeInTheDocument();
 });
 
 test('a failed load offers another try, with no form to overwrite an unseen record', async () => {
   server({ status: 500, body: { error: 'Server error occurred' } }, { body: { record } });
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
   expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   expect(screen.queryByLabelText('Bedtime')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
@@ -162,7 +163,7 @@ test('a failed load offers another try, with no form to overwrite an unseen reco
 
 test('pressing edit moves focus to the card instead of losing it', async () => {
   server({ body: { record } });
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
   const edit = await screen.findByRole('button', { name: 'Edit' });
   edit.focus();
   fireEvent.click(edit);
@@ -171,7 +172,7 @@ test('pressing edit moves focus to the card instead of losing it', async () => {
 
 test('saving unchanged times sends nothing, so an imported record stays as it is', async () => {
   const fetchMock = server({ body: { record: { ...record, source: 'garmin' } } });
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
   expect(screen.getByText(/erases the sleep stages and score/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -181,7 +182,7 @@ test('saving unchanged times sends nothing, so an imported record stays as it is
 
 test('a directly entered record has no such warning', async () => {
   server({ body: { record } });
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
   expect(screen.queryByText(/erases the sleep stages and score/)).not.toBeInTheDocument();
 });
@@ -193,7 +194,7 @@ test('a save in flight cannot be sent twice', async () => {
     .mockResolvedValueOnce(new Response(JSON.stringify({ record: null })))
     .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
   vi.stubGlobal('fetch', fetchMock);
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
   await screen.findByLabelText('Bedtime');
   typeTimes('23:30', '07:00');
   const save = screen.getByRole('button', { name: 'Save' });
@@ -209,18 +210,18 @@ test('a save in flight cannot be sent twice', async () => {
 test('a save that fails after leaving the day still says so', async () => {
   const shown = vi.spyOn(toast, 'error');
   let finish = (_response: Response) => {};
-  vi.stubGlobal(
-    'fetch',
-    vi
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ record: null })))
-      .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve))),
-  );
-  const { unmount } = render(<SleepCard date={date} />);
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify({ record: null })))
+    .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+  vi.stubGlobal('fetch', fetchMock);
+  const { unmount } = renderWithQuery(<SleepCard date={date} />);
   await screen.findByLabelText('Bedtime');
   typeTimes('23:30', '07:00');
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   unmount();
+  // React Query sends the save a moment after the click.
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   finish(new Response(JSON.stringify({ error: 'Server error occurred' }), { status: 500 }));
   await waitFor(() =>
     expect(shown).toHaveBeenCalledWith(
@@ -245,12 +246,12 @@ test('coming back while a save is on its way shows the saved night, not a blank 
     return Promise.resolve(new Response(JSON.stringify({ record: saved ? record : null })));
   });
   vi.stubGlobal('fetch', fetchMock);
-  const first = render(<SleepCard date={date} />);
+  const first = renderWithQuery(<SleepCard date={date} />);
   await screen.findByLabelText('Bedtime');
   typeTimes('23:30', '07:00');
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   first.unmount();
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
 
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -271,12 +272,12 @@ test('leaving again while waiting for a save sends no read for the day left', as
     return Promise.resolve(new Response(JSON.stringify({ record: null })));
   });
   vi.stubGlobal('fetch', fetchMock);
-  const first = render(<SleepCard date={date} />);
+  const first = renderWithQuery(<SleepCard date={date} />);
   await screen.findByLabelText('Bedtime');
   typeTimes('23:30', '07:00');
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   first.unmount();
-  render(<SleepCard date={date} />).unmount();
+  renderWithQuery(<SleepCard date={date} />).unmount();
 
   finishSave();
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -285,7 +286,7 @@ test('leaving again while waiting for a save sends no read for the day left', as
 
 test('trying again moves focus to the card, as the button it was on goes away', async () => {
   server({ status: 500, body: { error: 'Server error occurred' } }, { body: { record } });
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
   const again = await screen.findByRole('button', { name: 'Try again' });
   again.focus();
   fireEvent.click(again);
@@ -298,7 +299,7 @@ test('trying again moves focus to the card, as the button it was on goes away', 
 test('a retry cannot be started twice, so no older answer can land after a newer one', async () => {
   const finishers: ((response: Response) => void)[] = [];
   const fetchMock = server({ status: 500, body: { error: 'Server error occurred' } });
-  render(<SleepCard date={date} />);
+  renderWithQuery(<SleepCard date={date} />);
   const again = await screen.findByRole('button', { name: 'Try again' });
   fetchMock.mockImplementation(() => new Promise<Response>((resolve) => finishers.push(resolve)));
   const before = fetchMock.mock.calls.length;
@@ -313,4 +314,49 @@ test('a retry cannot be started twice, so no older answer can land after a newer
   }
   // Settles before the test ends, so nothing updates the card afterwards.
   expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
+});
+
+test('coming back soon after a save shows the saved night from the cache, without reading again', async () => {
+  const fetchMock = server({ body: { record: null } }, { body: record });
+  const first = renderWithQuery(<SleepCard date={date} />);
+  await screen.findByLabelText('Bedtime');
+  typeTimes('23:30', '07:00');
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(await screen.findByText('7 h 30 min')).toBeInTheDocument();
+  first.unmount();
+
+  renderWithQuery(<SleepCard date={date} />);
+  expect(screen.getByText('7 h 30 min')).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+test('a read from returning to the tab that is still on its way cannot undo a save', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  let finishRead = (_response: Response) => {};
+  let reads = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') return Promise.resolve(new Response(JSON.stringify(record)));
+      reads += 1;
+      if (reads === 1) return Promise.resolve(new Response(JSON.stringify({ record: null })));
+      return new Promise<Response>((resolve) => (finishRead = resolve));
+    }),
+  );
+  renderWithQuery(<SleepCard date={date} />);
+  await screen.findByLabelText('Bedtime');
+  // Half a minute later the day is stale, so coming back to the tab reads it again.
+  vi.setSystemTime(Date.now() + 31_000);
+  document.dispatchEvent(new Event('visibilitychange', { bubbles: true }));
+  await waitFor(() => expect(reads).toBe(2));
+
+  typeTimes('23:30', '07:00');
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(await screen.findByText('7 h 30 min')).toBeInTheDocument();
+  // The older read answers last, with the day as it was before the save.
+  finishRead(new Response(JSON.stringify({ record: null })));
+  // Long enough for a late answer to reach the screen if it were taken.
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  expect(screen.getByText('7 h 30 min')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Bedtime')).not.toBeInTheDocument();
 });

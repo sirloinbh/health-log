@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { BodyCard } from './body';
 import { toast } from './components/ui/sonner';
 import { findLive, queryLive } from './test/live';
+import { renderWithQuery } from './test/query';
 
 const date = '2026-03-15';
 const record = {
@@ -50,7 +51,7 @@ const sent = (fetchMock: ReturnType<typeof server>, method: string) => {
 test('weight alone is saved, and blanks go as no value', async () => {
   const saved = { ...record, systolicMmhg: null, diastolicMmhg: null, memo: null };
   const fetchMock = server({ recordReplies: [{ body: { record: null } }, { body: saved }] });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
 
   fireEvent.change(await screen.findByLabelText('Weight (kg)'), { target: { value: '70.5' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -77,7 +78,7 @@ test('saving reloads the trend so the new value counts at once', async () => {
     recordReplies: [{ body: { record: null } }, { body: record }],
     history: [{ body: { records: [earlier] } }, { body: { records: [earlier, record] } }],
   });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Weight (kg)'), { target: { value: '70.5' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -91,7 +92,7 @@ test('saving reloads the trend so the new value counts at once', async () => {
 
 test('the trend asks for the 90 days ending on the day shown', async () => {
   const fetchMock = server({ recordReplies: [{ body: { record: null } }] });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   await screen.findByLabelText('Weight (kg)');
   expect(fetchMock.mock.calls.map(([url]) => url)).toContain(
     '/api/body?from=2025-12-16&to=2026-03-15',
@@ -113,7 +114,7 @@ test('each window shows its own change with the days it compares', async () => {
       },
     ],
   });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   const row = await screen.findByRole('row', { name: /Weight/ });
   expect(
     within(row)
@@ -128,7 +129,7 @@ test('a window with one measurement says there is not enough', async () => {
     recordReplies: [{ body: { record } }],
     history: [{ body: { records: [{ ...record, date: '2026-01-10', weightKg: 75 }, record] } }],
   });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   const row = await screen.findByRole('row', { name: /Weight/ });
   expect(
     within(row)
@@ -146,7 +147,7 @@ test('a trend that fails to load leaves today usable and can be retried', async 
       { body: { records: [earlier, record] } },
     ],
   });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   expect(await screen.findByLabelText('Weight (kg)')).toBeEnabled();
   expect(await findLive('alert')).toHaveTextContent('Could not load the changes over time');
 
@@ -166,7 +167,7 @@ test('numbers from before a failed reload do not stay on screen', async () => {
       { status: 500, body: { error: 'Server error occurred' } },
     ],
   });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   await screen.findByRole('row', { name: /Weight.*−4\.5kg/ });
 
   fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
@@ -192,7 +193,7 @@ test('a trend retry shows it is running, allows one at a time, and announces fai
     return new Promise<Response>((resolve) => (finishRetry = resolve));
   });
   vi.stubGlobal('fetch', fetchMock);
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Reload changes' }));
 
   const retry = await screen.findByRole('button', { name: /Reload changes/ });
@@ -214,7 +215,7 @@ test('a trend retry shows it is running, allows one at a time, and announces fai
 
 test('a value too long to read is refused and the stored value stays', async () => {
   const fetchMock = server({ recordReplies: [{ body: { record } }] });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
   fireEvent.change(screen.getByLabelText('Weight (kg)'), { target: { value: '9'.repeat(400) } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -239,7 +240,7 @@ test('when both fail, one retry brings back the record and the trend', async () 
       { body: { records: [earlier, record] } },
     ],
   });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   await screen.findByText('Could not load the changes over time');
   await screen.findByText('Server error occurred');
   expect(screen.queryByRole('button', { name: 'Reload changes' })).not.toBeInTheDocument();
@@ -267,7 +268,7 @@ test('a slow older trend does not overwrite the one that includes a save', async
       );
     }),
   );
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Weight (kg)'), { target: { value: '70.5' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await screen.findByRole('row', { name: /Weight.*−1\.5kg/ });
@@ -280,10 +281,14 @@ test('a slow older trend does not overwrite the one that includes a save', async
 test('a save that fails after leaving the day still says so', async () => {
   const shown = vi.spyOn(toast, 'error');
   let failSave = (_response: Response) => {};
+  let saveSent = false;
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string, init?: RequestInit) => {
-      if (init?.method === 'PUT') return new Promise((resolve) => (failSave = resolve));
+      if (init?.method === 'PUT') {
+        saveSent = true;
+        return new Promise((resolve) => (failSave = resolve));
+      }
       return Promise.resolve(
         new Response(
           JSON.stringify(url.startsWith('/api/body?') ? { records: [] } : { record: null }),
@@ -291,10 +296,12 @@ test('a save that fails after leaving the day still says so', async () => {
       );
     }),
   );
-  const { unmount } = render(<BodyCard date={date} />);
+  const { unmount } = renderWithQuery(<BodyCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Weight (kg)'), { target: { value: '70.5' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   unmount();
+  // React Query sends the save a moment after the click.
+  await waitFor(() => expect(saveSent).toBe(true));
 
   failSave(new Response(JSON.stringify({ error: 'Server error occurred' }), { status: 500 }));
   await waitFor(() =>
@@ -311,7 +318,7 @@ test('a failed load hides the form so an unseen record cannot be overwritten', a
       { body: { record } },
     ],
   });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   await screen.findByText('Server error occurred');
   expect(screen.queryByLabelText('Weight (kg)')).not.toBeInTheDocument();
 
@@ -326,7 +333,7 @@ test('a server rejection keeps the form and the typed values', async () => {
       { status: 400, body: { error: 'The request body is not valid' } },
     ],
   });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Systolic blood pressure (mmHg)'), {
     target: { value: '120' },
   });
@@ -393,7 +400,7 @@ test.each([
   },
 ])('$name is refused before anything is sent', async ({ values, message }) => {
   const fetchMock = server({ recordReplies: [{ body: { record: null } }] });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   await screen.findByLabelText('Weight (kg)');
   for (const [label, value] of Object.entries(values)) {
     fireEvent.change(screen.getByLabelText(label), { target: { value } });
@@ -418,7 +425,7 @@ test('values at the edges the server takes are sent', async () => {
     memo: '가'.repeat(500),
   };
   const fetchMock = server({ recordReplies: [{ body: { record: null } }, { body: saved }] });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Weight (kg)'), { target: { value: '500' } });
   fireEvent.change(screen.getByLabelText('Body fat (%)'), { target: { value: '0.01' } });
   fireEvent.change(screen.getByLabelText('Systolic blood pressure (mmHg)'), {
@@ -443,7 +450,7 @@ test('values at the edges the server takes are sent', async () => {
 
 test('a saved row with only one blood pressure value shows no blood pressure', async () => {
   server({ recordReplies: [{ body: { record: { ...record, diastolicMmhg: null } } }] });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   expect(await screen.findByText('70.5kg')).toBeInTheDocument();
   expect(screen.queryByText('Blood pressure')).not.toBeInTheDocument();
   expect(screen.queryByText(/null/)).not.toBeInTheDocument();
@@ -451,7 +458,7 @@ test('a saved row with only one blood pressure value shows no blood pressure', a
 
 test('a comma decimal is refused, never read as ten times the value', async () => {
   const fetchMock = server({ recordReplies: [{ body: { record: null } }] });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   const weight = await screen.findByLabelText('Weight (kg)');
   fireEvent.change(weight, { target: { value: '49,5' } });
   expect(weight).toHaveValue('49,5');
@@ -470,7 +477,7 @@ test('a comma decimal is refused, never read as ten times the value', async () =
 
 test('editing starts from the record and cancel changes nothing', async () => {
   const fetchMock = server({ recordReplies: [{ body: { record } }] });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   expect(await screen.findByText('120/80mmHg')).toBeInTheDocument();
   expect(screen.getByText('Fasting')).toBeInTheDocument();
 
@@ -496,7 +503,7 @@ test('deleting asks first, then offers the form again and reloads the trend', as
     history: [{ body: { records: [record] } }, { body: { records: [] } }],
   });
   const success = vi.spyOn(toast, 'success');
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   const dialog = screen.getByRole('dialog', { name: 'Delete this body record?' });
   expect(
@@ -523,7 +530,7 @@ test('a record another tab already deleted counts as deleted', async () => {
       { status: 404, body: { error: 'Body record not found' } },
     ],
   });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   const dialog = screen.getByRole('dialog', { name: 'Delete this body record?' });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
@@ -553,11 +560,11 @@ test('coming back while a save is on its way shows the saved record, not a blank
       ([url, init]) => url === `/api/body/${date}` && init?.method === 'GET',
     ).length;
 
-  const first = render(<BodyCard date={date} />);
+  const first = renderWithQuery(<BodyCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Weight (kg)'), { target: { value: '70.5' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   first.unmount();
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
 
   // No form while the save is out: the server would still answer with the empty day.
   expect(screen.getByRole('status', { name: 'Loading body records' })).toBeInTheDocument();
@@ -567,7 +574,8 @@ test('coming back while a save is on its way shows the saved record, not a blank
 
   finishSave();
   expect(await screen.findByText('70.5kg')).toBeInTheDocument();
-  expect(reads()).toBe(2);
+  // The save's own answer is the record, so the day is not read again (#220).
+  expect(reads()).toBe(1);
   expect(screen.queryByLabelText('Weight (kg)')).not.toBeInTheDocument();
   expect(await screen.findByRole('row', { name: /Weight/ })).toBeInTheDocument();
 });
@@ -580,7 +588,7 @@ test('a failed delete says why and keeps the record and the dialog', async () =>
       { status: 500, body: { error: 'Server error occurred' } },
     ],
   });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' });
   fireEvent.click(confirm);
@@ -593,7 +601,7 @@ test('a failed delete says why and keeps the record and the dialog', async () =>
 
 test('pressing edit moves focus to the card instead of losing it', async () => {
   server({ recordReplies: [{ body: { record } }] });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   const edit = await screen.findByRole('button', { name: 'Edit' });
   edit.focus();
   fireEvent.click(edit);
@@ -619,7 +627,7 @@ test('a slow older trend failure does not replace the one that includes a save',
       );
     }),
   );
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Weight (kg)'), { target: { value: '70.5' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await screen.findByRole('row', { name: /Weight.*−1\.5kg/ });
@@ -637,7 +645,7 @@ test('trying again moves focus to the card, as the button it was on goes away', 
       { body: { record } },
     ],
   });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   const again = await screen.findByRole('button', { name: 'Try again' });
   again.focus();
   fireEvent.click(again);
@@ -652,7 +660,7 @@ test('a retry cannot be started twice, so no older answer can land after a newer
   const fetchMock = server({
     recordReplies: [{ status: 500, body: { error: 'Server error occurred' } }],
   });
-  render(<BodyCard date={date} />);
+  renderWithQuery(<BodyCard date={date} />);
   const again = await screen.findByRole('button', { name: 'Try again' });
   fetchMock.mockImplementation(() => new Promise<Response>((resolve) => finishers.push(resolve)));
   const before = fetchMock.mock.calls.length;

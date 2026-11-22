@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
+import { createServer } from 'node:http';
 import { test } from 'node:test';
 
 import { Pool } from 'pg';
 
 import { createApp } from '../src/app.js';
 import { testDatabaseSkip } from './helpers.js';
+import { listenLocally } from './standard/api.js';
 
 // project-standards#711: shared-ai calls the AI tool with a signed token; each call is checked for
 // its scope and leaves one audit_log row.
@@ -24,11 +26,9 @@ function token(scope: string, tool: string, key = privateKey) {
 test('AI tools: list_meals with scopes, signatures and audit rows', { skip }, async () => {
   const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
   const toolsPublicKey = publicKey.export({ type: 'spki', format: 'pem' }).toString();
-  const server = createApp(pool, { toolsPublicKey }).listen(0, '127.0.0.1');
-  await new Promise<void>((resolve) => server.once('listening', resolve));
-  const address = server.address();
-  assert.ok(address && typeof address !== 'string');
-  const base = `http://127.0.0.1:${address.port}/internal/tools`;
+  const server = createServer(createApp(pool, { toolsPublicKey }));
+  const port = await listenLocally(server);
+  const base = `http://127.0.0.1:${port}/internal/tools`;
   const call = (name: string, auth: string | null, body: unknown = {}) =>
     fetch(`${base}/${name}`, {
       method: 'POST',
@@ -120,12 +120,10 @@ test('AI tools: list_meals with scopes, signatures and audit rows', { skip }, as
 
 test('AI tools are off without the shared-ai public key', { skip }, async () => {
   const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
-  const server = createApp(pool).listen(0, '127.0.0.1');
-  await new Promise<void>((resolve) => server.once('listening', resolve));
-  const address = server.address();
-  assert.ok(address && typeof address !== 'string');
+  const server = createServer(createApp(pool));
+  const port = await listenLocally(server);
   try {
-    assert.equal((await fetch(`http://127.0.0.1:${address.port}/internal/tools`)).status, 404);
+    assert.equal((await fetch(`http://127.0.0.1:${port}/internal/tools`)).status, 404);
   } finally {
     server.close();
     await pool.end();

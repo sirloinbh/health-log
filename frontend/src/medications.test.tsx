@@ -7,6 +7,7 @@ import { toast } from './components/ui/sonner';
 import type { Medication, MedicationLists } from './med-text';
 import { trackWrite } from './pending-writes';
 import { findLive, getLive, queryLive } from './test/live';
+import { testQueryClient } from './test/query';
 import { VisitsCard } from './visit-card';
 import type { Visit } from './visit-text';
 
@@ -71,9 +72,10 @@ const serve = (medications: Handler) => {
   return fetchMock;
 };
 
+// The page already knows the server's date, so pressing a button at once fills it in.
 const open = (path = '/medications') => {
   window.history.replaceState(null, '', path);
-  render(<App />);
+  render(<App queryClient={testQueryClient({ today: '2026-03-15' })} />);
 };
 
 const writes = (fetchMock: ReturnType<typeof serve>) =>

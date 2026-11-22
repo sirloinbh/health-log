@@ -671,7 +671,7 @@ test('one failed check of the server keeps the report already on screen', async 
   await screen.findByText('Nov 2 – Nov 8');
   healthy = false;
   // Returning to the tab checks the server again.
-  document.dispatchEvent(new Event('visibilitychange'));
+  document.dispatchEvent(new Event('visibilitychange', { bubbles: true }));
   expect(await findLive('alert')).toHaveTextContent('Cannot reach the server');
   expect(screen.getByText('Nov 2 – Nov 8')).toBeInTheDocument();
   expect(stat('Average sleep')).toHaveTextContent('7 h 30 min');

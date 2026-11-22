@@ -1,4 +1,4 @@
-import { QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { type QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import {
   CalendarDays,
   Layers,
@@ -111,9 +111,10 @@ function Page({
   );
 }
 
-export function App() {
+/** `queryClient` is for tests that start with data already loaded; the app makes its own. */
+export function App({ queryClient: given }: { queryClient?: QueryClient } = {}) {
   // One cache per mounted app, with the shared defaults (ADR-0027).
-  const [queryClient] = useState(() => createQueryClient());
+  const [queryClient] = useState(() => given ?? createQueryClient());
   return (
     <QueryClientProvider client={queryClient}>
       <Routed />

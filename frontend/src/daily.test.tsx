@@ -206,7 +206,7 @@ test('returning to the tab checks today again', async () => {
   await act(() => Promise.resolve());
 
   health({ today: '2026-03-16' });
-  fireEvent(document, new Event('visibilitychange'));
+  fireEvent(document, new Event('visibilitychange', { bubbles: true }));
   expect(await screen.findByRole('link', { name: 'Today' })).toHaveAttribute(
     'href',
     '/daily/2026-03-16',
@@ -229,7 +229,7 @@ test('a slow older response does not overwrite a newer today', async () => {
     }),
   );
   open('/daily/2026-03-16');
-  fireEvent(document, new Event('visibilitychange'));
+  fireEvent(document, new Event('visibilitychange', { bubbles: true }));
   await act(() => Promise.resolve());
 
   await act(async () => {
@@ -545,7 +545,7 @@ test("one failed check of the server keeps today's coming-up card (#48)", async 
   open('/daily/2026-03-15');
   await screen.findByText('No clinic appointments or medication end dates in the next 7 days.');
   healthy = false;
-  fireEvent(document, new Event('visibilitychange'));
+  fireEvent(document, new Event('visibilitychange', { bubbles: true }));
   expect(await screen.findByText('Cannot reach the server')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Upcoming' })).toBeInTheDocument();
   expect(fetchMock.mock.calls.filter(([url]) => url === '/api/reminders')).toHaveLength(1);

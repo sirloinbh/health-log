@@ -96,8 +96,9 @@ test('coming back to the page checks the server again', async () => {
   const healthCalls = days('2026-10-26', '2026-10-27');
   render(<App />);
   expect(await screen.findByText('Server connected · 2026-10-26')).toBeInTheDocument();
+  // Browsers fire it at the document, and it bubbles up to the window.
   act(() => {
-    window.dispatchEvent(new Event('visibilitychange'));
+    document.dispatchEvent(new Event('visibilitychange', { bubbles: true }));
   });
   expect(await screen.findByText('Server connected · 2026-10-27')).toBeInTheDocument();
   expect(healthCalls).toHaveLength(2);

@@ -40,3 +40,8 @@ The hand-written polling hook `useHealth` in `app.tsx` (an interval, a visibilit
 ### Tests
 
 `app.test.tsx` adds three behavior tests: the date changes after a minute (fake timers advance 60 s, two health reads), the page becoming visible reads again, and an answer without a date is an alert.
+
+### Test adjustments
+
+- React Query hands a result to the screen one task later than the old `fetch().then(setState)`, so tests that pressed "Add" on the visits and medications pages the moment the button appeared now beat the server's date and got a blank date field. A person cannot press that fast; the waiting itself is covered by the pages' own "waits for today" tests (and #204 / PR #254 for medications). `App` takes an optional `queryClient`, and the new `src/test/query.ts` `testQueryClient({ today })` gives these tests a client that already knows the date. The two visits tests about waiting for the date keep the real read (`openAsking`).
+- `daily.test.tsx`, `report.test.tsx`: the `visibilitychange` event is created with `bubbles: true`, as browsers fire it. React Query listens on the window, which a non-bubbling event at the document never reaches.

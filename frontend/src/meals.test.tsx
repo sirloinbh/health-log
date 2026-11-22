@@ -1213,3 +1213,42 @@ test('a day without junk food says none for the week and the month', async () =>
     'This month Mar 1 – Mar 31: None',
   );
 });
+
+// #196: a retry after no answer carries the same Idempotency-Key, so the server adds the entry once.
+test('sending an entry again after no answer reuses its retry key; the next entry gets a new one', async () => {
+  const keys: (string | undefined)[] = [];
+  const replies: (() => Promise<Response>)[] = [
+    () => Promise.resolve(new Response(JSON.stringify(emptyDay))),
+    () => Promise.reject(new TypeError('Failed to fetch')),
+    () => Promise.resolve(new Response(JSON.stringify(oneEntry), { status: 201 })),
+    () => Promise.resolve(new Response(JSON.stringify(oneEntry), { status: 201 })),
+  ];
+  stubFetch((_url, init) => {
+    if (init?.method === 'POST') {
+      keys.push((init.headers as Record<string, string> | undefined)?.['Idempotency-Key']);
+    }
+    return replies.shift()!();
+  });
+  render(<MealCard date={date} />);
+  await screen.findByLabelText('Food name');
+  const typeEntry = () => {
+    fireEvent.change(screen.getByLabelText('Food name'), { target: { value: '떡볶이' } });
+    fireEvent.change(screen.getByLabelText('Calories per serving (kcal)'), {
+      target: { value: '480' },
+    });
+  };
+  const record = () => fireEvent.click(screen.getByRole('button', { name: 'Record now' }));
+
+  typeEntry();
+  record();
+  await findLive('alert');
+  record();
+  await waitFor(() => expect(screen.getByLabelText('Food name')).toHaveValue(''));
+  typeEntry();
+  record();
+  await waitFor(() => expect(keys).toHaveLength(3));
+
+  expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/);
+  expect(keys[1]).toBe(keys[0]);
+  expect(keys[2]).not.toBe(keys[0]);
+});

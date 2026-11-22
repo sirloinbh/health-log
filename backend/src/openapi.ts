@@ -12,9 +12,19 @@ import { comboUse, entryInput, mealCopy } from './meals.js';
 import { dayQuery, medicationInput } from './medications.js';
 import { doneInput } from './reminders.js';
 import { reportQuery } from './report.js';
+import { requestKeyHeader, requestKeySchema } from './request-keys.js';
 import { sleepInput } from './sleep.js';
 import { buildOpenApi, type Operation } from './standard/openapi.js';
 import { listQuery, visitInput } from './visits.js';
+
+// The meal adding routes take a retry key (#196).
+const retryKey = {
+  [requestKeyHeader]: {
+    description:
+      'A UUID per user action. A retry with the same key and request gets the first answer and adds nothing; the same key with a different request is a 409.',
+    schema: requestKeySchema,
+  },
+};
 
 // Every registered route must appear here exactly once (checked when building).
 export const operations: Record<string, Operation> = {
@@ -54,19 +64,22 @@ export const operations: Record<string, Operation> = {
     params: { date: z.iso.date() },
     summary: 'Add a meal entry from a stored food or typed in',
     body: ['MealEntry', entryInput],
-    status: [201, 400, 404],
+    headers: retryKey,
+    status: [201, 400, 404, 409],
   },
   'POST /api/meals/:date/combos/:id': {
     params: { date: z.iso.date() },
     summary: 'Add every food of a combo to a meal',
     body: ['ComboUse', comboUse],
-    status: [201, 400, 404],
+    headers: retryKey,
+    status: [201, 400, 404, 409],
   },
   'POST /api/meals/:date/copy': {
     params: { date: z.iso.date() },
     summary: 'Copy one meal of another day to this day',
     body: ['MealCopy', mealCopy],
-    status: [201, 400, 404],
+    headers: retryKey,
+    status: [201, 400, 404, 409],
   },
   'DELETE /api/meals/:date/entries/:id': {
     params: { date: z.iso.date() },

@@ -1,3 +1,4 @@
+import { kcalText } from './calorie-text';
 import { count } from './plural';
 // What the API answers for a combo (#46), and how the combo and meal screens describe it.
 
@@ -23,11 +24,11 @@ export type Combo = {
 export const fullName = ({ brand, name }: { brand: string | null; name: string }) =>
   brand ? `${brand} ${name}` : name;
 
-/** "3 foods · 650kcal", saying when some calories are unknown. */
+/** "3 foods · 1,235kcal", saying when some calories are unknown. */
 export function comboSummary(combo: Combo) {
   if (combo.items.length === 0) return 'No foods';
   const { value, missing } = combo.calories;
-  const calories = value === null ? 'No calorie value' : `${value}kcal`;
+  const calories = value === null ? 'No calorie value' : kcalText(value);
   const unknown =
     missing > 0 && value !== null
       ? ` (excludes ${count(missing, 'food')} with unknown calories)`

@@ -165,6 +165,26 @@ test('a searched food shows its calories per serving rounded, too', async () => 
   expect(screen.getByText(/^Serving 120g · 413kcal$/)).toBeInTheDocument();
 });
 
+// #281: the day's calorie total reads like every other calorie amount; grams keep their value.
+test('the calorie total of the day is rounded and grouped, and gram totals stay as they are', async () => {
+  server({
+    body: {
+      ...oneEntry,
+      entries: [{ ...entry, calories: 1234.5, protein: 82.5 }],
+      totals: {
+        ...oneEntry.totals,
+        calories: { value: 1234.5, missing: 0 },
+        protein: { value: 82.5, missing: 0 },
+      },
+    },
+  });
+  renderWithQuery(<MealCard date={date} />);
+  const total = (label: string) => screen.getByText(label, { selector: 'dt' }).parentElement;
+  await waitFor(() => expect(total('Calories')).toHaveTextContent('Calories1,235kcal'));
+  expect(total('Protein')).toHaveTextContent('Protein82.5g');
+  expect(screen.queryByText(/1234\.5/)).not.toBeInTheDocument();
+});
+
 test('complete totals carry no such note, and a day with no value says so', async () => {
   server({ body: emptyDay });
   renderWithQuery(<MealCard date={date} />);

@@ -3,7 +3,7 @@ import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { AddEntry } from './add-entry';
-import { calorieText } from './calorie-text';
+import { calorieText, kcalText } from './calorie-text';
 import { fullName } from './combo-text';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
@@ -70,6 +70,11 @@ function useMealWrite(date: string) {
   });
 }
 
+// Calories read like every other calorie amount, rounded and grouped (#281); the gram and
+// milligram totals keep the API's value.
+const totalText = (key: (typeof nutrients)[number]['key'], value: number | null, unit: string) =>
+  value === null ? 'No value' : key === 'calories' ? kcalText(value) : `${value}${unit}`;
+
 function Totals({ totals }: { totals: MealDay['totals'] }) {
   const incomplete = nutrients.filter(({ key }) => totals[key].missing > 0);
   return (
@@ -78,7 +83,7 @@ function Totals({ totals }: { totals: MealDay['totals'] }) {
         {nutrients.map(({ key, label, unit }) => (
           <div key={key}>
             <dt className="text-muted-foreground">{label}</dt>
-            <dd>{totals[key].value === null ? 'No value' : `${totals[key].value}${unit}`}</dd>
+            <dd>{totalText(key, totals[key].value, unit)}</dd>
           </div>
         ))}
       </dl>

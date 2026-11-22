@@ -1312,3 +1312,39 @@ test('sending an entry again after no answer reuses its retry key; the next entr
   expect(keys[1]).toBe(keys[0]);
   expect(keys[2]).not.toBe(keys[0]);
 });
+
+test('leaving the day while combos are read stops that request (#302)', async () => {
+  let combosSignal: AbortSignal | null | undefined;
+  stubFetch((url, init) => {
+    if (url !== '/api/combos') return Promise.resolve(new Response(JSON.stringify(emptyDay)));
+    combosSignal = init?.signal;
+    return new Promise<Response>(() => {});
+  });
+  const card = renderWithQuery(<MealCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Choose from combos' }));
+  await waitFor(() => expect(combosSignal).toBeDefined());
+  expect(combosSignal?.aborted).toBe(false);
+  card.unmount();
+  expect(combosSignal?.aborted).toBe(true);
+});
+
+test('asking for combos reads them, even when the shared list was read a moment ago (#302)', async () => {
+  const renamed = { ...combo, name: '저녁 세트' };
+  let answer = combo;
+  stubFetch((url) =>
+    Promise.resolve(
+      new Response(JSON.stringify(url === '/api/combos' ? { combos: [answer] } : emptyDay)),
+    ),
+  );
+  const first = renderWithQuery(<MealCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Choose from combos' }));
+  expect(await screen.findByRole('button', { name: 'Record 점심 세트' })).toBeInTheDocument();
+  first.unmount();
+
+  // The combos page saved a new name; the cached list is still under 30 seconds old.
+  answer = renamed;
+  renderWithQuery(<MealCard date={date} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Choose from combos' }));
+  expect(await screen.findByRole('button', { name: 'Record 저녁 세트' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Record 점심 세트' })).not.toBeInTheDocument();
+});

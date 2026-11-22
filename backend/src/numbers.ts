@@ -2,7 +2,7 @@
 export const optionalNumber = (value: string | null) => (value === null ? null : Number(value));
 
 /** `row` with the named NUMERIC columns as numbers; a column that can be NULL stays nullable. */
-export type WithNumbers<T, K extends keyof T> = {
+type WithNumbers<T, K extends keyof T> = {
   [P in keyof T]: P extends K ? (null extends T[P] ? number | null : number) : T[P];
 };
 

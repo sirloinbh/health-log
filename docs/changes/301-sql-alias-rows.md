@@ -30,6 +30,11 @@ The NUMERIC rule stays as it is: `standard/db.ts` keeps NUMERIC (type 1700) as a
 - Before the fixture update, `sleep.test.ts` failed (`undefined !== 480`), which showed the fake row still in column names.
 - `TEST_DATABASE_URL= npm run check`: passed. Backend: 295 tests, 158 passed, 0 failed, 137 skipped (the DB tests, which ran in the throwaway run above; CI runs them too). Frontend: 76 files, 786 passed, 3 skipped. Format, lint, contract, typecheck, skill tests and build passed. (The throwaway run with a database counted 300 tests, this one 295.)
 
+## Fix – knip unused export (2026-11-22)
+
+- CI `verify` failed in `npm run knip` (not part of `npm run check`): "Unused exported types (1) WithNumbers backend/src/numbers.ts". The type is only used inside `numbers.ts`, so it is no longer exported.
+- `npm run knip` (with `TEST_DATABASE_URL` set to the throwaway DB, which `playwright.config.ts` needs to load): exit 0; only the three configuration hints that main already prints remain.
+
 ## Limits and follow-up
 
 - Food and meal routes (`foods.ts`, `meals.ts`, `combos.ts`, `habits.ts`, `report.ts`) are the next PR under the same issue.

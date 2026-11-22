@@ -201,7 +201,8 @@ test(
         '롯데리아 리아 불고기 192/g/462/11/21/880',
         '맘스터치 싸이버거 230/g/594/14/28/1009',
         '맥도날드 빅맥 223/g/582/8/27/902',
-        '맥도날드 코카 콜라 미디엄 425/ml/133/33/0/9',
+        // 013 wrote 'ml'; 020 writes it 'mL' like the rest of the data (#199).
+        '맥도날드 코카 콜라 미디엄 425/mL/133/33/0/9',
         '버거킹 와퍼 286/g/706/10/30/1098',
       ],
     );
@@ -270,6 +271,48 @@ test('popular foods can be found by the words people search for', { skip }, asyn
       assert.ok(names.includes(name), `${q}: ${names.join(', ')}`);
     }
   });
+});
+
+// #199: each seeded food keeps the unit its source gives, milliliters are written one way, and the
+// three solid foods the source listed in mL are in grams, with their numbers unchanged.
+test('seeded serving units are corrected once and a rerun changes nothing', { skip }, async () => {
+  const unitOf = async (name: string, brand: string | null) => {
+    const { rows } = await pool.query<{ unit: string; size: string }>(
+      `SELECT serving_unit AS unit, serving_size::text AS size FROM foods
+       WHERE name = $1 AND brand IS NOT DISTINCT FROM $2`,
+      [name, brand],
+    );
+    assert.equal(rows.length, 1, name);
+    return `${Number(rows[0].size)}${rows[0].unit}`;
+  };
+  assert.equal(await unitOf('탕수육', null), '343g');
+  assert.equal(await unitOf('오징어튀김', null), '77g');
+  assert.equal(await unitOf('토스트(식빵)', null), '230.3g');
+  // Drinks stay as their sources give them: MFDS per 100 g, McDonald's in milliliters.
+  assert.equal(await unitOf('콜라', null), '100g');
+  assert.equal(await unitOf('아메리카노', null), '532mL');
+  assert.equal(await unitOf('코카 콜라 미디엄', '맥도날드'), '425mL');
+  // Only researched rows: other test files add typed-in foods with their own units at the same time.
+  const { rows } = await pool.query<{ lower: number; mcdonalds: number }>(
+    `SELECT count(*) FILTER (WHERE serving_unit = 'ml') AS lower,
+            count(*) FILTER (WHERE brand = '맥도날드' AND serving_unit = 'mL') AS mcdonalds
+     FROM foods WHERE source_type IN ('official', 'public')`,
+  );
+  // No researched row is left with a lowercase 'ml', and all 10 McDonald's drinks are 'mL'.
+  assert.deepEqual(
+    { lower: Number(rows[0].lower), mcdonalds: Number(rows[0].mcdonalds) },
+    { lower: 0, mcdonalds: 10 },
+  );
+
+  const migration = readFileSync(
+    new URL('../../database/migrations/020_foods_serving_units.sql', import.meta.url),
+    'utf8',
+  );
+  const results = (await pool.query(migration)) as unknown as { rowCount: number }[];
+  assert.deepEqual(
+    results.map((result) => result.rowCount),
+    [0, 0],
+  );
 });
 
 test('the documented example runs as written and repeats safely', { skip }, async (t) => {

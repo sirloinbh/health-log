@@ -37,3 +37,8 @@ Tests:
 - Backend and frontend `tsc`: passed. `node --import tsx --test test/contract.test.ts test/text.test.ts`: 10 passed. `vitest run` on the report, check-text, number-input and nutrition-label tests: 93 passed.
 - `npm run check` (foreground, under the lanes' shared check lock) with `TEST_DATABASE_URL` on a temporary PostgreSQL 17 `health_test`: passed. Backend 290 passed, 0 skipped (DB integration tests ran); frontend 731 passed, 3 skipped (existing skips); contract 3, skills 4 passed; format, lint, typecheck and build passed. The run before it had one failure in `frontend/src/lib/query.test.tsx` ("leaving the screen aborts the request"), a file this PR does not touch; it passed twice when run alone and in this full run.
 - No browser check: no screen looks different. The period buttons get the same dates from the same function, and the report screen tests cover them.
+
+## Change — 2026-11-22 (main merged in)
+
+- After #264 (#196) merged, `origin/main` was merged into this branch without conflicts. No local copy came back (the same `rg` finds only the contract), and `npm run contract:check` matches.
+- `npm run check` (foreground, under the shared check lock, `TEST_DATABASE_URL` on the temporary `health_test`): passed. Backend 298 passed, 0 skipped; frontend 764 passed, 3 skipped; contract 3, skills 4 passed; format, lint, typecheck and build passed.

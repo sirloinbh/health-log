@@ -34,3 +34,7 @@ The screens that #220 left reading with their own load functions and stale-answe
 - `vitest run` on medications, visits, daily and reminders tests: 82 passed.
 - Full `npm run check` with `TEST_DATABASE_URL` empty, under the shared check lock: passed (exit 0). Frontend: 76 files, 781 passed, 3 skipped; the backend's database tests are skipped without a test database, as intended.
 - No browser check: the markup is unchanged, and the screen tests cover the behavior.
+
+### Review round 1 (clinic lists PR)
+
+- Checked whether the daily card could keep a cached day after a save that lands once the clinic page is gone (the card no longer reads on every mount). It cannot: the dialog's submit keeps running after the page unmounts, as `mutateAsync` still resolves, so its `onSaved` reload invalidates the day. New guard test "a visit save that lands after leaving the clinic page still refreshes the daily card (#282)"; visits and medications tests: 42 passed.

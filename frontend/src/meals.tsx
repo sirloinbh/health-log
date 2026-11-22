@@ -2,6 +2,7 @@ import { Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { AddEntry } from './add-entry';
+import { calorieText } from './calorie-text';
 import { fullName } from './combo-text';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
@@ -114,8 +115,7 @@ function EntryRow({
           {entry.isJunk ? <JunkBadge /> : null}
         </span>
         <span className="text-caption text-muted-foreground">
-          {entry.servings} servings{serving} ·{' '}
-          {entry.calories === null ? 'No calorie value' : `${entry.calories}kcal`}
+          {entry.servings} servings{serving} · {calorieText(entry.calories)}
         </span>
       </div>
       <ConfirmDialog

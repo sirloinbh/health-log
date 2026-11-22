@@ -108,6 +108,21 @@ test('a combo shows its foods and says when a calorie is unknown', async () => {
   expect(within(card).getByText('삶은 달걀 · 2 servings · No calorie value')).toBeInTheDocument();
 });
 
+// #271: a food row is rounded and grouped like the combo total under it.
+test('a combo food row shows its calories rounded, like the total', async () => {
+  const fractional: Combo = {
+    ...breakfast,
+    items: [{ ...breakfast.items[0], servings: 1.5, calories: 618.75 }],
+    calories: { value: 618.75, missing: 0 },
+  };
+  serve(() => json({ combos: [fractional] }));
+  open();
+  const heading = await screen.findByRole('heading', { level: 2, name: '아침 세트' });
+  const card = heading.closest<HTMLElement>('[data-slot=card]')!;
+  expect(within(card).getByText(/^샘플 햇반 · 1\.5 servings? · 619kcal$/)).toBeInTheDocument();
+  expect(within(card).queryByText(/618\.75/)).not.toBeInTheDocument();
+});
+
 test('a combo whose foods are all gone says how to fix it', async () => {
   serve(() =>
     json({ combos: [{ ...breakfast, items: [], calories: { value: null, missing: 0 } }] }),

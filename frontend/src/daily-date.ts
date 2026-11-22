@@ -35,6 +35,18 @@ export const inDailyRange = (value: string) => value >= earliestDate && value <=
 
 export const dailyRangeText = `Records can be kept from ${earliestDate} to ${latestDate}`;
 
+/**
+ * Today in the service time zone by this device's clock. The server's today is preferred; this is
+ * for when it cannot be asked (a label read now, a start date while the server is unreachable).
+ */
+export const serviceToday = () =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+
 const monthNames = [
   'Jan',
   'Feb',

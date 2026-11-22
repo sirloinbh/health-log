@@ -249,3 +249,38 @@ test('the previous period is summed the same way as the current one', { skip }, 
     assert.deepEqual(previous.sleepGood, { days: 1, yes: 0 });
   });
 });
+
+// #195: the summary and the chart read their days from one SQL piece, so they cannot disagree.
+test(
+  'the calorie average is the mean of the chart days, and the drinking days match too',
+  { skip },
+  async (t) => {
+    t.after(clean);
+    // The week of Monday 1979-05-07.
+    await meal('1979-05-07', 200, 1.5);
+    await meal('1979-05-07', 123.45, 2);
+    await meal('1979-05-08', 333.33, 3);
+    // An unknown entry leaves the day out of both the average and the chart.
+    await meal('1979-05-09', 500);
+    await meal('1979-05-09', null);
+    // A known zero is a day, not a gap.
+    await meal('1979-05-11', 0);
+    await habit('1979-05-07', null, 2);
+    await habit('1979-05-08', null, 0);
+    await habit('1979-05-11', null, 1);
+
+    await withApi(pool, async (call) => {
+      const { current, days } = await report(call, 'week', '1979-05-07');
+      const charted = days.flatMap((day) => (day.calories === null ? [] : [day.calories]));
+      assert.deepEqual(charted, [547, 1000, 0]);
+      assert.equal(current.calories.days, charted.length);
+      assert.equal(current.calories.incompleteDays, 1);
+      const mean = charted.reduce((sum, value) => sum + value, 0) / charted.length;
+      assert.equal(current.calories.average, Math.round(mean));
+      assert.equal(current.calories.average, 516);
+
+      assert.equal(current.drinking.drinkingDays, days.filter((day) => day.drank).length);
+      assert.equal(current.drinking.days, days.filter((day) => day.drank !== null).length);
+    });
+  },
+);

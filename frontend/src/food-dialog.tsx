@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from './components/ui/select';
+import { serviceToday } from './daily-date';
 import {
   bodyOf,
   emptyForm,
@@ -36,15 +37,6 @@ import { requestJson } from './lib/api';
 import { useNotice } from './lib/use-notice';
 import { unreadableAmount } from './number-input';
 import { isCoupangUrl, readNutritionLabel } from './nutrition-label';
-
-// The checked date of a label read now, as a day in the service time zone.
-const serviceToday = () =>
-  new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
 
 type Change = (key: keyof Form) => (event: { target: { value: string } }) => void;
 type Assign = (change: Partial<Form>) => void;

@@ -114,7 +114,7 @@ test('a new medicine starts today, can be linked to a visit, and is sent as type
     init?.method === 'POST' ? json(prescribed, 201) : json(lists({ current: [] })),
   );
   open();
-  fireEvent.click(await screen.findByRole('button', { name: 'Medication record' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Add medication' }));
   expect(within(dialog()).getByLabelText('Start date')).toHaveValue('2026-03-15');
   fill('Medication name', '가상정');
   fill('Dose', '500mg');
@@ -135,6 +135,76 @@ test('a new medicine starts today, can be linked to a visit, and is sent as type
     note: '',
     visitId: 7,
   });
+});
+
+// #204: a new medicine never opens on a blank start date.
+// For the tests about waiting for the server's date: the app asks for it as it does when it opens.
+const openAsking = (path = '/medications') => {
+  window.history.replaceState(null, '', path);
+  render(<App />);
+};
+
+test('adding waits for the server’s today, then starts on it', async () => {
+  let answerToday: (response: Response) => void = () => undefined;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) =>
+      url.startsWith('/api/medications')
+        ? Promise.resolve(json(lists()))
+        : url.startsWith('/api/visits')
+          ? Promise.resolve(json({ visits: [visit], more: false }))
+          : new Promise<Response>((resolve) => {
+              answerToday = resolve;
+            }),
+    ),
+  );
+  openAsking();
+  const add = await screen.findByRole('button', { name: 'Add medication' });
+  await screen.findByRole('region', { name: 'Taking now 1' });
+  expect(add).toHaveAttribute('aria-disabled', 'true');
+  expect(add).toHaveAccessibleDescription("Checking today's date…");
+  add.focus();
+  fireEvent.click(add);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(add).toHaveFocus();
+
+  answerToday(json({ today: '2026-03-15' }));
+  await waitFor(() => expect(add).not.toHaveAttribute('aria-disabled'));
+  fireEvent.click(add);
+  expect(await screen.findByRole('dialog', { name: 'Add medication' })).toBeInTheDocument();
+  expect(within(dialog()).getByLabelText('Start date')).toHaveValue('2026-03-15');
+  expect(within(dialog()).getByLabelText('Start date')).not.toHaveAccessibleDescription();
+});
+
+test('when the server cannot say today, a new medicine starts on this device’s today and says so', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  // 2026-03-15 23:30 in UTC is already 2026-03-16 in the service time zone.
+  vi.setSystemTime(new Date('2026-03-15T23:30:00Z'));
+  try {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        Promise.resolve(
+          url.startsWith('/api/medications')
+            ? json(lists())
+            : url.startsWith('/api/visits')
+              ? json({ visits: [visit], more: false })
+              : json({ error: 'Database unavailable' }, 503),
+        ),
+      ),
+    );
+    openAsking();
+    const add = await screen.findByRole('button', { name: 'Add medication' });
+    await waitFor(() => expect(add).not.toHaveAttribute('aria-disabled'));
+    fireEvent.click(add);
+    const start = within(await screen.findByRole('dialog')).getByLabelText('Start date');
+    expect(start).toHaveValue('2026-03-16');
+    expect(start).toHaveAccessibleDescription(
+      "The server's date could not be checked, so this is today on this device. Check it before saving.",
+    );
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test('editing starts from the medicine, and taking the link off sends no visit', async () => {
@@ -158,7 +228,7 @@ test('editing starts from the medicine, and taking the link off sends no visit',
 test('what cannot be sent is explained before anything is sent', async () => {
   const fetchMock = serve(() => json(lists()));
   open();
-  fireEvent.click(await screen.findByRole('button', { name: 'Medication record' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Add medication' }));
   const save = () => fireEvent.click(within(dialog()).getByRole('button', { name: 'Save' }));
   const said = async (text: string) =>
     expect(await within(dialog()).findByRole('alert')).toHaveTextContent(text);
@@ -182,7 +252,7 @@ test('what cannot be sent is explained before anything is sent', async () => {
 test('a visit’s link opens a medicine linked to it, starting on its day', async () => {
   serve(() => json(lists()));
   open('/medications?visit=7&date=2026-03-10');
-  expect(await screen.findByRole('dialog', { name: 'Medication record' })).toBeInTheDocument();
+  expect(await screen.findByRole('dialog', { name: 'Add medication' })).toBeInTheDocument();
   expect(within(dialog()).getByLabelText('Start date')).toHaveValue('2026-03-10');
   await waitFor(() =>
     expect(within(dialog()).getByLabelText('Prescribing clinic visit')).toHaveValue('7'),
@@ -220,7 +290,7 @@ test('a failed save keeps the dialog, what was typed and the focus inside it', a
       : json(lists()),
   );
   open();
-  fireEvent.click(await screen.findByRole('button', { name: 'Medication record' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Add medication' }));
   fill('Medication name', '가상정');
   const save = within(dialog()).getByRole('button', { name: 'Save' });
   save.focus();
@@ -287,7 +357,7 @@ test('a linked visit older than the recent ones is still offered, and an unknown
   // A link without a date names the visit without inventing one.
   window.history.pushState(null, '', '/medications?visit=99');
   window.dispatchEvent(new PopStateEvent('popstate'));
-  const linked = await screen.findByRole('dialog', { name: 'Medication record' });
+  const linked = await screen.findByRole('dialog', { name: 'Add medication' });
   await waitFor(() =>
     expect(within(linked).getByLabelText('Prescribing clinic visit')).toHaveValue('99'),
   );
@@ -397,7 +467,7 @@ test('trying again also asks again for the visits a medicine can be linked to (#
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
   expect(getLive('status')).toHaveTextContent('Reloading the list…');
   await screen.findByRole('region', { name: 'Taking now 1' });
-  fireEvent.click(screen.getByRole('button', { name: 'Medication record' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add medication' }));
   const choices = within(dialog()).getByLabelText('Prescribing clinic visit');
   await waitFor(() => expect(within(choices).getAllByRole('option')).toHaveLength(2));
   expect(

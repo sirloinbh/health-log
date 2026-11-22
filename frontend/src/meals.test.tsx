@@ -1254,7 +1254,7 @@ test('junk food entries are marked, with the week and month counts below the tot
     'This week Mar 9 – Mar 15: 3 times · 2 days · 1,850kcal',
   );
   expect(within(summary).getByText(/This month/)).toHaveTextContent(
-    'This month Mar 1 – Mar 31: 4 times · 3 days · 2,100kcal (excludes 1 record with unknown calories)',
+    'This month Mar 1 – Mar 31: 4 times · 3 days · 2,100kcal or more (excludes 1 record with unknown calories)',
   );
   const lunch = screen.getByRole('region', { name: 'Lunch' });
   const items = within(lunch).getAllByRole('listitem');

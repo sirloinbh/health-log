@@ -72,10 +72,17 @@ const serve = (medications: Handler) => {
   return fetchMock;
 };
 
-// The page already knows the server's date, so pressing a button at once fills it in.
+// The page with the server's date already known, as the other pages want it.
 const open = (path = '/medications') => {
   window.history.replaceState(null, '', path);
   render(<App queryClient={testQueryClient({ today: '2026-03-15' })} />);
+};
+
+// A new medicine starts on this device's today in the service time zone (#204, #306). The clock is
+// fixed so the date does not depend on when or where the test runs; the setup puts it back after.
+const clockAt = (instant: string) => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(instant));
 };
 
 const writes = (fetchMock: ReturnType<typeof serve>) =>
@@ -110,6 +117,7 @@ test('the main menu opens the medicine page, split into taken now and finished',
 });
 
 test('a new medicine starts today, can be linked to a visit, and is sent as typed', async () => {
+  clockAt('2026-03-15T03:00:00Z');
   const fetchMock = serve((_url, init) =>
     init?.method === 'POST' ? json(prescribed, 201) : json(lists({ current: [] })),
   );
@@ -137,15 +145,9 @@ test('a new medicine starts today, can be linked to a visit, and is sent as type
   });
 });
 
-// #204: a new medicine never opens on a blank start date.
-// For the tests about waiting for the server's date: the app asks for it as it does when it opens.
-const openAsking = (path = '/medications') => {
-  window.history.replaceState(null, '', path);
-  render(<App />);
-};
-
-test('adding waits for the server’s today, then starts on it', async () => {
-  let answerToday: (response: Response) => void = () => undefined;
+test('adding opens at once on this device’s today in Asia/Seoul, without waiting for the server', async () => {
+  // 2026-03-15 23:30 in UTC is already 2026-03-16 in the service time zone.
+  clockAt('2026-03-15T23:30:00Z');
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) =>
@@ -153,58 +155,24 @@ test('adding waits for the server’s today, then starts on it', async () => {
         ? Promise.resolve(json(lists()))
         : url.startsWith('/api/visits')
           ? Promise.resolve(json({ visits: [visit], more: false }))
-          : new Promise<Response>((resolve) => {
-              answerToday = resolve;
-            }),
+          : // The server's date never arrives.
+            new Promise<Response>(() => undefined),
     ),
   );
-  openAsking();
+  window.history.replaceState(null, '', '/medications');
+  render(<App />);
   const add = await screen.findByRole('button', { name: 'Add medication' });
-  await screen.findByRole('region', { name: 'Taking now 1' });
-  expect(add).toHaveAttribute('aria-disabled', 'true');
-  expect(add).toHaveAccessibleDescription("Checking today's date…");
-  add.focus();
+  expect(add).not.toHaveAttribute('aria-disabled');
+  expect(add).not.toHaveAccessibleDescription();
   fireEvent.click(add);
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  expect(add).toHaveFocus();
-
-  answerToday(json({ today: '2026-03-15' }));
-  await waitFor(() => expect(add).not.toHaveAttribute('aria-disabled'));
-  fireEvent.click(add);
-  expect(await screen.findByRole('dialog', { name: 'Add medication' })).toBeInTheDocument();
-  expect(within(dialog()).getByLabelText('Start date')).toHaveValue('2026-03-15');
-  expect(within(dialog()).getByLabelText('Start date')).not.toHaveAccessibleDescription();
-});
-
-test('when the server cannot say today, a new medicine starts on this device’s today and says so', async () => {
-  vi.useFakeTimers({ toFake: ['Date'] });
-  // 2026-03-15 23:30 in UTC is already 2026-03-16 in the service time zone.
-  vi.setSystemTime(new Date('2026-03-15T23:30:00Z'));
-  try {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) =>
-        Promise.resolve(
-          url.startsWith('/api/medications')
-            ? json(lists())
-            : url.startsWith('/api/visits')
-              ? json({ visits: [visit], more: false })
-              : json({ error: 'Database unavailable' }, 503),
-        ),
-      ),
-    );
-    openAsking();
-    const add = await screen.findByRole('button', { name: 'Add medication' });
-    await waitFor(() => expect(add).not.toHaveAttribute('aria-disabled'));
-    fireEvent.click(add);
-    const start = within(await screen.findByRole('dialog')).getByLabelText('Start date');
-    expect(start).toHaveValue('2026-03-16');
-    expect(start).toHaveAccessibleDescription(
-      "The server's date could not be checked, so this is today on this device. Check it before saving.",
-    );
-  } finally {
-    vi.useRealTimers();
-  }
+  const start = within(
+    await screen.findByRole('dialog', { name: 'Add medication' }),
+  ).getByLabelText('Start date');
+  expect(start).toHaveValue('2026-03-16');
+  // No note about where the date came from, and it can still be changed.
+  expect(start).not.toHaveAccessibleDescription();
+  fill('Start date', '2026-03-14');
+  expect(start).toHaveValue('2026-03-14');
 });
 
 test('editing starts from the medicine, and taking the link off sends no visit', async () => {
@@ -339,6 +307,7 @@ test('a day without medicines says so', async () => {
 });
 
 test('a linked visit older than the recent ones is still offered, and an unknown one is named plainly', async () => {
+  clockAt('2026-03-15T03:00:00Z');
   const older: Medication = {
     ...prescribed,
     id: 5,

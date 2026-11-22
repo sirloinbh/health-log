@@ -37,7 +37,8 @@ export const dailyRangeText = `Records can be kept from ${earliestDate} to ${lat
 
 /**
  * Today in the service time zone by this device's clock. The server's today is preferred; this is
- * for when it cannot be asked (a label read now, a start date while the server is unreachable).
+ * for when it cannot be asked (a label read now, a start date while the server is unreachable), and
+ * for a new medicine's start date, which never waits for the server (#306).
  */
 export const serviceToday = () =>
   new Intl.DateTimeFormat('en-CA', {

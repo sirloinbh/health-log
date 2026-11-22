@@ -35,6 +35,11 @@ Tests:
 - nit, fixed: the combo test matched "1.5 servings?" with a pattern because it was written before #207 (`count()`) reached main. It now expects the exact text "샘플 햇반 · 1.5 servings · 619kcal". `vitest run src/combos.test.tsx`: 29 passed.
 - No other findings: the four inline null-or-kcal choices are gone (`rg "calories === null ? 'No calorie value'"` finds none outside tests), and the API values are unchanged.
 
+## Change — 2026-11-22 (main merged in after #276)
+
+- `origin/main` (#273, #276, #278) was merged in without textual conflicts. #276 moved the meal card to React Query, so `MealCard` now needs the query client: the two new meal tests used plain `render` and failed with "render is not defined". They now use `renderWithQuery`, like the other meal tests. The four `calorieText` call sites survived the merge, and no new raw `…kcal` site appeared.
+- `npm run check` (foreground, under the shared check lock, `TEST_DATABASE_URL` on the temporary `health_test`): passed. Backend 298 passed, 0 skipped; frontend 780 passed, 3 skipped; contract 3, skills 4 passed; format, lint, typecheck and build passed.
+
 ## Follow-up
 
 - The browser check showed one more place outside this issue's three files: the daily goal row reads "1,234.5kcal" (`goal-text.ts` keeps two decimals). Filed as #279 under #189.

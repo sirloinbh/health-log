@@ -93,3 +93,8 @@ The hand-written polling hook `useHealth` in `app.tsx` (an interval, a visibilit
 - `src/test/query.tsx` adds `write(path, answer)`: a write through the test's query client, as a card's `useApiMutation` with `asRequest` makes it. `goals.test.tsx` uses it instead of `trackWrite` and renders through `renderWithQuery`.
 - New: "saving in a real card of the same day judges again" renders `GoalsCard` and `SleepCard` in one client and checks that the sleep save reads the verdicts again.
 - `vitest run src/goals.test.tsx src/save-focus.test.tsx src/app.test.tsx`: all passed (24 goals tests).
+
+### Verification (meals and goals PR)
+
+- The full `npm run check` was not run locally for this PR: the PC ran critically low on memory while several lanes shared it, and the wait for the shared check lock was stopped. Following the coordinator's rule for that case, after merging `origin/main`: `prettier --check` and `eslint --max-warnings 0` on every changed file, `tsc --noEmit` for the frontend, and `vitest run` on meals, goals, save-focus and daily tests (131 passed). CI runs the full check, the backend tests, and the build.
+- `onWriteSettled` in `pending-writes.ts` has no caller now (only its own test); it goes with the module in the last #220 PR.

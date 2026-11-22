@@ -27,3 +27,7 @@ The goal results card on the daily page built its calorie text with `actualText`
 
 - Found while checking the other calorie texts: the meal card's daily totals (`frontend/src/meals.tsx:61`) still print the calorie total unrounded ("1234.5kcal"). That file is in PR #280's area, so it is filed as #281 under #189 instead of changed here.
 - No browser check at 390×844 and 1440×900: running the app locally needs the `health` database, which this worktree does not have. The visible change is the number format of one text line, covered by the screen test.
+
+## Merge of origin/main
+
+- Merged `origin/main` after the commit (it brought #276, React Query for meals and goals, which changed `goals.tsx` and `goals.test.tsx`); no conflict. `vitest run src/goal-text.test.ts src/goals.test.tsx`: 34 passed. CI runs the full check on the merged head.

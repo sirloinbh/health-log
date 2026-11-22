@@ -28,3 +28,6 @@
 - `npm test -w frontend`: 77 files, 780 passed, 3 skipped.
 
 ### Commands
+
+- `TEST_DATABASE_URL= npm run check` (under the shared check lock): passed (frontend 780 passed, 3 skipped; backend 156 passed, 137 DB tests skipped locally because `TEST_DATABASE_URL` was emptied; CI runs them).
+- lint, typecheck, prettier and `E2E_DATABASE_URL=<temporary local DB> npm run knip`: passed.

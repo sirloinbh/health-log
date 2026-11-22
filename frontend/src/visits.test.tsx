@@ -8,6 +8,7 @@ import { nextTask } from './test/answered';
 import { renderWithQuery, testQueryClient, write } from './test/query';
 import { VisitsCard } from './visit-card';
 import type { Visit } from './visit-text';
+import { VisitsPage } from './visits';
 
 // Made-up values only: no real visit belongs in tests.
 const visit: Visit = {
@@ -511,4 +512,58 @@ test('a daily link without a usable date still opens when the server cannot say 
   openAsking('/visits?new=garbage');
   expect(await screen.findByRole('dialog', { name: 'Record clinic visit' })).toBeInTheDocument();
   expect(within(dialog()).getByLabelText('Visit date')).toHaveValue('');
+});
+
+test('a visit saved on the clinic page reads the daily card again (#282)', async () => {
+  const fetchMock = serve((url, init) =>
+    init?.method === 'PUT' ? json(visit) : json({ visits: [visit], more: false }),
+  );
+  const dayReads = () =>
+    fetchMock.mock.calls.filter(([url]) => url === '/api/visits?date=2026-03-10').length;
+  renderWithQuery(
+    <MemoryRouter>
+      <VisitsCard date="2026-03-10" />
+      <VisitsPage today="2026-03-15" />
+    </MemoryRouter>,
+  );
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit 2026-03-10 가상피부과' }));
+  expect(dayReads()).toBe(1);
+  fireEvent.click(within(dialog()).getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(dayReads()).toBe(2));
+});
+
+test('a visit save that lands after leaving the clinic page still refreshes the daily card (#282)', async () => {
+  let finish: () => void = () => {};
+  const fetchMock = serve((url, init) =>
+    init?.method === 'PUT'
+      ? new Promise<Response>((resolve) => (finish = () => resolve(json(visit))))
+      : json({ visits: [visit], more: false }),
+  );
+  const dayReads = () =>
+    fetchMock.mock.calls.filter(([url]) => url === '/api/visits?date=2026-03-10').length;
+  const card = renderWithQuery(
+    <MemoryRouter>
+      <VisitsCard date="2026-03-10" />
+    </MemoryRouter>,
+  );
+  await screen.findByRole('list', { name: 'Clinic visits on this day' });
+  card.unmount();
+  const page = renderWithQuery(
+    <MemoryRouter>
+      <VisitsPage today="2026-03-15" />
+    </MemoryRouter>,
+  );
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit 2026-03-10 가상피부과' }));
+  fireEvent.click(within(dialog()).getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(writes(fetchMock)).toHaveLength(1));
+  // Back to the day while the save is on its way: the page and its dialog are gone.
+  page.unmount();
+  finish();
+  renderWithQuery(
+    <MemoryRouter>
+      <VisitsCard date="2026-03-10" />
+    </MemoryRouter>,
+  );
+  // The day was read under half a minute ago, but the save changed it.
+  await waitFor(() => expect(dayReads()).toBe(2));
 });

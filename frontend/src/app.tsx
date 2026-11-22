@@ -144,7 +144,7 @@ function Routed() {
             <Route path={pages.foods} element={<FoodsPage />} />
             <Route path={pages.combos} element={<CombosPage />} />
             <Route path={pages.visits} element={<VisitsPage today={pageToday} />} />
-            <Route path={pages.medications} element={<MedicationsPage today={pageToday} />} />
+            <Route path={pages.medications} element={<MedicationsPage />} />
             <Route
               path={pages.settings}
               element={

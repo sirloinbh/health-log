@@ -110,12 +110,8 @@ function Field({ id, label, children }: { id: string; label: string; children: R
 const fieldClass =
   'w-full min-w-0 rounded-md border border-input bg-transparent px-3 text-base shadow-xs outline-none md:text-body-sm dark:bg-input/30 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50';
 
-/** Where a new medicine starts. `fromDevice`: the date is this device's, as the server could not say. */
-type Start = { date: string; visitId: string; visitDate?: string; fromDevice?: boolean };
-
-// The server's today, or this device's when the server could not say.
-const startDate = (today: string | null | undefined): Pick<Start, 'date' | 'fromDevice'> =>
-  today ? { date: today } : { date: serviceToday(), fromDevice: true };
+/** Where a new medicine starts. */
+type Start = { date: string; visitId: string; visitDate?: string };
 
 function MedicationDialog({
   item,
@@ -207,16 +203,9 @@ function MedicationDialog({
                 type="date"
                 min={earliestDate}
                 max={latestDate}
-                aria-describedby={!item && start.fromDevice ? 'med-start-note' : undefined}
                 value={draft.startOn}
                 onChange={set('startOn')}
               />
-              {!item && start.fromDevice ? (
-                <p id="med-start-note" className="text-caption text-muted-foreground">
-                  The server's date could not be checked, so this is today on this device. Check it
-                  before saving.
-                </p>
-              ) : null}
             </Field>
             <Field id="med-end" label="End date">
               <Input
@@ -341,8 +330,11 @@ const sections = [
   { key: 'past', title: 'Past medication', empty: 'No finished medication.' },
 ] as const;
 
-/** `today` is undefined while the server is still being asked, and null if it could not say. */
-export function MedicationsPage({ today }: { today: string | null | undefined }) {
+/**
+ * A new medicine starts on today in the service time zone by this device's clock, so adding never
+ * waits for the server (user decision on #204, #306). The date stays editable.
+ */
+export function MedicationsPage() {
   const remover = useApiMutation<unknown, ApiRequest>(asRequest);
   const [params, setParams] = useSearchParams();
   const client = useQueryClient();
@@ -396,25 +388,20 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
   useEffect(() => {
     if (askedVisit === null) return;
     const inRange = askedDate !== null && isValidDate(askedDate) && inDailyRange(askedDate);
-    // Without a usable date, wait for the server's today; if it cannot say, open anyway.
-    if (!inRange && today === undefined) return;
     setParams({}, { replace: true });
     setEditing({
       item: null,
       start: {
-        ...(inRange ? { date: askedDate } : startDate(today)),
+        date: inRange ? askedDate : serviceToday(),
         visitId: /^[1-9]\d*$/.test(askedVisit) ? askedVisit : '',
         visitDate: inRange ? askedDate : undefined,
       },
     });
-  }, [askedDate, askedVisit, setParams, today]);
+  }, [askedDate, askedVisit, setParams]);
 
-  // A new medicine starts on the server's today, so adding waits until it is known (#204).
-  const waitingForToday = today === undefined;
   const openDialog = (opener: HTMLElement, item: Medication | null) => {
-    if (!item && waitingForToday) return;
     remember(opener);
-    setEditing({ item, start: { ...startDate(today), visitId: '' } });
+    setEditing({ item, start: { date: serviceToday(), visitId: '' } });
   };
   const closeDialog = () => {
     setEditing(null);
@@ -465,22 +452,10 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
         </p>
       </header>
       <div>
-        <Button
-          // aria-disabled, not disabled: the button keeps focus while the date is on its way (#98).
-          aria-disabled={waitingForToday || undefined}
-          aria-describedby={waitingForToday ? 'med-add-wait' : undefined}
-          className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
-          onClick={(event) => openDialog(event.currentTarget, null)}
-        >
+        <Button onClick={(event) => openDialog(event.currentTarget, null)}>
           <Plus aria-hidden />
           Add medication
         </Button>
-        {/* Read out only: a line that shows for a moment on every visit would shift the lists. */}
-        {waitingForToday ? (
-          <span id="med-add-wait" className="sr-only">
-            Checking today's date…
-          </span>
-        ) : null}
       </div>
       <Notice notice={notice} />
       {notice?.kind === 'error' ? (

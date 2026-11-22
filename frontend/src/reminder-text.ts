@@ -32,14 +32,14 @@ export type Reminders = {
 /** Path every reminder write goes under, so a reload waits for it (#71). */
 export const remindersPath = '/api/reminders';
 
-/** "Today", "Tomorrow", "In 3 days", and "1 day ago" for a date already past (#207). */
+/** "Today", "Tomorrow", "In 3 days", and "Overdue by 1 day" for a date already past (#207, #306). */
 export const whenText = (daysLeft: number) =>
   daysLeft === 0
     ? 'Today'
     : daysLeft === 1
       ? 'Tomorrow'
       : daysLeft < 0
-        ? `${count(-daysLeft, 'day')} ago`
+        ? `Overdue by ${count(-daysLeft, 'day')}`
         : `In ${count(daysLeft, 'day')}`;
 
 /** "Sample Clinic · Dermatology appointment", "Sample tablet ends". */

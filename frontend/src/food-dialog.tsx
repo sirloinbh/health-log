@@ -1,3 +1,4 @@
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, type ReactNode, useState } from 'react';
 
 import { Button } from './components/ui/button';
@@ -33,13 +34,26 @@ import {
   type SourceType,
   unreadableField,
 } from './food-form';
-import { requestJson } from './lib/api';
+import { apiKey, type ApiRequest, useApiMutation } from './lib/query';
 import { useNotice } from './lib/use-notice';
 import { unreadableAmount } from './number-input';
 import { isCoupangUrl, readNutritionLabel } from './nutrition-label';
+import { asRequest } from './writes';
 
 type Change = (key: keyof Form) => (event: { target: { value: string } }) => void;
 type Assign = (change: Partial<Form>) => void;
+
+/**
+ * A food's name, brand or values show in the meal cards, the combos and the recent foods, which read
+ * through React Query; they read again the next time they are shown (#282).
+ */
+function foodChanged(client: QueryClient) {
+  void client.invalidateQueries({
+    predicate: ({ queryKey: [path] }) => typeof path === 'string' && path.startsWith('/api/meals/'),
+  });
+  void client.invalidateQueries({ queryKey: apiKey('/api/combos') });
+  void client.invalidateQueries({ queryKey: apiKey('/api/foods/recent') });
+}
 
 function Field({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
@@ -51,7 +65,15 @@ function Field({ id, label, children }: { id: string; label: string; children: R
 }
 
 /** The pasted table, the button that reads it, and what the reading did. */
-function LabelReader({ form, onFill }: { form: Form; onFill: (form: Form) => void }) {
+function LabelReader({
+  form,
+  locked,
+  onFill,
+}: {
+  form: Form;
+  locked: boolean;
+  onFill: (form: Form) => void;
+}) {
   const [pasted, setPasted] = useState('');
   // `reads` counts presses: a new key remounts the message, so the same result is read out again.
   const [filled, setFilled] = useState<{
@@ -73,6 +95,7 @@ function LabelReader({ form, onFill }: { form: Form; onFill: (form: Form) => voi
         id="food-label-text"
         aria-describedby="food-label-text-help"
         rows={4}
+        readOnly={locked}
         value={pasted}
         onChange={(event) => {
           setPasted(event.target.value);
@@ -86,7 +109,14 @@ function LabelReader({ form, onFill }: { form: Form; onFill: (form: Form) => voi
         Copy the nutrition table text (in Korean, as on the product page) and paste it to fill the
         fields below. The app does not open the product page.
       </p>
-      <Button type="button" variant="outline" size="sm" className="self-start" onClick={fill}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="self-start"
+        disabled={locked}
+        onClick={fill}
+      >
         Read the table and fill in
       </Button>
       {filled ? (
@@ -105,30 +135,41 @@ function LabelReader({ form, onFill }: { form: Form; onFill: (form: Form) => voi
 }
 
 /** Name, brand, category, serving and the nutrition values. */
-function FoodFields({ form, update }: { form: Form; update: Change }) {
+function FoodFields({ form, locked, update }: { form: Form; locked: boolean; update: Change }) {
   return (
     <>
       <Field id="food-name" label="Food name">
-        <Input id="food-name" value={form.name} onChange={update('name')} />
+        <Input id="food-name" readOnly={locked} value={form.name} onChange={update('name')} />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field id="food-brand" label="Brand">
-          <Input id="food-brand" value={form.brand} onChange={update('brand')} />
+          <Input id="food-brand" readOnly={locked} value={form.brand} onChange={update('brand')} />
         </Field>
         <Field id="food-category" label="Category">
-          <Input id="food-category" value={form.category} onChange={update('category')} />
+          <Input
+            id="food-category"
+            readOnly={locked}
+            value={form.category}
+            onChange={update('category')}
+          />
         </Field>
         <Field id="food-serving-size" label="Serving size">
           <Input
             id="food-serving-size"
             inputMode="decimal"
             autoComplete="off"
+            readOnly={locked}
             value={form.servingSize}
             onChange={update('servingSize')}
           />
         </Field>
         <Field id="food-serving-unit" label="Unit">
-          <Input id="food-serving-unit" value={form.servingUnit} onChange={update('servingUnit')} />
+          <Input
+            id="food-serving-unit"
+            readOnly={locked}
+            value={form.servingUnit}
+            onChange={update('servingUnit')}
+          />
         </Field>
         {nutrients.map(({ key, label, unit }) => (
           <Field key={key} id={`food-${key}`} label={`${label} (${unit})`}>
@@ -136,6 +177,7 @@ function FoodFields({ form, update }: { form: Form; update: Change }) {
               id={`food-${key}`}
               inputMode="decimal"
               autoComplete="off"
+              readOnly={locked}
               value={form[key]}
               onChange={update(key)}
             />
@@ -147,11 +189,22 @@ function FoodFields({ form, update }: { form: Form; update: Change }) {
 }
 
 /** Where the values came from, and the junk food mark. */
-function SourceFields({ form, update, set }: { form: Form; update: Change; set: Assign }) {
+function SourceFields({
+  form,
+  locked,
+  update,
+  set,
+}: {
+  form: Form;
+  locked: boolean;
+  update: Change;
+  set: Assign;
+}) {
   return (
     <>
       <Field id="food-source-type" label="Source type">
         <Select
+          disabled={locked}
           value={form.sourceType}
           onValueChange={(value) => set({ sourceType: value as SourceType })}
         >
@@ -171,6 +224,7 @@ function SourceFields({ form, update, set }: { form: Form; update: Change; set: 
         <Input
           id="food-source-url"
           type="url"
+          readOnly={locked}
           aria-describedby={isCoupangUrl(form.sourceUrl) ? 'food-source-url-help' : undefined}
           value={form.sourceUrl}
           onChange={update('sourceUrl')}
@@ -188,6 +242,7 @@ function SourceFields({ form, update, set }: { form: Form; update: Change; set: 
         <Input
           id="food-checked-on"
           type="date"
+          readOnly={locked}
           value={form.checkedOn}
           onChange={update('checkedOn')}
         />
@@ -197,6 +252,7 @@ function SourceFields({ form, update, set }: { form: Form; update: Change; set: 
         <div className="flex items-center gap-2">
           <Checkbox
             id="food-is-junk"
+            disabled={locked}
             checked={form.isJunk}
             aria-describedby="food-is-junk-help"
             onCheckedChange={(checked) => set({ isJunk: checked === true })}
@@ -252,13 +308,20 @@ export function FoodDialog({
   onSaved: () => void;
 }) {
   const [form, setForm] = useState<Form>(food ? formOf(food) : emptyForm);
-  const [saving, setSaving] = useState(false);
+  const client = useQueryClient();
+  // The other screens' data is marked stale on every answer, even one that lands after the dialog
+  // is gone. Closing, and the page's own reload, run only for the latest save while the dialog is
+  // still there (#302).
+  const write = useApiMutation<Food, ApiRequest>(asRequest, {
+    onSuccess: () => foodChanged(client),
+  });
+  const saving = write.isPending;
   const { notice, error, clear } = useNotice();
   const update: Change = (key) => (event) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
   const set: Assign = (change) => setForm((current) => ({ ...current, ...change }));
 
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
+  const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     // The button stays pressable while saving, and Enter in a field submits too.
     if (saving) return;
@@ -270,17 +333,14 @@ export function FoodDialog({
     }
     // Cleared first, so the same failure twice is announced again.
     clear();
-    setSaving(true);
-    try {
-      await requestJson<Food>(food ? `/api/foods/${food.id}` : '/api/foods', {
+    write.mutate(
+      {
+        path: food ? `/api/foods/${food.id}` : '/api/foods',
         method: food ? 'PUT' : 'POST',
         body: bodyOf(form),
-      });
-      onSaved();
-    } catch (cause) {
-      error(cause);
-      setSaving(false);
-    }
+      },
+      { onSuccess: () => onSaved(), onError: (cause) => error(cause) },
+    );
   };
 
   return (
@@ -293,10 +353,11 @@ export function FoodDialog({
             Nutrition values are per serving. Leave unknown values blank.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={(event) => void submit(event)} noValidate className="flex flex-col gap-4">
-          <LabelReader form={form} onFill={setForm} />
-          <FoodFields form={form} update={update} />
-          <SourceFields form={form} update={update} set={set} />
+        <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+          {/* Read-only while saving: a change after Save would not be in the save on its way. */}
+          <LabelReader form={form} locked={saving} onFill={setForm} />
+          <FoodFields form={form} locked={saving} update={update} />
+          <SourceFields form={form} locked={saving} update={update} set={set} />
           <Notice notice={notice} />
           <Actions saving={saving} onCancel={onClose} />
         </form>

@@ -555,3 +555,25 @@ test('a list already shown keeps a way to read again when reading after a delete
   expect(await screen.findByText('No combos')).toBeInTheDocument();
   expect(queryLive('alert')).not.toBeInTheDocument();
 });
+
+test('the combo cannot change while it is saved, so the save holds what is on screen (#302)', async () => {
+  let finish = (_response: Response) => {};
+  serve((_url, init) =>
+    init?.method === 'PUT'
+      ? new Promise((resolve) => (finish = resolve))
+      : json({ combos: [breakfast] }),
+  );
+  open();
+  const { dialog } = await openWith('Edit 아침 세트');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  await within(dialog).findByRole('button', { name: 'Saving…' });
+  expect(within(dialog).getByLabelText('Combo name')).toHaveAttribute('readonly');
+  expect(within(dialog).getByLabelText('샘플 햇반 quantity')).toHaveAttribute('readonly');
+  expect(within(dialog).getByRole('button', { name: 'Remove 샘플 햇반' })).toBeDisabled();
+
+  // A failed save gives the combo back to edit.
+  finish(json({ error: 'Server error occurred' }, 500));
+  expect(await findLive('alert', dialog)).toHaveTextContent('Server error occurred');
+  expect(within(dialog).getByLabelText('Combo name')).not.toHaveAttribute('readonly');
+  expect(within(dialog).getByRole('button', { name: 'Remove 샘플 햇반' })).toBeEnabled();
+});

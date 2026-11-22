@@ -1,3 +1,4 @@
+import { isCancelledError } from '@tanstack/react-query';
 import { type FormEvent, useRef, useState } from 'react';
 
 import { BusyButton } from './busy-button';
@@ -11,7 +12,8 @@ import { Spinner } from './components/ui/spinner';
 import { formatDate, isValidDate, shiftDate } from './daily-date';
 import { FoodChoices } from './food-choices';
 import { resultText, useFoodSearch } from './food-search';
-import { RequestError, requestJson } from './lib/api';
+import { RequestError } from './lib/api';
+import { apiKey, useApiQuery } from './lib/query';
 import {
   type FoodList,
   type FoodOption,
@@ -173,21 +175,29 @@ function FoodSearch({ entry, adding, onAddFood }: FormProps & { onAddFood: OnAdd
   );
 }
 
+const combosKey = apiKey('/api/combos');
+
 function ComboPicker({ entry, adding }: FormProps) {
-  // Combos are read only when asked for, so a day opens with no extra request.
-  const [combos, setCombos] = useState<Combo[] | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Combos are read only when asked for, so a day opens with no extra request. The list is the
+  // combos page's cache entry (#302): combo and food saves mark it stale, a newer read replaces one
+  // still on its way, and leaving the day aborts the read instead of only ignoring its answer.
+  const [asked, setAsked] = useState(false);
+  const list = useApiQuery<{ combos: Combo[] }>(combosKey, '/api/combos', { enabled: asked });
+  // A failed reload keeps the combos already shown.
+  const combos = asked ? (list.data?.combos ?? null) : null;
+  const loading = asked && list.isFetching;
   const { combo: notice } = entry.notices;
 
   const loadCombos = async () => {
     entry.clear();
-    setLoading(true);
+    setAsked(true);
     try {
-      setCombos((await requestJson<{ combos: Combo[] }>('/api/combos')).combos);
+      // Read even when the cache is fresh: the person asked for the list now.
+      await list.refetch({ throwOnError: true });
     } catch (cause) {
+      // Cancelled by leaving the day: nothing is left to tell.
+      if (isCancelledError(cause)) return;
       notice.error(cause);
-    } finally {
-      setLoading(false);
     }
   };
 

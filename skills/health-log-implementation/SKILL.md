@@ -66,7 +66,8 @@ This skill applies to changes in `sirloinbh/health-log`. Do not apply this accou
 - After the merge, check that the linked issue (`Closes #<number>`) is closed. If it is not closed, find out why and report it.
 - Merge stacked PRs in order. After the earlier PR is merged, merge `origin/main` into the next PR branch to resolve conflicts, run the related tests again, push normally, and merge after CI passes. Repeat to the end of the stack.
 - **Forbidden:** merging while a check fails or is still running, bypassing branch protection with `--admin` or the like, approving your own PR instead of a review, pushing or committing to main directly, and force push.
-- A `main` merge in this project does not run a deploy now (CI only verifies and builds Docker). If a deploy is connected to the merge, write it in this document and check the deploy result after the merge.
+- A merge to `main` is deployed. Since 2026-11-20 the shared server's `health-autodeploy.timer` (`deploy/autodeploy.sh`) checks `main` every 2 minutes and deploys a commit once all its CI runs have passed. The deploy backs up the database, runs the migrations on the real data, and starts the new version. If the new version fails its health check, the previous version starts again, but a migration that already ran stays. So merge only a head whose CI is green, and treat a migration merge as a change to the real data that a rollback does not undo.
+- After the merge, the server deploys it within a few minutes. To check, `https://health-log.daysofme.com/api/health` should answer 200 from an allowed IP. The server keeps the deployed commit in `.deployed` in the app folder. Do not write the server address in the repository.
 - Deliver the issue URL, the branch name, the PR URL, the verification and CI results, the merge SHA, and the remaining work. If you cannot get CI to pass, leave the PR open and tell why.
 
 ## Authentication and failure handling

@@ -138,6 +138,12 @@ test('a new medicine starts today, can be linked to a visit, and is sent as type
 });
 
 // #204: a new medicine never opens on a blank start date.
+// For the tests about waiting for the server's date: the app asks for it as it does when it opens.
+const openAsking = (path = '/medications') => {
+  window.history.replaceState(null, '', path);
+  render(<App />);
+};
+
 test('adding waits for the server’s today, then starts on it', async () => {
   let answerToday: (response: Response) => void = () => undefined;
   vi.stubGlobal(
@@ -152,7 +158,7 @@ test('adding waits for the server’s today, then starts on it', async () => {
             }),
     ),
   );
-  open();
+  openAsking();
   const add = await screen.findByRole('button', { name: 'Add medication' });
   await screen.findByRole('region', { name: 'Taking now 1' });
   expect(add).toHaveAttribute('aria-disabled', 'true');
@@ -187,7 +193,7 @@ test('when the server cannot say today, a new medicine starts on this device’s
         ),
       ),
     );
-    open();
+    openAsking();
     const add = await screen.findByRole('button', { name: 'Add medication' });
     await waitFor(() => expect(add).not.toHaveAttribute('aria-disabled'));
     fireEvent.click(add);

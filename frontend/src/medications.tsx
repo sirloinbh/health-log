@@ -463,7 +463,7 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
           {lists ? ` (${lists.today})` : ''}.
         </p>
       </header>
-      <div className="flex flex-col items-start gap-2">
+      <div>
         <Button
           // aria-disabled, not disabled: the button keeps focus while the date is on its way (#98).
           aria-disabled={waitingForToday || undefined}
@@ -474,10 +474,11 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
           <Plus aria-hidden />
           Add medication
         </Button>
+        {/* Read out only: a line that shows for a moment on every visit would shift the lists. */}
         {waitingForToday ? (
-          <p id="med-add-wait" className="text-caption text-muted-foreground">
+          <span id="med-add-wait" className="sr-only">
             Checking today's date…
-          </p>
+          </span>
         ) : null}
       </div>
       <Notice notice={notice} />

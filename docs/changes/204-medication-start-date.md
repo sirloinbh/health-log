@@ -28,3 +28,8 @@
 ## Limits
 
 - No browser check at 390×844 and 1440×900: running the app locally needs the `health` database, which this worktree does not have. The visible changes are the button name, a one-line muted caption while the date loads (usually a moment), and a one-line note under the start date when the server cannot be reached.
+
+## Review round 1
+
+- `suggestion (blocking)`: the visible "Checking today's date…" line showed for a moment on every visit and then went away, shifting the lists below it. Fixed in "fix: keep the date wait note for screen readers only (#204)": the note is `sr-only` and still describes the button (`aria-describedby`); the dimmed button is the visual cue. The test "adding waits for the server's today, then starts on it" still checks the description.
+- `npm run check` with `TEST_DATABASE_URL` empty after this fix: passed (backend 146 passed, 126 skipped DB tests; frontend 660 passed, 3 skipped; skills 4 passed).

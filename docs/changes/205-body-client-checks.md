@@ -32,3 +32,7 @@ The body form in `frontend/src/body.tsx` only checked that each number was reada
 
 - The rules are copied from `backend/src/body.ts`, not shared; a change there must be mirrored here. There is no shared contract module for body input yet.
 - No browser check at 390×844 and 1440×900: running the app locally needs the `health` database, which this worktree does not have. The only visible change is which message appears in the existing alert, and it appears without a round trip.
+
+## Review round 1
+
+- Approve, no blocking comments. One non-blocking nitpick (the `Partial` + cast in `readForm`) left as is; the copied rules are noted under Limits.

@@ -1,4 +1,6 @@
-import '@testing-library/jest-dom/vitest';
+// The shared setup first (#250): it brings the jest-dom matchers and Testing Library's 8 s wait for findBy* and
+// waitFor. Without this import the wait stayed at the 1 s default and first renders timed out under load.
+import './standard-setup';
 
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';

@@ -33,3 +33,7 @@
 
 - `suggestion (blocking)`: the visible "Checking today's date…" line showed for a moment on every visit and then went away, shifting the lists below it. Fixed in "fix: keep the date wait note for screen readers only (#204)": the note is `sr-only` and still describes the button (`aria-describedby`); the dimmed button is the visual cue. The test "adding waits for the server's today, then starts on it" still checks the description.
 - `npm run check` with `TEST_DATABASE_URL` empty after this fix: passed (backend 146 passed, 126 skipped DB tests; frontend 660 passed, 3 skipped; skills 4 passed).
+
+## Review round 2
+
+- Approve, no blocking comments. The round 1 fix is in place; the final diff was re-read (editing an existing medicine never waits; both add paths share `startDate`).

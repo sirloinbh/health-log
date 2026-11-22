@@ -40,3 +40,4 @@
 ### Commands
 
 - `TEST_DATABASE_URL= npm run check` (under the shared check lock): passed (frontend 764 passed, 3 skipped; backend 155 passed, 137 DB tests skipped locally because `TEST_DATABASE_URL` was emptied; CI runs them).
+- Second `TEST_DATABASE_URL= npm run check` after merging #269 (under the shared check lock): frontend 769 passed, 3 skipped, 1 failed: "the main menu opens the day the server counts as today" in `daily.test.tsx`, the known load-dependent timeout filed as #250 (a test this PR does not touch). `daily.test.tsx` alone: 28 passed. Backend 155 passed, 137 DB tests skipped locally; CI runs the full suite.

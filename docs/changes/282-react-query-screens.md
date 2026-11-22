@@ -32,3 +32,5 @@ The screens that #220 left reading with their own load functions and stale-answe
 
 - New: "a visit saved on the clinic page reads the daily card again (#282)" renders the daily card and the clinic page in one client; it fails when only the page's own list is invalidated.
 - `vitest run` on medications, visits, daily and reminders tests: 82 passed.
+- Full `npm run check` with `TEST_DATABASE_URL` empty, under the shared check lock: passed (exit 0). Frontend: 76 files, 781 passed, 3 skipped; the backend's database tests are skipped without a test database, as intended.
+- No browser check: the markup is unchanged, and the screen tests cover the behavior.

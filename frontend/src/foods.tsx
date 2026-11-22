@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from './components/ui/select';
 import { toast } from './components/ui/sonner';
+import { serviceToday } from './daily-date';
 import { useFoodSearch } from './food-search';
 import { requestJson } from './lib/api';
 import { useNotice } from './lib/use-notice';
@@ -138,15 +139,6 @@ const bodyOf = (form: Form) => ({
   checkedOn: textOrNull(form.checkedOn),
   isJunk: form.isJunk,
 });
-
-// The checked date of a label read now, as a day in the service time zone.
-const serviceToday = () =>
-  new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
 
 // The server and database only store http(s) addresses; a link must never run script regardless.
 const isSafeLink = (url: string) => /^https?:\/\//i.test(url);

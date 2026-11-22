@@ -18,7 +18,14 @@ import { Input } from './components/ui/input';
 import { Label } from './components/ui/label';
 import { Notice } from './components/ui/notice';
 import { toast } from './components/ui/sonner';
-import { dailyRangeText, earliestDate, inDailyRange, isValidDate, latestDate } from './daily-date';
+import {
+  dailyRangeText,
+  earliestDate,
+  inDailyRange,
+  isValidDate,
+  latestDate,
+  serviceToday,
+} from './daily-date';
 import { RequestError, requestJson } from './lib/api';
 import { errorText, useNotice } from './lib/use-notice';
 import {
@@ -96,6 +103,13 @@ function Field({ id, label, children }: { id: string; label: string; children: R
 const fieldClass =
   'w-full min-w-0 rounded-md border border-input bg-transparent px-3 text-base shadow-xs outline-none md:text-body-sm dark:bg-input/30 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50';
 
+/** Where a new medicine starts. `fromDevice`: the date is this device's, as the server could not say. */
+type Start = { date: string; visitId: string; visitDate?: string; fromDevice?: boolean };
+
+// The server's today, or this device's when the server could not say.
+const startDate = (today: string | null | undefined): Pick<Start, 'date' | 'fromDevice'> =>
+  today ? { date: today } : { date: serviceToday(), fromDevice: true };
+
 function MedicationDialog({
   item,
   start,
@@ -104,7 +118,7 @@ function MedicationDialog({
   onSaved,
 }: {
   item: Medication | null;
-  start: { date: string; visitId: string; visitDate?: string };
+  start: Start;
   visits: Visit[];
   onClose: () => void;
   onSaved: () => void;
@@ -160,7 +174,7 @@ function MedicationDialog({
     <Dialog open onOpenChange={(open) => (open || saving ? undefined : onClose())}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{item ? 'Edit medication record' : 'Medication record'}</DialogTitle>
+          <DialogTitle>{item ? 'Edit medication record' : 'Add medication'}</DialogTitle>
           <DialogDescription>
             Leave the end date blank to count it as a medication you still take. Leave unknown
             values blank.
@@ -188,9 +202,16 @@ function MedicationDialog({
                 type="date"
                 min={earliestDate}
                 max={latestDate}
+                aria-describedby={!item && start.fromDevice ? 'med-start-note' : undefined}
                 value={draft.startOn}
                 onChange={set('startOn')}
               />
+              {!item && start.fromDevice ? (
+                <p id="med-start-note" className="text-caption text-muted-foreground">
+                  The server's date could not be checked, so this is today on this device. Check it
+                  before saving.
+                </p>
+              ) : null}
             </Field>
             <Field id="med-end" label="End date">
               <Input
@@ -321,10 +342,7 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
   const [lists, setLists] = useState<MedicationLists | null>(null);
   const [visits, setVisits] = useState<Visit[]>([]);
   // null: closed. Otherwise the medicine being edited (null for a new one) and where it starts.
-  const [editing, setEditing] = useState<{
-    item: Medication | null;
-    start: { date: string; visitId: string; visitDate?: string };
-  } | null>(null);
+  const [editing, setEditing] = useState<{ item: Medication | null; start: Start } | null>(null);
   const { notice, status, error, clear } = useNotice();
   const latest = useRef(0);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -380,16 +398,19 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
     setEditing({
       item: null,
       start: {
-        date: inRange ? askedDate : (today ?? ''),
+        ...(inRange ? { date: askedDate } : startDate(today)),
         visitId: /^[1-9]\d*$/.test(askedVisit) ? askedVisit : '',
         visitDate: inRange ? askedDate : undefined,
       },
     });
   }, [askedDate, askedVisit, setParams, today]);
 
+  // A new medicine starts on the server's today, so adding waits until it is known (#204).
+  const waitingForToday = today === undefined;
   const openDialog = (opener: HTMLElement, item: Medication | null) => {
+    if (!item && waitingForToday) return;
     remember(opener);
-    setEditing({ item, start: { date: today ?? '', visitId: '' } });
+    setEditing({ item, start: { ...startDate(today), visitId: '' } });
   };
   const closeDialog = () => {
     setEditing(null);
@@ -442,11 +463,22 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
           {lists ? ` (${lists.today})` : ''}.
         </p>
       </header>
-      <div>
-        <Button onClick={(event) => openDialog(event.currentTarget, null)}>
+      <div className="flex flex-col items-start gap-2">
+        <Button
+          // aria-disabled, not disabled: the button keeps focus while the date is on its way (#98).
+          aria-disabled={waitingForToday || undefined}
+          aria-describedby={waitingForToday ? 'med-add-wait' : undefined}
+          className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+          onClick={(event) => openDialog(event.currentTarget, null)}
+        >
           <Plus aria-hidden />
-          Medication record
+          Add medication
         </Button>
+        {waitingForToday ? (
+          <p id="med-add-wait" className="text-caption text-muted-foreground">
+            Checking today's date…
+          </p>
+        ) : null}
       </div>
       <Notice notice={notice} />
       {notice?.kind === 'error' ? (

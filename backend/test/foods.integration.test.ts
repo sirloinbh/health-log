@@ -292,11 +292,17 @@ test('seeded serving units are corrected once and a rerun changes nothing', { sk
   assert.equal(await unitOf('콜라', null), '100g');
   assert.equal(await unitOf('아메리카노', null), '532mL');
   assert.equal(await unitOf('코카 콜라 미디엄', '맥도날드'), '425mL');
-  const { rows } = await pool.query<{ count: string }>(
-    `SELECT count(*) FROM foods WHERE serving_unit = 'ml' OR (brand = '맥도날드' AND serving_unit = 'mL')`,
+  // Only researched rows: other test files add typed-in foods with their own units at the same time.
+  const { rows } = await pool.query<{ lower: number; mcdonalds: number }>(
+    `SELECT count(*) FILTER (WHERE serving_unit = 'ml') AS lower,
+            count(*) FILTER (WHERE brand = '맥도날드' AND serving_unit = 'mL') AS mcdonalds
+     FROM foods WHERE source_type IN ('official', 'public')`,
   );
-  // No lowercase 'ml' is left, and all 10 McDonald's drinks are 'mL'.
-  assert.equal(Number(rows[0].count), 10);
+  // No researched row is left with a lowercase 'ml', and all 10 McDonald's drinks are 'mL'.
+  assert.deepEqual(
+    { lower: Number(rows[0].lower), mcdonalds: Number(rows[0].mcdonalds) },
+    { lower: 0, mcdonalds: 10 },
+  );
 
   const migration = readFileSync(
     new URL('../../database/migrations/020_foods_serving_units.sql', import.meta.url),

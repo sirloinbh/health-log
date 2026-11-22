@@ -2,7 +2,7 @@
 -- source gives. Drinks the MFDS pages give per 100 g (005: cola, cider, orange juice, beer, soju,
 -- makgeolli, milk, liquid yogurt) and the franchise drinks given in g (013: Lotteria, KFC, Mom's
 -- Touch) stay in g. Only two things change, and the numbers stay as they are:
--- 1. Milliliters are written 'mL' everywhere. 013 wrote McDonald's 10 drinks as 'ml'.
+-- 1. Milliliters are written 'mL' in the seed data. 013 wrote McDonald's 10 drinks as 'ml'.
 -- 2. Three solid foods from 005 were stored in 'mL' because their MFDS pages say mL
 --    (sweet and sour pork 343, fried squid 77, toast 230.3). They are solid foods, so 'g'.
 -- Each update changes only a row that still has the seeded unit (and size), so a value fixed on the

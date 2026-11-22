@@ -34,6 +34,12 @@ The user chose to keep the source units (option C, recorded in the [#199 comment
 - Local throwaway PostgreSQL 17 `health_test`: 020 applied with the runner (`backend/src/migrate.ts`). `foods.integration`, `franchise-foods`, `bibigo-foods` and `migrations.integration` tests: 32 passed, 0 skipped.
 - `npm run check` with `TEST_DATABASE_URL` set to the same throwaway `health_test` (after `npm ci`, because main added `@tanstack/react-query`): passed. Backend 287 passed and 0 skipped, frontend 729 passed and 3 skipped.
 
+## Review round 1
+
+- **issue (fixed):** the new test counted lowercase `ml` over all foods. `meals.integration.test.ts` saves a typed-in food with `ml` in the same database while test files run in parallel, so the count could depend on timing. The test now counts only researched rows (`official`, `public`), and checks "no `ml` left" and "10 McDonald's `mL`" apart.
+- **nit (fixed):** the migration comment now says `mL` is used "in the seed data", not "everywhere" (the label reader still fills `ml`, #260). The file is not applied anywhere yet.
+- `npm test -w backend` with the same `TEST_DATABASE_URL`: 287 passed, 0 skipped. `npm run lint` and the backend typecheck passed.
+
 ## Limits and follow-up
 
 - Meal entries keep the unit they were recorded with (`meal_entries.serving_unit`), as they keep the junk mark. Past entries of the three solid foods still say mL; the numbers are the same.

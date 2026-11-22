@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeAll, expect, test, vi } from 'vitest';
 
 import { toast } from './components/ui/sonner';
 import { HabitsCard } from './habits';
 import { findLive } from './test/live';
+import { renderWithQuery } from './test/query';
 
 // jsdom lacks pointer capture and scrolling, which Radix Select calls.
 beforeAll(() => {
@@ -62,7 +63,7 @@ const card = () =>
 
 test('a day with nothing recorded shows the form and says the periods have no record', async () => {
   const fetchMock = server({ body: dayOf(null) });
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   expect(await screen.findByLabelText('Cigarettes')).toHaveValue('');
   expect(request(fetchMock, 0).url).toBe(`/api/habits/${date}`);
   const week = screen.getByRole('region', { name: 'This week' });
@@ -89,7 +90,7 @@ test('zero cigarettes and no drinking are saved as recorded none, not left blank
       }),
     },
   );
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Cigarettes'), { target: { value: '0' } });
   fireEvent.click(screen.getByRole('button', { name: 'No drinking' }));
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -115,7 +116,7 @@ test('drinks are listed one per row, and a blank cigarette field stays unrecorde
     { body: dayOf(null) },
     { body: dayOf({ date, cigarettes: null, drinks }) },
   );
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   await screen.findByLabelText('Cigarettes');
   fireEvent.click(screen.getByRole('button', { name: 'Drank' }));
   fireEvent.change(screen.getByLabelText('Drink 1 amount'), { target: { value: '1.5' } });
@@ -140,7 +141,7 @@ test('a removed drink row is not sent', async () => {
       }),
     },
   );
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   await screen.findByLabelText('Cigarettes');
   fireEvent.click(screen.getByRole('button', { name: 'Drank' }));
   fireEvent.click(screen.getByRole('button', { name: 'Add drink' }));
@@ -162,7 +163,7 @@ test.each([
   [{ cigarettes: '', drinks: true, amount: '1,5' }, 'Drink 1 amount'],
 ])('%j is refused before anything is sent', async (input, message) => {
   const fetchMock = server({ body: dayOf(null) });
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Cigarettes'), {
     target: { value: input.cigarettes },
   });
@@ -177,7 +178,7 @@ test.each([
 
 test('drinking with every row removed asks for one', async () => {
   const fetchMock = server({ body: dayOf(null) });
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   await screen.findByLabelText('Cigarettes');
   fireEvent.click(screen.getByRole('button', { name: 'Drank' }));
   fireEvent.click(screen.getByRole('button', { name: 'Remove drink 1' }));
@@ -189,7 +190,7 @@ test('drinking with every row removed asks for one', async () => {
 test('a saved day opens its own values for editing', async () => {
   const record = { date, cigarettes: 7, drinks: [{ kind: 'wine', unit: 'glass', amount: 2 }] };
   const fetchMock = server({ body: dayOf(record) }, { body: dayOf({ ...record, cigarettes: 5 }) });
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   expect(await screen.findByText('7 cigarettes')).toBeInTheDocument();
   expect(screen.getByText('Wine 2 glasses')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
@@ -206,7 +207,7 @@ test('a saved day opens its own values for editing', async () => {
 
 test('cancelling an edit keeps the saved values', async () => {
   server({ body: dayOf({ date, cigarettes: 7, drinks: null }) });
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
   fireEvent.change(screen.getByLabelText('Cigarettes'), { target: { value: '99' } });
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -224,7 +225,7 @@ test('deleting asks first, then reloads the totals without the day', async () =>
     { status: 204 },
     { body: dayOf(null) },
   );
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   const dialog = await screen.findByRole('dialog', {
     name: 'Delete this alcohol and tobacco record?',
@@ -249,7 +250,7 @@ test('a server refusal is shown and the form keeps what was typed', async () => 
     { body: dayOf(null) },
     { status: 400, body: { error: 'Cigarettes must be 200 or fewer' } },
   );
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Cigarettes'), { target: { value: '300' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   expect(await findLive('alert')).toHaveTextContent('200 or fewer');
@@ -259,7 +260,7 @@ test('a server refusal is shown and the form keeps what was typed', async () => 
 
 test('a failed load can be tried again', async () => {
   server({ status: 500, body: { error: 'Server error occurred' } }, { body: dayOf(null) });
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   expect(await findLive('alert')).toHaveTextContent('Server error occurred');
   expect(within(card()).queryByRole('region', { name: 'This week' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
@@ -268,7 +269,7 @@ test('a failed load can be tried again', async () => {
 
 test('the same kind and unit twice is refused before anything is sent', async () => {
   const fetchMock = server({ body: dayOf(null) });
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   await screen.findByLabelText('Cigarettes');
   fireEvent.click(screen.getByRole('button', { name: 'Drank' }));
   fireEvent.click(screen.getByRole('button', { name: 'Add drink' }));
@@ -281,7 +282,7 @@ test('the same kind and unit twice is refused before anything is sent', async ()
 
 test('once every kind is listed, a new row takes a unit not used yet', async () => {
   server({ body: dayOf(null) });
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   await screen.findByLabelText('Cigarettes');
   fireEvent.click(screen.getByRole('button', { name: 'Drank' }));
   for (let row = 2; row <= 7; row += 1) {
@@ -302,7 +303,7 @@ test('adding the last allowed drink keeps focus on the add button, which then re
     ['glass', 'bottle', 'can'].map((unit) => ({ kind, unit, amount: 1 })),
   );
   server({ body: dayOf({ date, cigarettes: null, drinks }) });
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
   const add = screen.getByRole('button', { name: 'Add drink' });
   add.focus();
@@ -320,7 +321,7 @@ test('adding the last allowed drink keeps focus on the add button, which then re
 
 test('removing a drink moves focus to the next row, then the previous row, then the add button', async () => {
   server({ body: dayOf(null) });
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   await screen.findByLabelText('Cigarettes');
   fireEvent.click(screen.getByRole('button', { name: 'Drank' }));
   fireEvent.click(screen.getByRole('button', { name: 'Add drink' }));
@@ -356,11 +357,11 @@ test('coming back while a save is on its way shows the saved day, not a blank fo
     return Promise.resolve(new Response(JSON.stringify(dayOf(saved ? smoked : null))));
   });
   vi.stubGlobal('fetch', fetchMock);
-  const first = render(<HabitsCard date={date} />);
+  const first = renderWithQuery(<HabitsCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Cigarettes'), { target: { value: '3' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   first.unmount();
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
 
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -376,7 +377,7 @@ test('a failed delete says why and keeps the day and the dialog', async () => {
     { body: dayOf({ date, cigarettes: 3, drinks: null }) },
     { status: 500, body: { error: 'Server error occurred' } },
   );
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' });
   fireEvent.click(confirm);
@@ -389,7 +390,7 @@ test('a failed delete says why and keeps the day and the dialog', async () => {
 
 test('trying again moves focus to the card, as the button it was on goes away', async () => {
   server({ status: 500, body: { error: 'Server error occurred' } }, { body: dayOf(null) });
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   const again = await screen.findByRole('button', { name: 'Try again' });
   again.focus();
   fireEvent.click(again);
@@ -404,7 +405,7 @@ test('trying again moves focus to the card, as the button it was on goes away', 
 test('a retry cannot be started twice, so no older answer can land after a newer one', async () => {
   const finishers: ((response: Response) => void)[] = [];
   const fetchMock = server({ status: 500, body: { error: 'Server error occurred' } });
-  render(<HabitsCard date={date} />);
+  renderWithQuery(<HabitsCard date={date} />);
   const again = await screen.findByRole('button', { name: 'Try again' });
   fetchMock.mockImplementation(() => new Promise<Response>((resolve) => finishers.push(resolve)));
   const before = fetchMock.mock.calls.length;

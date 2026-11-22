@@ -1,3 +1,4 @@
+import { kcalText } from './calorie-text';
 import { count } from './plural';
 
 /** Junk food of a week or a month, as the meals API answers it (#38). */
@@ -12,14 +13,14 @@ export type JunkPeriod = {
   calories: { value: number | null; missing: number };
 };
 
-/** "3 times · 2 days · 1850kcal" */
+/** "3 times · 2 days · 1,850kcal", saying when some calories are unknown as a combo does. */
 export function junkText({ times, days, calories }: JunkPeriod) {
   if (times === 0) return 'None';
   const kcal =
     calories.value === null
       ? 'No calorie value'
       : calories.missing > 0
-        ? `${calories.value}kcal or more (excludes ${count(calories.missing, 'record')} with unknown calories)`
-        : `${calories.value}kcal`;
+        ? `${kcalText(calories.value)} (excludes ${count(calories.missing, 'record')} with unknown calories)`
+        : kcalText(calories.value);
   return `${count(times, 'time')} · ${count(days, 'day')} · ${kcal}`;
 }

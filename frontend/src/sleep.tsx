@@ -1,4 +1,5 @@
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 
 import { BusyButton } from './busy-button';
 import { Badge } from './components/ui/badge';
@@ -11,9 +12,10 @@ import { Notice } from './components/ui/notice';
 import { SkeletonText } from './components/ui/skeleton';
 import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
-import { RequestError, requestJson } from './lib/api';
-import { errorText, useNotice } from './lib/use-notice';
-import { trackWrite, writesSettled } from './pending-writes';
+import { RequestError } from './lib/api';
+import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
+import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
+import { trackWrite } from './pending-writes';
 import {
   clockOf,
   dayOf,
@@ -22,6 +24,7 @@ import {
   minutesBetween,
   toInstants,
 } from './sleep-time';
+import { asRequest, useReadAfterWrites } from './writes';
 
 type SleepRecord = {
   date: string;
@@ -33,7 +36,18 @@ type SleepRecord = {
 
 const sourceLabels = { manual: 'Manual', garmin: 'Garmin' } as const;
 
+type SleepDay = { record: SleepRecord | null };
+
 const pathOf = (date: string) => `/api/sleep/${date}`;
+const keyOf = (date: string) => apiKey(pathOf(date));
+
+/** A write to one day's sleep. Its answer goes into that day's cached record, even after the card is gone. */
+function useSleepWrite(date: string, recordAfter: (data: unknown) => SleepRecord | null) {
+  const client = useQueryClient();
+  return useApiMutation<unknown, ApiRequest>(asRequest, {
+    onSuccess: (data) => client.setQueryData<SleepDay>(keyOf(date), { record: recordAfter(data) }),
+  });
+}
 
 function SleepForm({
   date,
@@ -48,7 +62,8 @@ function SleepForm({
 }) {
   const [bed, setBed] = useState(record ? clockOf(record.bedAt) : '');
   const [wake, setWake] = useState(record ? clockOf(record.wakeAt) : '');
-  const [saving, setSaving] = useState(false);
+  const save = useSleepWrite(date, (data) => data as SleepRecord);
+  const saving = save.isPending;
   const { notice, error, clear } = useNotice();
   const length = bed && wake ? minutesBetween(bed, wake) : 0;
   const mounted = useRef(true);
@@ -75,17 +90,13 @@ function SleepForm({
     }
     // A repeated failure then appears anew and is announced again (as in #98).
     clear();
-    setSaving(true);
     try {
-      onSaved(
-        await trackWrite(
-          pathOf(date),
-          requestJson<SleepRecord>(pathOf(date), {
-            method: 'PUT',
-            body: toInstants(date, bed, wake),
-          }),
-        ),
+      // trackWrite until every card reads through React Query (#220).
+      const saved = await trackWrite(
+        pathOf(date),
+        save.mutateAsync({ path: pathOf(date), method: 'PUT', body: toInstants(date, bed, wake) }),
       );
+      onSaved(saved as SleepRecord);
     } catch (cause) {
       // Moving to another day removes this form, and the night still was not saved.
       if (!mounted.current) {
@@ -93,7 +104,6 @@ function SleepForm({
         return;
       }
       error(cause);
-      setSaving(false);
     }
   };
 
@@ -196,34 +206,22 @@ function SleepSummary({
 
 // The daily page gives this a key per date, so nothing here outlives the day it was loaded for.
 export function SleepCard({ date }: { date: string }) {
-  const [record, setRecord] = useState<SleepRecord | null | undefined>(undefined);
   const [editing, setEditing] = useState(false);
-  const { notice, error, clear } = useNotice();
   const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLDivElement>(null);
-  const live = useRef(true);
-
-  const load = useCallback(async () => {
-    clear();
-    try {
-      // A save from before leaving this day may still be on its way; read after it lands.
-      await writesSettled(pathOf(date));
-      // Left again while waiting: nothing would show the answer.
-      if (!live.current) return;
-      const data = await requestJson<{ record: SleepRecord | null }>(pathOf(date));
-      if (live.current) setRecord(data.record);
-    } catch (cause) {
-      if (live.current) error(cause);
-    }
-  }, [clear, date, error]);
-
-  useEffect(() => {
-    live.current = true;
-    void load();
-    return () => {
-      live.current = false;
-    };
-  }, [load]);
+  const client = useQueryClient();
+  const remover = useSleepWrite(date, () => null);
+  // A save from before leaving this day may still be on its way; read after it lands.
+  const ready = useReadAfterWrites(pathOf(date));
+  const query = useApiQuery<SleepDay>(keyOf(date), pathOf(date), { enabled: ready });
+  const record = ready ? query.data?.record : undefined;
+  // A failed read with nothing to show; a failed refresh keeps the record on screen.
+  const notice: NoticeValue | undefined =
+    query.isError && record === undefined
+      ? { kind: 'error', text: errorText(query.error) }
+      : undefined;
+  // One read at a time: pressing again while it is on its way does not start another.
+  const load = () => void query.refetch({ cancelRefetch: false });
 
   // The button that was pressed is gone by now, and a closing dialog restores focus on a timer first.
   useEffect(() => {
@@ -232,24 +230,24 @@ export function SleepCard({ date }: { date: string }) {
     return () => clearTimeout(timer);
   }, [moveFocus]);
 
-  const finish = (next: SleepRecord | null) => {
-    setRecord(next);
+  const finish = () => {
     setEditing(false);
     setMoveFocus((count) => count + 1);
   };
 
   const remove = async () => {
     try {
-      await trackWrite(pathOf(date), requestJson(pathOf(date), { method: 'DELETE' }));
+      await trackWrite(pathOf(date), remover.mutateAsync({ path: pathOf(date), method: 'DELETE' }));
     } catch (cause) {
       // Already gone counts as deleted; anything else keeps the dialog open with the reason.
       if (!(cause instanceof RequestError && cause.status === 404)) {
         toast.error(errorText(cause));
         throw cause;
       }
+      client.setQueryData<SleepDay>(keyOf(date), { record: null });
     }
     toast.success('Deleted');
-    finish(null);
+    finish();
   };
 
   return (
@@ -266,7 +264,7 @@ export function SleepCard({ date }: { date: string }) {
             variant="outline"
             className="self-start"
             onClick={() => {
-              void load();
+              load();
               // Trying again removes this button, which would drop keyboard focus to the page.
               setMoveFocus((count) => count + 1);
             }}
@@ -283,11 +281,11 @@ export function SleepCard({ date }: { date: string }) {
           <SleepForm
             date={date}
             record={record}
-            onSaved={(saved) => {
+            onSaved={() => {
               toast.success('Saved');
-              finish(saved);
+              finish();
             }}
-            onCancel={record ? () => finish(record) : undefined}
+            onCancel={record ? finish : undefined}
           />
         ) : null}
         {record && !editing ? (

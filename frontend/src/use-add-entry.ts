@@ -1,0 +1,154 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { requestJson } from './lib/api';
+import { errorText, useNotice } from './lib/use-notice';
+import { type FoodOption, type MealKey, meals, type Pending } from './meal-entry';
+import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
+
+/** Records an entry; `path` follows the day's address, e.g. `/combos/3` to record a combo. */
+export type OnAdd = (body: object, path?: string) => Promise<boolean>;
+
+/**
+ * The state the meal add forms share (#210): the chosen meal and quantity, the waiting button,
+ * each form's message, and the recently eaten foods.
+ */
+export function useAddEntry({ onAdd }: { onAdd: OnAdd }) {
+  const [meal, setMeal] = useState<MealKey>('breakfast');
+  const [servings, setServings] = useState('1');
+  const [pending, setPending] = useState<Pending | null>(null);
+  // A long result list sits between the forms, so each shows its errors next to its own buttons.
+  // `page` is below a long result list, next to the button that asked for the page.
+  const notices = {
+    recent: useNotice(),
+    list: useNotice(),
+    combo: useNotice(),
+    copy: useNotice(),
+    typed: useNotice(),
+    page: useNotice(),
+  };
+  const mealLabel = meals.find(({ key }) => key === meal)!.label;
+
+  /** Every form's message goes when any form acts. */
+  const clear = () => {
+    for (const notice of Object.values(notices)) notice.clear();
+  };
+
+  const recentFoods = useRecentFoods();
+
+  /** The quantity as a number, or null after showing why it cannot be used. Clears messages first. */
+  const readServings = (showError: (message: string) => void) => {
+    clear();
+    const value = parseAmount(servings);
+    if (value === undefined) {
+      showError(unreadableAmount('Quantity'));
+      return null;
+    }
+    if (value === null || !(value > 0)) {
+      showError('The quantity must be a number greater than 0');
+      return null;
+    }
+    if (!hasTwoDecimalsAtMost(value)) {
+      showError('The quantity can have at most 2 decimal places');
+      return null;
+    }
+    return value;
+  };
+
+  /**
+   * Sends one add with `target` shown as waiting. `onRecorded` runs once the day took it; a failure
+   * goes to `onError`, next to the form that sent it.
+   */
+  const record = async (
+    target: Pending,
+    body: object,
+    {
+      path,
+      onRecorded,
+      onError,
+    }: {
+      path?: string;
+      onRecorded: () => void;
+      onError: (cause: unknown) => void;
+    },
+  ) => {
+    setPending(target);
+    try {
+      if (await onAdd(body, path)) onRecorded();
+    } catch (cause) {
+      onError(cause);
+    } finally {
+      setPending(null);
+    }
+  };
+
+  return {
+    meal,
+    setMeal,
+    mealLabel,
+    servings,
+    setServings,
+    pending,
+    notices,
+    clear,
+    readServings,
+    record,
+    ...recentFoods,
+  };
+}
+
+export type AddEntryState = ReturnType<typeof useAddEntry>;
+
+/** Stored foods last recorded, so a usual food needs no search. */
+function useRecentFoods() {
+  // null until read, or if it failed.
+  const [recent, setRecent] = useState<FoodOption[] | null>(null);
+  // Why the list could not be read. Kept apart from the add errors, which the next action clears:
+  // this one stays with its retry button until a read succeeds.
+  const [recentFailure, setRecentFailure] = useState<string | null>(null);
+  const latestRecent = useRef(0);
+  const recentHeading = useRef<HTMLParagraphElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const [focusAfterRetry, setFocusAfterRetry] = useState(0);
+  const focusAfterRead = useRef(false);
+
+  const loadRecent = useCallback(async () => {
+    // A slow older read must not put back an order that a newer one already replaced.
+    const request = ++latestRecent.current;
+    try {
+      const data = await requestJson<{ foods: FoodOption[] }>('/api/foods/recent');
+      if (request !== latestRecent.current) return;
+      setRecent(data.foods);
+      setRecentFailure(null);
+      // Whichever read clears the failure removes the retry button, even one started by an add
+      // that finished after the retry was pressed.
+      if (focusAfterRead.current) {
+        focusAfterRead.current = false;
+        setFocusAfterRetry((count) => count + 1);
+      }
+    } catch (cause) {
+      if (request !== latestRecent.current) return;
+      setRecentFailure(errorText(cause));
+      // The retry button is still there, and focus with it.
+      focusAfterRead.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadRecent();
+  }, [loadRecent]);
+
+  // The retry button goes away once the read works. Focus moves to the list's heading, or to the
+  // search when there is still nothing to offer, instead of falling to the page.
+  useEffect(() => {
+    if (!focusAfterRetry) return;
+    const timer = setTimeout(() => (recentHeading.current ?? searchInput.current)?.focus(), 0);
+    return () => clearTimeout(timer);
+  }, [focusAfterRetry]);
+
+  const retryRecent = () => {
+    focusAfterRead.current = true;
+    void loadRecent();
+  };
+
+  return { recent, recentFailure, loadRecent, retryRecent, recentHeading, searchInput };
+}

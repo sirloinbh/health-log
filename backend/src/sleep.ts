@@ -18,45 +18,35 @@ export const sleepInput = z.object(
   { error: 'The request body is not valid' },
 );
 
-type SleepRow = {
-  sleep_date: string;
-  bed_at: Date;
-  wake_at: Date;
-  duration_minutes: number;
-  deep_minutes: number | null;
-  light_minutes: number | null;
-  rem_minutes: number | null;
-  awake_minutes: number | null;
-  sleep_score: number | null;
+type SleepRecord = {
+  date: string;
+  /** res.json writes a Date with toJSON, which is toISOString: "2026-11-22T22:30:00.000Z". */
+  bedAt: Date;
+  wakeAt: Date;
+  durationMinutes: number;
+  deepMinutes: number | null;
+  lightMinutes: number | null;
+  remMinutes: number | null;
+  awakeMinutes: number | null;
+  sleepScore: number | null;
   source: string;
 };
 
-const columns =
-  'sleep_date, bed_at, wake_at, duration_minutes, deep_minutes, light_minutes, rem_minutes, awake_minutes, sleep_score, source';
-
-const toRecord = (row: SleepRow) => ({
-  date: row.sleep_date,
-  bedAt: row.bed_at.toISOString(),
-  wakeAt: row.wake_at.toISOString(),
-  durationMinutes: row.duration_minutes,
-  deepMinutes: row.deep_minutes,
-  lightMinutes: row.light_minutes,
-  remMinutes: row.rem_minutes,
-  awakeMinutes: row.awake_minutes,
-  sleepScore: row.sleep_score,
-  source: row.source,
-});
+const columns = `sleep_date AS date, bed_at AS "bedAt", wake_at AS "wakeAt",
+  duration_minutes AS "durationMinutes", deep_minutes AS "deepMinutes",
+  light_minutes AS "lightMinutes", rem_minutes AS "remMinutes", awake_minutes AS "awakeMinutes",
+  sleep_score AS "sleepScore", source`;
 
 export function sleepRouter(pool: Pool) {
   const router = Router();
 
   router.get('/:date', async (req, res) => {
     const date = parseDate(req.params.date);
-    const { rows } = await pool.query<SleepRow>(
+    const { rows } = await pool.query<SleepRecord>(
       `SELECT ${columns} FROM sleep_records WHERE sleep_date = $1`,
       [date],
     );
-    res.json({ record: rows[0] ? toRecord(rows[0]) : null });
+    res.json({ record: rows[0] ?? null });
   });
 
   // Typed times replace the whole record: stages and a score from an import no longer describe them.
@@ -75,7 +65,7 @@ export function sleepRouter(pool: Pool) {
     if (serviceDate(new Date(wakeAt)) !== date) {
       throw new HttpError(400, 'The wake-up date does not match the record date');
     }
-    const { rows } = await pool.query<SleepRow>(
+    const { rows } = await pool.query<SleepRecord>(
       `INSERT INTO sleep_records (sleep_date, bed_at, wake_at, duration_minutes, source)
        VALUES ($1, $2, $3, $4, 'manual')
        ON CONFLICT (sleep_date) DO UPDATE SET
@@ -92,7 +82,7 @@ export function sleepRouter(pool: Pool) {
        RETURNING ${columns}`,
       [date, bedAt, wakeAt, minutes],
     );
-    res.json(toRecord(rows[0]));
+    res.json(rows[0]);
   });
 
   router.delete('/:date', async (req, res) => {

@@ -6,6 +6,10 @@ import { HabitsCard } from './habits';
 import { findLive } from './test/live';
 import { renderWithQuery } from './test/query';
 
+/** Whether a save (PUT) has gone out, for a test that must land it after it is sent. */
+const saveSent = (fetchMock: { mock: { calls: unknown[][] } }) =>
+  fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PUT');
+
 // jsdom lacks pointer capture and scrolling, which Radix Select calls.
 beforeAll(() => {
   Element.prototype.hasPointerCapture ??= () => false;
@@ -363,13 +367,16 @@ test('coming back while a save is on its way shows the saved day, not a blank fo
   first.unmount();
   renderWithQuery(<HabitsCard date={date} />);
 
-  // Only the first card has read; the second waits for the save (and reads once, below).
+  // The save is on its way (it is sent a moment after the press).
+  await waitFor(() => expect(saveSent(fetchMock)).toBe(true));
+  // Only the first card has read; the second waits for the save.
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(screen.queryByLabelText('Cigarettes')).not.toBeInTheDocument();
   finishSave();
   expect(await screen.findByText('3 cigarettes')).toBeInTheDocument();
-  // The first card's read, the save, and the second card's one read after it landed.
-  expect(fetchMock).toHaveBeenCalledTimes(3);
+  // The first card's read and the save: the save's own answer is the record, so the day is not read
+  // again (#220).
+  expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(screen.queryByLabelText('Cigarettes')).not.toBeInTheDocument();
 });
 

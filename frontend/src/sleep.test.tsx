@@ -3,8 +3,13 @@ import { expect, test, vi } from 'vitest';
 
 import { toast } from './components/ui/sonner';
 import { SleepCard } from './sleep';
+import { answered } from './test/answered';
 import { findLive, queryLive } from './test/live';
 import { renderWithQuery } from './test/query';
+
+/** Whether a save (PUT) has gone out, for a test that must land it after it is sent. */
+const saveSent = (fetchMock: { mock: { calls: unknown[][] } }) =>
+  fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PUT');
 
 const date = '2026-03-15';
 const record = {
@@ -253,13 +258,16 @@ test('coming back while a save is on its way shows the saved night, not a blank 
   first.unmount();
   renderWithQuery(<SleepCard date={date} />);
 
-  // Only the first card has read; the second waits for the save (and reads once, below).
+  // The save is on its way (it is sent a moment after the press).
+  await waitFor(() => expect(saveSent(fetchMock)).toBe(true));
+  // Only the first card has read; the second waits for the save.
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(screen.queryByLabelText('Bedtime')).not.toBeInTheDocument();
   finishSave();
   expect(await screen.findByText('7 h 30 min')).toBeInTheDocument();
-  // The first card's read, the save, and the second card's one read after it landed.
-  expect(fetchMock).toHaveBeenCalledTimes(3);
+  // The first card's read and the save: the save's own answer is the record, so the day is not read
+  // again (#220).
+  expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(screen.queryByLabelText('Bedtime')).not.toBeInTheDocument();
 });
 
@@ -281,13 +289,16 @@ test('leaving again while waiting for a save sends no read for the day left', as
   first.unmount();
   renderWithQuery(<SleepCard date={date} />).unmount();
 
+  // The save is on its way (it is sent a moment after the press).
+  await waitFor(() => expect(saveSent(fetchMock)).toBe(true));
   finishSave();
-  // A card shown now waits for the same save, as the gone one did, and reads after it; by the time
-  // it shows its form, a read from the gone card would have gone out first.
-  render(<SleepCard date={date} />);
-  await screen.findByLabelText('Bedtime');
-  // The first card's read, the save, and the new card's read: none from the card that left.
-  expect(fetchMock).toHaveBeenCalledTimes(3);
+  // A card shown once the save has landed shows its answer; a read the gone card sent after the
+  // save would have gone out by then.
+  renderWithQuery(<SleepCard date={date} />);
+  expect(await screen.findByText('7 h 30 min')).toBeInTheDocument();
+  // The first card's read and the save: none from the card that left, and the save's answer
+  // needs no read (#220).
+  expect(fetchMock).toHaveBeenCalledTimes(2);
 });
 
 test('trying again moves focus to the card, as the button it was on goes away', async () => {
@@ -359,9 +370,9 @@ test('a read from returning to the tab that is still on its way cannot undo a sa
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   expect(await screen.findByText('7 h 30 min')).toBeInTheDocument();
   // The older read answers last, with the day as it was before the save.
-  finishRead(new Response(JSON.stringify({ record: null })));
-  // Long enough for a late answer to reach the screen if it were taken.
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  const late = new Response(JSON.stringify({ record: null }));
+  finishRead(late);
+  await answered(late);
   expect(screen.getByText('7 h 30 min')).toBeInTheDocument();
   expect(screen.queryByLabelText('Bedtime')).not.toBeInTheDocument();
 });

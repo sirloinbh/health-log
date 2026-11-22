@@ -7,6 +7,10 @@ import { answered } from './test/answered';
 import { findLive, queryLive } from './test/live';
 import { renderWithQuery } from './test/query';
 
+/** Whether a save (PUT) has gone out, for a test that must land it after it is sent. */
+const saveSent = (fetchMock: { mock: { calls: unknown[][] } }) =>
+  fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PUT');
+
 const date = '2026-03-15';
 const record = {
   date,
@@ -568,6 +572,8 @@ test('coming back while a save is on its way shows the saved record, not a blank
   first.unmount();
   renderWithQuery(<BodyCard date={date} />);
 
+  // The save is on its way (it is sent a moment after the press).
+  await waitFor(() => expect(saveSent(fetchMock)).toBe(true));
   // No form while the save is out: the server would still answer with the empty day.
   expect(screen.getByRole('status', { name: 'Loading body records' })).toBeInTheDocument();
   expect(reads()).toBe(1);

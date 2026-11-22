@@ -3,12 +3,12 @@ import { MemoryRouter } from 'react-router';
 import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
-import { trackWrite } from './pending-writes';
 import type { Reminder, Reminders } from './reminder-text';
 import { reminderDetail, reminderTitle, whenText } from './reminder-text';
 import { RemindersCard } from './reminders';
-import { nextTask } from './test/answered';
+import { answered, nextTask } from './test/answered';
 import { findLive, queryLive } from './test/live';
+import { renderWithQuery, testQueryClient, write } from './test/query';
 
 // Made-up values only: no real appointment or prescription belongs in tests.
 const appointment: Reminder = {
@@ -56,7 +56,7 @@ const serve = (handler: Handler) => {
 };
 
 const show = () =>
-  render(
+  renderWithQuery(
     <MemoryRouter>
       <RemindersCard />
     </MemoryRouter>,
@@ -133,8 +133,10 @@ test('marking one done sends its day, takes it off and keeps focus in the card',
   });
   expect(other).toHaveAttribute('aria-disabled', 'true');
   fireEvent.click(other);
-  const posts = fetchMock.mock.calls.filter(([url]) => url === '/api/reminders/done');
-  expect(posts).toHaveLength(1);
+  const sent = () => fetchMock.mock.calls.filter(([url]) => url === '/api/reminders/done');
+  // The mark is sent a moment after the press.
+  await waitFor(() => expect(sent()).toHaveLength(1));
+  const posts = sent();
   expect(posts[0][1]).toMatchObject({ method: 'POST' });
   expect(JSON.parse(String(posts[0][1]?.body))).toEqual({
     kind: 'medication',
@@ -250,7 +252,7 @@ test('a visit just saved elsewhere is waited for before the list is read', async
   let land: () => void = () => {};
   // Set as the save settles, before the card can see it.
   let landed = false;
-  void trackWrite(
+  void write(
     '/api/visits/',
     new Promise<void>((resolve) => (land = resolve)).then(() => {
       landed = true;
@@ -306,10 +308,37 @@ test('reminders failing to load leave the rest of the dashboard alone', async ()
     ),
   );
   window.history.replaceState(null, '', '/');
-  render(<App />);
+  // Without the app's one retry after a server error, so the failure shows at once.
+  render(<App queryClient={testQueryClient()} />);
   // Each keeps its own word and its own retry.
   expect(await screen.findByText('Cannot reach the server')).toBeInTheDocument();
   expect(await screen.findByText('No report')).toBeInTheDocument();
   expect(screen.getAllByRole('button', { name: 'Try again' })).toHaveLength(2);
   expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
+});
+
+test('a read from returning to the tab, still on its way, does not bring back one marked done', async () => {
+  const reads: ((response: Response) => void)[] = [];
+  let finish: (response: Response) => void = () => {};
+  serve((url) =>
+    url === '/api/reminders/done'
+      ? new Promise((resolve) => (finish = resolve))
+      : new Promise((resolve) => reads.push(resolve)),
+  );
+  show();
+  await waitFor(() => expect(reads).toHaveLength(1));
+  reads[0](json(listOf([appointment, lastPill])));
+  fireEvent.click(await screen.findByRole('button', { name: '가상정 ends reminder done' }));
+  // Coming back to the tab while the mark is on its way reads the list again.
+  fireEvent(document, new Event('visibilitychange', { bubbles: true }));
+  await waitFor(() => expect(reads).toHaveLength(2));
+  finish(json(null, 204));
+  expect(await findLive('status')).toHaveTextContent('가상정 ends reminder marked as done.');
+  // That read left before the mark landed, so its list still has the medicine.
+  const late = json(listOf([appointment, lastPill]));
+  reads[1](late);
+  await answered(late);
+  const list = screen.getByRole('list', { name: 'Upcoming' });
+  expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+  expect(within(list).queryByText('가상정 ends')).not.toBeInTheDocument();
 });

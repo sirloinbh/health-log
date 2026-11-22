@@ -5,7 +5,6 @@ import './standard-setup';
 import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
 
-import { forgetPendingWrites } from '../pending-writes';
 import { forgetQueryClient } from './query';
 import { failOnUnexpectedRequests, unmockedFetch } from './requests';
 
@@ -21,10 +20,9 @@ const knownStrayRequests = ['unmocked fetch: GET /api/tags'];
 // (cleanup, timers, stubbed globals, mocks, localStorage, the theme class and the URL).
 afterEach(() => {
   // Vitest runs afterEach hooks in reverse order, so this one runs before the shared one. The cards must unmount
-  // before their query cache and pending writes are forgotten, and before the requests are checked; the shared
+  // before their query cache is forgotten, and before the requests are checked; the shared
   // cleanup() that follows then finds nothing left to do.
   cleanup();
-  forgetPendingWrites();
   forgetQueryClient();
   // Last, so the resets above still run when it fails the test.
   failOnUnexpectedRequests(knownStrayRequests);

@@ -1,6 +1,7 @@
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
+import { calorieText } from './calorie-text';
 import { type Combo, type ComboItem, comboSummary, fullName } from './combo-text';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
@@ -261,8 +262,7 @@ function ComboDialog({
                       <span className="wrap-anywhere">{fullName(food)}</span>
                       <span className="text-caption text-muted-foreground">
                         Serving {food.servingSize}
-                        {food.servingUnit} ·{' '}
-                        {food.calories === null ? 'No calorie value' : `${food.calories}kcal`}
+                        {food.servingUnit} · {calorieText(food.calories)}
                       </span>
                     </div>
                     <Button
@@ -347,8 +347,7 @@ function ComboCard({
           <ul className="flex flex-col gap-1 text-body-sm">
             {combo.items.map((item) => (
               <li key={item.foodId} className="wrap-anywhere">
-                {fullName(item)} · {count(item.servings, 'serving')} ·{' '}
-                {item.calories === null ? 'No calorie value' : `${item.calories}kcal`}
+                {fullName(item)} · {count(item.servings, 'serving')} · {calorieText(item.calories)}
               </li>
             ))}
           </ul>

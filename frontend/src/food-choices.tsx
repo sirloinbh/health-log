@@ -1,4 +1,5 @@
 import { BusyButton } from './busy-button';
+import { calorieText } from './calorie-text';
 import { fullName } from './combo-text';
 import { Badge } from './components/ui/badge';
 import { Spinner } from './components/ui/spinner';
@@ -32,8 +33,7 @@ export function FoodChoices({
             </span>
             <span className="text-caption text-muted-foreground">
               Serving {food.servingSize}
-              {food.servingUnit} ·{' '}
-              {food.calories === null ? 'No calorie value' : `${food.calories}kcal`}
+              {food.servingUnit} · {calorieText(food.calories)}
             </span>
           </div>
           <BusyButton

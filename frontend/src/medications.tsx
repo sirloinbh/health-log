@@ -27,6 +27,7 @@ import {
   serviceToday,
 } from './daily-date';
 import { RequestError, requestJson } from './lib/api';
+import { type ApiRequest, useApiMutation } from './lib/query';
 import { errorText, useNotice } from './lib/use-notice';
 import {
   howText,
@@ -35,9 +36,9 @@ import {
   medicationsPath,
   periodText,
 } from './med-text';
-import { trackWrite } from './pending-writes';
 import { useReturnFocus } from './return-focus';
 import { type Visit, visitsPath } from './visit-text';
+import { asRequest } from './writes';
 
 type Draft = {
   name: string;
@@ -125,6 +126,7 @@ function MedicationDialog({
 }) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(item, start));
   const [saving, setSaving] = useState(false);
+  const write = useApiMutation<unknown, ApiRequest>(asRequest);
   const { notice, error, clear } = useNotice();
   const set = (key: keyof Draft) => (event: { target: { value: string } }) =>
     setDraft((current) => ({ ...current, [key]: event.target.value }));
@@ -158,10 +160,7 @@ function MedicationDialog({
     setSaving(true);
     try {
       const path = item ? `${medicationsPath}/${item.id}` : medicationsPath;
-      await trackWrite(
-        `${medicationsPath}/`,
-        requestJson<Medication>(path, { method: item ? 'PUT' : 'POST', body }),
-      );
+      await write.mutateAsync({ path, method: item ? 'PUT' : 'POST', body });
       onSaved();
     } catch (cause) {
       error(cause);
@@ -338,6 +337,7 @@ const sections = [
 
 /** `today` is undefined while the server is still being asked, and null if it could not say. */
 export function MedicationsPage({ today }: { today: string | null | undefined }) {
+  const remover = useApiMutation<unknown, ApiRequest>(asRequest);
   const [params, setParams] = useSearchParams();
   const [lists, setLists] = useState<MedicationLists | null>(null);
   const [visits, setVisits] = useState<Visit[]>([]);
@@ -419,10 +419,7 @@ export function MedicationsPage({ today }: { today: string | null | undefined })
 
   const remove = async (item: Medication) => {
     try {
-      await trackWrite(
-        `${medicationsPath}/`,
-        requestJson(`${medicationsPath}/${item.id}`, { method: 'DELETE' }),
-      );
+      await remover.mutateAsync({ path: `${medicationsPath}/${item.id}`, method: 'DELETE' });
     } catch (cause) {
       // Already gone counts as deleted; anything else keeps the dialog open with the reason.
       if (!(cause instanceof RequestError && cause.status === 404)) {

@@ -105,3 +105,26 @@ The hand-written polling hook `useHealth` in `app.tsx` (an interval, a visibilit
 - #213's "a card that is gone stops listening" showed that a `GoalsCard` mounted again within the 30-second fresh time would show the cached verdict without reading, though saves made while no card listened may have changed it. The verdict query now has `staleTime: 0`, so it reads on every mount as before.
 - `meals.test.tsx`: #213 removed a zero-delay wait in "coming back while an entry is being recorded"; the test now waits until the add is sent (a mutation sends a moment after the press) before finishing it. The new #207 test renders through `renderWithQuery`.
 - `vitest run` on meals, goals, save-focus, daily, sleep, body, checks and habits tests: 234 passed. `tsc --noEmit` and `eslint` clean.
+
+## Clinic, medicine and reminders — 2026-11-22
+
+- **Writers:** the visit dialog, the medicine dialog, and the visit and medicine deletes run through `useApiMutation(asRequest)`, so their paths are in the mutation cache. The dialogs keep their own `saving` state (it stays on until the dialog closes after a save).
+- **Daily visit card** (`VisitsCard`): two `useApiQuery` reads (`apiKey('/api/visits', date)`, `apiKey('/api/medications', date)`) behind `useReadAfterWrites('/api/visits', '/api/medications')`, shown together as the single read was. `staleTime: 0`, so it reads on every mount as before, because the clinic and medicine pages do not refresh it yet (#282). "Try again" reads only the part that failed.
+- **Upcoming card** (`RemindersCard`): `useApiQuery` on `apiKey('/api/reminders')` behind `useReadAfterWrites` of visits, medicines, and reminders, with `staleTime: 0` (it is keyed per service day). A mark is a mutation; on success the item is dropped from the cached list, and on 404 the list is read again before focus moves. The load error and a mark's error share one notice; a mark's word comes first.
+- **Behavior change:** returning to the tab now reads the upcoming list again in place (React Query's focus refetch, with the list kept on screen). `daily.test.tsx` "one failed check of the server keeps today's coming-up card" checks that the list stays without a loading state instead of counting one read.
+- **Tests:** the card tests render through `renderWithQuery` and use `write` for a save on its way. "marking one done" waits until the mark is sent. "reminders failing to load leave the rest of the dashboard alone" renders the app with `testQueryClient()`, as the real client retries a 503 once after a second.
+
+## Removing the hand-made tracker — 2026-11-22
+
+- Every writer is a React Query mutation now, so the transitional `trackWrite` wrappers in the sleep, checks, habits, body, meal, and goal cards are gone, and `pending-writes.ts` with its test is deleted. `test/setup.ts` no longer calls `forgetPendingWrites`.
+- Read-after-write (#71) is `useReadAfterWrites`, and re-judging (#104) is `onWriteSettled`, both in `writes.ts` and built on the mutation cache.
+- The report, the clinic and medicine page lists, food search, and combos still read with their own load functions; that move is #282.
+
+### Verification (clinic and tracker PR)
+
+- The full `npm run check` was not run locally: another lane held the shared check lock and memory was low. Instead, on the rebuilt branch over `origin/main`: `prettier --check` on the changed files, `eslint --max-warnings 0 frontend/src`, frontend `tsc --noEmit`, and the whole frontend suite with `vitest run --maxWorkers=2` (75 files, 769 passed, 3 skipped). `knip` finds nothing in `frontend/src`; locally it cannot load the Playwright config without a test DB, so CI's run is the one that counts. CI runs the full check.
+- No browser check: the markup is unchanged, and the screen tests cover the behavior.
+
+### Review round 1 fix (clinic and tracker PR)
+
+- Returning to the tab now reads the upcoming list again, which the old card never did. A read that left before a "Done" landed could then bring the marked item back. The mark now cancels a read of the list still on its way before dropping the item, as `putAnswer` does. New test "a read from returning to the tab, still on its way, does not bring back one marked done" fails without the cancel and passes with it; reminders, daily and report tests: 67 passed.

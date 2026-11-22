@@ -151,3 +151,33 @@ test('the database itself refuses a wake time before the bed time', { skip }, as
     { code: '23514' },
   );
 });
+
+// #197: an import that writes here directly cannot store a length that contradicts its own times.
+test(
+  'the database itself refuses a duration that does not match the bed and wake times',
+  { skip },
+  async (t) => {
+    // An earlier test in this file leaves its day in place; start from no record.
+    await clean();
+    t.after(clean);
+    const insert = (wakeAt: string, minutes: number) =>
+      pool.query(
+        `INSERT INTO sleep_records (sleep_date, bed_at, wake_at, duration_minutes)
+       VALUES ($1, '1990-01-04T22:00:00Z', $2, $3)`,
+        [days[3], wakeAt, minutes],
+      );
+    // 7 h 29 min 30 s rounds up to 450 minutes, as sleepMinutes in sleep.ts rounds it.
+    for (const minutes of [449, 451, 1]) {
+      await assert.rejects(insert('1990-01-05T05:29:30Z', minutes), {
+        code: '23514',
+        constraint: 'sleep_records_duration_matches_times',
+      });
+    }
+    await insert('1990-01-05T05:29:30Z', 450);
+    const { rows } = await pool.query<{ duration_minutes: number }>(
+      'SELECT duration_minutes FROM sleep_records WHERE sleep_date = $1',
+      [days[3]],
+    );
+    assert.deepEqual(rows, [{ duration_minutes: 450 }]);
+  },
+);

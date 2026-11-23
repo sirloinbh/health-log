@@ -1,5 +1,5 @@
 {
-  "centralSha": "138e626f986bed08c4880c789667b741702dd95c",
+  "centralSha": "28d9e3bf7c8513aef9b96c1b11c28a271f397d8d",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -275,7 +275,7 @@
     },
     "backend/src/standard/db.ts": {
       "mode": "full",
-      "sha256": "740d508493e06ef5ebc1c093218809903fdb68ab9f6ca5a2ffe0ea504ea831db",
+      "sha256": "14c9830c0d4fa071016c5e2ac134f331bad410f31e109e607a57ad8814e55a51",
       "source": "templates/app/backend/src/standard/db.ts"
     },
     "backend/src/standard/http.ts": {
@@ -310,7 +310,7 @@
     },
     "backend/src/standard/tools.ts": {
       "mode": "full",
-      "sha256": "ab47124dfdeca19e68ba17453f069a7c8194540a44e2b1f1209348f3907b21fa",
+      "sha256": "a495d8224ba162ac906d743ad39cfa210f2e618356f6b54d27e7e6960ae75a15",
       "source": "templates/app/backend/src/standard/tools.ts"
     },
     "backend/test/standard-api.test.ts": {
@@ -405,7 +405,7 @@
     },
     "deploy/notify.sh": {
       "mode": "full",
-      "sha256": "5cc9641ee2170563949f36450029195f89849bd4fc74ecc4226c759dfcb166b2",
+      "sha256": "5b123f87490620cde829a72677b647fe415459e78bca57c99136cd361aa97789",
       "source": "templates/deploy/deploy/notify.sh.tmpl"
     },
     "deploy/remote-deploy.sh": {
@@ -761,12 +761,12 @@
     },
     "frontend/src/components/ui/number-input.test.tsx": {
       "mode": "full",
-      "sha256": "633fe81a1ae8cc234e3d15f0080eae82002b92f40c14b185243d25ae5f7ec9fd",
+      "sha256": "83376bcaf66c70f2c16074b21fbe88760ee7816b49a61c07c20fae6fe36f47e4",
       "source": "templates/ui/frontend/src/components/ui/number-input.test.tsx"
     },
     "frontend/src/components/ui/number-input.tsx": {
       "mode": "full",
-      "sha256": "f96ea1d33c8174272f60cb791fdb926b69e77cb3c576de96e722efc816be299c",
+      "sha256": "a4a1f31491655d26c6647656e36f215efffc345cb713d99f14227b5d42960cbb",
       "source": "templates/ui/frontend/src/components/ui/number-input.tsx"
     },
     "frontend/src/components/ui/number-step.ts": {
@@ -886,12 +886,12 @@
     },
     "frontend/src/lib/ai-chat.test.ts": {
       "mode": "full",
-      "sha256": "3ee0265a86f0b066252bec455b4f76b04bfa2799cc06fee2fd3554e48b9a1462",
+      "sha256": "87feec086ff208c8e66a0f5db59694805e1416e05d64385e7560db05468842b3",
       "source": "templates/ui/frontend/src/lib/ai-chat.test.ts"
     },
     "frontend/src/lib/ai-chat.ts": {
       "mode": "full",
-      "sha256": "8befa3a6f2bfacc5edf55e7945fe1cabd8f05d9936f33e3cdc5c004a74086df0",
+      "sha256": "f0868312f6800a41d3287a908a6387ec7dd241f66d99d37e39dd0b87f4f0a033",
       "source": "templates/ui/frontend/src/lib/ai-chat.ts"
     },
     "frontend/src/lib/ai-config.ts": {

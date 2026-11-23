@@ -1,5 +1,5 @@
 {
-  "centralSha": "7638be209d5d91dd0565ec4041bfe7c9553e6bd1",
+  "centralSha": "740b5e1d7ec66e943793aec58c40493d5ce0228e",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -180,7 +180,7 @@
     },
     ".standards/check.mjs": {
       "mode": "full",
-      "sha256": "173364dd454da9a5a772d7a597391b2e5a760d1f3907bf73d6b1c6faa486ee6a",
+      "sha256": "b0a0d20637413cf230985cd4d0e1a9f5088429ac1a74477885fc6b2667039704",
       "source": "scripts/standards-check.mjs"
     },
     ".standards/ci-migrate.sh": {
@@ -190,7 +190,7 @@
     },
     ".standards/ioc-scan.mjs": {
       "mode": "full",
-      "sha256": "1fdedfb197f82a9e97a6f2282d48b693f0a5bc8d20f6fb34c88075fd342b1ed0",
+      "sha256": "41549001c629ee094d306f236be2995f3beb8e8c79498bd1cd4ab25513125aca",
       "source": "scripts/ioc-scan.mjs"
     },
     ".standards/lib/env-tags.mjs": {
@@ -215,7 +215,7 @@
     },
     ".standards/secret-scan.mjs": {
       "mode": "full",
-      "sha256": "951b4e75e5515818717413a0ed03e94d8224a7f89ba4af7f2399a66860cd1b9e",
+      "sha256": "48f48ff10dea0e4f42518141e601e7d2d6f8f6dcfe7a4bd6192d01e1f37e9d30",
       "source": "scripts/secret-scan.mjs"
     },
     ".vscode/extensions.json": {
@@ -300,7 +300,7 @@
     },
     "backend/src/standard/openapi.ts": {
       "mode": "full",
-      "sha256": "e9fe812e39f00d8c85ec55c7313fb3674fe02ed086e64e725e2671bef2e8ebc8",
+      "sha256": "9d4c92cf40151d7aa721497d77b22dcdec2e4d8ac730013456319c35e2056c82",
       "source": "templates/app/backend/src/standard/openapi.ts"
     },
     "backend/src/standard/rate-limit.ts": {
@@ -365,7 +365,7 @@
     },
     "deploy/backup.sh": {
       "mode": "full",
-      "sha256": "14653b238a28217c75e3700a9e38684ded03b22c9a61cd24b10873da4c22dad5",
+      "sha256": "1b64282660ed493ae77a3fa69d6b05402c6131ee7d2d2498f1ba216f02f4e62a",
       "source": "templates/deploy/deploy/backup.sh.tmpl"
     },
     "deploy/backup.timer": {
@@ -470,7 +470,7 @@
     },
     "frontend/nginx.conf": {
       "mode": "full",
-      "sha256": "ffe82415905bab95adac6da98c0d3d0735db33d814387951355e4e053fa67b17",
+      "sha256": "212c0742f9719c3efe78b60af689c0566c048a1499f4581340473241417231ed",
       "source": "templates/app/frontend/nginx.conf.tmpl"
     },
     "frontend/package.json": {

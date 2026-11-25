@@ -8,8 +8,12 @@ import {
   type CheckDay,
   type CheckSummary,
   type DayCheck,
+  notRated,
   questions,
   rateText,
+  scores,
+  scoreText,
+  scoreValues,
   unchecked,
 } from './check-text';
 import { Button } from './components/ui/button';
@@ -31,7 +35,14 @@ const pathOf = (date: string) => `/api/checks/${date}`;
 const keyOf = (date: string) => apiKey(pathOf(date));
 const maxMemo = 200;
 
-type Form = { dietKept: boolean | null; sleepGood: boolean | null; memo: string };
+type Form = {
+  dietKept: boolean | null;
+  sleepGood: boolean | null;
+  mood: number | null;
+  energy: number | null;
+  stress: number | null;
+  memo: string;
+};
 
 function CheckForm({
   date,
@@ -47,6 +58,9 @@ function CheckForm({
   const [form, setForm] = useState<Form>(() => ({
     dietKept: record?.dietKept ?? null,
     sleepGood: record?.sleepGood ?? null,
+    mood: record?.mood ?? null,
+    energy: record?.energy ?? null,
+    stress: record?.stress ?? null,
     memo: record?.memo ?? '',
   }));
   const client = useQueryClient();
@@ -70,8 +84,12 @@ function CheckForm({
     // The save button stays pressable while saving (#126), and Enter in a field submits too.
     if (saving) return;
     const memo = form.memo.trim() || null;
-    if (form.dietKept === null && form.sleepGood === null && memo === null) {
-      error('Enter at least one check or a note');
+    const { dietKept, sleepGood, mood, energy, stress } = form;
+    if (
+      [dietKept, sleepGood, mood, energy, stress].every((value) => value === null) &&
+      memo === null
+    ) {
+      error('Enter at least one check, score or note');
       return;
     }
     if (memo && charCount(memo) > maxMemo) {
@@ -85,7 +103,7 @@ function CheckForm({
         await save.mutateAsync({
           path: pathOf(date),
           method: 'PUT',
-          body: { dietKept: form.dietKept, sleepGood: form.sleepGood, memo },
+          body: { dietKept, sleepGood, mood, energy, stress, memo },
         }),
       );
     } catch (cause) {
@@ -124,6 +142,36 @@ function CheckForm({
                 {label}
               </Button>
             ))}
+          </div>
+        </div>
+      ))}
+      {scores.map(({ key, question, low, high }) => (
+        <div key={key} className="flex flex-col gap-2">
+          <p id={`check-${key}`} className="text-body-sm font-medium">
+            {question}
+          </p>
+          <div role="group" aria-labelledby={`check-${key}`} className="flex flex-wrap gap-2">
+            {[null, ...scoreValues].map((value) => {
+              const label = value === null ? notRated : String(value);
+              return (
+                <Button
+                  key={label}
+                  type="button"
+                  size="sm"
+                  variant={form[key] === value ? 'default' : 'outline'}
+                  aria-pressed={form[key] === value}
+                  aria-label={
+                    value === null
+                      ? notRated
+                      : `${value} of 5${value === 1 ? `, ${low}` : value === 5 ? `, ${high}` : ''}`
+                  }
+                  disabled={saving}
+                  onClick={() => setForm((current) => ({ ...current, [key]: value }))}
+                >
+                  {label}
+                </Button>
+              );
+            })}
           </div>
         </div>
       ))}
@@ -175,6 +223,12 @@ function CheckView({
           <div key={key}>
             <dt className="text-muted-foreground">{title}</dt>
             <dd>{answerText(record[key], yes, no)}</dd>
+          </div>
+        ))}
+        {scores.map(({ key, title }) => (
+          <div key={key}>
+            <dt className="text-muted-foreground">{title}</dt>
+            <dd>{scoreText(record[key])}</dd>
           </div>
         ))}
         {record.memo ? (

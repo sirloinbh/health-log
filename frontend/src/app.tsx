@@ -1,6 +1,7 @@
 import { type QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import {
   CalendarDays,
+  FlaskConical,
   Layers,
   LayoutDashboard,
   Pill,
@@ -20,6 +21,8 @@ import { FoodsPage } from './foods';
 import { goalSettingsPath } from './goal-text';
 import { GoalsSettings } from './goals';
 import { type Health, healthText } from './health';
+import { labsPagePath } from './lab-text';
+import { LabsPage } from './labs';
 import { requestJson } from './lib/api';
 import { apiKey, createQueryClient } from './lib/query';
 import { medicationsPagePath } from './med-text';
@@ -37,6 +40,7 @@ const pages = {
   combos: '/combos',
   visits: visitsPagePath,
   medications: medicationsPagePath,
+  labs: labsPagePath,
   settings: goalSettingsPath,
 } as const;
 
@@ -48,6 +52,7 @@ const nav: NavItem[] = [
   { to: pages.combos, label: 'Combos', icon: Layers },
   { to: pages.visits, label: 'Clinic', icon: Stethoscope },
   { to: pages.medications, label: 'Medication', icon: Pill },
+  { to: pages.labs, label: 'Lab results', icon: FlaskConical },
   { to: pages.settings, label: 'Settings', icon: Settings2 },
 ];
 
@@ -145,6 +150,7 @@ function Routed() {
             <Route path={pages.combos} element={<CombosPage />} />
             <Route path={pages.visits} element={<VisitsPage today={pageToday} />} />
             <Route path={pages.medications} element={<MedicationsPage />} />
+            <Route path={pages.labs} element={<LabsPage />} />
             <Route
               path={pages.settings}
               element={

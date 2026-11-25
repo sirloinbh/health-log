@@ -8,6 +8,7 @@ import { checkInput } from './checks.js';
 import { comboInput } from './combos.js';
 import { foodInput, searchQuery } from './foods.js';
 import { habitInput } from './habits.js';
+import { labInput, labListQuery } from './labs.js';
 import { comboUse, entryInput, mealCopy } from './meals.js';
 import { dayQuery, medicationInput } from './medications.js';
 import { doneInput } from './reminders.js';
@@ -212,6 +213,23 @@ export const operations: Record<string, Operation> = {
     status: [200, 400, 404],
   },
   'DELETE /api/visits/:id': { summary: 'Delete a clinic visit', status: [204, 400, 404] },
+
+  'GET /api/labs': {
+    summary: 'List checkup and blood test results, filtered by test name, one page at a time',
+    query: labListQuery,
+    status: [200, 400],
+  },
+  'POST /api/labs': {
+    summary: 'Add a test result',
+    body: ['LabResult', labInput],
+    status: [201, 400],
+  },
+  'PUT /api/labs/:id': {
+    summary: 'Replace a test result',
+    body: ['LabResult', labInput],
+    status: [200, 400, 404],
+  },
+  'DELETE /api/labs/:id': { summary: 'Delete a test result', status: [204, 400, 404] },
 
   'GET /api/medications': {
     summary: 'List the medicines taken on a day, or every medicine split by today',

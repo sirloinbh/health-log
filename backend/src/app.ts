@@ -10,6 +10,7 @@ import { combosRouter } from './combos.js';
 import { foodsRouter } from './foods.js';
 import { goalsRouter } from './goals.js';
 import { habitsRouter } from './habits.js';
+import { labsRouter } from './labs.js';
 import { mealsRouter } from './meals.js';
 import { medicationsRouter } from './medications.js';
 import { remindersRouter } from './reminders.js';
@@ -63,6 +64,7 @@ export function createApp(
   app.use('/api/goals', goalsRouter(pool, today));
   app.use('/api/report', reportRouter(pool));
   app.use('/api/visits', visitsRouter(pool));
+  app.use('/api/labs', labsRouter(pool));
   app.use('/api/medications', medicationsRouter(pool, today));
   app.use('/api/reminders', remindersRouter(pool, today));
   // AI tools for shared-ai on /internal/tools: outside /api, so nginx never forwards them and the signed

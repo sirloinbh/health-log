@@ -23,6 +23,17 @@ export const servingsInput = z
   .max(999, 'The quantity is too large')
   .refine(hasTwoDecimalsAtMost, 'The quantity can have at most 2 decimal places');
 
+/** A slot's time of day: "HH:MM" on a 24-hour clock (Asia/Seoul), or null to clear it. */
+export const mealTimeInput = z.object(
+  {
+    time: z
+      .string({ error: 'The time is not valid' })
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'The time must be HH:MM on a 24-hour clock')
+      .nullable(),
+  },
+  { error: 'The request body is not valid' },
+);
+
 export const comboUse = z.object({ meal: mealKey }, { error: 'The request body is not valid' });
 
 export const mealCopy = z.object(
@@ -165,9 +176,18 @@ const junkOf = async (db: Db, period: { from: string; to: string }) => {
 // may show in the periods before the list, until the next read. The AI tool list_meals calls it too (#711).
 export const mealsOfDay = async (db: Db, date: string) => {
   const { rows } = await db.query<DayRow>(daySql, [date]);
+  const timed = await db.query<{ meal: string; time: string }>(
+    `SELECT meal, to_char(eaten_time, 'HH24:MI') AS "time" FROM meal_times WHERE entry_date = $1`,
+    [date],
+  );
+  // Every slot is listed; null: no time recorded for it.
+  const times = Object.fromEntries(
+    mealKey.options.map((key) => [key, timed.rows.find((row) => row.meal === key)?.time ?? null]),
+  );
   const { week, month } = periodsOf(date);
   return {
     entries: rows.map(toEntry),
+    times,
     totals: toTotals(rows[0]),
     junk: { week: await junkOf(db, week), month: await junkOf(db, month) },
   };
@@ -273,6 +293,31 @@ export function mealsRouter(pool: Pool) {
       }),
     );
     res.status(201).json(answer);
+  });
+
+  // One time per meal slot per day; null clears it. Setting the same time again changes nothing.
+  router.put('/:date/times/:meal', async (req, res) => {
+    const date = parseDate(req.params.date);
+    const meal = mealKey.safeParse(req.params.meal);
+    if (!meal.success) throw new HttpError(400, 'Choose a meal');
+    const { time } = mealTimeInput.parse(req.body);
+    const answer = await inTransaction(pool, async (client) => {
+      if (time === null) {
+        await client.query('DELETE FROM meal_times WHERE entry_date = $1 AND meal = $2', [
+          date,
+          meal.data,
+        ]);
+      } else {
+        await client.query(
+          `INSERT INTO meal_times (entry_date, meal, eaten_time) VALUES ($1, $2, $3)
+           ON CONFLICT (entry_date, meal) DO UPDATE SET
+             eaten_time = EXCLUDED.eaten_time, updated_at = now()`,
+          [date, meal.data, time],
+        );
+      }
+      return mealsOfDay(client, date);
+    });
+    res.json(answer);
   });
 
   router.delete('/:date/entries/:id', async (req, res) => {

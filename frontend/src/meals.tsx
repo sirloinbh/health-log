@@ -128,11 +128,12 @@ function SlotTime({
   label: string;
   value: string | null;
   disabled: boolean;
-  onSave: (time: string | null) => Promise<unknown>;
+  /** Resolves false when the save failed. */
+  onSave: (time: string | null) => Promise<boolean>;
 }) {
   return (
     <Input
-      // A new key shows the saved value again after a failed save or a new answer.
+      // A new answer replaces what was typed.
       key={value ?? ''}
       type="time"
       aria-label={`${label} time`}
@@ -140,8 +141,13 @@ function SlotTime({
       defaultValue={value ?? ''}
       disabled={disabled}
       onBlur={(event) => {
-        const time = event.target.value || null;
-        if (time !== value) void onSave(time);
+        const field = event.target;
+        const time = field.value || null;
+        if (time === value) return;
+        // A failed save puts the saved time back, so the field never shows what was not saved.
+        void onSave(time).then((saved) => {
+          if (!saved) field.value = value ?? '';
+        });
       }}
     />
   );
@@ -280,8 +286,10 @@ export function MealCard({ date }: { date: string }) {
         method: 'PUT',
         body: { time },
       });
+      return true;
     } catch (cause) {
       toast.error(`Could not save the time: ${errorText(cause)}`);
+      return false;
     }
   };
 

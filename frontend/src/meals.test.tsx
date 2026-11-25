@@ -250,6 +250,18 @@ test('clearing a slot time sends null, and an unchanged time sends nothing', asy
   expect(request(fetchMock, 1).body).toEqual({ time: null });
 });
 
+test('a slot time that could not be saved goes back to the saved one', async () => {
+  server(
+    { body: { ...oneEntry, times: { ...noTimes, lunch: '12:30' } } },
+    { status: 500, body: { error: 'Could not save' } },
+  );
+  renderWithQuery(<MealCard date={date} />);
+  const field = await screen.findByLabelText('Lunch time');
+  fireEvent.change(field, { target: { value: '13:10' } });
+  fireEvent.blur(field);
+  await waitFor(() => expect(field).toHaveValue('12:30'));
+});
+
 // #207: one serving reads as one.
 test('an entry of one serving says "1 serving"', async () => {
   server({ body: { ...oneEntry, entries: [{ ...entry, servings: 1, calories: 300 }] } });

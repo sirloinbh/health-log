@@ -19,7 +19,7 @@ export const labsPath = '/api/labs';
 /** The lab results page, in the app's page list. */
 export const labsPagePath = '/labs';
 
-export const maxLabValue = 1_000_000_000;
+const maxLabValue = 1_000_000_000;
 
 /**
  * A result or range limit as typed: 0 or more, at most 4 decimals, below 1 billion. Blank is no value

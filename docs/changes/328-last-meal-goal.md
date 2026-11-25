@@ -2,7 +2,7 @@
 
 ## What changed
 
-- New goal item `last_meal`: the target is the last allowed minute of the day counted from midnight (21:00 is 1260), 1 to 1439. Migration `024_goal_last_meal.sql` widens the `goals` item and range checks.
+- New goal item `last_meal`: the target is the last allowed minute of the day counted from midnight (21:00 is 1260), 1 to 1439. Migration `025_goal_last_meal.sql` widens the `goals` item and range checks.
 - `GET /api/goals/days/:date` has a `last_meal` entry whose `actual` is `{ slots: [{ meal, time }] }`: each meal slot that has an entry, with its time (minutes) from the slot times of #327, or `null`.
 - Judging (`judgeLastMeal`): no entries is `none`; any slot timed after the limit is `missed` (even if another slot has no time); otherwise a slot with no time makes the day `unknown`; otherwise `met`. Eating exactly at the limit is allowed.
 - `PUT /api/goals/last_meal` takes minutes from midnight; errors say the range as a clock time. `docs/openapi.json` regenerated.

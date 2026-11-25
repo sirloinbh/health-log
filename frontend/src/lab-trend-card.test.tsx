@@ -6,8 +6,15 @@ import type { TrendPoint } from './lab-trend';
 import { testQueryClient } from './test/query';
 
 // Made-up values only.
-const point = (id: number, date: string, value: number, overrides: Partial<TrendPoint> = {}) =>
-  ({ id, date, value, unit: 'mg/dL', refLow: 0, refHigh: 200, ...overrides });
+const point = (id: number, date: string, value: number, overrides: Partial<TrendPoint> = {}) => ({
+  id,
+  date,
+  value,
+  unit: 'mg/dL',
+  refLow: 0,
+  refHigh: 200,
+  ...overrides,
+});
 
 const json = (body: object, status = 200) => new Response(JSON.stringify(body), { status });
 

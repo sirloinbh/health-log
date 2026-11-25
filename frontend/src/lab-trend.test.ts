@@ -10,8 +10,15 @@ import {
   unitsOf,
 } from './lab-trend';
 
-const point = (id: number, date: string, value: number, overrides: Partial<TrendPoint> = {}) =>
-  ({ id, date, value, unit: 'mg/dL', refLow: 0, refHigh: 200, ...overrides });
+const point = (id: number, date: string, value: number, overrides: Partial<TrendPoint> = {}) => ({
+  id,
+  date,
+  value,
+  unit: 'mg/dL',
+  refLow: 0,
+  refHigh: 200,
+  ...overrides,
+});
 
 test('each row changes against the result before it, in the same unit', () => {
   const rows = trendRows([

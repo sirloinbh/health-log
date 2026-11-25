@@ -73,3 +73,14 @@ test('a too long search term or an offset that is not a number is rejected', asy
   });
   assert.equal(queries.length, 0);
 });
+
+test('the trend needs a test name of at most 100 characters', async () => {
+  const { pool, queries } = recording();
+  await withApi(pool, async (call) => {
+    assert.equal((await call('/api/labs/trend')).status, 400);
+    assert.equal((await call('/api/labs/trend?name=%20%20')).status, 400);
+    assert.equal((await call(`/api/labs/trend?name=${'a'.repeat(101)}`)).status, 400);
+    assert.equal((await call('/api/labs/trend?name=a&name=b')).status, 400);
+  });
+  assert.equal(queries.length, 0);
+});

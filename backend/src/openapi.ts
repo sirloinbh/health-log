@@ -9,7 +9,7 @@ import { comboInput } from './combos.js';
 import { foodInput, searchQuery } from './foods.js';
 import { habitInput } from './habits.js';
 import { intakeInput } from './intake.js';
-import { labInput, labListQuery } from './labs.js';
+import { labInput, labListQuery, trendQuery } from './labs.js';
 import { comboUse, entryInput, mealCopy, mealTimeInput } from './meals.js';
 import { dayQuery, medicationInput } from './medications.js';
 import { doneInput } from './reminders.js';
@@ -242,6 +242,16 @@ export const operations: Record<string, Operation> = {
   'GET /api/labs': {
     summary: 'List checkup and blood test results, filtered by test name, one page at a time',
     query: labListQuery,
+    status: [200, 400],
+  },
+  'GET /api/labs/names': {
+    summary: 'List the test names recorded, with their result counts and latest dates',
+    status: [200],
+  },
+  'GET /api/labs/trend': {
+    summary:
+      'Get one test over time, oldest first, with the unit and reference range of each result',
+    query: trendQuery,
     status: [200, 400],
   },
   'POST /api/labs': {

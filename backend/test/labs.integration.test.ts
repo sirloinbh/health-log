@@ -135,3 +135,65 @@ test('the database itself refuses a negative value and an inverted range', { ski
   await assert.rejects(insert(-1, null, null), { code: '23514' });
   await assert.rejects(insert(1, 5, 4), { code: '23514' });
 });
+
+test(
+  'a trend lists one test oldest first, whatever its case, and keeps each unit and range',
+  {
+    skip,
+  },
+  async () => {
+    await withApi(pool, async (call) => {
+      const name = `${marker}-trend`;
+      const add = (date: string, value: number, overrides: Record<string, unknown> = {}) =>
+        call('/api/labs', { method: 'POST', body: body({ date, name, value, ...overrides }) });
+      await add('1990-04-20', 210);
+      await add('1990-04-05', 180.25, { refLow: null });
+      await add('1990-04-12', 195, { name: name.toUpperCase(), unit: 'mmol/L' });
+      await call('/api/labs', {
+        method: 'POST',
+        body: body({ date: '1990-04-06', name: `${marker}-other-trend`, value: 1 }),
+      });
+
+      const { status, data } = await call(`/api/labs/trend?name=${encodeURIComponent(name)}`);
+      assert.equal(status, 200);
+      const points = data.points as {
+        date: string;
+        value: number;
+        unit: string;
+        refLow: unknown;
+      }[];
+      assert.deepEqual(
+        points.map((point) => [point.date, point.value]),
+        [
+          ['1990-04-05', 180.25],
+          ['1990-04-12', 195],
+          ['1990-04-20', 210],
+        ],
+      );
+      assert.equal(points[0]!.refLow, null);
+      assert.equal(points[1]!.unit, 'mmol/L');
+      assert.equal(points[2]!.unit, 'mg/dL');
+
+      const none = await call(`/api/labs/trend?name=${marker}-nothing`);
+      assert.deepEqual(none.data.points, []);
+    });
+  },
+);
+
+test('the names list has each test once with its count and latest date', { skip }, async () => {
+  await withApi(pool, async (call) => {
+    const names = (await call('/api/labs/names')).data.names as {
+      name: string;
+      count: number;
+      latest: string;
+    }[];
+    const mine = names.filter((entry) => entry.name.toLowerCase().startsWith(`${marker}-trend`));
+    assert.equal(mine.length, 1);
+    assert.equal(mine[0]!.count, 3);
+    assert.equal(mine[0]!.latest, '1990-04-20');
+    assert.equal(
+      names.filter((entry) => entry.name.toLowerCase() === `${marker}-other-trend`).length,
+      1,
+    );
+  });
+});

@@ -18,7 +18,7 @@ export const intakeLabels: Record<IntakeKind, string> = {
 };
 
 /** Water counts in ml, every other kind in mg of caffeine. */
-export const intakeUnit = (kind: IntakeKind) => (kind === 'water' ? 'ml' : 'mg');
+const intakeUnit = (kind: IntakeKind) => (kind === 'water' ? 'ml' : 'mg');
 
 export const amountText = (kind: IntakeKind, amount: number) =>
   `${amount.toLocaleString('en-US')} ${intakeUnit(kind)}`;

@@ -6,10 +6,10 @@ import { parseDate } from './dates.js';
 import { type Db, inTransaction, snapshotRead } from './db.js';
 
 /** Water is counted in cups; the others are caffeine drinks, one per cup or can. */
-export const intakeKinds = ['water', 'coffee', 'tea', 'energy', 'other_caffeine'] as const;
-export type IntakeKind = (typeof intakeKinds)[number];
+const intakeKinds = ['water', 'coffee', 'tea', 'energy', 'other_caffeine'] as const;
+type IntakeKind = (typeof intakeKinds)[number];
 /** What one tap adds: ml for water, mg of caffeine for the others (approximate cup or can sizes, #325). */
-export const intakeAmounts: Record<IntakeKind, number> = {
+const intakeAmounts: Record<IntakeKind, number> = {
   water: 250,
   coffee: 95,
   tea: 40,
@@ -17,7 +17,7 @@ export const intakeAmounts: Record<IntakeKind, number> = {
   other_caffeine: 50,
 };
 // Far above any real day; stops a stuck button or a script from filling the table.
-export const maxPerKind = 50;
+const maxPerKind = 50;
 
 export const intakeInput = z.object(
   { kind: z.enum(intakeKinds, { error: 'The drink type is not valid' }) },

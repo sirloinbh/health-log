@@ -21,12 +21,22 @@ type ReportDay = {
   drank: boolean | null;
 };
 type Night = { nights: number; averageMinutes: number | null };
+type ConditionScore = { days: number; average: number | null };
+export type ConditionGroup = {
+  days: number;
+  mood: ConditionScore;
+  energy: ConditionScore;
+  stress: ConditionScore;
+};
+export type ConditionSplit = { with: ConditionGroup; without: ConditionGroup };
+export type ConditionAfter = Record<'shortSleep' | 'drinking' | 'junkFood', ConditionSplit>;
 export type Report = {
   period: Period;
   current: ReportSummary;
   previous: ReportSummary;
   days: ReportDay[];
   sleepAfterDrinking: { afterDrinking: Night; afterNoDrinking: Night };
+  conditionAfter: ConditionAfter;
 };
 
 export type PeriodWords = { name: string; previous: string };
@@ -75,6 +85,13 @@ export const daysText = (days: number) => `${count(days, 'day')} recorded`;
 
 /** Fewer nights than this in either group make the comparison too thin to lean on. */
 export const fewNights = 5;
+
+/** Fewest days with a score on each side before a condition comparison is shown (#324). */
+export const fewConditionDays = 3;
+
+/** "3.5" for an average score; "–" when no day has that score. */
+export const scoreAverageText = (average: number | null) =>
+  average === null ? '–' : average.toFixed(1);
 
 const yearOf = (date: string) => Number(date.slice(0, 4));
 

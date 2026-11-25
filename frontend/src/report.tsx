@@ -17,6 +17,7 @@ import { apiKey } from './lib/query';
 import { errorText, type NoticeValue } from './lib/use-notice';
 import { count } from './plural';
 import { RemindersCard } from './reminders';
+import { ConditionAfter } from './report-condition';
 import { initialReportFocus, reportFocus } from './report-focus';
 import {
   changeText,
@@ -511,6 +512,7 @@ export function ReportPage({ health }: { health: Health }) {
             </CardContent>
           </Card>
           <SleepAfterDrinking report={shown} />
+          <ConditionAfter report={shown} />
         </div>
       ) : null}
     </section>

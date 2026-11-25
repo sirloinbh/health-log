@@ -1,6 +1,6 @@
 // The day's workouts from workout-memo (#333), as the API summarizes them: read-only.
 export type WorkoutExercise = { exercise: string; sets: number; topWeightKg: number };
-export type WorkoutJournal = { id: number; title: string; exercises: WorkoutExercise[] };
+type WorkoutJournal = { id: number; title: string; exercises: WorkoutExercise[] };
 export type WorkoutDay = { state: 'ok'; workouts: WorkoutJournal[] } | { state: 'unavailable' };
 
 export const unavailableText = 'Workouts from workout-memo cannot be shown right now.';

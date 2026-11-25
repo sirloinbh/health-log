@@ -2,7 +2,7 @@
 
 ## What changed
 
-- Migration `022_meal_slot_times.sql` adds `meal_times` (`entry_date`, `meal`, `eaten_time`), one optional time per meal slot per day, Asia/Seoul wall-clock. No row means "not recorded".
+- Migration `023_meal_slot_times.sql` adds `meal_times` (`entry_date`, `meal`, `eaten_time`), one optional time per meal slot per day, Asia/Seoul wall-clock. No row means "not recorded".
 - `PUT /api/meals/:date/times/:meal` with `{ time: "HH:MM" | null }` sets or clears a slot's time and answers with the whole day. `GET /api/meals/:date` (and the AI tool `list_meals`) now return `times`, an object with all four slots, each `"HH:MM"` or `null`.
 - Each meal section in the day list has a time field; it saves when it loses focus, and clearing it sends `null`.
 - `docs/openapi.json` regenerated.

@@ -9,7 +9,7 @@ import { comboInput } from './combos.js';
 import { foodInput, searchQuery } from './foods.js';
 import { habitInput } from './habits.js';
 import { intakeInput } from './intake.js';
-import { comboUse, entryInput, mealCopy } from './meals.js';
+import { comboUse, entryInput, mealCopy, mealTimeInput } from './meals.js';
 import { dayQuery, medicationInput } from './medications.js';
 import { doneInput } from './reminders.js';
 import { reportQuery } from './report.js';
@@ -81,6 +81,12 @@ export const operations: Record<string, Operation> = {
     body: ['MealCopy', mealCopy],
     headers: retryKey,
     status: [201, 400, 404, 409],
+  },
+  'PUT /api/meals/:date/times/:meal': {
+    params: { date: z.iso.date(), meal: z.enum(['breakfast', 'lunch', 'dinner', 'snack']) },
+    summary: 'Set or clear the time of day a meal slot was eaten',
+    body: ['MealTime', mealTimeInput],
+    status: [200, 400],
   },
   'DELETE /api/meals/:date/entries/:id': {
     params: { date: z.iso.date() },

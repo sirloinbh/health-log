@@ -25,8 +25,8 @@ Made-up values only in tests and docs.
 - `backend/test/labs.test.ts` (7): rejected input never reaches the database.
 - `backend/test/labs.integration.test.ts` (4): create/read/change/delete, paging and search, visit link, the database checks. Run against a temporary PostgreSQL 17 `health_test` with all migrations applied.
 - `frontend/src/lab-text.test.ts` (4), `frontend/src/labs.test.tsx` (8): parsing, range text and status, the add/edit/delete/search/paging flows, validation messages and a failed read.
-- `npm run check`: see the PR.
-- Browser check at 390x844 and 1440x900: see the PR.
+- `npm run check` (2026-11-25, `TEST_DATABASE_URL` on a temporary PostgreSQL 17): passed. Format, lint, contract, typecheck, backend tests, frontend tests (806 passed, 3 skipped), skills test and build.
+- Browser check at 390x844 and 1440x900 (headless Chrome on the Vite dev server, API replaced by an in-memory stand-in because the local API could not be reached from the browser run): add dialog, save, the card with "Above range", delete and the empty state worked, with no horizontal overflow. The real API is covered by the integration tests.
 
 ## Limits
 

@@ -17,6 +17,7 @@ import { AppShell, type NavItem } from './components/layout/app-shell';
 import { EmptyState } from './components/ui/empty-state';
 import { Toaster } from './components/ui/sonner';
 import { DailyPage, TodayRedirect } from './daily';
+import { ExportCard } from './export';
 import { FoodsPage } from './foods';
 import { goalSettingsPath } from './goal-text';
 import { GoalsSettings } from './goals';
@@ -160,6 +161,7 @@ function Routed() {
                   health={health}
                 >
                   <GoalsSettings />
+                  <ExportCard />
                 </Page>
               }
             />

@@ -6,6 +6,7 @@ import { z } from 'zod/v4';
 import { bodyInput } from './body.js';
 import { checkInput } from './checks.js';
 import { comboInput } from './combos.js';
+import { exportQuery } from './export.js';
 import { foodInput, searchQuery } from './foods.js';
 import { habitInput } from './habits.js';
 import { intakeInput } from './intake.js';
@@ -238,6 +239,14 @@ export const operations: Record<string, Operation> = {
     status: [200, 400, 404],
   },
   'DELETE /api/visits/:id': { summary: 'Delete a clinic visit', status: [204, 400, 404] },
+
+  'GET /api/export': {
+    summary:
+      'Download my records for a date range as one CSV file per kind, or every kind in one zip',
+    query: exportQuery,
+    status: [200, 400],
+    produces: 'text/csv',
+  },
 
   'GET /api/labs': {
     summary: 'List checkup and blood test results, filtered by test name, one page at a time',

@@ -97,17 +97,19 @@ const dayCard = (url: string) =>
       ? noMeals()
       : url.startsWith('/api/habits')
         ? noHabits()
-        : url.startsWith('/api/intake')
-          ? noIntake(url)
-          : url.startsWith('/api/checks')
-            ? noChecks()
-            : url.startsWith('/api/goals/days/')
-              ? noGoals(url)
-              : url === '/api/foods/recent'
-                ? new Response(JSON.stringify({ foods: [] }))
-                : url === '/api/reminders'
-                  ? new Response(JSON.stringify(noReminders))
-                  : null;
+        : url.startsWith('/api/workout-memo')
+          ? new Response(JSON.stringify({ state: 'ok', workouts: [] }))
+          : url.startsWith('/api/intake')
+            ? noIntake(url)
+            : url.startsWith('/api/checks')
+              ? noChecks()
+              : url.startsWith('/api/goals/days/')
+                ? noGoals(url)
+                : url === '/api/foods/recent'
+                  ? new Response(JSON.stringify({ foods: [] }))
+                  : url === '/api/reminders'
+                    ? new Response(JSON.stringify(noReminders))
+                    : null;
 
 const health = (body: object, status = 200) =>
   vi.stubGlobal(

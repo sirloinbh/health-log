@@ -5,6 +5,9 @@ export type DayCheck = {
   date: string;
   dietKept: boolean | null;
   sleepGood: boolean | null;
+  mood: number | null;
+  energy: number | null;
+  stress: number | null;
   memo: string | null;
 };
 
@@ -28,6 +31,24 @@ export const questions = [
     no: 'Slept badly',
   },
 ] as const;
+
+/** Condition scores, 1 to 5 each. null: not rated. */
+export const scores = [
+  { key: 'mood', title: 'Mood', question: 'How was your mood?', low: 'Low', high: 'High' },
+  { key: 'energy', title: 'Energy', question: 'How was your energy?', low: 'Low', high: 'High' },
+  {
+    key: 'stress',
+    title: 'Stress',
+    question: 'How stressed were you?',
+    low: 'Calm',
+    high: 'Stressed',
+  },
+] as const;
+
+export const scoreValues = [1, 2, 3, 4, 5] as const;
+export const notRated = 'Not rated';
+
+export const scoreText = (value: number | null) => (value === null ? notRated : `${value} of 5`);
 
 export const unchecked = 'Not checked';
 

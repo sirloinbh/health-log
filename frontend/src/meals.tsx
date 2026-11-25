@@ -8,6 +8,7 @@ import { fullName } from './combo-text';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
+import { Input } from './components/ui/input';
 import { Notice } from './components/ui/notice';
 import { SkeletonText } from './components/ui/skeleton';
 import { toast } from './components/ui/sonner';
@@ -47,6 +48,8 @@ type Entry = Record<NutrientKey, number | null> & {
 
 type MealDay = {
   entries: Entry[];
+  /** When each meal slot was eaten, "HH:MM" (Asia/Seoul); null when not recorded. */
+  times: Record<MealKey, string | null>;
   totals: Record<NutrientKey, { value: number | null; missing: number }>;
   junk: { week: JunkPeriod; month: JunkPeriod };
 };
@@ -112,6 +115,41 @@ function JunkSummary({ junk }: { junk: MealDay['junk'] }) {
         </p>
       ))}
     </section>
+  );
+}
+
+/** The time the slot was eaten. Saved when the field loses focus; empty clears it. */
+function SlotTime({
+  label,
+  value,
+  disabled,
+  onSave,
+}: {
+  label: string;
+  value: string | null;
+  disabled: boolean;
+  /** Resolves false when the save failed. */
+  onSave: (time: string | null) => Promise<boolean>;
+}) {
+  return (
+    <Input
+      // A new answer replaces what was typed.
+      key={value ?? ''}
+      type="time"
+      aria-label={`${label} time`}
+      className="w-32"
+      defaultValue={value ?? ''}
+      disabled={disabled}
+      onBlur={(event) => {
+        const field = event.target;
+        const time = field.value || null;
+        if (time === value) return;
+        // A failed save puts the saved time back, so the field never shows what was not saved.
+        void onSave(time).then((saved) => {
+          if (!saved) field.value = value ?? '';
+        });
+      }}
+    />
   );
 }
 
@@ -241,6 +279,20 @@ export function MealCard({ date }: { date: string }) {
     setMoveFocus((count) => count + 1);
   };
 
+  const saveTime = async (meal: MealKey, time: string | null) => {
+    try {
+      await write.mutateAsync({
+        path: `${pathOf(date)}/times/${meal}`,
+        method: 'PUT',
+        body: { time },
+      });
+      return true;
+    } catch (cause) {
+      toast.error(`Could not save the time: ${errorText(cause)}`);
+      return false;
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -279,7 +331,15 @@ export function MealCard({ date }: { date: string }) {
                 .filter(({ key }) => day.entries.some((entry) => entry.meal === key))
                 .map(({ key, label }) => (
                   <section key={key} aria-label={label} className="flex flex-col gap-2">
-                    <h3 className="text-body-sm font-semibold">{label}</h3>
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-body-sm font-semibold">{label}</h3>
+                      <SlotTime
+                        label={label}
+                        value={day.times[key]}
+                        disabled={adding}
+                        onSave={(time) => saveTime(key, time)}
+                      />
+                    </div>
                     <ul className="flex flex-col divide-y">
                       {day.entries
                         .filter((entry) => entry.meal === key)

@@ -10,7 +10,7 @@ const fromFood = { meal: 'lunch', servings: 1.5, foodId: 7 };
 const typed = { meal: 'snack', servings: 1, name: '떡볶이', calories: 480 };
 
 // Rejected input must never reach the database.
-const rejects = async (target: string, body: object | undefined, message: string) => {
+const rejects = async (target: string, body: object | undefined, message: string, put = false) => {
   const queries: unknown[] = [];
   const pool = {
     query: async (...args: unknown[]) => {
@@ -19,12 +19,18 @@ const rejects = async (target: string, body: object | undefined, message: string
     },
   } as unknown as Pool;
   await withApi(pool, async (call) => {
-    const { status, data } = await call(target, { method: body ? 'POST' : 'GET', body });
+    const { status, data } = await call(target, {
+      method: put ? 'PUT' : body ? 'POST' : 'GET',
+      body,
+    });
     assert.equal(status, 400);
     assert.equal(data.error, message);
   });
   assert.equal(queries.length, 0);
 };
+
+const rejectsPut = (target: string, body: object, message: string) =>
+  rejects(target, body, message, true);
 
 test('a meal has to be one of the four', async () => {
   await rejects(path, { ...fromFood, meal: 'brunch' }, 'Choose a meal');
@@ -177,4 +183,15 @@ test('the junk food mark is a yes or no, and only for typed-in food', async () =
     { ...fromFood, isJunk: true },
     'A chosen food and manual entry cannot be used together',
   );
+});
+
+test('a meal slot time must be HH:MM on a 24-hour clock', async () => {
+  const target = '/api/meals/2026-03-15/times/dinner';
+  const message = 'The time must be HH:MM on a 24-hour clock';
+  for (const time of ['24:00', '7:30', '12:60', '12:30:15', 'noon', '']) {
+    await rejectsPut(target, { time }, message);
+  }
+  await rejectsPut(target, { time: 2130 }, 'The time is not valid');
+  await rejectsPut(target, {}, 'The time is not valid');
+  await rejectsPut('/api/meals/2026-03-15/times/brunch', { time: '20:00' }, 'Choose a meal');
 });

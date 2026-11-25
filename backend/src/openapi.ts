@@ -8,6 +8,7 @@ import { checkInput } from './checks.js';
 import { comboInput } from './combos.js';
 import { foodInput, searchQuery } from './foods.js';
 import { habitInput } from './habits.js';
+import { intakeInput } from './intake.js';
 import { comboUse, entryInput, mealCopy } from './meals.js';
 import { dayQuery, medicationInput } from './medications.js';
 import { doneInput } from './reminders.js';
@@ -153,6 +154,24 @@ export const operations: Record<string, Operation> = {
     params: { date: z.iso.date() },
     summary: 'Delete the alcohol and tobacco record of a day',
     status: [204, 400, 404],
+  },
+
+  'GET /api/intake/:date': {
+    params: { date: z.iso.date() },
+    summary: 'Get the water (ml) and caffeine (mg) counts and totals of a day',
+    status: [200, 400],
+  },
+  'POST /api/intake/:date': {
+    params: { date: z.iso.date() },
+    summary:
+      'Add one drink to a day: water adds 250 ml, caffeine drinks add their default mg (at most 50 per kind)',
+    body: ['Intake', intakeInput],
+    status: [201, 400],
+  },
+  'DELETE /api/intake/:date/:kind': {
+    params: { date: z.iso.date() },
+    summary: 'Remove the newest drink of a kind from a day; a count at 0 stays 0',
+    status: [200, 400],
   },
 
   'GET /api/checks/:date': {

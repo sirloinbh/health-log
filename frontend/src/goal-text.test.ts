@@ -8,6 +8,7 @@ import {
   type Goals,
   sleepParts,
   targetText,
+  toLastMealTarget,
   toSleepTarget,
   toTarget,
   withoutChange,
@@ -57,6 +58,7 @@ test('deleting a change brings back the goal before it, as of today', () => {
       protein: null,
       sleep: null,
       sober_days: null,
+      last_meal: null,
     },
     history: [
       { item: 'calories', from: '2026-12-01', target: 1500 },
@@ -162,6 +164,7 @@ test('sober days count a change up to this Sunday as current, daily goals only u
       protein: null,
       sleep: null,
       sober_days: { from: '2026-11-07', target: 6 },
+      last_meal: null,
     },
     history: [
       { item: 'calories', from: '2026-11-07', target: 1800 },
@@ -199,7 +202,7 @@ test('a sober change on this Sunday already counts, and one turning it off leave
   const base = {
     today: '2026-11-06',
     week: { from: '2026-11-02', to: '2026-11-08' },
-    current: { calories: null, protein: null, sleep: null, sober_days: null },
+    current: { calories: null, protein: null, sleep: null, sober_days: null, last_meal: null },
   };
   // Sunday is the week's last day, the day its goal is read on.
   const sunday: Goals = {
@@ -228,4 +231,15 @@ test('a sober change on this Sunday already counts, and one turning it off leave
   const afterDelete = withoutChange(off, 'sober_days', '2026-11-09');
   expect(afterDelete.current.sober_days).toBeNull();
   expect(currentText(afterDelete, 'sober_days')).toBe("This week's goal (Nov 2 – Nov 8): not set");
+});
+
+test('a last meal time is typed as HH:MM and kept as minutes from midnight', () => {
+  expect(targetText('last_meal', 1260)).toBe('No eating after 21:00');
+  expect(targetText('last_meal', 65)).toBe('No eating after 01:05');
+  expect(toLastMealTarget('21:00')).toBe(1260);
+  expect(toLastMealTarget('23:59')).toBe(1439);
+  expect(toLastMealTarget('00:01')).toBe(1);
+  expect(toLastMealTarget('00:00')).toMatch('after 00:00');
+  expect(toLastMealTarget('')).toMatch('HH:MM');
+  expect(toLastMealTarget('24:00')).toMatch('HH:MM');
 });

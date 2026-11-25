@@ -187,7 +187,7 @@ export const operations: Record<string, Operation> = {
   // The body depends on the item (each has its own target range), so it is described here only.
   'PUT /api/goals/:item': {
     summary:
-      'Set a goal (calories, protein, sleep, or sober_days) from a date: body { from: YYYY-MM-DD, target: whole number, or null to turn the goal off }',
+      'Set a goal (calories, protein, sleep, sober_days, or last_meal) from a date: body { from: YYYY-MM-DD, target: whole number (last_meal: minutes from midnight, 1260 is 21:00), or null to turn the goal off }',
     status: [200, 400, 404],
   },
   'DELETE /api/goals/:item/:from': {

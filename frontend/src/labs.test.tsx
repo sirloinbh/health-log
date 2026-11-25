@@ -221,8 +221,9 @@ test('more results load after the ones shown', async () => {
 
 test('a failed read shows the reason and can be tried again', async () => {
   let calls = 0;
-  serve(() =>
-    ++calls === 1
+  // Only the list read fails first; the trend card reads its own paths.
+  serve((url) =>
+    url.startsWith('/api/labs?') && ++calls === 1
       ? json({ error: 'The database is not ready' }, 400)
       : json({ results: [plain], more: false }),
   );

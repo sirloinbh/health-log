@@ -79,6 +79,14 @@ export const labListQuery = z.object({
     .default(0),
 });
 
+export const trendQuery = z.object({
+  name: z
+    .string({ error: 'Enter the test name' })
+    .trim()
+    .refine((value) => value.length >= 1, 'Enter the test name')
+    .refine((value) => charCount(value) <= 100, 'Test name must be 100 characters or fewer'),
+});
+
 type LabRow = {
   id: number;
   date: string;
@@ -151,6 +159,32 @@ export function labsRouter(pool: Pool) {
       [q, likePattern(q), pageSize + 1, offset],
     );
     res.json({ results: rows.slice(0, pageSize).map(toResult), more: rows.length > pageSize });
+  });
+
+  // Every test name recorded, with how many results it has and the latest date. Names that differ
+  // only in case or outer spaces are one test.
+  router.get('/names', async (_req, res) => {
+    const { rows } = await pool.query<{ name: string; count: number; latest: string }>(
+      `SELECT (array_agg(name ORDER BY test_date DESC, id DESC))[1] AS name, count(*)::int AS count,
+         max(test_date) AS latest
+       FROM lab_results GROUP BY lower(btrim(name)) ORDER BY max(test_date) DESC, 1`,
+    );
+    res.json({ names: rows });
+  });
+
+  // One test over time, oldest first, each point with its own unit and reference range.
+  router.get('/trend', async (req, res) => {
+    const { name } = trendQuery.parse(req.query);
+    const { rows } = await pool.query<Omit<LabRow, 'note' | 'visit' | 'name'>>(
+      `SELECT id, test_date AS date, value, unit, ref_low AS "refLow", ref_high AS "refHigh"
+       FROM lab_results WHERE lower(btrim(name)) = lower($1)
+       ORDER BY test_date, id`,
+      [name],
+    );
+    res.json({
+      name,
+      points: rows.map((row) => withNumbers(row, ['value', 'refLow', 'refHigh'])),
+    });
   });
 
   router.post('/', async (req, res) => {

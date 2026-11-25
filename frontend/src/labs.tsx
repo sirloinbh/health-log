@@ -34,6 +34,7 @@ import {
   rangeText,
   valueText,
 } from './lab-text';
+import { LabTrendCard } from './lab-trend-card';
 import { RequestError, requestJson } from './lib/api';
 import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { errorText, useNotice } from './lib/use-notice';
@@ -444,6 +445,7 @@ export function LabsPage() {
           </Button>
         </form>
       </div>
+      <LabTrendCard />
       <Notice notice={notice} />
       {notice?.kind === 'error' ? (
         <Button

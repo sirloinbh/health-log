@@ -70,6 +70,7 @@ const dayOf = (overrides: Record<string, unknown> = {}, checks: unknown = null) 
       status: null,
       actual: { ...week, recordedDays: 0, soberDays: 0 },
     },
+    { item: 'last_meal', goal: null, status: null, actual: { slots: [] } },
   ].map((entry) => ({ ...entry, ...(overrides[entry.item] as object) })),
   checks,
 });
@@ -228,6 +229,70 @@ test('the sober card shows the goal this week is judged by, and a change later t
 
 const cardOf = (title: string) =>
   screen.getByRole('heading', { name: title }).closest('[data-slot="card"]') as HTMLElement;
+
+// #328: no eating after a set time.
+test('a last meal goal is typed as a clock time and sent in minutes from midnight', async () => {
+  const saved = goalsOf({ last_meal: { from: '2026-11-03', target: 1260 } }, [
+    { item: 'last_meal', from: '2026-11-03', target: 1260 },
+  ]);
+  const fetchMock = server({ body: goalsOf() }, { body: saved });
+  renderWithQuery(<GoalsSettings />);
+  await screen.findByRole('heading', { name: 'Last meal' });
+  const card = cardOf('Last meal');
+  expect(within(card).getByText('Current goal: not set')).toBeInTheDocument();
+  fireEvent.change(within(card).getByLabelText('No eating after'), { target: { value: '21:00' } });
+  fireEvent.change(within(card).getByLabelText('Start date'), { target: { value: '2026-11-03' } });
+  fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
+
+  await waitFor(() =>
+    expect(
+      within(cardOf('Last meal')).getByText(
+        'Current goal: No eating after 21:00 (from 2026-11-03)',
+      ),
+    ).toBeInTheDocument(),
+  );
+  expect(request(fetchMock, 1)).toEqual({
+    url: '/api/goals/last_meal',
+    method: 'PUT',
+    body: { from: '2026-11-03', target: 1260 },
+  });
+  expect(within(cardOf('Last meal')).getByLabelText('No eating after')).toHaveValue('21:00');
+});
+
+test('a last meal goal without a time is refused before sending', async () => {
+  const fetchMock = server({ body: goalsOf() });
+  renderWithQuery(<GoalsSettings />);
+  await screen.findByRole('heading', { name: 'Last meal' });
+  fireEvent.click(within(cardOf('Last meal')).getByRole('button', { name: 'Save' }));
+  expect(await screen.findByText('No eating after: enter a time as HH:MM')).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+test('the day card says which meal slots have a time, and why a day is undetermined', async () => {
+  server({
+    body: dayOf({
+      last_meal: {
+        goal: { from, target: 1260 },
+        status: 'unknown',
+        actual: {
+          slots: [
+            { meal: 'dinner', time: 1140 },
+            { meal: 'snack', time: null },
+          ],
+        },
+      },
+    }),
+  });
+  renderCard();
+  const card = await screen.findByRole('region', { name: 'Eating time' });
+  expect(within(card).getByText('Undetermined')).toBeInTheDocument();
+  expect(
+    within(card).getByText('Dinner 19:00, Snack has no time · Goal: No eating after 21:00'),
+  ).toBeInTheDocument();
+  expect(
+    within(card).getByText('A meal has no time recorded, so it cannot be judged'),
+  ).toBeInTheDocument();
+});
 
 test('a sleep goal is typed in hours and minutes and sent in minutes from the chosen date', async () => {
   const saved = goalsOf({ sleep: { from: '2026-11-03', target: 430 } }, [

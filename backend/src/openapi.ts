@@ -262,6 +262,12 @@ export const operations: Record<string, Operation> = {
     summary: 'List the clinic visit and medicine reminders that are due soon',
     status: [200],
   },
+  'GET /api/workout-memo/:date': {
+    params: { date: z.iso.date() },
+    summary:
+      "Read the day's workouts from workout-memo (read-only). The answer is { state: 'ok', workouts } or { state: 'unavailable' } when workout-memo cannot be reached",
+    status: [200, 400],
+  },
   'POST /api/reminders/done': {
     summary: 'Mark a reminder as done',
     body: ['ReminderDone', doneInput],

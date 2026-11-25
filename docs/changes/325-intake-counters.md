@@ -17,7 +17,7 @@ Water and caffeine were not recorded anywhere, and typing them as meals is too s
 
 ## Change
 
-- `database/migrations/022_intake_entries.sql`: table `intake_entries` (the number is renamed at the final sync if another lane takes 022 first).
+- `database/migrations/023_intake_entries.sql`: table `intake_entries` (022 was taken by #323).
 - `backend/src/intake.ts`: `GET /api/intake/:date`, `POST /api/intake/:date` (body `{ kind }`), `DELETE /api/intake/:date/:kind`; wired in `app.ts`, listed in `openapi.ts`, `docs/openapi.json` regenerated.
 - `frontend/src/intake.tsx`, `intake-text.ts`: the card; added to `daily.tsx`.
 - Tests: `backend/test/intake.integration.test.ts`, `frontend/src/intake.test.tsx`, `intake-text.test.ts`; `daily.test.tsx` answers the new route.

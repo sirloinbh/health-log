@@ -221,7 +221,13 @@ export const exportQuery = z
   });
 
 /** The file name part for the range, such as 2026-01-01_2026-03-31. */
-const rangeName = (from: string, to: string) => `${from}_${to}`;
+const dayPattern = /^\d{4}-\d{2}-\d{2}$/;
+const rangeName = (from: string, to: string) => {
+  // Already checked by the query schema; checked again here so only digits and dashes can reach a
+  // file name (a name goes into a header and into the zip).
+  if (!dayPattern.test(from) || !dayPattern.test(to)) throw new Error('The range is not valid');
+  return `${from}_${to}`;
+};
 
 export function exportRouter(pool: Pool) {
   const router = Router();

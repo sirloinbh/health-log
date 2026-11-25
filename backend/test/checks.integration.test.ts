@@ -35,6 +35,9 @@ type Day = {
     date: string;
     dietKept: boolean | null;
     sleepGood: boolean | null;
+    mood: number | null;
+    energy: number | null;
+    stress: number | null;
     memo: string | null;
   } | null;
   week: { from: string; to: string; diet: Rate; sleep: Rate };
@@ -76,6 +79,9 @@ test(
         date: '1990-03-07',
         dietKept: null,
         sleepGood: null,
+        mood: null,
+        energy: null,
+        stress: null,
         memo: '회식',
       });
       // Diet answered twice, one yes; sleep answered once, no yes.
@@ -94,6 +100,9 @@ test('saving again replaces every field, a cleared one included', { skip }, asyn
       date: '1990-03-12',
       dietKept: null,
       sleepGood: false,
+      mood: null,
+      energy: null,
+      stress: null,
       memo: null,
     });
     assert.deepEqual(again.week.diet, { days: 0, yes: 0 });
@@ -175,3 +184,40 @@ test(
     );
   },
 );
+
+test(
+  'scores are saved, changed and cleared per date, and a scores-only day is kept',
+  { skip },
+  async (t) => {
+    t.after(clean);
+    await withApi(pool, async (call) => {
+      const first = await put(call, '1990-03-22', { mood: 4, energy: 2, stress: 5 });
+      assert.deepEqual([first.record?.mood, first.record?.energy, first.record?.stress], [4, 2, 5]);
+      // One score alone is enough, and the others read back as not rated.
+      const second = await put(call, '1990-03-22', { energy: 1 });
+      assert.deepEqual(
+        [second.record?.mood, second.record?.energy, second.record?.stress],
+        [null, 1, null],
+      );
+      // Clearing the only value left is refused: there would be nothing to keep.
+      const { status } = await call('/api/checks/1990-03-22', {
+        method: 'PUT',
+        body: { energy: null },
+      });
+      assert.equal(status, 400);
+    });
+  },
+);
+
+test('the database refuses a score outside 1 to 5', { skip }, async (t) => {
+  t.after(clean);
+  for (const value of [0, 6]) {
+    await assert.rejects(
+      pool.query('INSERT INTO day_checks (record_date, mood) VALUES ($1, $2)', [
+        '1990-03-23',
+        value,
+      ]),
+      /day_checks_mood_check/,
+    );
+  }
+});

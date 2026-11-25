@@ -19,10 +19,12 @@ import {
 import { GoalsCard } from './goals';
 import { HabitsCard } from './habits';
 import { type Health, healthText } from './health';
+import { IntakeCard } from './intake';
 import { MealCard } from './meals';
 import { RemindersCard } from './reminders';
 import { SleepCard } from './sleep';
 import { VisitsCard } from './visit-card';
+import { WorkoutsCard } from './workouts';
 
 // Typing a year passes through values like 0002-10-31: they stay out of range and change nothing,
 // and only a year of four digits is worth a word about the range.
@@ -204,9 +206,11 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
         <MealCard key={`meal-${date}`} date={date} />
         <BodyCard key={`body-${date}`} date={date} />
         <HabitsCard key={`habits-${date}`} date={date} />
+        <IntakeCard key={`intake-${date}`} date={date} />
         <ChecksCard key={`checks-${date}`} date={date} />
         <GoalsCard key={`goals-${date}`} date={date} />
         <VisitsCard key={`visits-${date}`} date={date} />
+        <WorkoutsCard key={`workouts-${date}`} date={date} />
       </div>
     </section>
   );

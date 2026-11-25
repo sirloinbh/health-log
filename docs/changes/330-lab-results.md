@@ -14,7 +14,7 @@ Visits and medications were recorded, but checkup and blood test values had no p
 
 ## Changes
 
-- `database/migrations/022_lab_results.sql`: table `lab_results` (value `numeric(14,4)`, 0 or more; reference minimum not above maximum; indexes on date, visit and lower-cased name). The number may change at merge if another lane took 022.
+- `database/migrations/026_lab_results.sql`: table `lab_results` (value `numeric(14,4)`, 0 or more; reference minimum not above maximum; indexes on date, visit and lower-cased name). Renamed from 022 to 026 when merging origin/main, because other lanes had taken 022 to 025.
 - `backend/src/labs.ts`, `app.ts`, `openapi.ts`, `docs/openapi.json`: `GET/POST /api/labs`, `PUT/DELETE /api/labs/:id`. The list is newest first, searched by test name, 20 per page with `more`. Numbers must be 0 to 1 billion with at most 4 decimals. An unknown visit is a 400.
 - `frontend/src/lab-text.ts`, `labs.tsx`, `app.tsx`: a "Lab results" page (menu entry, route `/labs`) with add, edit, delete, search and "Show more", the value with its range and an in/above/below-range word.
 

@@ -8,8 +8,9 @@ import { checkInput } from './checks.js';
 import { comboInput } from './combos.js';
 import { foodInput, searchQuery } from './foods.js';
 import { habitInput } from './habits.js';
+import { intakeInput } from './intake.js';
 import { labInput, labListQuery } from './labs.js';
-import { comboUse, entryInput, mealCopy } from './meals.js';
+import { comboUse, entryInput, mealCopy, mealTimeInput } from './meals.js';
 import { dayQuery, medicationInput } from './medications.js';
 import { doneInput } from './reminders.js';
 import { reportQuery } from './report.js';
@@ -81,6 +82,12 @@ export const operations: Record<string, Operation> = {
     body: ['MealCopy', mealCopy],
     headers: retryKey,
     status: [201, 400, 404, 409],
+  },
+  'PUT /api/meals/:date/times/:meal': {
+    params: { date: z.iso.date(), meal: z.enum(['breakfast', 'lunch', 'dinner', 'snack']) },
+    summary: 'Set or clear the time of day a meal slot was eaten',
+    body: ['MealTime', mealTimeInput],
+    status: [200, 400],
   },
   'DELETE /api/meals/:date/entries/:id': {
     params: { date: z.iso.date() },
@@ -156,6 +163,24 @@ export const operations: Record<string, Operation> = {
     status: [204, 400, 404],
   },
 
+  'GET /api/intake/:date': {
+    params: { date: z.iso.date() },
+    summary: 'Get the water (ml) and caffeine (mg) counts and totals of a day',
+    status: [200, 400],
+  },
+  'POST /api/intake/:date': {
+    params: { date: z.iso.date() },
+    summary:
+      'Add one drink to a day: water adds 250 ml, caffeine drinks add their default mg (at most 50 per kind)',
+    body: ['Intake', intakeInput],
+    status: [201, 400],
+  },
+  'DELETE /api/intake/:date/:kind': {
+    params: { date: z.iso.date() },
+    summary: 'Remove the newest drink of a kind from a day; a count at 0 stays 0',
+    status: [200, 400],
+  },
+
   'GET /api/checks/:date': {
     params: { date: z.iso.date() },
     summary: 'Get the daily check of a day with period rates',
@@ -182,7 +207,7 @@ export const operations: Record<string, Operation> = {
   // The body depends on the item (each has its own target range), so it is described here only.
   'PUT /api/goals/:item': {
     summary:
-      'Set a goal (calories, protein, sleep, or sober_days) from a date: body { from: YYYY-MM-DD, target: whole number, or null to turn the goal off }',
+      'Set a goal (calories, protein, sleep, sober_days, or last_meal) from a date: body { from: YYYY-MM-DD, target: whole number (last_meal: minutes from midnight, 1260 is 21:00), or null to turn the goal off }',
     status: [200, 400, 404],
   },
   'DELETE /api/goals/:item/:from': {
@@ -254,6 +279,12 @@ export const operations: Record<string, Operation> = {
   'GET /api/reminders': {
     summary: 'List the clinic visit and medicine reminders that are due soon',
     status: [200],
+  },
+  'GET /api/workout-memo/:date': {
+    params: { date: z.iso.date() },
+    summary:
+      "Read the day's workouts from workout-memo (read-only). The answer is { state: 'ok', workouts } or { state: 'unavailable' } when workout-memo cannot be reached",
+    status: [200, 400],
   },
   'POST /api/reminders/done': {
     summary: 'Mark a reminder as done',

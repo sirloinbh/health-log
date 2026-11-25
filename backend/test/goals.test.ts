@@ -3,7 +3,14 @@ import { test } from 'node:test';
 
 import type { Pool } from 'pg';
 
-import { judgeAtLeast, judgeAtMost, judgeSleep, judgeSoberWeek } from '../src/goals.js';
+import {
+  clockText,
+  judgeAtLeast,
+  judgeAtMost,
+  judgeLastMeal,
+  judgeSleep,
+  judgeSoberWeek,
+} from '../src/goals.js';
 import { withApi } from './helpers.js';
 
 const recording = () => {
@@ -109,4 +116,35 @@ test('a bad date or item in the path is refused before the database', async () =
     assert.equal((await call('/api/goals/water/2026-11-01', { method: 'DELETE' })).status, 404);
   });
   assert.equal(queries.length, 0);
+});
+
+// #328: no eating after a set time, judged from the time of each meal slot.
+test('a day with no meals is no record for the last meal goal', () => {
+  assert.equal(judgeLastMeal(1260, []), 'none');
+});
+
+test('a last meal goal is met at the limit and missed after it', () => {
+  const dinner = (time: number | null) => [{ meal: 'dinner', time }];
+  assert.equal(judgeLastMeal(1260, dinner(1259)), 'met');
+  assert.equal(judgeLastMeal(1260, dinner(1260)), 'met');
+  assert.equal(judgeLastMeal(1260, dinner(1261)), 'missed');
+});
+
+test('a slot with no time leaves the day undetermined unless another slot already missed', () => {
+  const untimed = { meal: 'snack', time: null };
+  assert.equal(judgeLastMeal(1260, [{ meal: 'dinner', time: 1100 }, untimed]), 'unknown');
+  assert.equal(judgeLastMeal(1260, [untimed]), 'unknown');
+  assert.equal(judgeLastMeal(1260, [{ meal: 'dinner', time: 1300 }, untimed]), 'missed');
+});
+
+test('a clock time has two digits for the hour and the minute', () => {
+  assert.equal(clockText(1260), '21:00');
+  assert.equal(clockText(65), '01:05');
+  assert.equal(clockText(1439), '23:59');
+});
+
+test('the last meal goal takes minutes from midnight in range, and says them as a time', async () => {
+  await rejects('/api/goals/last_meal', { from, target: 0 }, 400, 'at least 00:01');
+  await rejects('/api/goals/last_meal', { from, target: 1440 }, 400, 'at most 23:59');
+  await rejects('/api/goals/last_meal', { from, target: 21.5 }, 400, 'whole number');
 });

@@ -8,18 +8,31 @@ import { type Db, inTransaction, snapshotRead } from './db.js';
 import { optionalNumber } from './numbers.js';
 import { HttpError } from './standard/http.js';
 
-const goalItems = ['calories', 'protein', 'sleep', 'sober_days'] as const;
+const goalItems = ['calories', 'protein', 'sleep', 'sober_days', 'last_meal'] as const;
 type GoalItem = (typeof goalItems)[number];
+
+/** Minutes from midnight as "HH:MM": 1260 is "21:00". */
+export const clockText = (minutes: number) =>
+  `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 
 // The same ranges as the database's goals_target_range. `units` is the plural when it differs.
 const ranges: Record<
   GoalItem,
-  { label: string; min: number; max: number; unit: string; units?: string }
+  {
+    label: string;
+    min: number;
+    max: number;
+    unit: string;
+    units?: string;
+    show?: (n: number) => string;
+  }
 > = {
   calories: { label: 'Calorie goal', min: 100, max: 10_000, unit: 'kcal' },
   protein: { label: 'Protein goal', min: 1, max: 1000, unit: 'g' },
   sleep: { label: 'Sleep goal', min: 60, max: 1440, unit: 'min' },
   sober_days: { label: 'Alcohol-free goal', min: 1, max: 7, unit: 'day', units: 'days' },
+  // Minutes from midnight, said as a clock time: 1260 is 21:00.
+  last_meal: { label: 'Last meal time goal', min: 1, max: 1439, unit: 'min', show: clockText },
 };
 
 /** "1 day", "7 days", "100 kcal" (#207). */
@@ -33,7 +46,8 @@ const parseItem = (value: unknown) => {
 };
 
 const goalInput = (item: GoalItem) => {
-  const { label, min, max, unit, units } = ranges[item];
+  const { label, min, max, unit, units, show } = ranges[item];
+  const amount = (value: number) => show?.(value) ?? amountText(value, unit, units);
   return z.object(
     {
       from: z
@@ -43,8 +57,8 @@ const goalInput = (item: GoalItem) => {
       target: z
         .number({ error: `${label} must be a number` })
         .int(`${label} must be a whole number`)
-        .min(min, `${label} must be at least ${amountText(min, unit, units)}`)
-        .max(max, `${label} must be at most ${amountText(max, unit, units)}`)
+        .min(min, `${label} must be at least ${amount(min)}`)
+        .max(max, `${label} must be at most ${amount(max)}`)
         .nullable(),
     },
     { error: 'The request body is not valid' },
@@ -84,6 +98,19 @@ export const judgeSoberWeek = (target: number, { recordedDays, soberDays }: Week
   if (soberDays >= target) return 'met';
   const drinkingDays = recordedDays - soberDays;
   return drinkingDays > 7 - target ? 'missed' : 'unknown';
+};
+
+type Slot = { meal: string; time: number | null };
+
+/**
+ * "No eating after" the limit, from the time of each meal slot that has an entry. A slot timed
+ * after the limit is a miss whatever else is missing. Otherwise a slot with no time could still
+ * have been late, so the day is undetermined. Eating exactly at the limit is allowed.
+ */
+export const judgeLastMeal = (limit: number, slots: Slot[]): Status => {
+  if (slots.length === 0) return 'none';
+  if (slots.some(({ time }) => time !== null && time > limit)) return 'missed';
+  return slots.some(({ time }) => time === null) ? 'unknown' : 'met';
 };
 
 type Goal = { item: GoalItem; from: string; target: number | null };
@@ -146,6 +173,16 @@ const readDay = async (db: Db, date: string) => {
       [date],
     )
   ).rows[0];
+  // Only slots that have an entry count; each with its recorded time in minutes, or null.
+  const slots = (
+    await db.query<{ meal: string; time: number | null }>(
+      `SELECT e.meal, extract(hour FROM t.eaten_time)::int * 60 + extract(minute FROM t.eaten_time)::int AS "time"
+       FROM (SELECT DISTINCT meal FROM meal_entries WHERE entry_date = $1) e
+       LEFT JOIN meal_times t ON t.entry_date = $1 AND t.meal = e.meal
+       ORDER BY e.meal`,
+      [date],
+    )
+  ).rows;
   const sleep = await db.query<{ minutes: number }>(
     'SELECT duration_minutes AS minutes FROM sleep_records WHERE sleep_date = $1',
     [date],
@@ -205,6 +242,12 @@ const readDay = async (db: Db, date: string) => {
         goal: goals.sober_days,
         status: judged(goals.sober_days, (target) => judgeSoberWeek(target, sober)),
         actual: sober,
+      },
+      {
+        item: 'last_meal',
+        goal: goals.last_meal,
+        status: judged(goals.last_meal, (target) => judgeLastMeal(target, slots)),
+        actual: { slots },
       },
     ],
     // The day's own checks (#37), shown beside the automatic verdicts. null: not checked.

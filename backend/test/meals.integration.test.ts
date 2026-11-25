@@ -19,6 +19,7 @@ const days = [
   '1991-01-06',
   '1991-01-07',
   '1991-01-08',
+  '1991-01-09',
 ];
 
 type Total = { value: number | null; missing: number };
@@ -31,6 +32,7 @@ let pool: Pool;
 
 const clean = async () => {
   await pool.query('DELETE FROM meal_entries WHERE entry_date = ANY($1)', [days]);
+  await pool.query('DELETE FROM meal_times WHERE entry_date = ANY($1)', [days]);
   await pool.query('DELETE FROM foods WHERE name LIKE $1', [`${prefix}%`]);
 };
 
@@ -223,4 +225,38 @@ test('the database itself refuses a quantity of zero', { skip }, async () => {
     ),
     { code: '23514' },
   );
+});
+
+test('a meal slot time comes back as saved, can change, and can be cleared', { skip }, async () => {
+  await withApi(pool, async (call) => {
+    const path = `/api/meals/${days[8]}`;
+    const empty = (await call(path)).data as unknown as { times: Record<string, string | null> };
+    assert.deepEqual(empty.times, { breakfast: null, lunch: null, dinner: null, snack: null });
+
+    const put = (meal: string, time: string | null) =>
+      call(`${path}/times/${meal}`, { method: 'PUT', body: { time } });
+    await put('dinner', '19:30');
+    const set = await put('snack', '23:40');
+    assert.equal(set.status, 200);
+    assert.deepEqual((set.data as unknown as Day & { times: unknown }).times, {
+      breakfast: null,
+      lunch: null,
+      dinner: '19:30',
+      snack: '23:40',
+    });
+
+    await put('dinner', '20:05');
+    const cleared = await put('snack', null);
+    assert.deepEqual((cleared.data as unknown as { times: unknown }).times, {
+      breakfast: null,
+      lunch: null,
+      dinner: '20:05',
+      snack: null,
+    });
+    // A day with no times is untouched, and the time shows with the meals of the day.
+    const other = (await call(`/api/meals/${days[0]}`)).data as unknown as {
+      times: Record<string, string | null>;
+    };
+    assert.equal(other.times.dinner, null);
+  });
 });

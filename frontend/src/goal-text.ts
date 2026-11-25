@@ -1,12 +1,13 @@
 import { kcalText } from './calorie-text';
 import { spanText } from './habit-text';
+import { meals } from './meal-entry';
 import { count } from './plural';
 import { minutesText } from './report-text';
 
 /** Where goals are set: the same as pages.settings in app.tsx. */
 export const goalSettingsPath = '/settings';
 
-export const goalItems = ['calories', 'protein', 'sleep', 'sober_days'] as const;
+export const goalItems = ['calories', 'protein', 'sleep', 'sober_days', 'last_meal'] as const;
 export type GoalItem = (typeof goalItems)[number];
 
 export type Goal = { from: string; target: number } | null;
@@ -28,7 +29,8 @@ type Judged<I, A> = { item: I; goal: Goal; status: Status | null; actual: A };
 export type GoalDayItem =
   | Judged<'calories' | 'protein', Sum>
   | Judged<'sleep', { minutes: number | null }>
-  | Judged<'sober_days', { from: string; to: string; recordedDays: number; soberDays: number }>;
+  | Judged<'sober_days', { from: string; to: string; recordedDays: number; soberDays: number }>
+  | Judged<'last_meal', { slots: { meal: string; time: number | null }[] }>;
 
 export type GoalDay = {
   date: string;
@@ -73,7 +75,20 @@ export const goalFields: Record<
     max: 7,
     example: '5',
   },
+  // Typed as a clock time and kept as minutes from midnight (21:00 is 1260).
+  last_meal: {
+    title: 'Last meal',
+    label: 'No eating after',
+    unit: 'time',
+    min: 1,
+    max: 1439,
+    example: '21:00',
+  },
 };
+
+/** Minutes from midnight as "HH:MM": 1260 is "21:00". */
+export const clockText = (minutes: number) =>
+  `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 
 const number = (value: number) => value.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
@@ -88,6 +103,8 @@ export function targetText(item: GoalItem, target: number) {
       return `At least ${minutesText(target)}`;
     case 'sober_days':
       return `At least ${count(target, 'alcohol-free day')} a week`;
+    case 'last_meal':
+      return `No eating after ${clockText(target)}`;
   }
 }
 
@@ -96,7 +113,10 @@ export const changeText = (item: GoalItem, target: number | null) =>
   target === null ? 'Goal off' : targetText(item, target);
 
 /** A number typed in the form, as the API takes it; a string says why it cannot be. Not for sleep. */
-export function toTarget(item: Exclude<GoalItem, 'sleep'>, value: number): number | string {
+export function toTarget(
+  item: Exclude<GoalItem, 'sleep' | 'last_meal'>,
+  value: number,
+): number | string {
   const { label, unit, min, max } = goalFields[item];
   // NaN fails every comparison, so it is refused by name rather than passed on (#209).
   if (Number.isNaN(value) || value < min || value > max) {
@@ -117,6 +137,14 @@ export function toSleepTarget(hours: number, minutes: number): number | string {
   if (minutes < 0 || minutes > 59) return 'Sleep time: enter minutes from 0 to 59';
   const total = hours * 60 + minutes;
   return total < 60 || total > 1440 ? 'Sleep time: enter between 1 and 24 hours' : total;
+}
+
+/** A time typed as "HH:MM" (the time field's value), kept as minutes from midnight. */
+export function toLastMealTarget(value: string): number | string {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+  if (!match) return 'No eating after: enter a time as HH:MM';
+  const minutes = Number(match[1]) * 60 + Number(match[2]);
+  return minutes < goalFields.last_meal.min ? 'No eating after: enter a time after 00:00' : minutes;
 }
 
 /** A stored sleep target as its two fields. */
@@ -186,6 +214,16 @@ export function actualText(day: GoalDayItem) {
         ? `This week (${span}): no drink records`
         : `This week (${span}): ${count(soberDays, 'alcohol-free day')} / ${count(recordedDays, 'day')} recorded`;
     }
+    case 'last_meal': {
+      const { slots } = day.actual;
+      if (slots.length === 0) return 'No meal records';
+      return slots
+        .map(({ meal, time }) => {
+          const label = meals.find(({ key }) => key === meal)?.label ?? meal;
+          return `${label} ${time === null ? 'has no time' : clockText(time)}`;
+        })
+        .join(', ');
+    }
   }
 }
 
@@ -193,4 +231,6 @@ export function actualText(day: GoalDayItem) {
 export const unknownReason = (item: GoalItem) =>
   item === 'sober_days'
     ? 'It depends on days not recorded yet'
-    : 'Some foods have unknown values, so it cannot be judged';
+    : item === 'last_meal'
+      ? 'A meal has no time recorded, so it cannot be judged'
+      : 'Some foods have unknown values, so it cannot be judged';

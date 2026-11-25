@@ -11,6 +11,7 @@ import { foodsRouter } from './foods.js';
 import { goalsRouter } from './goals.js';
 import { habitsRouter } from './habits.js';
 import { intakeRouter } from './intake.js';
+import { labsRouter } from './labs.js';
 import { mealsRouter } from './meals.js';
 import { medicationsRouter } from './medications.js';
 import { remindersRouter } from './reminders.js';
@@ -69,6 +70,7 @@ export function createApp(
   app.use('/api/goals', goalsRouter(pool, today));
   app.use('/api/report', reportRouter(pool));
   app.use('/api/visits', visitsRouter(pool));
+  app.use('/api/labs', labsRouter(pool));
   app.use('/api/medications', medicationsRouter(pool, today));
   app.use('/api/reminders', remindersRouter(pool, today));
   app.use('/api/workout-memo', workoutMemoRouter(options.workoutMemoUrl, options.workoutMemoFetch));

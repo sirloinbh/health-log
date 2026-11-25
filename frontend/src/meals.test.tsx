@@ -29,7 +29,8 @@ const noJunk = {
   week: noJunkPeriod('2026-03-09', '2026-03-15'),
   month: noJunkPeriod('2026-03-01', '2026-03-31'),
 };
-const emptyDay = { entries: [], totals: emptyTotals, junk: noJunk };
+const noTimes = { breakfast: null, lunch: null, dinner: null, snack: null };
+const emptyDay = { entries: [], times: noTimes, totals: emptyTotals, junk: noJunk };
 const food = {
   id: 7,
   name: '치즈버거',
@@ -57,6 +58,7 @@ const entry = {
 };
 const oneEntry = {
   entries: [entry],
+  times: noTimes,
   junk: noJunk,
   totals: {
     ...emptyTotals,
@@ -212,6 +214,40 @@ test('a food not in the store is recorded with just a name and calories', async 
     calories: 480,
     isJunk: false,
   });
+});
+
+// #327: one optional time per meal slot.
+test('a slot shows its saved time and saves a new one when the field loses focus', async () => {
+  const fetchMock = server(
+    { body: { ...oneEntry, times: { ...noTimes, lunch: '12:30' } } },
+    { body: { ...oneEntry, times: { ...noTimes, lunch: '13:10' } } },
+  );
+  renderWithQuery(<MealCard date={date} />);
+  const field = await screen.findByLabelText('Lunch time');
+  expect(field).toHaveValue('12:30');
+  fireEvent.change(field, { target: { value: '13:10' } });
+  fireEvent.blur(field);
+  await waitFor(() => expect(screen.getByLabelText('Lunch time')).toHaveValue('13:10'));
+  expect(request(fetchMock, 1)).toEqual({
+    url: `/api/meals/${date}/times/lunch`,
+    method: 'PUT',
+    body: { time: '13:10' },
+  });
+});
+
+test('clearing a slot time sends null, and an unchanged time sends nothing', async () => {
+  const fetchMock = server(
+    { body: { ...oneEntry, times: { ...noTimes, lunch: '12:30' } } },
+    { body: oneEntry },
+  );
+  renderWithQuery(<MealCard date={date} />);
+  const field = await screen.findByLabelText('Lunch time');
+  fireEvent.blur(field);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  fireEvent.change(field, { target: { value: '' } });
+  fireEvent.blur(field);
+  await waitFor(() => expect(screen.getByLabelText('Lunch time')).toHaveValue(''));
+  expect(request(fetchMock, 1).body).toEqual({ time: null });
 });
 
 // #207: one serving reads as one.
@@ -621,6 +657,7 @@ test('the delete question names the brand, as two entries can differ only by it'
 test('a read started before an entry was recorded does not undo it on screen', async () => {
   let finishRead = (_response: Response) => {};
   const added = {
+    times: noTimes,
     entries: [entry, { ...entry, id: 2, name: '떡볶이', brand: null }],
     totals: emptyTotals,
     junk: noJunk,
@@ -1159,6 +1196,7 @@ test('a next page clears only its own message, not the other forms', async () =>
 
 test('coming back while an entry is being recorded shows it, not the day without it', async () => {
   const added = {
+    times: noTimes,
     entries: [{ ...entry, name: '떡볶이', brand: null }],
     totals: emptyTotals,
     junk: noJunk,
@@ -1236,6 +1274,7 @@ test('a stored food is recorded without a mark of its own; it brings the food ma
 test('junk food entries are marked, with the week and month counts below the totals', async () => {
   server({
     body: {
+      times: noTimes,
       entries: [
         { ...entry, isJunk: true },
         { ...entry, id: 2, name: '샐러드', brand: null, isJunk: false },

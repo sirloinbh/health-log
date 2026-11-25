@@ -10,6 +10,7 @@ import { combosRouter } from './combos.js';
 import { foodsRouter } from './foods.js';
 import { goalsRouter } from './goals.js';
 import { habitsRouter } from './habits.js';
+import { intakeRouter } from './intake.js';
 import { mealsRouter } from './meals.js';
 import { medicationsRouter } from './medications.js';
 import { remindersRouter } from './reminders.js';
@@ -59,6 +60,7 @@ export function createApp(
   app.use('/api/sleep', sleepRouter(pool));
   app.use('/api/body', bodyRouter(pool));
   app.use('/api/habits', habitsRouter(pool));
+  app.use('/api/intake', intakeRouter(pool, today));
   app.use('/api/checks', checksRouter(pool));
   app.use('/api/goals', goalsRouter(pool, today));
   app.use('/api/report', reportRouter(pool));

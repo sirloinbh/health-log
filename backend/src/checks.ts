@@ -15,11 +15,24 @@ const check = (label: string) =>
     .nullable()
     .default(null);
 
+// null: not rated. 1 to 5 whole numbers only.
+const score = (label: string) =>
+  z
+    .number({ error: `${label} must be a whole number from 1 to 5` })
+    .int({ error: `${label} must be a whole number from 1 to 5` })
+    .min(1, { error: `${label} must be a whole number from 1 to 5` })
+    .max(5, { error: `${label} must be a whole number from 1 to 5` })
+    .nullable()
+    .default(null);
+
 export const checkInput = z
   .object(
     {
       dietKept: check('Diet kept'),
       sleepGood: check('Sleep good'),
+      mood: score('Mood'),
+      energy: score('Energy'),
+      stress: score('Stress'),
       memo: z
         .string({ error: 'The note is not valid' })
         .trim()
@@ -34,7 +47,7 @@ export const checkInput = z
   )
   .superRefine((input, ctx) => {
     if (Object.values(input).every((value) => value === null)) {
-      ctx.addIssue({ code: 'custom', message: 'Enter at least one check or a note' });
+      ctx.addIssue({ code: 'custom', message: 'Enter at least one check, score or note' });
     }
   });
 
@@ -42,6 +55,9 @@ type CheckRecord = {
   date: string;
   dietKept: boolean | null;
   sleepGood: boolean | null;
+  mood: number | null;
+  energy: number | null;
+  stress: number | null;
   memo: string | null;
 };
 
@@ -71,7 +87,8 @@ const readSummary = async (db: Db, { from, to }: { from: string; to: string }) =
 const readDay = async (db: Db, date: string) => {
   const { week, month } = periodsOf(date);
   const { rows } = await db.query<CheckRecord>(
-    `SELECT record_date AS date, diet_kept AS "dietKept", sleep_good AS "sleepGood", memo
+    `SELECT record_date AS date, diet_kept AS "dietKept", sleep_good AS "sleepGood",
+            mood, energy, stress, memo
      FROM day_checks WHERE record_date = $1`,
     [date],
   );
@@ -97,13 +114,17 @@ export function checksRouter(pool: Pool) {
     // The save and the rates it answers with succeed together.
     const day = await inTransaction(pool, async (client) => {
       await client.query(
-        `INSERT INTO day_checks (record_date, diet_kept, sleep_good, memo) VALUES ($1, $2, $3, $4)
+        `INSERT INTO day_checks (record_date, diet_kept, sleep_good, mood, energy, stress, memo)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (record_date) DO UPDATE SET
            diet_kept = EXCLUDED.diet_kept,
            sleep_good = EXCLUDED.sleep_good,
+           mood = EXCLUDED.mood,
+           energy = EXCLUDED.energy,
+           stress = EXCLUDED.stress,
            memo = EXCLUDED.memo,
            updated_at = now()`,
-        [date, input.dietKept, input.sleepGood, input.memo],
+        [date, input.dietKept, input.sleepGood, input.mood, input.energy, input.stress, input.memo],
       );
       return readDay(client, date);
     });

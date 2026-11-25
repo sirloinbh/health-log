@@ -39,6 +39,14 @@ test('a check is yes, no or left out; nothing else stands for one', async () => 
   }
 });
 
+test('a score is a whole number from 1 to 5 or left out', async () => {
+  for (const key of ['mood', 'energy', 'stress']) {
+    for (const value of [0, 6, -1, 2.5, '3', true, []]) {
+      await rejects({ [key]: value }, 'must be a whole number from 1 to 5');
+    }
+  }
+});
+
 test('the memo is text of at most 200 characters', async () => {
   await rejects({ memo: 'a'.repeat(201) }, '200 characters or fewer');
   await rejects({ memo: 3 }, 'The note is not valid');
@@ -46,8 +54,8 @@ test('the memo is text of at most 200 characters', async () => {
 });
 
 test('a check needs something in it', async () => {
-  await rejects({}, 'at least one check');
-  await rejects({ dietKept: null, sleepGood: null, memo: '   ' }, 'at least one check');
+  await rejects({}, 'at least one check, score or note');
+  await rejects({ dietKept: null, sleepGood: null, mood: null, memo: '   ' }, 'at least one check');
   await rejects([], 'request body');
 });
 

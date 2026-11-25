@@ -63,7 +63,15 @@ test('a day with no check starts with both questions unchecked and no rate', asy
 });
 
 test('one answered question is sent with the other left unchecked, not as a no', async () => {
-  const saved = { date, dietKept: true, sleepGood: null, memo: null };
+  const saved = {
+    date,
+    dietKept: true,
+    sleepGood: null,
+    mood: null,
+    energy: null,
+    stress: null,
+    memo: null,
+  };
   const fetchMock = server({ body: dayOf(null) }, { body: dayOf(saved, { days: 1, yes: 1 }) });
   renderWithQuery(<ChecksCard date={date} />);
   fireEvent.click(
@@ -85,7 +93,7 @@ test('one answered question is sent with the other left unchecked, not as a no',
   expect(request(fetchMock, 1)).toEqual({
     url: `/api/checks/${date}`,
     method: 'PUT',
-    body: { dietKept: true, sleepGood: null, memo: null },
+    body: { dietKept: true, sleepGood: null, mood: null, energy: null, stress: null, memo: null },
   });
   const week = screen.getByRole('region', { name: 'This week' });
   expect(within(week).getByText('Diet: Kept on 1/1 day (100%)')).toBeInTheDocument();
@@ -116,7 +124,14 @@ test('no answers and a memo are saved as they are, the memo trimmed', async () =
   expect(await screen.findByText('야근')).toBeInTheDocument();
   expect(screen.getByText('Not kept')).toBeInTheDocument();
   expect(screen.getByText('Slept badly')).toBeInTheDocument();
-  expect(request(fetchMock, 1).body).toEqual({ dietKept: false, sleepGood: false, memo: '야근' });
+  expect(request(fetchMock, 1).body).toEqual({
+    dietKept: false,
+    sleepGood: false,
+    mood: null,
+    energy: null,
+    stress: null,
+    memo: '야근',
+  });
   expect(
     within(screen.getByRole('region', { name: 'This week' })).getByText(
       'Diet: Kept on 0/1 day (0%)',
@@ -129,7 +144,7 @@ test('nothing checked and no memo is refused before anything is sent', async () 
   renderWithQuery(<ChecksCard date={date} />);
   fireEvent.change(await screen.findByLabelText('Note'), { target: { value: '   ' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  expect(await findLive('alert')).toHaveTextContent('Enter at least one check or a note');
+  expect(await findLive('alert')).toHaveTextContent('Enter at least one check, score or note');
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
@@ -156,12 +171,29 @@ test('a saved day opens its own answers for editing, and an answer can be taken 
   await waitFor(() =>
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument(),
   );
-  expect(request(fetchMock, 1).body).toEqual({ dietKept: true, sleepGood: null, memo: 'Note' });
+  expect(request(fetchMock, 1).body).toEqual({
+    dietKept: true,
+    sleepGood: null,
+    mood: null,
+    energy: null,
+    stress: null,
+    memo: 'Note',
+  });
   await waitFor(() => expect(screen.getByText('Daily check').parentElement).toHaveFocus());
 });
 
 test('cancelling an edit keeps the saved answers', async () => {
-  server({ body: dayOf({ date, dietKept: true, sleepGood: null, memo: null }) });
+  server({
+    body: dayOf({
+      date,
+      dietKept: true,
+      sleepGood: null,
+      mood: null,
+      energy: null,
+      stress: null,
+      memo: null,
+    }),
+  });
   renderWithQuery(<ChecksCard date={date} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
   fireEvent.click(
@@ -173,7 +205,20 @@ test('cancelling an edit keeps the saved answers', async () => {
 
 test('deleting asks first, then reloads the rates without the day', async () => {
   const fetchMock = server(
-    { body: dayOf({ date, dietKept: true, sleepGood: null, memo: null }, { days: 1, yes: 1 }) },
+    {
+      body: dayOf(
+        {
+          date,
+          dietKept: true,
+          sleepGood: null,
+          mood: null,
+          energy: null,
+          stress: null,
+          memo: null,
+        },
+        { days: 1, yes: 1 },
+      ),
+    },
     { status: 204 },
     { body: dayOf(null) },
   );
@@ -276,7 +321,14 @@ test('200 emoji are sent as the hint says, and one more is refused before sendin
   fireEvent.change(field, { target: { value: memo } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-  expect(request(fetchMock, 1).body).toEqual({ dietKept: null, sleepGood: null, memo });
+  expect(request(fetchMock, 1).body).toEqual({
+    dietKept: null,
+    sleepGood: null,
+    mood: null,
+    energy: null,
+    stress: null,
+    memo,
+  });
 });
 
 test('a save that fails after leaving the day still says so', async () => {
@@ -402,4 +454,69 @@ test('a retry cannot be started twice, so no older answer can land after a newer
   }
   // Settles before the test ends, so nothing updates the card afterwards.
   expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
+});
+
+test('scores are picked per item, saved and shown, and Not rated takes one back', async () => {
+  const saved = {
+    date,
+    dietKept: null,
+    sleepGood: null,
+    mood: 4,
+    energy: null,
+    stress: 2,
+    memo: null,
+  };
+  const fetchMock = server({ body: dayOf(null) }, { body: dayOf(saved) });
+  renderWithQuery(<ChecksCard date={date} />);
+  const mood = await screen.findByRole('group', { name: 'How was your mood?' });
+  expect(within(mood).getByRole('button', { name: 'Not rated' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  // Labels say the scale ends for screen readers.
+  expect(within(mood).getByRole('button', { name: '1 of 5, Low' })).toBeInTheDocument();
+  expect(within(mood).getByRole('button', { name: '5 of 5, High' })).toBeInTheDocument();
+  fireEvent.click(within(mood).getByRole('button', { name: '3 of 5' }));
+  expect(within(mood).getByRole('button', { name: '3 of 5' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  fireEvent.click(within(mood).getByRole('button', { name: 'Not rated' }));
+  fireEvent.click(within(mood).getByRole('button', { name: '4 of 5' }));
+  fireEvent.click(within(group('How stressed were you?')).getByRole('button', { name: '2 of 5' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+  expect(await screen.findByText('4 of 5')).toBeInTheDocument();
+  expect(screen.getByText('2 of 5')).toBeInTheDocument();
+  expect(screen.getByText('Not rated')).toBeInTheDocument();
+  expect(request(fetchMock, 1).body).toEqual({
+    dietKept: null,
+    sleepGood: null,
+    mood: 4,
+    energy: null,
+    stress: 2,
+    memo: null,
+  });
+});
+
+test('a day with only a score can be saved', async () => {
+  const saved = {
+    date,
+    dietKept: null,
+    sleepGood: null,
+    mood: null,
+    energy: 5,
+    stress: null,
+    memo: null,
+  };
+  const fetchMock = server({ body: dayOf(null) }, { body: dayOf(saved) });
+  renderWithQuery(<ChecksCard date={date} />);
+  fireEvent.click(
+    within(await screen.findByRole('group', { name: 'How was your energy?' })).getByRole('button', {
+      name: '5 of 5, High',
+    }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(await screen.findByText('5 of 5')).toBeInTheDocument();
+  expect(request(fetchMock, 1).body).toMatchObject({ energy: 5, mood: null });
 });

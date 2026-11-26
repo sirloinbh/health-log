@@ -46,6 +46,16 @@ const noReport = {
   ),
 };
 
+const noDrinks = { count: 0, amount: 0 };
+const noIntake = {
+  date: '2026-10-26',
+  kinds: Object.fromEntries(
+    ['water', 'coffee', 'tea', 'energy', 'other_caffeine'].map((kind) => [kind, noDrinks]),
+  ),
+  waterMl: 0,
+  caffeineMg: 0,
+};
+
 // The other reads the pages make. Anything else fails the test (#214).
 const otherRead = (url: string) =>
   url === '/api/goals'
@@ -54,7 +64,11 @@ const otherRead = (url: string) =>
       ? noReminders
       : url.startsWith('/api/report?period=week&date=2026-10-2')
         ? noReport
-        : null;
+        : url === '/api/foods/recent'
+          ? { foods: [] }
+          : url.startsWith('/api/intake/')
+            ? noIntake
+            : null;
 
 const answerOther = (url: string, init?: RequestInit) => {
   const body = otherRead(url);
@@ -98,6 +112,52 @@ test('each page has its own address and is marked in the main menu', async () =>
   );
   // Goals are set here (#45).
   expect(await screen.findByRole('heading', { level: 2, name: 'Goals' })).toBeInTheDocument();
+});
+
+test('quick entry is the first item of the main menu', async () => {
+  health({ today: '2026-10-26' });
+  render(<App />);
+  const menu = screen.getByRole('navigation', { name: 'Main menu' });
+  const links = within(menu).getAllByRole('link');
+  expect(links[0]).toHaveAccessibleName('Quick entry');
+  expect(links[0]).toHaveAttribute('href', '/quick');
+  expect(links[1]).toHaveAccessibleName('Dashboard');
+  fireEvent.click(links[0]);
+  expect(await screen.findByRole('heading', { level: 1, name: 'Quick entry' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { level: 2, name: 'Water' })).toBeInTheDocument();
+});
+
+// Runs the app as the installed app (PWA) does: in the standalone display mode.
+const installed = () =>
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query: string) => ({
+      matches: query === '(display-mode: standalone)',
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
+
+test('the installed app opens on quick entry, and the dashboard is still reachable', async () => {
+  installed();
+  health({ today: '2026-10-26' });
+  render(<App />);
+  expect(await screen.findByRole('heading', { level: 1, name: 'Quick entry' })).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/quick');
+  const menu = screen.getByRole('navigation', { name: 'Main menu' });
+  fireEvent.click(within(menu).getByRole('link', { name: 'Dashboard' }));
+  expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/');
+});
+
+test('the installed app opened at another address stays there', async () => {
+  installed();
+  health({ today: '2026-10-26' });
+  window.history.replaceState(null, '', '/settings');
+  render(<App />);
+  expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/settings');
 });
 
 test('an unknown address falls back to the overview', async () => {

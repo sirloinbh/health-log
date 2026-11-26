@@ -8,9 +8,10 @@ import {
   Settings2,
   Stethoscope,
   Utensils,
+  Zap,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router';
 
 import { CombosPage } from './combos';
 import { AppShell, type NavItem } from './components/layout/app-shell';
@@ -28,6 +29,7 @@ import { requestJson } from './lib/api';
 import { apiKey, createQueryClient } from './lib/query';
 import { medicationsPagePath } from './med-text';
 import { MedicationsPage } from './medications';
+import { QuickEntryPage } from './quick-entry';
 import { ReportPage } from './report';
 import { AccountActions, SignInGate } from './sign-in';
 import { visitsPagePath } from './visit-text';
@@ -35,6 +37,7 @@ import { VisitsPage } from './visits';
 
 // Every page URL lives here (central docs/directory-rules.md).
 const pages = {
+  quick: '/quick',
   overview: '/',
   daily: '/daily',
   foods: '/foods',
@@ -47,6 +50,7 @@ const pages = {
 
 // Main menu (LNB) items, in display order.
 const nav: NavItem[] = [
+  { to: pages.quick, label: 'Quick entry', icon: Zap },
   { to: pages.overview, label: 'Dashboard', icon: LayoutDashboard },
   { to: pages.daily, label: 'Daily record', icon: CalendarDays },
   { to: pages.foods, label: 'Foods', icon: Utensils },
@@ -117,6 +121,27 @@ function Page({
   );
 }
 
+/**
+ * The installed app opens on quick entry (#329, user decision 2026-11-26). The manifest's
+ * start_url is a centrally managed "/", so when the app runs standalone and opens at "/", it moves
+ * to quick entry once, at launch. The dashboard stays at "/" for every later visit.
+ */
+function InstalledStart() {
+  const navigate = useNavigate();
+  // Only the first check counts: going back to "/" later must stay on the dashboard.
+  const checked = useRef(false);
+  useEffect(() => {
+    if (checked.current) return;
+    checked.current = true;
+    const installed =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(display-mode: standalone)').matches;
+    if (installed && window.location.pathname === pages.overview)
+      void navigate(pages.quick, { replace: true });
+  }, [navigate]);
+  return null;
+}
+
 /** `queryClient` is for tests that start with data already loaded; the app makes its own. */
 export function App({ queryClient: given }: { queryClient?: QueryClient } = {}) {
   // One cache per mounted app, with the shared defaults (ADR-0027).
@@ -135,9 +160,14 @@ function Routed() {
     health.state === 'ok' ? health.today : health.state === 'loading' ? undefined : null;
   return (
     <BrowserRouter>
+      <InstalledStart />
       <SignInGate>
         <AppShell appName="Diet, Sleep and Health Log" nav={nav} actions={<AccountActions />}>
           <Routes>
+            <Route
+              path={pages.quick}
+              element={<QuickEntryPage health={health} dailyPath={pages.daily} />}
+            />
             <Route path={pages.overview} element={<ReportPage health={health} />} />
             <Route
               path={pages.daily}

@@ -61,6 +61,11 @@ const reportOf = (overrides: Record<string, unknown> = {}) => ({
     afterDrinking: { nights: 2, averageMinutes: 360 },
     afterNoDrinking: { nights: 6, averageMinutes: 450 },
   },
+  sleepAfterCaffeine: {
+    none: { nights: 4, averageMinutes: 470 },
+    low: { nights: 6, averageMinutes: 440 },
+    high: { nights: 2, averageMinutes: 380 },
+  },
   conditionAfter: {
     shortSleep: { with: group(4, 2.5, 3, 4.5), without: group(3, 4, 4.3, 2) },
     drinking: { with: group(3, 3, 3, 3), without: group(6, 4, 4, 2) },
@@ -173,8 +178,48 @@ test('enough nights on both sides drop the warning', async () => {
     ),
   );
   renderApp();
-  await screen.findByRole('heading', { name: 'Drinking and sleep that night' });
-  expect(screen.queryByText(/One sample has/)).not.toBeInTheDocument();
+  const card = (
+    await screen.findByRole('heading', { name: 'Drinking and sleep that night' })
+  ).closest<HTMLElement>('[data-slot=card]')!;
+  expect(within(card).queryByText(/One sample has/)).not.toBeInTheDocument();
+});
+
+test('the caffeine comparison shows three groups with their nights and average sleep', async () => {
+  serve(() => json(reportOf()));
+  renderApp();
+  const card = (
+    await screen.findByRole('heading', { name: 'Caffeine and sleep that night' })
+  ).closest<HTMLElement>('[data-slot=card]')!;
+  const row = (label: string) => within(card).getByText(label).closest('div')!;
+  expect(row('Nights after over 200 mg')).toHaveTextContent('Sample: 2 nights');
+  expect(row('Nights after over 200 mg')).toHaveTextContent('6 h 20 min');
+  expect(row('Nights after 200 mg or less')).toHaveTextContent('Sample: 6 nights');
+  expect(row('Nights after 200 mg or less')).toHaveTextContent('7 h 20 min');
+  expect(row('Nights without caffeine')).toHaveTextContent('Sample: 4 nights');
+  expect(row('Nights without caffeine')).toHaveTextContent('7 h 50 min');
+  expect(within(card).getByText(/One sample has fewer than 5 nights/)).toBeInTheDocument();
+  expect(within(card).getByText(/without any water or caffeine record/)).toBeInTheDocument();
+});
+
+test('a caffeine group with no nights says no records', async () => {
+  serve(() =>
+    json(
+      reportOf({
+        sleepAfterCaffeine: {
+          none: { nights: 5, averageMinutes: 470 },
+          low: { nights: 0, averageMinutes: null },
+          high: { nights: 5, averageMinutes: 380 },
+        },
+      }),
+    ),
+  );
+  renderApp();
+  const card = (
+    await screen.findByRole('heading', { name: 'Caffeine and sleep that night' })
+  ).closest<HTMLElement>('[data-slot=card]')!;
+  expect(within(card).getByText('Nights after 200 mg or less').closest('div')!).toHaveTextContent(
+    'No records',
+  );
 });
 
 test('a day without a record is a gap in the chart and says so in the table', async () => {

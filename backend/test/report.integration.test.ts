@@ -20,6 +20,7 @@ const clean = async () => {
   await pool.query('DELETE FROM meal_entries WHERE entry_date BETWEEN $1 AND $2', [first, last]);
   await pool.query('DELETE FROM habit_days WHERE record_date BETWEEN $1 AND $2', [first, last]);
   await pool.query('DELETE FROM day_checks WHERE record_date BETWEEN $1 AND $2', [first, last]);
+  await pool.query('DELETE FROM intake_entries WHERE record_date BETWEEN $1 AND $2', [first, last]);
 };
 
 before(async () => {
@@ -64,6 +65,17 @@ const habit = async (date: string, cigarettes: number | null, drinks: number | n
   }
 };
 
+// One intake row per amount: water in ml, any other kind in mg of caffeine.
+const intake = async (date: string, kind: string, ...amounts: number[]) => {
+  for (const amount of amounts) {
+    await pool.query('INSERT INTO intake_entries (record_date, kind, amount) VALUES ($1, $2, $3)', [
+      date,
+      kind,
+      amount,
+    ]);
+  }
+};
+
 const check = (date: string, dietKept: boolean | null, sleepGood: boolean | null) =>
   pool.query('INSERT INTO day_checks (record_date, diet_kept, sleep_good) VALUES ($1, $2, $3)', [
     date,
@@ -96,6 +108,7 @@ type Report = {
     drank: boolean | null;
   }[];
   sleepAfterDrinking: { afterDrinking: Night; afterNoDrinking: Night };
+  sleepAfterCaffeine: Record<'none' | 'low' | 'high', Night>;
   conditionAfter: Record<'shortSleep' | 'drinking' | 'junkFood', Split>;
 };
 
@@ -227,6 +240,41 @@ test(
       assert.deepEqual(sleepAfterDrinking, {
         afterDrinking: { nights: 3, averageMinutes: 360 },
         afterNoDrinking: { nights: 1, averageMinutes: 480 },
+      });
+    });
+  },
+);
+
+test(
+  'sleep after caffeine groups the next night by none, up to 200 mg and over 200 mg',
+  { skip },
+  async (t) => {
+    t.after(clean);
+    await intake('1979-04-02', 'water', 250); // water only: no caffeine
+    await sleep('1979-04-03', 480);
+    await intake('1979-04-03', 'coffee', 95, 95); // 190 mg
+    await intake('1979-04-03', 'water', 250);
+    await sleep('1979-04-04', 420);
+    await intake('1979-04-04', 'tea', 40, 40, 40, 40, 40); // exactly 200 mg: still "up to 200"
+    await sleep('1979-04-05', 400);
+    await intake('1979-04-05', 'coffee', 95, 95);
+    await intake('1979-04-05', 'energy', 80); // 270 mg
+    await sleep('1979-04-06', 300);
+    await sleep('1979-04-07', 540); // after 04-06, which has no intake record: left out
+    await intake('1979-04-08', 'other_caffeine', 50); // Sunday; its night is Monday 04-09
+    await sleep('1979-04-09', 450);
+    // Caffeine on the Sunday before belongs to the week before, though its night is 04-02.
+    await intake('1979-04-01', 'coffee', 95, 95, 95);
+    await sleep('1979-04-02', 100);
+    // A day with caffeine but no sleep the next night adds nothing.
+    await intake('1979-04-07', 'coffee', 95);
+
+    await withApi(pool, async (call) => {
+      const { sleepAfterCaffeine } = await report(call, 'week', '1979-04-04');
+      assert.deepEqual(sleepAfterCaffeine, {
+        none: { nights: 1, averageMinutes: 480 },
+        low: { nights: 3, averageMinutes: 423 },
+        high: { nights: 1, averageMinutes: 300 },
       });
     });
   },

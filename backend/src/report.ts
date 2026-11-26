@@ -159,6 +159,80 @@ const readSleepAfterDrinking = async (db: Db, span: Span) => {
   return { afterDrinking: group(true), afterNoDrinking: group(false) };
 };
 
+type ConditionRow = {
+  flag: boolean;
+  days: number;
+  moodDays: number;
+  mood: string | null;
+  energyDays: number;
+  energy: string | null;
+  stressDays: number;
+  stress: string | null;
+};
+
+// Rows of one comparison: `flag` is the input of the day, joined to the day_checks row `c` that
+// holds the condition to compare. Only days with at least one score count.
+const conditionSplit = async (db: Db, from: string, to: string, join: string, where: string) => {
+  const { rows } = await db.query<ConditionRow>(
+    `SELECT x.flag, count(*) AS days,
+       count(c.mood) AS "moodDays", avg(c.mood) AS mood,
+       count(c.energy) AS "energyDays", avg(c.energy) AS energy,
+       count(c.stress) AS "stressDays", avg(c.stress) AS stress
+     FROM day_checks c ${join}
+     WHERE ${where} AND (c.mood IS NOT NULL OR c.energy IS NOT NULL OR c.stress IS NOT NULL)
+     GROUP BY x.flag`,
+    [from, to],
+  );
+  const group = (flag: boolean) => {
+    const row = rows.find((each) => each.flag === flag);
+    const score = (days: number | undefined, average: string | null | undefined) => ({
+      days: days ?? 0,
+      average: rounded(average ?? null, 1),
+    });
+    return {
+      days: row?.days ?? 0,
+      mood: score(row?.moodDays, row?.mood),
+      energy: score(row?.energyDays, row?.energy),
+      stress: score(row?.stressDays, row?.stress),
+    };
+  };
+  return { with: group(true), without: group(false) };
+};
+
+/** Short sleep: under 6 hours. */
+const shortSleepMinutes = 360;
+
+// The condition of the day after each input (#324). A night's sleep is filed under the day of
+// waking, so its condition is that same day's; drinking and junk food are of day D, so their
+// condition is day D + 1's. Days without the input's own record are left out, never counted as no.
+const readConditionAfter = async (db: Db, span: Span) => {
+  const next = [shiftDay(span.from, 1), shiftDay(span.to, 1)] as const;
+  return {
+    shortSleep: await conditionSplit(
+      db,
+      span.from,
+      span.to,
+      `JOIN (SELECT sleep_date AS day, duration_minutes < ${shortSleepMinutes} AS flag
+             FROM sleep_records) x ON x.day = c.record_date`,
+      'c.record_date BETWEEN $1 AND $2',
+    ),
+    drinking: await conditionSplit(
+      db,
+      ...next,
+      `JOIN (SELECT record_date + 1 AS day, ${drankSql('habit_days.record_date')} AS flag
+             FROM habit_days WHERE drinks_recorded) x ON x.day = c.record_date`,
+      'c.record_date BETWEEN $1 AND $2',
+    ),
+    junkFood: await conditionSplit(
+      db,
+      ...next,
+      `JOIN (SELECT entry_date + 1 AS day, bool_or(is_junk) AS flag
+             FROM meal_entries GROUP BY entry_date) x ON x.day = c.record_date`,
+      'c.record_date BETWEEN $1 AND $2',
+    ),
+  };
+};
+
 export function reportRouter(pool: Pool) {
   const router = Router();
 
@@ -175,6 +249,7 @@ export function reportRouter(pool: Pool) {
         previous: await readSummary(client, previous),
         days: await readDays(client, current),
         sleepAfterDrinking: await readSleepAfterDrinking(client, current),
+        conditionAfter: await readConditionAfter(client, current),
       }),
       { setup: snapshotRead },
     );

@@ -21,6 +21,18 @@ const empty = {
 const week = { from: '2026-11-02', to: '2026-11-08' };
 const weekDays = ['02', '03', '04', '05', '06', '07', '08'].map((day) => `2026-11-${day}`);
 
+const group = (
+  days: number,
+  mood: number | null,
+  energy: number | null,
+  stress: number | null,
+) => ({
+  days,
+  mood: { days: mood === null ? 0 : days, average: mood },
+  energy: { days: energy === null ? 0 : days, average: energy },
+  stress: { days: stress === null ? 0 : days, average: stress },
+});
+
 const reportOf = (overrides: Record<string, unknown> = {}) => ({
   period: 'week',
   current: {
@@ -48,6 +60,11 @@ const reportOf = (overrides: Record<string, unknown> = {}) => ({
   sleepAfterDrinking: {
     afterDrinking: { nights: 2, averageMinutes: 360 },
     afterNoDrinking: { nights: 6, averageMinutes: 450 },
+  },
+  conditionAfter: {
+    shortSleep: { with: group(4, 2.5, 3, 4.5), without: group(3, 4, 4.3, 2) },
+    drinking: { with: group(3, 3, 3, 3), without: group(6, 4, 4, 2) },
+    junkFood: { with: group(0, null, null, null), without: group(5, 3.5, 3.5, 3.5) },
   },
   ...overrides,
 });
@@ -736,4 +753,25 @@ test('a period cached a while ago is shown dimmed while it is read again (#282 r
   expect(stat('Average sleep').closest('[aria-busy="true"]')).not.toBeNull();
   finishWeek();
   await waitFor(() => expect(document.querySelector('[aria-busy="true"]')).toBeNull());
+});
+
+test('the next-day condition is compared per input, and a side with too few days says so', async () => {
+  serve(() => json(reportOf()));
+  renderApp();
+  await screen.findByRole('heading', { name: 'Condition the next day' });
+  const sleep = screen.getByRole('region', { name: 'Short sleep' });
+  const rows = within(sleep).getAllByRole('row');
+  // Header, then the two groups with their day counts and the three averages.
+  expect(within(rows[1]).getByText('Under 6 h of sleep')).toBeInTheDocument();
+  expect(within(rows[1]).getByText('(4 days)')).toBeInTheDocument();
+  expect(
+    within(rows[1])
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent),
+  ).toEqual(['2.5', '3.0', '4.5']);
+  expect(within(screen.getByRole('region', { name: 'Drinking' })).getByRole('table')).toBeTruthy();
+  // Junk food has no days on one side, under the minimum of 3, so a message replaces the table.
+  const junk = screen.getByRole('region', { name: 'Junk food' });
+  expect(within(junk).queryByRole('table')).not.toBeInTheDocument();
+  expect(within(junk).getByText(/Too few days to compare/)).toHaveTextContent('0 and 5 so far');
 });

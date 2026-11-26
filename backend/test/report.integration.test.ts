@@ -81,6 +81,9 @@ type Summary = {
   diet: { days: number; yes: number };
   sleepGood: { days: number; yes: number };
 };
+type Score = { days: number; average: number | null };
+type Group = { days: number; mood: Score; energy: Score; stress: Score };
+type Split = { with: Group; without: Group };
 type Night = { nights: number; averageMinutes: number | null };
 type Report = {
   period: string;
@@ -93,6 +96,7 @@ type Report = {
     drank: boolean | null;
   }[];
   sleepAfterDrinking: { afterDrinking: Night; afterNoDrinking: Night };
+  conditionAfter: Record<'shortSleep' | 'drinking' | 'junkFood', Split>;
 };
 
 const report = async (
@@ -284,3 +288,79 @@ test(
     });
   },
 );
+
+const score = (date: string, mood: number | null, energy: number | null, stress: number | null) =>
+  pool.query('INSERT INTO day_checks (record_date, mood, energy, stress) VALUES ($1, $2, $3, $4)', [
+    date,
+    mood,
+    energy,
+    stress,
+  ]);
+
+test(
+  'next-day condition is averaged by sleep, drinking and junk food, over the days that have a score',
+  { skip },
+  async (t) => {
+    t.after(clean);
+    // The week of Monday 1979-04-02.
+    // Sleep is filed under the waking day, and its condition is that same day's.
+    await sleep('1979-04-02', 300); // short
+    await sleep('1979-04-03', 360); // exactly 6 h is not short
+    await sleep('1979-04-04', 480);
+    await score('1979-04-02', 2, 2, 5);
+    await score('1979-04-03', 4, null, 3);
+    await score('1979-04-04', 5, 4, 1);
+    // Drinking on 04-02 and 04-04, none recorded on 04-03; the condition is the next day's.
+    await habit('1979-04-02', null, 1);
+    await habit('1979-04-03', null, 0);
+    await habit('1979-04-04', null, 2);
+    // Junk food on 04-02 only; 04-03 and 04-04 have meals without it.
+    await pool.query(
+      `INSERT INTO meal_entries (entry_date, meal, name, servings, calories, is_junk)
+       VALUES ('1979-04-02', 'lunch', 'junk', 1, 500, true), ('1979-04-03', 'lunch', 'plain', 1, 400, false),
+         ('1979-04-04', 'lunch', 'plain', 1, 400, false)`,
+    );
+    // A day with only a diet check carries no score and is not counted.
+    await check('1979-04-05', true, null);
+
+    await withApi(pool, async (call) => {
+      const { conditionAfter } = await report(call, 'week', '1979-04-04');
+      assert.deepEqual(conditionAfter.shortSleep.with, {
+        days: 1,
+        mood: { days: 1, average: 2 },
+        energy: { days: 1, average: 2 },
+        stress: { days: 1, average: 5 },
+      });
+      assert.deepEqual(conditionAfter.shortSleep.without, {
+        days: 2,
+        mood: { days: 2, average: 4.5 },
+        energy: { days: 1, average: 4 },
+        stress: { days: 2, average: 2 },
+      });
+      // Drank on 04-02 (condition 04-03) and 04-04 (condition 04-05, no score): one day with.
+      assert.equal(conditionAfter.drinking.with.days, 1);
+      assert.deepEqual(conditionAfter.drinking.with.mood, { days: 1, average: 4 });
+      // No drinking recorded on 04-03, whose next day 04-04 has a score.
+      assert.equal(conditionAfter.drinking.without.days, 1);
+      assert.deepEqual(conditionAfter.drinking.without.mood, { days: 1, average: 5 });
+      // Junk on 04-02 -> 04-03's score; plain 04-03 -> 04-04's score.
+      assert.deepEqual(conditionAfter.junkFood.with.mood, { days: 1, average: 4 });
+      assert.deepEqual(conditionAfter.junkFood.without.mood, { days: 1, average: 5 });
+    });
+  },
+);
+
+test('a period with no scores has empty condition groups', { skip }, async () => {
+  await withApi(pool, async (call) => {
+    const { conditionAfter } = await report(call, 'week', '1979-02-14');
+    const empty = {
+      days: 0,
+      mood: { days: 0, average: null },
+      energy: { days: 0, average: null },
+      stress: { days: 0, average: null },
+    };
+    for (const split of Object.values(conditionAfter)) {
+      assert.deepEqual(split, { with: empty, without: empty });
+    }
+  });
+});

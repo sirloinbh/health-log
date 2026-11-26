@@ -25,6 +25,8 @@ const none = {
   diet: { days: 0, yes: 0 },
   sleepGood: { days: 0, yes: 0 },
 };
+const noScore = { days: 0, average: null };
+const noGroup = { days: 0, mood: noScore, energy: noScore, stress: noScore };
 const noReport = {
   period: 'week',
   current: { from: '2026-10-26', to: '2026-11-01', ...none },
@@ -34,6 +36,9 @@ const noReport = {
     afterDrinking: { nights: 0, averageMinutes: null },
     afterNoDrinking: { nights: 0, averageMinutes: null },
   },
+  conditionAfter: Object.fromEntries(
+    ['shortSleep', 'drinking', 'junkFood'].map((key) => [key, { with: noGroup, without: noGroup }]),
+  ),
 };
 
 // The other reads the pages make. Anything else fails the test (#214).

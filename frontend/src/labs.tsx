@@ -5,6 +5,7 @@ import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'rea
 import { charCount } from './check-text';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
+import { Combobox } from './components/ui/combobox';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
 import {
   Dialog,
@@ -38,6 +39,7 @@ import { LabTrendCard } from './lab-trend-card';
 import { RequestError, requestJson } from './lib/api';
 import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { errorText, useNotice } from './lib/use-notice';
+import { usedValues } from './lib/used-values';
 import { useReturnFocus } from './return-focus';
 import { type Visit, visitsPath } from './visit-text';
 import { asRequest } from './writes';
@@ -120,11 +122,14 @@ const fieldClass =
 function LabDialog({
   item,
   visits,
+  units,
   onClose,
   onSaved,
 }: {
   item: LabResult | null;
   visits: Visit[];
+  /** Units already used, to pick from. */
+  units: string[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -132,6 +137,11 @@ function LabDialog({
   const [saving, setSaving] = useState(false);
   const write = useApiMutation<unknown, ApiRequest>(asRequest);
   const { notice, error, clear } = useNotice();
+  // The test names used before, so a repeat test is picked, not typed again.
+  const names = useApiQuery<{ names: { name: string }[] }>(
+    apiKey(labsPath, 'names'),
+    `${labsPath}/names`,
+  );
   const set = (key: keyof Draft) => (event: { target: { value: string } }) =>
     setDraft((current) => ({ ...current, [key]: event.target.value }));
 
@@ -185,7 +195,14 @@ function LabDialog({
               />
             </Field>
             <Field id="lab-name" label="Test name">
-              <Input id="lab-name" autoComplete="off" value={draft.name} onChange={set('name')} />
+              <Combobox
+                id="lab-name"
+                autoComplete="off"
+                value={draft.name}
+                onValueChange={(name) => setDraft((current) => ({ ...current, name }))}
+                options={usedValues(names.data?.names.map((entry) => entry.name) ?? [])}
+                listLabel="Tests already recorded"
+              />
             </Field>
             <Field id="lab-value" label="Result">
               <Input
@@ -197,7 +214,14 @@ function LabDialog({
               />
             </Field>
             <Field id="lab-unit" label="Unit">
-              <Input id="lab-unit" autoComplete="off" value={draft.unit} onChange={set('unit')} />
+              <Combobox
+                id="lab-unit"
+                autoComplete="off"
+                value={draft.unit}
+                onValueChange={(unit) => setDraft((current) => ({ ...current, unit }))}
+                options={units}
+                listLabel="Units already used"
+              />
             </Field>
             <Field id="lab-low" label="Reference minimum">
               <Input
@@ -500,6 +524,13 @@ export function LabsPage() {
         <LabDialog
           item={editing.item}
           visits={visits}
+          units={usedValues(results?.map((result) => result.unit) ?? [], [
+            'mg/dL',
+            'mmol/L',
+            'g/dL',
+            'U/L',
+            '%',
+          ])}
           onClose={closeDialog}
           onSaved={() => {
             closeDialog();

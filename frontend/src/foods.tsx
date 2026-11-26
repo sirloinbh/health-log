@@ -12,6 +12,7 @@ import { FoodDialog } from './food-dialog';
 import { type Food, nutrients, sourceLabels } from './food-form';
 import { useFoodSearch } from './food-search';
 import { useNotice } from './lib/use-notice';
+import { usedValues } from './lib/used-values';
 import { MoreFoodsButton } from './more-foods-button';
 import { useReturnFocus } from './return-focus';
 
@@ -185,6 +186,11 @@ export function FoodsPage() {
       {editing ? (
         <FoodDialog
           food={editing === 'new' ? null : editing}
+          choices={{
+            brands: usedValues(foods?.map((food) => food.brand) ?? []),
+            categories: usedValues(foods?.map((food) => food.category) ?? []),
+            units: usedValues(foods?.map((food) => food.servingUnit) ?? [], ['g', 'ml']),
+          }}
           onClose={closeDialog}
           onSaved={() => {
             closeDialog();

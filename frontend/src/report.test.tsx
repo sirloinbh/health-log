@@ -7,7 +7,11 @@ import { findLive, getLive } from './test/live';
 import { testQueryClient } from './test/query';
 
 // Without the app's one retry after a server error, so each failure a test serves shows at once.
-const renderApp = () => render(<App queryClient={testQueryClient()} />);
+// The dashboard lives at /dashboard; "/" is the day log (#350).
+const renderApp = () => {
+  if (window.location.pathname === '/') window.history.replaceState(null, '', '/dashboard');
+  return render(<App queryClient={testQueryClient()} />);
+};
 
 const today = '2026-11-05';
 const empty = {
@@ -339,7 +343,7 @@ test('"This week" goes once the week is shown, and its focus moves to the period
         : reportOf({ current: { ...reportOf().current, from: '2026-10-26', to: '2026-11-01' } }),
     ),
   );
-  window.history.replaceState(null, '', '/?period=week&date=2026-10-28');
+  window.history.replaceState(null, '', '/dashboard?period=week&date=2026-10-28');
   renderApp();
   await screen.findByText('Oct 26 – Nov 1');
   const thisWeek = screen.getByRole('button', { name: 'This week' });
@@ -361,7 +365,7 @@ test('"This week" keeps its focus while the week loads (#138 review)', async () 
           reportOf({ current: { ...reportOf().current, from: '2026-10-26', to: '2026-11-01' } }),
         ),
   );
-  window.history.replaceState(null, '', '/?period=week&date=2026-10-28');
+  window.history.replaceState(null, '', '/dashboard?period=week&date=2026-10-28');
   renderApp();
   await screen.findByText('Oct 26 – Nov 1');
   const thisWeek = screen.getByRole('button', { name: 'This week' });
@@ -405,7 +409,7 @@ test('a failed "This week" does not move focus on a later report (#138 review)',
             }),
           ),
   );
-  window.history.replaceState(null, '', '/?period=week&date=2026-10-28');
+  window.history.replaceState(null, '', '/dashboard?period=week&date=2026-10-28');
   renderApp();
   await screen.findByText('Oct 26 – Nov 1');
   fireEvent.click(screen.getByRole('button', { name: 'This week' }));
@@ -539,7 +543,7 @@ test('the first and last periods of the range do not move past it (#130)', async
       }),
     );
   });
-  window.history.replaceState(null, '', '/?period=week&date=2000-01-01');
+  window.history.replaceState(null, '', '/dashboard?period=week&date=2000-01-01');
   renderApp();
   await screen.findByText('Dec 27, 1999 – Jan 2, 2000');
   const previous = screen.getByRole('button', { name: 'Previous week' });
@@ -558,7 +562,7 @@ test('the first and last periods of the range do not move past it (#130)', async
     'true',
   );
 
-  window.history.pushState({}, '', '/?period=week&date=2099-12-31');
+  window.history.pushState({}, '', '/dashboard?period=week&date=2099-12-31');
   fireEvent(window, new PopStateEvent('popstate'));
   await screen.findByText('Dec 28, 2099 – Jan 3, 2100');
   expect(screen.getByRole('button', { name: 'Next week' })).toHaveAttribute(
@@ -587,7 +591,7 @@ test('the week before the second week of 2000 is asked for by a day in range (#1
       }),
     ),
   );
-  window.history.replaceState(null, '', '/?period=week&date=2000-01-05');
+  window.history.replaceState(null, '', '/dashboard?period=week&date=2000-01-05');
   renderApp();
   await screen.findByText('Jan 3 – Jan 9, 2000');
   fireEvent.click(screen.getByRole('button', { name: 'Previous week' }));
@@ -607,7 +611,7 @@ test('a report still on its way does not land next to the word about a date out 
   renderApp();
   // The week's report is on its way before the address moves out of range.
   await waitFor(() => expect(reportCalls(fetchMock)).toHaveLength(1));
-  window.history.pushState(null, '', '/?period=week&date=1999-06-01');
+  window.history.pushState(null, '', '/dashboard?period=week&date=1999-06-01');
   fireEvent(window, new PopStateEvent('popstate'));
   await screen.findByText('Records can be kept from 2000-01-01 to 2099-12-31: 1999-06-01');
   const late = json(reportOf());
@@ -618,7 +622,7 @@ test('a report still on its way does not land next to the word about a date out 
 
 test('a date in the address outside the range is said, not shown as an empty report (#130)', async () => {
   const fetchMock = serve(() => json(reportOf()));
-  window.history.replaceState(null, '', '/?period=week&date=1999-06-01');
+  window.history.replaceState(null, '', '/dashboard?period=week&date=1999-06-01');
   renderApp();
   expect(
     await screen.findByText('Records can be kept from 2000-01-01 to 2099-12-31: 1999-06-01'),
@@ -682,7 +686,7 @@ test('an answer for a period already left does not replace the one on screen', a
 
 test('a date in the address that does not exist falls back to the server date', async () => {
   const fetchMock = serve(() => json(reportOf()));
-  window.history.replaceState(null, '', '/?period=week&date=2026-02-30');
+  window.history.replaceState(null, '', '/dashboard?period=week&date=2026-02-30');
   renderApp();
   await screen.findByText('Nov 2 – Nov 8');
   expect(reportCalls(fetchMock)).toEqual([`/api/report?period=week&date=${today}`]);

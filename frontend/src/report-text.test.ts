@@ -61,6 +61,12 @@ test('a span of another year, or across one, names the year (#129)', () => {
   expect(spanLabel({ from: '2026-11-02', to: '2026-11-08' }, null)).toBe('Nov 2 – Nov 8, 2026');
 });
 
+test('12 weeks step by 84 days (#350)', () => {
+  expect(shiftPeriod('weeks12', '2026-08-17', 1)).toBe('2026-11-09');
+  expect(shiftPeriod('weeks12', '2026-08-17', -1)).toBe('2026-05-25');
+  expect(periodsOf('2026-11-05').weeks12).toEqual({ from: '2026-08-17', to: '2026-11-08' });
+});
+
 // The screen and the server read periods from the same shared contract (#215).
 test('the period holding a date is Monday to Sunday, or the calendar month', () => {
   expect(periodsOf('2026-11-05').week).toEqual({ from: '2026-11-02', to: '2026-11-08' });

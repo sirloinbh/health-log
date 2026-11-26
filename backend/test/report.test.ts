@@ -20,8 +20,8 @@ const untouched = () => {
 test('a report needs a known period and a real date', async () => {
   await withApi(untouched(), async (call) => {
     for (const [query, message] of [
-      ['?date=2026-11-05', 'The period must be week or month'],
-      ['?period=year&date=2026-11-05', 'The period must be week or month'],
+      ['?date=2026-11-05', 'The period must be week, month or weeks12'],
+      ['?period=year&date=2026-11-05', 'The period must be week, month or weeks12'],
       ['?period=week', 'The date is not valid'],
       ['?period=week&date=2026-02-30', 'The date is not valid'],
       ['?period=week&date=2026-11-05&date=2026-11-06', 'The date is not valid'],

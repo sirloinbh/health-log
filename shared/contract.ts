@@ -18,7 +18,7 @@ export const maxAmount = 99_999;
 const toDay = (time: number) => new Date(time).toISOString().slice(0, 10);
 
 /**
- * The week (Monday to Sunday) and the calendar month that hold `date`. The date is already a day in
+ * The week (Monday to Sunday), the 12 weeks ending with it, and the calendar month that hold `date`. The date is already a day in
  * the service time zone; counting it as a UTC midnight keeps every boundary on the day it names,
  * whatever the zone of the server or the browser.
  */
@@ -29,6 +29,8 @@ export function periodsOf(date: string) {
   const [year, month] = date.split('-').map(Number);
   return {
     week: { from: toDay(monday), to: toDay(monday + 6 * 86_400_000) },
+    // Twelve weeks (84 days) that end with the week holding `date` (#350).
+    weeks12: { from: toDay(monday - 77 * 86_400_000), to: toDay(monday + 6 * 86_400_000) },
     // Day 0 of the next month is the last day of this one.
     month: { from: `${date.slice(0, 7)}-01`, to: toDay(Date.UTC(year, month, 0)) },
   };

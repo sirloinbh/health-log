@@ -1,7 +1,7 @@
 import { shortMonthDay } from './daily-date';
 import { count } from './plural';
 
-export type Period = 'week' | 'month';
+export type Period = 'week' | 'month' | 'weeks12';
 
 type Count = { days: number; yes: number };
 export type ReportSummary = {
@@ -46,6 +46,7 @@ export type PeriodWords = { name: string; previous: string };
 export const periodWords: Record<Period, PeriodWords> = {
   week: { name: 'week', previous: 'last week' },
   month: { name: 'month', previous: 'last month' },
+  weeks12: { name: '12 weeks', previous: 'the 12 weeks before' },
 };
 
 /** "7 h 30 min" */
@@ -118,6 +119,9 @@ export const spanLabel = ({ from, to }: { from: string; to: string }, today: str
 export const shiftPeriod = (period: Period, from: string, step: -1 | 1) => {
   const start = Date.parse(`${from}T00:00:00Z`);
   if (period === 'week') return new Date(start + step * 7 * 86_400_000).toISOString().slice(0, 10);
+  if (period === 'weeks12') {
+    return new Date(start + step * 84 * 86_400_000).toISOString().slice(0, 10);
+  }
   const day = new Date(start);
   return new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth() + step, 1))
     .toISOString()

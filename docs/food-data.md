@@ -6,16 +6,16 @@ Food nutrition values must be verifiable later. These rules apply to the researc
 
 - Store nutrition **per serving**. If the product label is per 100g, write the serving as `100`, `g`.
 - For sources such as the Ministry of Food and Drug Safety (MFDS) food nutrition DB, which give values per 100g (or 100mL) together with the total content, **convert to the total content** and store that. If there is no total content, store it as 100g (100mL). When you compare with the source, convert back to a per-100 value first.
-- A food name may be written in the words people search for. If it differs from the official name, confirm it on the source page. For example `돈가스(돈까스)` (pork cutlet) and `닭가슴살(삶은것)` (chicken breast, boiled).
+- **Write the name, brand, and category in English** (user decision on #351, 2026-11-27). Use the common English name with the Korean dish in front when there is no good English word, for example `Jajangmyeon (black bean noodles)`, and the brand's English spelling, for example `McDonald's`. Keep the Korean name, or the Korean `brand name`, in `search_alias` (below), so a Korean search still finds the food. The source page keeps its own spelling, which is how you check the row.
 - If there are several records for the same food, choose in this order: **measured analysis value → collected value → calculated value, records whose total content differs from the reference amount, eating out → home cooking → institutional meals, newest creation date**. The source itself calls calculated values reference values, so use them only when there is no analysis record. A total content of `100g` or `-` means there is no per-portion information.
-- When you look for candidates, also look for the other spellings in the source. Spacing and word order differ, so the exactly matching name misses them. For example `짜장면` (jajangmyeon) is `자장면`, `참치김밥` (tuna gimbap) is `김밥_참치`, and `제육볶음` (stir-fried pork) is `돼지고기볶음(제육볶음)`.
+- When you look for candidates, also look for the other spellings in the source. Spacing and word order differ, so the exactly matching name misses them. For example jajangmyeon is `자장면` and tuna gimbap is `김밥_참치` there, and jeyuk-bokkeum is `돼지고기볶음(제육볶음)`.
 - **Keep the serving unit the source gives** (user decision on #199, 2026-11-22). A drink the source gives per 100 g, or a franchise drink listed in g, stays in `g`; do not turn it into mL. Write milliliters as `mL`, never `ml`. Only a solid food that a source lists in mL is stored in `g`, with the same number.
 - Calories are in kcal, carbs, protein, fat, and sugars in g, and sodium in mg.
 - **Leave an unknown value as NULL. Do not write 0.** Use 0 only when it really is 0. A value given only as a range, such as "less than 1g", is also NULL.
-- For a packaged product (#32), write the total content at the end of the name (`갈비탕 400g`, galbitang, beef rib soup), and write the reference amount of the nutrition label as the serving. If the two are the same, the label is per total content, and if the serving is smaller, the label is per part of the weight.
+- For a packaged product (#32), write the total content at the end of the name (`Galbitang (beef rib soup) 400g`), and write the reference amount of the nutrition label as the serving. If the two are the same, the label is per total content, and if the serving is smaller, the label is per part of the weight.
 - Store numbers to two decimal places. The screen and the API reject finer values.
 - The checked date cannot be in the future.
-- If the same menu item comes in different sizes, tell them apart by name. For example `와퍼` (Whopper) and `와퍼 주니어` (Whopper Junior).
+- If the same menu item comes in different sizes, tell them apart by name. For example `Whopper` and `Whopper Junior`.
 - Foods are told apart by the combination of name and brand, and cannot be registered twice.
 
 ## Sources
@@ -47,9 +47,9 @@ What happens to a value fixed on the screen after a rerun depends on what was fi
 | Name or brand changed                             | One more food appears from the research value |
 
 ```sql
-INSERT INTO foods (name, brand, category, serving_size, serving_unit, calories, carbs, protein, fat, sugars, sodium, source_type, source_url, checked_on, is_junk)
+INSERT INTO foods (name, brand, category, serving_size, serving_unit, calories, carbs, protein, fat, sugars, sodium, source_type, source_url, checked_on, is_junk, search_alias)
 VALUES
-  (U&'\C608\C2DC', U&'\BE0C\B79C\B4DC', NULL, 100, 'g', 250, NULL, 10, 8, NULL, 500, 'official', 'https://example.com/nutrition', '2026-10-31', true)
+  ('Example', 'Brand', NULL, 100, 'g', 250, NULL, 10, 8, NULL, 500, 'official', 'https://example.com/nutrition', '2026-10-31', true, U&'\BE0C\B79C\B4DC \C608\C2DC')
 ON CONFLICT (name, COALESCE(brand, '')) DO UPDATE SET
   category = EXCLUDED.category,
   serving_size = EXCLUDED.serving_size,
@@ -75,10 +75,11 @@ WHERE EXCLUDED.checked_on > foods.checked_on;
 
   ```sql
   UPDATE foods SET calories = 510, updated_at = now()
-  WHERE name = U&'\C608\C2DC' AND brand = U&'\BE0C\B79C\B4DC' AND calories = 500;
+  WHERE name = 'Example' AND brand = 'Brand' AND calories = 500;
   ```
 
-- Write Korean in SQL as `U&'\C608\C2DC'` (the example word 예시, "example"), with one backslash before each code value.
+- **`search_alias` (#351) is the hidden Korean search text.** The food search reads it together with the brand and name, and no screen or API response shows it. Write the Korean `brand name` as the screens used to show it (the example's alias spells 브랜드 예시, "brand example"), and leave it out of `DO UPDATE SET`, as with `is_junk`. It is NULL for a food a person adds.
+- Write Korean in SQL as `U&'\C608\C2DC'` (the word 예시, "example"), with one backslash before each code value. Only `search_alias` needs it.
 
 When you apply it to an existing DB, **a food of the same name with an earlier date is changed to the research value.** If there is user data, check the foods whose names overlap before you apply it. The values of meal records that are already registered do not change.
 

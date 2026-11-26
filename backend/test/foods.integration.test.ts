@@ -39,7 +39,7 @@ const importFood = (name: string, calories: number, checkedOn: string) =>
   pool.query(
     documentedSql.replace(
       /VALUES[\s\S]*?ON CONFLICT/,
-      `VALUES ($1, 'integration-brand', NULL, 100, 'g', $2, NULL, NULL, NULL, NULL, NULL, 'official', 'https://example.com/menu', $3, true)\nON CONFLICT`,
+      `VALUES ($1, 'integration-brand', NULL, 100, 'g', $2, NULL, NULL, NULL, NULL, NULL, 'official', 'https://example.com/menu', $3, true, NULL)\nON CONFLICT`,
     ),
     [name, calories, checkedOn],
   );
@@ -116,26 +116,26 @@ test('popular foods are stored per serving with a checkable public source', { sk
 
   // Measured values win: the calculated record would give 590 mL with 342 mg of sodium.
   const ramen = await pool.query<{ serving_size: string; sodium: string }>(
-    "SELECT serving_size, sodium FROM foods WHERE name = '라면' AND brand IS NULL",
+    "SELECT serving_size, sodium FROM foods WHERE name = 'Ramyeon (instant noodles)' AND brand IS NULL",
   );
   assert.equal(Number(ramen.rows[0]!.serving_size), 550);
   assert.equal(Number(ramen.rows[0]!.sodium), 1556.5);
 
-  // Measured records filed under another spelling: 자장면 (jajangmyeon) and 돼지고기볶음 (stir-fried pork, 제육볶음) at the source.
+  // Measured records filed under another spelling at the source: 자장면 (jajangmyeon) and 돼지고기볶음 (stir-fried pork, jeyuk-bokkeum).
   const servings = await pool.query<{ name: string; serving_size: string; serving_unit: string }>(
-    "SELECT name, serving_size, serving_unit FROM foods WHERE name IN ('짜장면(자장면)', '제육볶음') AND brand IS NULL ORDER BY name",
+    "SELECT name, serving_size, serving_unit FROM foods WHERE name IN ('Jajangmyeon (black bean noodles)', 'Jeyuk-bokkeum (spicy stir-fried pork)') AND brand IS NULL ORDER BY name",
   );
   assert.deepEqual(
     servings.rows.map((row) => [row.name, Number(row.serving_size), row.serving_unit]),
     [
-      ['제육볶음', 250, 'g'],
-      ['짜장면(자장면)', 650, 'g'],
+      ['Jajangmyeon (black bean noodles)', 650, 'g'],
+      ['Jeyuk-bokkeum (spicy stir-fried pork)', 250, 'g'],
     ],
   );
 
-  // The source gives 61 kcal per 100 g and a total of 400 g; its Korean name must decode too.
+  // The source gives 61 kcal per 100 g and a total of 400 g.
   const stew = await pool.query<{ serving_size: string; serving_unit: string; calories: string }>(
-    "SELECT serving_size, serving_unit, calories FROM foods WHERE name = '김치찌개' AND brand IS NULL",
+    "SELECT serving_size, serving_unit, calories FROM foods WHERE name = 'Kimchi stew' AND brand IS NULL",
   );
   assert.equal(stew.rowCount, 1);
   assert.equal(Number(stew.rows[0]!.serving_size), 400);
@@ -144,7 +144,7 @@ test('popular foods are stored per serving with a checkable public source', { sk
 });
 
 // #31. Franchise menus: official numbers only, each with where and when they were checked.
-const franchiseBrands = ['맥도날드', '버거킹', '롯데리아', 'KFC', '맘스터치'];
+const franchiseBrands = ["McDonald's", 'Burger King', 'Lotteria', 'KFC', "Mom's Touch"];
 
 test(
   'franchise menus carry an official source, a date and the junk food mark',
@@ -158,9 +158,9 @@ test(
       unchecked: number;
     }>(
       `SELECT brand,
-            count(*) FILTER (WHERE category = '버거') AS burgers,
-            count(*) FILTER (WHERE category = '사이드') AS sides,
-            count(*) FILTER (WHERE category = '음료') AS drinks,
+            count(*) FILTER (WHERE category = 'Burgers') AS burgers,
+            count(*) FILTER (WHERE category = 'Sides') AS sides,
+            count(*) FILTER (WHERE category = 'Drinks') AS drinks,
             count(*) FILTER (
               WHERE source_type <> 'official' OR source_url NOT LIKE 'https://%'
                 OR checked_on IS NULL OR NOT is_junk
@@ -178,11 +178,11 @@ test(
     );
     // Burger King publishes no row for its fries and soft drinks (docs/changes/31-franchise-foods.md).
     assert.deepEqual(byBrand, {
-      맥도날드: [21, 2, 10, 0],
-      버거킹: [37, 0, 0, 0],
-      롯데리아: [28, 2, 3, 0],
+      "McDonald's": [21, 2, 10, 0],
+      'Burger King': [37, 0, 0, 0],
+      Lotteria: [28, 2, 3, 0],
       KFC: [12, 2, 12, 0],
-      맘스터치: [29, 2, 4, 0],
+      "Mom's Touch": [29, 2, 4, 0],
     });
 
     // One value per brand as the source prints it, so a shifted column would show.
@@ -190,20 +190,21 @@ test(
       `SELECT brand, name, concat_ws('/', serving_size::float8, serving_unit, calories::float8,
               sugars::float8, protein::float8, sodium::float8) AS values
      FROM foods
-     WHERE (brand, name) IN (('맥도날드', '빅맥'), ('버거킹', '와퍼'), ('롯데리아', '리아 불고기'),
-                             ('KFC', '징거'), ('맘스터치', '싸이버거'), ('맥도날드', '코카 콜라 미디엄'))
-     ORDER BY brand, name`,
+     WHERE (brand, name) IN (('McDonald''s', 'Big Mac'), ('Burger King', 'Whopper'), ('Lotteria', 'Ria Bulgogi'),
+                             ('KFC', 'Zinger'), ('Mom''s Touch', 'Thigh Burger'),
+                             ('McDonald''s', 'Coca-Cola Medium'))
+     ORDER BY brand COLLATE "C", name COLLATE "C"`,
     );
     assert.deepEqual(
       samples.rows.map((row) => `${row.brand} ${row.name} ${row.values}`),
       [
-        'KFC 징거 225/g/553/5/33/866',
-        '롯데리아 리아 불고기 192/g/462/11/21/880',
-        '맘스터치 싸이버거 230/g/594/14/28/1009',
-        '맥도날드 빅맥 223/g/582/8/27/902',
+        'Burger King Whopper 286/g/706/10/30/1098',
+        'KFC Zinger 225/g/553/5/33/866',
+        'Lotteria Ria Bulgogi 192/g/462/11/21/880',
         // 013 wrote 'ml'; 020 writes it 'mL' like the rest of the data (#199).
-        '맥도날드 코카 콜라 미디엄 425/mL/133/33/0/9',
-        '버거킹 와퍼 286/g/706/10/30/1098',
+        "McDonald's Big Mac 223/g/582/8/27/902",
+        "McDonald's Coca-Cola Medium 425/mL/133/33/0/9",
+        "Mom's Touch Thigh Burger 230/g/594/14/28/1009",
       ],
     );
   },
@@ -218,14 +219,14 @@ test('Bibigo soups are found by name and keep their label values', { skip }, asy
                 OR source_url NOT LIKE 'https://www.cjthemarket.com/the/product/product-main?prdCd=%'
                 OR calories IS NULL OR protein IS NULL OR fat IS NULL OR sodium IS NULL
             ) AS unchecked
-     FROM foods WHERE brand = '비비고' AND category = '국·탕·찌개'`,
+     FROM foods WHERE brand = 'Bibigo' AND category = 'Soups and stews'`,
   );
   assert.deepEqual(rows[0], { total: 27, unchecked: 0 });
 
   await withApi(pool, async (call) => {
     const { data } = await call(`/api/foods?q=${encodeURIComponent('갈비탕')}`);
     const galbitang = (data.foods as Record<string, unknown>[]).find(
-      (food) => food.brand === '비비고',
+      (food) => food.brand === 'Bibigo',
     );
     // "Less than 4 g" on the label is not a value, so carbohydrate stays unknown.
     assert.deepEqual(
@@ -240,7 +241,7 @@ test('Bibigo soups are found by name and keep their label values', { skip }, asy
         isJunk: galbitang.isJunk,
       },
       {
-        name: '갈비탕 400g',
+        name: 'Galbitang (beef rib soup) 400g',
         servingSize: 400,
         calories: 85,
         carbs: null,
@@ -253,17 +254,18 @@ test('Bibigo soups are found by name and keep their label values', { skip }, asy
   });
 });
 
-test('popular foods can be found by the words people search for', { skip }, async () => {
+// #351: the seeded foods are English now; the old Korean text is a hidden search alias.
+test('popular foods can be found by the Korean words people search for', { skip }, async () => {
   await withApi(pool, async (call) => {
     const expected = {
-      닭가슴살: '닭가슴살(삶은것)',
-      계란: '삶은 달걀(계란)',
-      치킨: '닭튀김(치킨)',
-      돈까스: '돈가스(돈까스)',
-      콜라: '콜라',
-      요거트: '플레인 요거트(요구르트)',
-      찜닭: '찜닭(안동찜닭)',
-      참치김밥: '참치김밥',
+      닭가슴살: 'Chicken breast (boiled)',
+      계란: 'Boiled egg',
+      치킨: 'Fried chicken',
+      돈까스: 'Pork cutlet (donkatsu)',
+      콜라: 'Cola',
+      요거트: 'Plain yogurt',
+      찜닭: 'Andong braised chicken (jjimdak)',
+      참치김밥: 'Tuna gimbap',
     };
     for (const [q, name] of Object.entries(expected)) {
       const { data } = await call(`/api/foods?q=${encodeURIComponent(q)}`);
@@ -285,17 +287,17 @@ test('seeded serving units are corrected once and a rerun changes nothing', { sk
     assert.equal(rows.length, 1, name);
     return `${Number(rows[0].size)}${rows[0].unit}`;
   };
-  assert.equal(await unitOf('탕수육', null), '343g');
-  assert.equal(await unitOf('오징어튀김', null), '77g');
-  assert.equal(await unitOf('토스트(식빵)', null), '230.3g');
+  assert.equal(await unitOf('Tangsuyuk (sweet and sour pork)', null), '343g');
+  assert.equal(await unitOf('Fried squid', null), '77g');
+  assert.equal(await unitOf('Toast (sliced bread)', null), '230.3g');
   // Drinks stay as their sources give them: MFDS per 100 g, McDonald's in milliliters.
-  assert.equal(await unitOf('콜라', null), '100g');
-  assert.equal(await unitOf('아메리카노', null), '532mL');
-  assert.equal(await unitOf('코카 콜라 미디엄', '맥도날드'), '425mL');
+  assert.equal(await unitOf('Cola', null), '100g');
+  assert.equal(await unitOf('Americano', null), '532mL');
+  assert.equal(await unitOf('Coca-Cola Medium', "McDonald's"), '425mL');
   // Only researched rows: other test files add typed-in foods with their own units at the same time.
   const { rows } = await pool.query<{ lower: number; mcdonalds: number }>(
     `SELECT count(*) FILTER (WHERE serving_unit = 'ml') AS lower,
-            count(*) FILTER (WHERE brand = '맥도날드' AND serving_unit = 'mL') AS mcdonalds
+            count(*) FILTER (WHERE brand = 'McDonald''s' AND serving_unit = 'mL') AS mcdonalds
      FROM foods WHERE source_type IN ('official', 'public')`,
   );
   // No researched row is left with a lowercase 'ml', and all 10 McDonald's drinks are 'mL'.
@@ -315,9 +317,69 @@ test('seeded serving units are corrected once and a rerun changes nothing', { sk
   );
 });
 
+// #351: the rename migration keeps the Korean text only as a hidden search alias.
+test(
+  'seeded foods are English, the Korean text is a hidden alias, and a rerun changes nothing',
+  { skip },
+  async () => {
+    const { rows } = await pool.query<{ korean: number; aliased: number }>(
+      `SELECT count(*) FILTER (WHERE name ~ '[가-힣]' OR brand ~ '[가-힣]' OR category ~ '[가-힣]') AS korean,
+            count(*) FILTER (WHERE search_alias IS NOT NULL) AS aliased
+     FROM foods WHERE source_type IN ('official', 'public')`,
+    );
+    assert.equal(Number(rows[0]!.korean), 0);
+    assert.ok(Number(rows[0]!.aliased) >= 286, `${rows[0]!.aliased} aliased`);
+
+    await withApi(pool, async (call) => {
+      for (const q of ['짜장면', '맥도날드 빅맥', '비비고 갈비탕']) {
+        const { data } = await call(`/api/foods?q=${encodeURIComponent(q)}`);
+        const foods = data.foods as Record<string, unknown>[];
+        assert.ok(foods.length > 0, q);
+        // The alias is searched but never sent, and a result shows no Korean name.
+        assert.ok(
+          foods.every((food) => !('searchAlias' in food) && !('search_alias' in food)),
+          q,
+        );
+        assert.ok(
+          foods.every((food) => !/[가-힣]/.test(JSON.stringify(food))),
+          q,
+        );
+      }
+      const { data } = await call(`/api/foods?q=${encodeURIComponent("McDonald's Big Mac")}`);
+      assert.equal((data.foods as unknown[]).length, 1);
+    });
+
+    const migration = readFileSync(
+      new URL('../../database/migrations/027_foods_english_names.sql', import.meta.url),
+      'utf8',
+    );
+    const results = (await pool.query(migration)) as unknown as { rowCount: number }[];
+    assert.equal(results.at(-2)!.rowCount, 0);
+  },
+);
+
+test('a food a person added keeps its Korean text when the seed is renamed', { skip }, async () => {
+  const name = `${prefix}한글`;
+  await pool.query(
+    `INSERT INTO foods (name, brand, category, serving_size, serving_unit) VALUES ($1, '맥도날드', '버거', 100, 'g')`,
+    [name],
+  );
+  const migration = readFileSync(
+    new URL('../../database/migrations/027_foods_english_names.sql', import.meta.url),
+    'utf8',
+  );
+  await pool.query(migration);
+  const { rows } = await pool.query<{
+    brand: string;
+    category: string;
+    search_alias: string | null;
+  }>('SELECT brand, category, search_alias FROM foods WHERE name = $1', [name]);
+  assert.deepEqual(rows, [{ brand: '맥도날드', category: '버거', search_alias: null }]);
+});
+
 test('the documented example runs as written and repeats safely', { skip }, async (t) => {
-  // Its Korean literals must decode: the escapes spell 예시 ("example") and 브랜드 ("brand").
-  const example = "name = '예시' AND brand = '브랜드'";
+  // Its Korean alias must decode: the escapes spell 브랜드 예시 ("brand example").
+  const example = "name = 'Example' AND brand = 'Brand' AND search_alias = '브랜드 예시'";
   const clean = () => pool.query(`DELETE FROM foods WHERE ${example}`);
   await clean();
   t.after(clean);

@@ -174,7 +174,8 @@ const readSleepAfterCaffeine = async (db: Db, span: Span) => {
        count(*) AS nights, avg(s.duration_minutes) AS average
      FROM sleep_records s
      JOIN (SELECT record_date, coalesce(sum(amount) FILTER (WHERE kind <> 'water'), 0) AS caffeine
-           FROM intake_entries GROUP BY record_date) i ON i.record_date = s.sleep_date - 1
+           FROM intake_entries WHERE record_date BETWEEN $1::date - 1 AND $2::date - 1
+           GROUP BY record_date) i ON i.record_date = s.sleep_date - 1
      WHERE s.sleep_date BETWEEN $1 AND $2
      GROUP BY 1`,
     [shiftDay(span.from, 1), shiftDay(span.to, 1)],

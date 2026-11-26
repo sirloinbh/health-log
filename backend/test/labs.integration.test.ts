@@ -16,7 +16,7 @@ const day = '1990-03-05';
 let pool: Pool;
 
 const clean = async () => {
-  await pool.query('DELETE FROM lab_results WHERE name LIKE $1', [`${marker}%`]);
+  await pool.query('DELETE FROM lab_results WHERE name ILIKE $1', [`${marker}%`]);
   await pool.query('DELETE FROM clinic_visits WHERE clinic = $1', [clinic]);
 };
 

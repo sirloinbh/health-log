@@ -43,6 +43,20 @@ const noHabits = () =>
       month: { from: '2026-03-01', to: '2026-03-31', ...emptyPeriod },
     }),
   );
+const noIntake = (url: string) =>
+  new Response(
+    JSON.stringify({
+      date: url.slice(-10),
+      kinds: Object.fromEntries(
+        ['water', 'coffee', 'tea', 'energy', 'other_caffeine'].map((kind) => [
+          kind,
+          { count: 0, amount: 0 },
+        ]),
+      ),
+      waterMl: 0,
+      caffeineMg: 0,
+    }),
+  );
 const noRate = { days: 0, yes: 0 };
 const noChecks = () =>
   new Response(
@@ -83,15 +97,19 @@ const dayCard = (url: string) =>
       ? noMeals()
       : url.startsWith('/api/habits')
         ? noHabits()
-        : url.startsWith('/api/checks')
-          ? noChecks()
-          : url.startsWith('/api/goals/days/')
-            ? noGoals(url)
-            : url === '/api/foods/recent'
-              ? new Response(JSON.stringify({ foods: [] }))
-              : url === '/api/reminders'
-                ? new Response(JSON.stringify(noReminders))
-                : null;
+        : url.startsWith('/api/workout-memo')
+          ? new Response(JSON.stringify({ state: 'ok', workouts: [] }))
+          : url.startsWith('/api/intake')
+            ? noIntake(url)
+            : url.startsWith('/api/checks')
+              ? noChecks()
+              : url.startsWith('/api/goals/days/')
+                ? noGoals(url)
+                : url === '/api/foods/recent'
+                  ? new Response(JSON.stringify({ foods: [] }))
+                  : url === '/api/reminders'
+                    ? new Response(JSON.stringify(noReminders))
+                    : null;
 
 const health = (body: object, status = 200) =>
   vi.stubGlobal(

@@ -18,6 +18,7 @@ const clean = async () => {
   // Goals hold from their date onwards, so none from this file may outlive it.
   await pool.query('DELETE FROM goals WHERE effective_from BETWEEN $1 AND $2', [first, last]);
   await pool.query('DELETE FROM meal_entries WHERE entry_date BETWEEN $1 AND $2', [first, last]);
+  await pool.query('DELETE FROM meal_times WHERE entry_date BETWEEN $1 AND $2', [first, last]);
   await pool.query('DELETE FROM sleep_records WHERE sleep_date BETWEEN $1 AND $2', [first, last]);
   await pool.query('DELETE FROM habit_days WHERE record_date BETWEEN $1 AND $2', [first, last]);
   await pool.query('DELETE FROM day_checks WHERE record_date BETWEEN $1 AND $2', [first, last]);
@@ -131,6 +132,7 @@ test('a day without records is "none", not missed, for every goal', { skip }, as
     await setGoal(call, 'protein', '1981-04-01', 100);
     await setGoal(call, 'sleep', '1981-04-01', 420);
     await setGoal(call, 'sober_days', '1981-04-01', 5);
+    await setGoal(call, 'last_meal', '1981-04-01', 1260);
     const empty = await day(call, '1981-04-08');
     assert.deepEqual(
       empty.items.map(({ item, status }) => [item, status]),
@@ -139,6 +141,7 @@ test('a day without records is "none", not missed, for every goal', { skip }, as
         ['protein', 'none'],
         ['sleep', 'none'],
         ['sober_days', 'none'],
+        ['last_meal', 'none'],
       ],
     );
     assert.equal(empty.checks, null);
@@ -321,5 +324,54 @@ test('the database refuses goals the API would never write', { skip }, async (t)
   await assert.rejects(insert('sleep', 59));
   await assert.rejects(insert('sober_days', 0));
   await assert.rejects(insert('sober_days', 8));
+  await assert.rejects(insert('last_meal', 0));
+  await assert.rejects(insert('last_meal', 1440));
+  await insert('last_meal', 1260);
   await insert('sober_days', null);
+});
+
+test('the last meal goal is judged from the time of each meal slot', { skip }, async (t) => {
+  t.after(clean);
+  await withApi(pool, async (call) => {
+    await setGoal(call, 'last_meal', '1981-05-01', 1260);
+    const eatAt = async (date: string, meal: string, time: string | null) => {
+      await pool.query(
+        'INSERT INTO meal_entries (entry_date, meal, servings, name) VALUES ($1, $2, 1, $3)',
+        [date, meal, 'goal-test'],
+      );
+      if (time) {
+        await pool.query(
+          'INSERT INTO meal_times (entry_date, meal, eaten_time) VALUES ($1, $2, $3)',
+          [date, meal, time],
+        );
+      }
+    };
+    await eatAt('1981-05-04', 'dinner', '20:59');
+    await eatAt('1981-05-05', 'dinner', '21:00');
+    await eatAt('1981-05-06', 'snack', '21:01');
+    await eatAt('1981-05-07', 'dinner', '19:00');
+    await eatAt('1981-05-07', 'snack', null);
+    await eatAt('1981-05-08', 'snack', null);
+    await eatAt('1981-05-09', 'dinner', '22:30');
+    await eatAt('1981-05-09', 'lunch', null);
+
+    const status = async (date: string) => itemOf(await day(call, date), 'last_meal').status;
+    assert.equal(await status('1981-05-04'), 'met');
+    // Eating exactly at the limit is not after it.
+    assert.equal(await status('1981-05-05'), 'met');
+    assert.equal(await status('1981-05-06'), 'missed');
+    // A slot with no time could have been late.
+    assert.equal(await status('1981-05-07'), 'unknown');
+    assert.equal(await status('1981-05-08'), 'unknown');
+    // A slot already after the limit decides it, whatever the others are.
+    assert.equal(await status('1981-05-09'), 'missed');
+    // Nothing eaten is no record, not a miss.
+    assert.equal(await status('1981-05-10'), 'none');
+    assert.deepEqual(itemOf(await day(call, '1981-05-07'), 'last_meal').actual, {
+      slots: [
+        { meal: 'dinner', time: 1140 },
+        { meal: 'snack', time: null },
+      ],
+    });
+  });
 });

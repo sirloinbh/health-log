@@ -6,8 +6,11 @@ import { z } from 'zod/v4';
 import { bodyInput } from './body.js';
 import { checkInput } from './checks.js';
 import { comboInput } from './combos.js';
+import { exportQuery } from './export.js';
 import { foodInput, searchQuery } from './foods.js';
 import { habitInput } from './habits.js';
+import { intakeInput } from './intake.js';
+import { labInput, labListQuery, trendQuery } from './labs.js';
 import { comboUse, entryInput, mealCopy, mealTimeInput } from './meals.js';
 import { dayQuery, medicationInput } from './medications.js';
 import { doneInput } from './reminders.js';
@@ -161,6 +164,24 @@ export const operations: Record<string, Operation> = {
     status: [204, 400, 404],
   },
 
+  'GET /api/intake/:date': {
+    params: { date: z.iso.date() },
+    summary: 'Get the water (ml) and caffeine (mg) counts and totals of a day',
+    status: [200, 400],
+  },
+  'POST /api/intake/:date': {
+    params: { date: z.iso.date() },
+    summary:
+      'Add one drink to a day: water adds 250 ml, caffeine drinks add their default mg (at most 50 per kind)',
+    body: ['Intake', intakeInput],
+    status: [201, 400],
+  },
+  'DELETE /api/intake/:date/:kind': {
+    params: { date: z.iso.date() },
+    summary: 'Remove the newest drink of a kind from a day; a count at 0 stays 0',
+    status: [200, 400],
+  },
+
   'GET /api/checks/:date': {
     params: { date: z.iso.date() },
     summary: 'Get the daily check of a day with period rates',
@@ -187,7 +208,7 @@ export const operations: Record<string, Operation> = {
   // The body depends on the item (each has its own target range), so it is described here only.
   'PUT /api/goals/:item': {
     summary:
-      'Set a goal (calories, protein, sleep, or sober_days) from a date: body { from: YYYY-MM-DD, target: whole number, or null to turn the goal off }',
+      'Set a goal (calories, protein, sleep, sober_days, or last_meal) from a date: body { from: YYYY-MM-DD, target: whole number (last_meal: minutes from midnight, 1260 is 21:00), or null to turn the goal off }',
     status: [200, 400, 404],
   },
   'DELETE /api/goals/:item/:from': {
@@ -219,6 +240,41 @@ export const operations: Record<string, Operation> = {
   },
   'DELETE /api/visits/:id': { summary: 'Delete a clinic visit', status: [204, 400, 404] },
 
+  'GET /api/export': {
+    summary:
+      'Download my records for a date range as one CSV file per kind, or every kind in one zip',
+    query: exportQuery,
+    status: [200, 400],
+    produces: 'text/csv',
+  },
+
+  'GET /api/labs': {
+    summary: 'List checkup and blood test results, filtered by test name, one page at a time',
+    query: labListQuery,
+    status: [200, 400],
+  },
+  'GET /api/labs/names': {
+    summary: 'List the test names recorded, with their result counts and latest dates',
+    status: [200],
+  },
+  'GET /api/labs/trend': {
+    summary:
+      'Get one test over time, oldest first, with the unit and reference range of each result',
+    query: trendQuery,
+    status: [200, 400],
+  },
+  'POST /api/labs': {
+    summary: 'Add a test result',
+    body: ['LabResult', labInput],
+    status: [201, 400],
+  },
+  'PUT /api/labs/:id': {
+    summary: 'Replace a test result',
+    body: ['LabResult', labInput],
+    status: [200, 400, 404],
+  },
+  'DELETE /api/labs/:id': { summary: 'Delete a test result', status: [204, 400, 404] },
+
   'GET /api/medications': {
     summary: 'List the medicines taken on a day, or every medicine split by today',
     query: dayQuery,
@@ -242,6 +298,12 @@ export const operations: Record<string, Operation> = {
   'GET /api/reminders': {
     summary: 'List the clinic visit and medicine reminders that are due soon',
     status: [200],
+  },
+  'GET /api/workout-memo/:date': {
+    params: { date: z.iso.date() },
+    summary:
+      "Read the day's workouts from workout-memo (read-only). The answer is { state: 'ok', workouts } or { state: 'unavailable' } when workout-memo cannot be reached",
+    status: [200, 400],
   },
   'POST /api/reminders/done': {
     summary: 'Mark a reminder as done',

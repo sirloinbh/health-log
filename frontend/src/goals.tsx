@@ -18,6 +18,7 @@ import { earliestDate, inDailyRange, isValidDate, latestDate, shiftDate } from '
 import {
   actualText,
   changeText,
+  clockText,
   countsUntil,
   currentText,
   type Goal,
@@ -32,6 +33,7 @@ import {
   type Status,
   statusText,
   targetText,
+  toLastMealTarget,
   toSleepTarget,
   toTarget,
   unknownReason,
@@ -73,9 +75,16 @@ function GoalForm({
 }) {
   const field = goalFields[item];
   const isSleep = item === 'sleep';
+  const isTime = item === 'last_meal';
   // Sleep fills hours here and minutes below; every other goal is the one number.
   const [value, setValue] = useState(() =>
-    goal ? (isSleep ? sleepParts(goal.target).hours : String(goal.target)) : '',
+    goal
+      ? isSleep
+        ? sleepParts(goal.target).hours
+        : isTime
+          ? clockText(goal.target)
+          : String(goal.target)
+      : '',
   );
   const [minutes, setMinutes] = useState(() =>
     goal && isSleep ? sleepParts(goal.target).minutes : '',
@@ -120,6 +129,15 @@ function GoalForm({
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (saving) return;
+    if (isTime) {
+      const time = toLastMealTarget(value);
+      if (typeof time === 'string') {
+        error(time);
+        return;
+      }
+      void save(time);
+      return;
+    }
     const typed = parseAmount(value);
     if (typed === null) {
       error(`Enter ${field.label.toLowerCase()}`);
@@ -157,14 +175,15 @@ function GoalForm({
                 full name is on the field, as for minutes. A long label wrapped in a half-width
                 card and pushed the hours field below the minutes field. */}
             <Label htmlFor={`${id}-target`}>
-              {isSleep ? field.unit : `${field.label} (${field.unit})`}
+              {isSleep ? field.unit : isTime ? field.label : `${field.label} (${field.unit})`}
             </Label>
             <Input
               id={`${id}-target`}
               aria-label={isSleep ? `${field.label} (${field.unit})` : undefined}
-              inputMode={isSleep ? 'numeric' : 'decimal'}
+              type={isTime ? 'time' : undefined}
+              inputMode={isTime ? undefined : isSleep ? 'numeric' : 'decimal'}
               autoComplete="off"
-              placeholder={`e.g. ${field.example}`}
+              placeholder={isTime ? undefined : `e.g. ${field.example}`}
               readOnly={saving}
               value={value}
               onChange={(event) => setValue(event.target.value)}
@@ -415,6 +434,7 @@ const groups: { title: string; items: GoalItem[]; check?: (typeof questions)[num
   { title: 'Diet', items: ['calories', 'protein'], check: questions[0] },
   { title: 'Sleep', items: ['sleep'], check: questions[1] },
   { title: 'Alcohol-free', items: ['sober_days'] },
+  { title: 'Eating time', items: ['last_meal'] },
 ];
 
 function Verdict({ day }: { day: GoalDayItem }) {

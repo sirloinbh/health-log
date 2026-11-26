@@ -53,5 +53,10 @@
     "node": "24.21.0",
     "npm": "11.19.0"
   },
+  "overrides": {
+    "eslint-plugin-jsx-a11y-x": {
+      "minimatch": "^11.0.5"
+    }
+  },
   "packageManager": "npm@11.19.0"
 }

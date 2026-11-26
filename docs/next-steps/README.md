@@ -8,7 +8,7 @@ Requirements are registered as GitHub issues. Choose later work with the selecti
 
 - **Lanes:** none assigned now. Nothing is in progress: every issue is closed except #28, #47 and #118.
 - **Deploy:** health-log deploys itself from `main` (`health-autodeploy.timer`), so a merge to `main` reaches the server. Migrations up to 027 are in `main`. The after-deploy check of 2026-11-22 is in the [#74 change record](../changes/74-proxy-access.md#after-deploy-check-2026-11-22).
-- **Recently finished (2026-11-23 to 2026-11-27):** about 30 PRs from two Orca lanes, listed issue by issue in the [daily log](../daily/2026-11-27.md#what-was-done). Epics #320, #88, #349, #321 and #303 are closed. The two area reviews of 2026-11-27 (daily log and report, platform) found nothing to file.
+- **Recently finished (2026-11-23 to 2026-11-27):** about 30 PRs from two Orca lanes, listed issue by issue in the [daily log](../daily/2026-11-27.md#what-was-done). Epics #320, #321, #322, #88, #349 and #303 are closed. The two area reviews of 2026-11-27 (daily log and report, platform) found nothing to file.
 
 ## User actions
 

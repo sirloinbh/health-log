@@ -303,6 +303,9 @@ test('a sleep goal is typed in hours and minutes and sent in minutes from the ch
   await screen.findByRole('heading', { name: 'Sleep' });
   const sleep = cardOf('Sleep');
   expect(within(sleep).getByText('Current goal: not set')).toBeInTheDocument();
+  // #359: both visible labels are capitalised; the fields keep their full accessible names.
+  expect(within(sleep).getByText('Hours')).toBeInTheDocument();
+  expect(within(sleep).getByText('Minutes')).toBeInTheDocument();
   // The start date begins at the server's today.
   expect(within(sleep).getByLabelText('Start date')).toHaveValue('2026-11-06');
   fireEvent.change(within(sleep).getByLabelText('Daily sleep time (hours)'), {

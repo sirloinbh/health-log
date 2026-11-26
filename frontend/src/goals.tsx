@@ -175,7 +175,7 @@ function GoalForm({
                 full name is on the field, as for minutes. A long label wrapped in a half-width
                 card and pushed the hours field below the minutes field. */}
             <Label htmlFor={`${id}-target`}>
-              {isSleep ? field.unit : isTime ? field.label : `${field.label} (${field.unit})`}
+              {isSleep ? 'Hours' : isTime ? field.label : `${field.label} (${field.unit})`}
             </Label>
             <Input
               id={`${id}-target`}

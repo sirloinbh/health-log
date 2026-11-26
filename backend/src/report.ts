@@ -7,13 +7,15 @@ import { isRealDate, shiftDay } from './dates.js';
 import { type Db, inTransaction, snapshotRead } from './db.js';
 
 export const reportQuery = z.object({
-  period: z.enum(['week', 'month'], { error: 'The period must be week or month' }),
+  period: z.enum(['week', 'month', 'weeks12'], {
+    error: 'The period must be week, month or weeks12',
+  }),
   date: z.string({ error: 'The date is not valid' }).refine(isRealDate, 'The date is not valid'),
 });
 
 type Span = { from: string; to: string };
 
-const spanOf = (period: 'week' | 'month', date: string) => periodsOf(date)[period];
+const spanOf = (period: 'week' | 'month' | 'weeks12', date: string) => periodsOf(date)[period];
 
 const datesIn = ({ from, to }: Span) => {
   const dates: string[] = [];

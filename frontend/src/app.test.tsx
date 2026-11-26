@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
@@ -62,7 +62,7 @@ const otherRead = (url: string) =>
     ? noGoals
     : url === '/api/reminders'
       ? noReminders
-      : url.startsWith('/api/report?period=week&date=2026-10-2')
+      : url.startsWith('/api/report?period=')
         ? noReport
         : url === '/api/foods/recent'
           ? { foods: [] }
@@ -86,8 +86,9 @@ const health = (body: object, status = 200) =>
     ),
   );
 
-test('shows the server date from /api/health on the overview', async () => {
+test('shows the server date from /api/health on the dashboard', async () => {
   health({ today: '2026-10-26' });
+  window.history.replaceState(null, '', '/dashboard');
   render(<App />);
   expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
   expect(await screen.findByText('Server connected · 2026-10-26')).toBeInTheDocument();
@@ -114,15 +115,27 @@ test('each page has its own address and is marked in the main menu', async () =>
   expect(await screen.findByRole('heading', { level: 2, name: 'Goals' })).toBeInTheDocument();
 });
 
-test('quick entry is the first item of the main menu', async () => {
+test('the main menu follows the shared order: day log, Quick entry, Week, 12 weeks, ..., Dashboard, Settings', async () => {
   health({ today: '2026-10-26' });
   render(<App />);
   const menu = screen.getByRole('navigation', { name: 'Main menu' });
-  const links = within(menu).getAllByRole('link');
-  expect(links[0]).toHaveAccessibleName('Quick entry');
-  expect(links[0]).toHaveAttribute('href', '/quick');
-  expect(links[1]).toHaveAccessibleName('Dashboard');
-  fireEvent.click(links[0]);
+  const names = within(menu)
+    .getAllByRole('link')
+    .map((link) => link.getAttribute('aria-label') ?? link.textContent);
+  expect(names).toEqual([
+    'Daily record',
+    'Quick entry',
+    'Week',
+    '12 weeks',
+    'Foods',
+    'Combos',
+    'Clinic',
+    'Medication',
+    'Lab results',
+    'Dashboard',
+    'Settings',
+  ]);
+  fireEvent.click(within(menu).getByRole('link', { name: 'Quick entry' }));
   expect(await screen.findByRole('heading', { level: 1, name: 'Quick entry' })).toBeInTheDocument();
   expect(await screen.findByRole('heading', { level: 2, name: 'Water' })).toBeInTheDocument();
 });
@@ -139,16 +152,53 @@ const installed = () =>
     })),
   );
 
-test('the installed app opens on quick entry, and the dashboard is still reachable', async () => {
-  installed();
-  health({ today: '2026-10-26' });
+// Answers /api/health and leaves every other read pending: enough to see which page opens.
+const healthOnly = () =>
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) =>
+      url === '/api/health'
+        ? Promise.resolve(new Response(JSON.stringify({ today: '2026-10-26' })))
+        : new Promise<Response>(() => {}),
+    ),
+  );
+
+test('the start page is the day log, in the browser and in the installed app (#350)', async () => {
+  healthOnly();
   render(<App />);
-  expect(await screen.findByRole('heading', { level: 1, name: 'Quick entry' })).toBeInTheDocument();
-  expect(window.location.pathname).toBe('/quick');
-  const menu = screen.getByRole('navigation', { name: 'Main menu' });
-  fireEvent.click(within(menu).getByRole('link', { name: 'Dashboard' }));
+  expect(
+    await screen.findByRole('heading', { level: 1, name: 'Daily record' }),
+  ).toBeInTheDocument();
+  await waitFor(() => expect(window.location.pathname).toBe('/daily/2026-10-26'));
+  cleanup();
+  window.history.replaceState(null, '', '/');
+  installed();
+  render(<App />);
+  expect(
+    await screen.findByRole('heading', { level: 1, name: 'Daily record' }),
+  ).toBeInTheDocument();
+  await waitFor(() => expect(window.location.pathname).toBe('/daily/2026-10-26'));
+});
+
+test('an old dashboard link at "/" goes to the dashboard with its period and date', async () => {
+  health({ today: '2026-10-26' });
+  window.history.replaceState(null, '', '/?period=week&date=2026-10-20');
+  render(<App />);
   expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
-  expect(window.location.pathname).toBe('/');
+  expect(window.location.pathname).toBe('/dashboard');
+  expect(window.location.search).toBe('?period=week&date=2026-10-20');
+});
+
+test('Week and 12 weeks are pages of their own, without period buttons', async () => {
+  health({ today: '2026-10-26' });
+  window.history.replaceState(null, '', '/week');
+  render(<App />);
+  expect(await screen.findByRole('heading', { level: 1, name: 'Week' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Monthly' })).not.toBeInTheDocument();
+  const menu = screen.getByRole('navigation', { name: 'Main menu' });
+  fireEvent.click(within(menu).getByRole('link', { name: '12 weeks' }));
+  expect(await screen.findByRole('heading', { level: 1, name: '12 weeks' })).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/weeks');
 });
 
 test('the installed app opened at another address stays there', async () => {
@@ -160,12 +210,14 @@ test('the installed app opened at another address stays there', async () => {
   expect(window.location.pathname).toBe('/settings');
 });
 
-test('an unknown address falls back to the overview', async () => {
-  health({ today: '2026-10-26' });
+test('an unknown address falls back to the start page', async () => {
+  healthOnly();
   window.history.replaceState(null, '', '/no-such-page');
   render(<App />);
-  expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
-  expect(window.location.pathname).toBe('/');
+  expect(
+    await screen.findByRole('heading', { level: 1, name: 'Daily record' }),
+  ).toBeInTheDocument();
+  await waitFor(() => expect(window.location.pathname).toBe('/daily/2026-10-26'));
 });
 
 // Answers /api/health with each date in turn (the last one repeats), and the other pages' reads as above.
@@ -186,6 +238,7 @@ const days = (...todays: string[]) => {
 test('an app left open past midnight shows the new date within a minute', async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   const healthCalls = days('2026-10-26', '2026-10-27');
+  window.history.replaceState(null, '', '/dashboard');
   render(<App />);
   expect(await screen.findByText('Server connected · 2026-10-26')).toBeInTheDocument();
   await act(() => vi.advanceTimersByTimeAsync(60_000));
@@ -195,6 +248,7 @@ test('an app left open past midnight shows the new date within a minute', async 
 
 test('coming back to the page checks the server again', async () => {
   const healthCalls = days('2026-10-26', '2026-10-27');
+  window.history.replaceState(null, '', '/dashboard');
   render(<App />);
   expect(await screen.findByText('Server connected · 2026-10-26')).toBeInTheDocument();
   // Browsers fire it at the document, and it bubbles up to the window.
@@ -207,6 +261,7 @@ test('coming back to the page checks the server again', async () => {
 
 test('an answer without a date is reported instead of a blank date', async () => {
   health({});
+  window.history.replaceState(null, '', '/dashboard');
   render(<App />);
   expect(await findLive('alert')).toHaveTextContent('Cannot check the server status');
 });

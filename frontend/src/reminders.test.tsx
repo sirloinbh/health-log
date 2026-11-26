@@ -290,7 +290,7 @@ const app = (path: string) => {
 };
 
 test('the dashboard shows what is coming up', async () => {
-  app('/');
+  app('/dashboard');
   expect(await screen.findByText('가상피부과 · 피부과 appointment')).toBeInTheDocument();
 });
 
@@ -307,7 +307,7 @@ test('reminders failing to load leave the rest of the dashboard alone', async ()
       ),
     ),
   );
-  window.history.replaceState(null, '', '/');
+  window.history.replaceState(null, '', '/dashboard');
   // Without the app's one retry after a server error, so the failure shows at once.
   render(<App queryClient={testQueryClient()} />);
   // Each keeps its own word and its own retry.

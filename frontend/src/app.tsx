@@ -1,6 +1,7 @@
 import { type QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import {
   CalendarDays,
+  CalendarRange,
   FlaskConical,
   Layers,
   LayoutDashboard,
@@ -10,8 +11,8 @@ import {
   Utensils,
   Zap,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router';
+import { type ReactNode, useState } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router';
 
 import { CombosPage } from './combos';
 import { AppShell, type NavItem } from './components/layout/app-shell';
@@ -37,9 +38,12 @@ import { VisitsPage } from './visits';
 
 // Every page URL lives here (central docs/directory-rules.md).
 const pages = {
+  start: '/',
   quick: '/quick',
-  overview: '/',
   daily: '/daily',
+  week: '/week',
+  weeks12: '/weeks',
+  dashboard: '/dashboard',
   foods: '/foods',
   combos: '/combos',
   visits: visitsPagePath,
@@ -49,15 +53,19 @@ const pages = {
 } as const;
 
 // Main menu (LNB) items, in display order.
+// Order (project-standards#1128, health-log#350): day log, Week, 12 weeks, the other pages, Dashboard,
+// Settings. Quick entry follows the day log by the user's decision on #350.
 const nav: NavItem[] = [
-  { to: pages.quick, label: 'Quick entry', icon: Zap },
-  { to: pages.overview, label: 'Dashboard', icon: LayoutDashboard },
   { to: pages.daily, label: 'Daily record', icon: CalendarDays },
+  { to: pages.quick, label: 'Quick entry', icon: Zap },
+  { to: pages.week, label: 'Week', icon: CalendarRange },
+  { to: pages.weeks12, label: '12 weeks', icon: CalendarRange },
   { to: pages.foods, label: 'Foods', icon: Utensils },
   { to: pages.combos, label: 'Combos', icon: Layers },
   { to: pages.visits, label: 'Clinic', icon: Stethoscope },
   { to: pages.medications, label: 'Medication', icon: Pill },
   { to: pages.labs, label: 'Lab results', icon: FlaskConical },
+  { to: pages.dashboard, label: 'Dashboard', icon: LayoutDashboard },
   { to: pages.settings, label: 'Settings', icon: Settings2 },
 ];
 
@@ -122,24 +130,16 @@ function Page({
 }
 
 /**
- * The installed app opens on quick entry (#329, user decision 2026-11-26). The manifest's
- * start_url is a centrally managed "/", so when the app runs standalone and opens at "/", it moves
- * to quick entry once, at launch. The dashboard stays at "/" for every later visit.
+ * The start page is the day log: "/" moves to today's record, in the browser and in the installed
+ * app alike (#350, user decision 2026-11-26; it replaces the quick-entry launch of #329). Links made
+ * when the dashboard lived at "/" ("/?period=month&date=...") keep working: they go to the dashboard.
  */
-function InstalledStart() {
-  const navigate = useNavigate();
-  // Only the first check counts: going back to "/" later must stay on the dashboard.
-  const checked = useRef(false);
-  useEffect(() => {
-    if (checked.current) return;
-    checked.current = true;
-    const installed =
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(display-mode: standalone)').matches;
-    if (installed && window.location.pathname === pages.overview)
-      void navigate(pages.quick, { replace: true });
-  }, [navigate]);
-  return null;
+function Start({ health }: { health: Health }) {
+  const { search } = useLocation();
+  if (new URLSearchParams(search).has('period')) {
+    return <Navigate to={`${pages.dashboard}${search}`} replace />;
+  }
+  return <TodayRedirect basePath={pages.daily} health={health} />;
 }
 
 /** `queryClient` is for tests that start with data already loaded; the app makes its own. */
@@ -160,7 +160,6 @@ function Routed() {
     health.state === 'ok' ? health.today : health.state === 'loading' ? undefined : null;
   return (
     <BrowserRouter>
-      <InstalledStart />
       <SignInGate>
         <AppShell appName="Diet, Sleep and Health Log" nav={nav} actions={<AccountActions />}>
           <Routes>
@@ -168,7 +167,7 @@ function Routed() {
               path={pages.quick}
               element={<QuickEntryPage health={health} dailyPath={pages.daily} />}
             />
-            <Route path={pages.overview} element={<ReportPage health={health} />} />
+            <Route path={pages.start} element={<Start health={health} />} />
             <Route
               path={pages.daily}
               element={<TodayRedirect basePath={pages.daily} health={health} />}
@@ -177,6 +176,9 @@ function Routed() {
               path={`${pages.daily}/:date`}
               element={<DailyPage basePath={pages.daily} health={health} />}
             />
+            <Route path={pages.week} element={<ReportPage health={health} fixed="week" />} />
+            <Route path={pages.weeks12} element={<ReportPage health={health} fixed="weeks12" />} />
+            <Route path={pages.dashboard} element={<ReportPage health={health} />} />
             <Route path={pages.foods} element={<FoodsPage />} />
             <Route path={pages.combos} element={<CombosPage />} />
             <Route path={pages.visits} element={<VisitsPage today={pageToday} />} />
@@ -195,7 +197,7 @@ function Routed() {
                 </Page>
               }
             />
-            <Route path="*" element={<Navigate to={pages.overview} replace />} />
+            <Route path="*" element={<Navigate to={pages.start} replace />} />
           </Routes>
         </AppShell>
         <Toaster />

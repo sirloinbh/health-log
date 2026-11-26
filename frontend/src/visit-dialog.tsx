@@ -2,6 +2,7 @@ import { Plus, X } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { Button } from './components/ui/button';
+import { Combobox } from './components/ui/combobox';
 import {
   Dialog,
   DialogContent,
@@ -39,7 +40,20 @@ const textareaClass =
   'min-h-20 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs outline-none md:text-body-sm dark:bg-input/30 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50';
 
 /** The visit's own fields: dates, clinic, department, cost and the note. */
-function VisitFields({ draft, set }: { draft: Draft; set: (key: DraftField) => OnText }) {
+/** Clinics and departments already used, to pick from. */
+export type VisitChoices = { clinics: string[]; departments: string[] };
+
+function VisitFields({
+  draft,
+  set,
+  setValue,
+  used,
+}: {
+  draft: Draft;
+  set: (key: DraftField) => OnText;
+  setValue: (key: DraftField, value: string) => void;
+  used: VisitChoices;
+}) {
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -64,19 +78,23 @@ function VisitFields({ draft, set }: { draft: Draft; set: (key: DraftField) => O
           />
         </Field>
         <Field id="visit-clinic" label="Clinic name">
-          <Input
+          <Combobox
             id="visit-clinic"
             autoComplete="off"
             value={draft.clinic}
-            onChange={set('clinic')}
+            onValueChange={(value) => setValue('clinic', value)}
+            options={used.clinics}
+            listLabel="Clinics already used"
           />
         </Field>
         <Field id="visit-department" label="Department">
-          <Input
+          <Combobox
             id="visit-department"
             autoComplete="off"
             value={draft.department}
-            onChange={set('department')}
+            onValueChange={(value) => setValue('department', value)}
+            options={used.departments}
+            listLabel="Departments already used"
           />
         </Field>
         <Field id="visit-cost" label="Visit cost (₩)">
@@ -267,11 +285,13 @@ function DialogActions({ saving, onCancel }: { saving: boolean; onCancel: () => 
 export function VisitDialog({
   visit,
   date,
+  used,
   onClose,
   onSaved,
 }: {
   visit: Visit | null;
   date: string;
+  used: VisitChoices;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -315,7 +335,12 @@ export function VisitDialog({
           <DialogDescription>Costs are in won. Leave unknown values blank.</DialogDescription>
         </DialogHeader>
         <form onSubmit={(event) => void submit(event)} noValidate className="flex flex-col gap-4">
-          <VisitFields draft={draft} set={set} />
+          <VisitFields
+            draft={draft}
+            set={set}
+            setValue={(key, value) => setDraft((current) => ({ ...current, [key]: value }))}
+            used={used}
+          />
           <ProcedureList
             procedures={draft.procedures}
             onChange={(update) =>

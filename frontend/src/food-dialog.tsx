@@ -3,6 +3,7 @@ import { type FormEvent, type ReactNode, useState } from 'react';
 
 import { Button } from './components/ui/button';
 import { Checkbox } from './components/ui/checkbox';
+import { Combobox } from './components/ui/combobox';
 import {
   Dialog,
   DialogContent,
@@ -135,7 +136,22 @@ function LabelReader({
 }
 
 /** Name, brand, category, serving and the nutrition values. */
-function FoodFields({ form, locked, update }: { form: Form; locked: boolean; update: Change }) {
+/** Values already used in the food list, offered as picks next to the common serving units. */
+export type FoodChoices = { brands: string[]; categories: string[]; units: string[] };
+
+function FoodFields({
+  form,
+  locked,
+  update,
+  set,
+  choices,
+}: {
+  form: Form;
+  locked: boolean;
+  update: Change;
+  set: Assign;
+  choices: FoodChoices;
+}) {
   return (
     <>
       <Field id="food-name" label="Food name">
@@ -143,14 +159,25 @@ function FoodFields({ form, locked, update }: { form: Form; locked: boolean; upd
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field id="food-brand" label="Brand">
-          <Input id="food-brand" readOnly={locked} value={form.brand} onChange={update('brand')} />
+          <Combobox
+            id="food-brand"
+            autoComplete="off"
+            readOnly={locked}
+            value={form.brand}
+            onValueChange={(brand) => set({ brand })}
+            options={choices.brands}
+            listLabel="Brands already used"
+          />
         </Field>
         <Field id="food-category" label="Category">
-          <Input
+          <Combobox
             id="food-category"
+            autoComplete="off"
             readOnly={locked}
             value={form.category}
-            onChange={update('category')}
+            onValueChange={(category) => set({ category })}
+            options={choices.categories}
+            listLabel="Categories already used"
           />
         </Field>
         <Field id="food-serving-size" label="Serving size">
@@ -164,11 +191,14 @@ function FoodFields({ form, locked, update }: { form: Form; locked: boolean; upd
           />
         </Field>
         <Field id="food-serving-unit" label="Unit">
-          <Input
+          <Combobox
             id="food-serving-unit"
+            autoComplete="off"
             readOnly={locked}
             value={form.servingUnit}
-            onChange={update('servingUnit')}
+            onValueChange={(servingUnit) => set({ servingUnit })}
+            options={choices.units}
+            listLabel="Units already used"
           />
         </Field>
         {nutrients.map(({ key, label, unit }) => (
@@ -300,10 +330,12 @@ function Actions({ saving, onCancel }: { saving: boolean; onCancel: () => void }
 
 export function FoodDialog({
   food,
+  choices,
   onClose,
   onSaved,
 }: {
   food: Food | null;
+  choices: FoodChoices;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -356,7 +388,7 @@ export function FoodDialog({
         <form onSubmit={submit} noValidate className="flex flex-col gap-4">
           {/* Read-only while saving: a change after Save would not be in the save on its way. */}
           <LabelReader form={form} locked={saving} onFill={setForm} />
-          <FoodFields form={form} locked={saving} update={update} />
+          <FoodFields form={form} locked={saving} update={update} set={set} choices={choices} />
           <SourceFields form={form} locked={saving} update={update} set={set} />
           <Notice notice={notice} />
           <Actions saving={saving} onCancel={onClose} />

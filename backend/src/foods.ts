@@ -194,10 +194,12 @@ export function foodsRouter(pool: Pool, today: () => string) {
     // Pages only add up if every food has one place in the order. A name and brand are already
     // unique; id keeps that true even if the rule is ever relaxed.
     // The screens show a food as "brand name" (#198), so the search runs on that text: it also
-    // finds the name alone or the brand alone, and concat_ws drops a missing brand.
+    // finds the name alone or the brand alone, and concat_ws drops a missing brand. search_alias holds
+    // the Korean text a seeded food had before it was renamed to English (#351): it is searched but
+    // never returned, so a Korean search still finds the food.
     const { rows } = await pool.query<FoodRow>(
       `SELECT ${columns} FROM foods
-       WHERE $1 = '' OR concat_ws(' ', brand, name) ILIKE $2
+       WHERE $1 = '' OR concat_ws(' ', brand, name, search_alias) ILIKE $2
        ORDER BY name, brand NULLS FIRST, id
        LIMIT $3 OFFSET $4`,
       [q, likePattern(q), foodPageSize + 1, offset],

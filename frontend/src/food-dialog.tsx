@@ -104,7 +104,7 @@ function LabelReader({
           setFilled((current) => (current?.kind === 'error' ? null : current));
         }}
         className="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-body-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
-        placeholder={'e.g. 100g당 250kcal\n나트륨 300mg 탄수화물 30g …'}
+        placeholder="Paste the nutrition table text here"
       />
       <p id="food-label-text-help" className="text-caption break-keep text-muted-foreground">
         Copy the nutrition table text (in Korean, as on the product page) and paste it to fill the

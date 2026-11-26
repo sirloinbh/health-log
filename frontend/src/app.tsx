@@ -164,7 +164,10 @@ function Routed() {
       <SignInGate>
         <AppShell appName="Diet, Sleep and Health Log" nav={nav} actions={<AccountActions />}>
           <Routes>
-            <Route path={pages.quick} element={<QuickEntryPage health={health} />} />
+            <Route
+              path={pages.quick}
+              element={<QuickEntryPage health={health} dailyPath={pages.daily} />}
+            />
             <Route path={pages.overview} element={<ReportPage health={health} />} />
             <Route
               path={pages.daily}

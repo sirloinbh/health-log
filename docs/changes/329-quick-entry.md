@@ -21,6 +21,8 @@ The user decided these on 2026-11-26 (comments on #329):
   - **Water:** the day's cups and ml, with large "One cup" and "One less" buttons.
   - **Meal:** the four meals as large buttons, with the one for the time of day chosen first. Each recently eaten food is a full-width button that records one serving in the chosen meal. With no recent foods yet, it links to the daily record.
 - **Time of day** `frontend/src/quick-entry-text.ts`: `mealAt` reads the hour in Asia/Seoul whatever the device time zone is.
+- **Coming back to the app (review round 1):** the installed app can stay open in the background for hours. When the page becomes visible again and the time of day has moved into another meal, that meal is chosen. A meal picked by hand stays while the time is still in the same meal.
+- **Daily record link:** the page gets the daily record path from `app.tsx`, where every page URL lives, instead of writing `/daily` itself.
 - **Shared code:** the daily cards' add and counter logic moved into hooks, so both pages save the same way. `use-meal-add.ts` (`useMealAdd`) holds the meal add with its Idempotency-Key retry, from `meals.tsx`. `use-intake-day.ts` (`useIntakeDay`) holds the counters, from `intake.tsx`. `useAddEntry` takes an optional `initialMeal`. The daily cards behave as before.
 - **Installed app start** `frontend/src/app.tsx`: `manifest.webmanifest` is a centrally managed file with `start_url: "/"`. So when the app runs in the standalone display mode and opens at `/`, it moves to `/quick` once, at launch. Going back to the dashboard later stays there, and an installed app opened at any other address stays where it is.
 - **Tests:** `quick-entry.test.tsx` covers:
@@ -36,5 +38,5 @@ The user decided these on 2026-11-26 (comments on #329):
 
 ## Verification — 2026-11-26
 
-- `TEST_DATABASE_URL=<scratch PG 17 with all migrations> npm run check` passed: backend 357 pass, 0 skipped; frontend 872 pass, 3 skipped. `npm run knip` passed. The first run failed three labs tests because of a row an earlier labs run left in the reused scratch DB. That is a bug in the labs test itself, filed as #347; after removing the row the check passed.
+- `TEST_DATABASE_URL=<scratch PG 17 with all migrations> npm run check` passed: backend 357 pass, 0 skipped; frontend 872 pass, 3 skipped. `npm run knip` passed. After review round 1: frontend 874 pass, 3 skipped, and knip passed again. The first run failed three labs tests because of a row an earlier labs run left in the reused scratch DB. That is a bug in the labs test itself, filed as #347; after removing the row the check passed.
 - **Browser:** the API and Vite dev server ran against the scratch DB, with four recent foods added through the API. Headless Chrome opened `/quick` at 390×844 (touch) and 1440×900. There was no horizontal overflow and no page error, and the smallest button was 44 px high. At 21:56 Seoul time "Snack" was chosen first. A tap on a recent food saved it as a snack for 2026-11-26, and "One cup" added 250 ml.

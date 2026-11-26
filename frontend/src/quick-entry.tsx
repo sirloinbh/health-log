@@ -1,5 +1,5 @@
 import { Minus, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
 import { BusyButton } from './busy-button';
@@ -14,7 +14,7 @@ import { formatDate } from './daily-date';
 import { JunkBadge } from './food-choices';
 import { type Health, healthText } from './health';
 import { errorText } from './lib/use-notice';
-import { type FoodOption, meals, waitingFood } from './meal-entry';
+import { type FoodOption, type MealKey, meals, waitingFood } from './meal-entry';
 import { mealAt, waterText } from './quick-entry-text';
 import { useAddEntry } from './use-add-entry';
 import { useIntakeDay } from './use-intake-day';
@@ -83,12 +83,26 @@ function QuickWater({ date }: { date: string }) {
 }
 
 /** Recently eaten foods, each one tap to record one serving in the chosen meal (#329). */
-function QuickMeal({ date }: { date: string }) {
+function QuickMeal({ date, dailyPath }: { date: string; dailyPath: string }) {
   const { add, adding } = useMealAdd(date);
-  // Chosen once, when the page opens; a tap on another meal changes it.
   const [initialMeal] = useState(() => mealAt(new Date()));
   const entry = useAddEntry({ onAdd: add, initialMeal });
-  const { recent, recentFailure, notices } = entry;
+  const { recent, recentFailure, notices, setMeal } = entry;
+  // The installed app can stay open in the background for hours. When it comes back and the
+  // time of day has moved into another meal, that meal is chosen; a meal picked by hand stays
+  // while the time is still in the same meal.
+  const timeMeal = useRef<MealKey>(initialMeal);
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = mealAt(new Date());
+      if (now === timeMeal.current) return;
+      timeMeal.current = now;
+      setMeal(now);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [setMeal]);
   const waiting = waitingFood(entry.pending, 'recent');
 
   const addFood = (food: FoodOption) => {
@@ -150,7 +164,7 @@ function QuickMeal({ date }: { date: string }) {
         {recent && recent.length === 0 ? (
           <p className="text-body-sm break-keep text-muted-foreground">
             No recent foods yet. Record a meal once on the{' '}
-            <Link to={`/daily/${date}`}>daily record</Link> and it shows here.
+            <Link to={`${dailyPath}/${date}`}>daily record</Link> and it shows here.
           </p>
         ) : null}
         {recent?.length ? (
@@ -192,7 +206,7 @@ function QuickMeal({ date }: { date: string }) {
 }
 
 /** A meal or a cup of water in a few taps, for today, on a phone (#329). */
-export function QuickEntryPage({ health }: { health: Health }) {
+export function QuickEntryPage({ health, dailyPath }: { health: Health; dailyPath: string }) {
   // The last today the server gave: one failed check must not take the buttons away.
   const [lastToday, setLastToday] = useState<string | null>(null);
   if (health.state === 'ok' && health.today && health.today !== lastToday)
@@ -220,7 +234,7 @@ export function QuickEntryPage({ health }: { health: Health }) {
       {today ? (
         <div key={today} className="flex flex-col gap-6">
           <QuickWater date={today} />
-          <QuickMeal date={today} />
+          <QuickMeal date={today} dailyPath={dailyPath} />
         </div>
       ) : null}
     </section>

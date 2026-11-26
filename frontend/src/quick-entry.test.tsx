@@ -86,7 +86,7 @@ const renderPage = (
 ) =>
   renderWithQuery(
     <MemoryRouter>
-      <QuickEntryPage health={health} />
+      <QuickEntryPage health={health} dailyPath="/daily" />
     </MemoryRouter>,
   );
 
@@ -134,6 +134,37 @@ test('another meal can be chosen before the tap', async () => {
         ({ method, body }) => method === 'POST' && (body as { meal?: string })?.meal === 'dinner',
       ),
     ).toBe(true),
+  );
+});
+
+/** The app going to the background and coming back at `time`. */
+const comeBackAt = (time: string) => {
+  vi.setSystemTime(new Date(`${today}T${time}:00+09:00`));
+  document.dispatchEvent(new Event('visibilitychange'));
+};
+
+test('coming back in another part of the day chooses that meal', async () => {
+  at('08:00');
+  serve();
+  renderPage();
+  expect(screen.getByRole('button', { name: 'Breakfast' })).toHaveAttribute('aria-pressed', 'true');
+  comeBackAt('12:40');
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Lunch' })).toHaveAttribute('aria-pressed', 'true'),
+  );
+});
+
+test('a meal picked by hand stays while the time is in the same meal', async () => {
+  at('12:00');
+  serve();
+  renderPage();
+  fireEvent.click(screen.getByRole('button', { name: 'Snack' }));
+  comeBackAt('14:30');
+  expect(screen.getByRole('button', { name: 'Snack' })).toHaveAttribute('aria-pressed', 'true');
+  // Past 15:00 it is dinner time, so dinner is chosen.
+  comeBackAt('15:10');
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Dinner' })).toHaveAttribute('aria-pressed', 'true'),
   );
 });
 

@@ -6,6 +6,8 @@
 // values are read only inside the table: from the amount they are given for (or the table's
 // heading) up to the first line that is not part of a table or the next basis on a later line.
 
+// korean-ok-file: the parser matches the Korean words on a Korean nutrition label (sirloinbh/project-standards#1129).
+
 // The server's limit for any stored amount comes from the shared contract (#215).
 import { maxAmount } from '../../shared/contract';
 

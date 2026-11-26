@@ -36,6 +36,11 @@ const noReport = {
     afterDrinking: { nights: 0, averageMinutes: null },
     afterNoDrinking: { nights: 0, averageMinutes: null },
   },
+  sleepAfterCaffeine: {
+    none: { nights: 0, averageMinutes: null },
+    low: { nights: 0, averageMinutes: null },
+    high: { nights: 0, averageMinutes: null },
+  },
   conditionAfter: Object.fromEntries(
     ['shortSleep', 'drinking', 'junkFood'].map((key) => [key, { with: noGroup, without: noGroup }]),
   ),

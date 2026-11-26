@@ -159,6 +159,34 @@ const readSleepAfterDrinking = async (db: Db, span: Span) => {
   return { afterDrinking: group(true), afterNoDrinking: group(false) };
 };
 
+/** Caffeine above this many mg in a day is the "more" group (about two cups of coffee, #326). */
+const highCaffeineMg = 200;
+
+type CaffeineRow = { level: 'none' | 'low' | 'high'; nights: number; average: string | null };
+
+// Like sleep after drinking: caffeine of day D against the sleep dated D + 1 (#326). Only days
+// with an intake record, water included, take part; a day with water and no caffeine is "none".
+// A day with no intake record at all may just be unrecorded, so it is left out.
+const readSleepAfterCaffeine = async (db: Db, span: Span) => {
+  const { rows } = await db.query<CaffeineRow>(
+    `SELECT CASE WHEN i.caffeine = 0 THEN 'none'
+         WHEN i.caffeine <= ${highCaffeineMg} THEN 'low' ELSE 'high' END AS level,
+       count(*) AS nights, avg(s.duration_minutes) AS average
+     FROM sleep_records s
+     JOIN (SELECT record_date, coalesce(sum(amount) FILTER (WHERE kind <> 'water'), 0) AS caffeine
+           FROM intake_entries WHERE record_date BETWEEN $1::date - 1 AND $2::date - 1
+           GROUP BY record_date) i ON i.record_date = s.sleep_date - 1
+     WHERE s.sleep_date BETWEEN $1 AND $2
+     GROUP BY 1`,
+    [shiftDay(span.from, 1), shiftDay(span.to, 1)],
+  );
+  const group = (level: CaffeineRow['level']) => {
+    const row = rows.find((each) => each.level === level);
+    return { nights: row?.nights ?? 0, averageMinutes: row ? rounded(row.average) : null };
+  };
+  return { none: group('none'), low: group('low'), high: group('high') };
+};
+
 type ConditionRow = {
   flag: boolean;
   days: number;
@@ -249,6 +277,7 @@ export function reportRouter(pool: Pool) {
         previous: await readSummary(client, previous),
         days: await readDays(client, current),
         sleepAfterDrinking: await readSleepAfterDrinking(client, current),
+        sleepAfterCaffeine: await readSleepAfterCaffeine(client, current),
         conditionAfter: await readConditionAfter(client, current),
       }),
       { setup: snapshotRead },

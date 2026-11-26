@@ -23,6 +23,7 @@ import {
   changeText,
   daysText,
   fewNights,
+  highCaffeineMg,
   minutesText,
   type Period,
   periodWords,
@@ -168,22 +169,29 @@ function Stats({
   );
 }
 
-function SleepAfterDrinking({ report }: { report: Report }) {
-  const { afterDrinking, afterNoDrinking } = report.sleepAfterDrinking;
-  const groups = [
-    { label: 'Nights after drinking', group: afterDrinking, bar: 'bg-[#eb6834] dark:bg-[#d95926]' },
-    {
-      label: 'Nights without drinking',
-      group: afterNoDrinking,
-      bar: 'bg-[#2a78d6] dark:bg-[#3987e5]',
-    },
-  ];
+type Night = Report['sleepAfterDrinking']['afterDrinking'];
+type NightGroup = { label: string; group: Night; bar: string };
+
+const moreBar = 'bg-[#eb6834] dark:bg-[#d95926]';
+const lessBar = 'bg-[#f2a65a] dark:bg-[#c9813b]';
+const noneBar = 'bg-[#2a78d6] dark:bg-[#3987e5]';
+
+/** Average sleep of the night after each group of days, with each group's sample. */
+function SleepComparison({
+  title,
+  groups,
+  note,
+}: {
+  title: string;
+  groups: NightGroup[];
+  note: string;
+}) {
   const longest = Math.max(...groups.map(({ group }) => group.averageMinutes ?? 0), 1);
   const thin = groups.some(({ group }) => group.nights < fewNights);
   return (
     <Card>
       <CardHeader>
-        <CardTitle asHeading="h2">Drinking and sleep that night</CardTitle>
+        <CardTitle asHeading="h2">{title}</CardTitle>
         <CardDescription className="break-keep">
           This shows a relationship only; it does not establish a cause.
         </CardDescription>
@@ -220,13 +228,38 @@ function SleepAfterDrinking({ report }: { report: Report }) {
             again once more records build up.
           </p>
         ) : null}
-        <p className="text-caption break-keep text-muted-foreground">
-          Compares sleep from nights after a recorded drinking day to the next morning. Sleep is
-          recorded by the day you wake up, so it is the next date's sleep. Nights after days without
-          a drinking record are left out.
-        </p>
+        <p className="text-caption break-keep text-muted-foreground">{note}</p>
       </CardContent>
     </Card>
+  );
+}
+
+function SleepAfterDrinking({ report }: { report: Report }) {
+  const { afterDrinking, afterNoDrinking } = report.sleepAfterDrinking;
+  return (
+    <SleepComparison
+      title="Drinking and sleep that night"
+      groups={[
+        { label: 'Nights after drinking', group: afterDrinking, bar: moreBar },
+        { label: 'Nights without drinking', group: afterNoDrinking, bar: noneBar },
+      ]}
+      note="Compares sleep from nights after a recorded drinking day to the next morning. Sleep is recorded by the day you wake up, so it is the next date's sleep. Nights after days without a drinking record are left out."
+    />
+  );
+}
+
+function SleepAfterCaffeine({ report }: { report: Report }) {
+  const { none, low, high } = report.sleepAfterCaffeine;
+  return (
+    <SleepComparison
+      title="Caffeine and sleep that night"
+      groups={[
+        { label: `Nights after over ${highCaffeineMg} mg`, group: high, bar: moreBar },
+        { label: `Nights after ${highCaffeineMg} mg or less`, group: low, bar: lessBar },
+        { label: 'Nights without caffeine', group: none, bar: noneBar },
+      ]}
+      note="Groups days by their total caffeine and compares sleep the night after. Sleep is recorded by the day you wake up, so it is the next date's sleep. Days without any water or caffeine record are left out."
+    />
   );
 }
 
@@ -512,6 +545,7 @@ export function ReportPage({ health }: { health: Health }) {
             </CardContent>
           </Card>
           <SleepAfterDrinking report={shown} />
+          <SleepAfterCaffeine report={shown} />
           <ConditionAfter report={shown} />
         </div>
       ) : null}

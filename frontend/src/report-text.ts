@@ -36,6 +36,7 @@ export type Report = {
   previous: ReportSummary;
   days: ReportDay[];
   sleepAfterDrinking: { afterDrinking: Night; afterNoDrinking: Night };
+  sleepAfterCaffeine: Record<'none' | 'low' | 'high', Night>;
   conditionAfter: ConditionAfter;
 };
 
@@ -88,6 +89,9 @@ export const fewNights = 5;
 
 /** Fewest days with a score on each side before a condition comparison is shown (#324). */
 export const fewConditionDays = 3;
+
+/** A day with more caffeine than this (mg) is in the "more" group of the caffeine card (#326). */
+export const highCaffeineMg = 200;
 
 /** "3.5" for an average score; "–" when no day has that score. */
 export const scoreAverageText = (average: number | null) =>

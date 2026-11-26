@@ -29,7 +29,7 @@ export type ConditionGroup = {
   stress: ConditionScore;
 };
 export type ConditionSplit = { with: ConditionGroup; without: ConditionGroup };
-export type ConditionAfter = Record<'shortSleep' | 'drinking' | 'junkFood', ConditionSplit>;
+type ConditionAfter = Record<'shortSleep' | 'drinking' | 'junkFood', ConditionSplit>;
 export type Report = {
   period: Period;
   current: ReportSummary;

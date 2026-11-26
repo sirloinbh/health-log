@@ -14,6 +14,7 @@ import { formatDate, inDailyRange, isValidDate } from './daily-date';
 import { RequestError, requestJson } from './lib/api';
 import { apiKey, type ApiRequest, useApiMutation } from './lib/query';
 import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
+import { usedValues } from './lib/used-values';
 import { cn } from './lib/utils';
 import { medicationsPagePath } from './med-text';
 import { MoreFoodsButton } from './more-foods-button';
@@ -354,6 +355,10 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
         <VisitDialog
           visit={editing.visit}
           date={editing.date}
+          used={{
+            clinics: usedValues(visits?.map((visit) => visit.clinic) ?? []),
+            departments: usedValues(visits?.map((visit) => visit.department) ?? []),
+          }}
           onClose={closeDialog}
           onSaved={() => {
             closeDialog();

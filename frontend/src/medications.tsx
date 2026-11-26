@@ -6,6 +6,7 @@ import { useSearchParams } from 'react-router';
 import { charCount } from './check-text';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
+import { Combobox } from './components/ui/combobox';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
 import {
   Dialog,
@@ -30,6 +31,7 @@ import {
 import { RequestError } from './lib/api';
 import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
+import { usedValues } from './lib/used-values';
 import {
   howText,
   type Medication,
@@ -117,12 +119,15 @@ function MedicationDialog({
   item,
   start,
   visits,
+  used,
   onClose,
   onSaved,
 }: {
   item: Medication | null;
   start: Start;
   visits: Visit[];
+  /** Names, doses and directions already used, to pick from. */
+  used: { names: string[]; doses: string[]; directions: string[] };
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -183,18 +188,34 @@ function MedicationDialog({
         </DialogHeader>
         <form onSubmit={(event) => void submit(event)} noValidate className="flex flex-col gap-4">
           <Field id="med-name" label="Medication name">
-            <Input id="med-name" autoComplete="off" value={draft.name} onChange={set('name')} />
+            <Combobox
+              id="med-name"
+              autoComplete="off"
+              value={draft.name}
+              onValueChange={(name) => setDraft((current) => ({ ...current, name }))}
+              options={used.names}
+              listLabel="Medicines already recorded"
+            />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field id="med-dose" label="Dose">
-              <Input id="med-dose" autoComplete="off" value={draft.dose} onChange={set('dose')} />
+              <Combobox
+                id="med-dose"
+                autoComplete="off"
+                value={draft.dose}
+                onValueChange={(dose) => setDraft((current) => ({ ...current, dose }))}
+                options={used.doses}
+                listLabel="Doses already used"
+              />
             </Field>
             <Field id="med-directions" label="Directions">
-              <Input
+              <Combobox
                 id="med-directions"
                 autoComplete="off"
                 value={draft.directions}
-                onChange={set('directions')}
+                onValueChange={(directions) => setDraft((current) => ({ ...current, directions }))}
+                options={used.directions}
+                listLabel="Directions already used"
               />
             </Field>
             <Field id="med-start" label="Start date">
@@ -341,6 +362,7 @@ export function MedicationsPage() {
   const query = useApiQuery<MedicationLists>(listsKey, medicationsPath);
   // A failed read keeps the lists already shown.
   const lists = query.data ?? null;
+  const everyMedicine = lists ? [...lists.current, ...lists.upcoming, ...lists.past] : [];
   // The recent visits offered as where a medicine was prescribed; without them it can still be saved.
   const recent = useApiQuery<{ visits: Visit[] }>(recentVisitsKey, visitsPath);
   const visits = recent.data?.visits ?? [];
@@ -508,6 +530,11 @@ export function MedicationsPage() {
           item={editing.item}
           start={editing.start}
           visits={visits}
+          used={{
+            names: usedValues(everyMedicine.map((medicine) => medicine.name)),
+            doses: usedValues(everyMedicine.map((medicine) => medicine.dose)),
+            directions: usedValues(everyMedicine.map((medicine) => medicine.directions)),
+          }}
           onClose={closeDialog}
           onSaved={() => {
             closeDialog();

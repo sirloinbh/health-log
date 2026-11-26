@@ -48,11 +48,13 @@ const json = (body: object | null, status = 200) =>
 const serve = (labs: Handler) => {
   const fetchMock = vi.fn((url: string, init?: RequestInit) =>
     Promise.resolve(
-      url.startsWith('/api/labs')
-        ? labs(url, init)
-        : url.startsWith('/api/visits')
-          ? json({ visits: [visit], more: false })
-          : json({ today: '2026-03-15' }),
+      url === '/api/labs/names'
+        ? json({ names: [{ name: 'Hemoglobin', count: 2, latest: '2026-03-01' }] })
+        : url.startsWith('/api/labs')
+          ? labs(url, init)
+          : url.startsWith('/api/visits')
+            ? json({ visits: [visit], more: false })
+            : json({ today: '2026-03-15' }),
     ),
   );
   vi.stubGlobal('fetch', fetchMock);
@@ -71,7 +73,7 @@ const open = () => {
 };
 
 const labCalls = (fetchMock: ReturnType<typeof serve>) =>
-  fetchMock.mock.calls.filter(([url]) => url.startsWith('/api/labs'));
+  fetchMock.mock.calls.filter(([url]) => url.startsWith('/api/labs') && url !== '/api/labs/names');
 const writes = (fetchMock: ReturnType<typeof serve>) =>
   labCalls(fetchMock).filter(([, init]) => (init?.method ?? 'GET') !== 'GET');
 const sentBody = (call: unknown[]) => JSON.parse(String((call[1] as RequestInit).body)) as unknown;
@@ -140,6 +142,20 @@ test('a new result is sent as typed with the visit link', async () => {
     note: '',
     visitId: 7,
   });
+});
+
+test('a test name and unit already used are picked from a list (#352)', async () => {
+  serve(() => json({ results: [{ ...high, name: 'Hemoglobin', unit: 'g/dL' }], more: false }));
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: 'Add test result' }));
+  const name = within(dialog()).getByLabelText('Test name');
+  fireEvent.keyDown(name, { key: 'ArrowDown' });
+  fireEvent.click(await within(dialog()).findByRole('option', { name: 'Hemoglobin' }));
+  expect(name).toHaveValue('Hemoglobin');
+  const unit = within(dialog()).getByLabelText('Unit');
+  fireEvent.keyDown(unit, { key: 'ArrowDown' });
+  fireEvent.click(await within(dialog()).findByRole('option', { name: 'g/dL' }));
+  expect(unit).toHaveValue('g/dL');
 });
 
 test('invalid input is explained and never sent', async () => {

@@ -8,15 +8,15 @@
 
 Every text input was listed and marked. Fields with a known or repeating set of values became pickers; the rest stay free text.
 
-| Form | Field | Result |
-|---|---|---|
-| Food | Brand, Category, Unit | Combobox: values already in the food list; the unit also offers `g` and `ml` |
-| Lab result | Test name | Combobox from `/api/labs/names` |
-| Lab result | Unit | Combobox: units already used, plus mg/dL, mmol/L, g/dL, U/L, % |
-| Medication | Name, Dose, Directions | Combobox: values already on the medicine lists |
-| Clinic visit | Clinic name, Department | Combobox: values already in the loaded visits |
-| Already pickers or typed numbers/dates | dates, times, number fields, source type, meal, drink kind | unchanged |
-| Open values | food name, notes and memos, procedure names, areas and amounts, costs, search boxes | stay free text |
+| Form                                   | Field                                                                               | Result                                                                       |
+| -------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Food                                   | Brand, Category, Unit                                                               | Combobox: values already in the food list; the unit also offers `g` and `ml` |
+| Lab result                             | Test name                                                                           | Combobox from `/api/labs/names`                                              |
+| Lab result                             | Unit                                                                                | Combobox: units already used, plus mg/dL, mmol/L, g/dL, U/L, %               |
+| Medication                             | Name, Dose, Directions                                                              | Combobox: values already on the medicine lists                               |
+| Clinic visit                           | Clinic name, Department                                                             | Combobox: values already in the loaded visits                                |
+| Already pickers or typed numbers/dates | dates, times, number fields, source type, meal, drink kind                          | unchanged                                                                    |
+| Open values                            | food name, notes and memos, procedure names, areas and amounts, costs, search boxes | stay free text                                                               |
 
 A combobox still accepts a new value: typing something that is not in the list is always allowed, so "add new" works.
 

@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -16,12 +15,12 @@ import { JunkBadge } from './food-choices';
 import { spanText } from './habit-text';
 import { type JunkPeriod, junkText } from './junk-text';
 import { RequestError } from './lib/api';
-import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
+import { apiKey, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue } from './lib/use-notice';
 import { type MealKey, meals } from './meal-entry';
 import { count } from './plural';
-import { createRetryKeys } from './retry-key';
-import { asRequest, putAnswer, useReadAfterWrites } from './writes';
+import { useMealAdd } from './use-meal-add';
+import { useReadAfterWrites } from './writes';
 
 const nutrients = [
   { key: 'calories', label: 'Calories', unit: 'kcal' },
@@ -46,7 +45,7 @@ type Entry = Record<NutrientKey, number | null> & {
   isJunk: boolean;
 };
 
-type MealDay = {
+export type MealDay = {
   entries: Entry[];
   /** When each meal slot was eaten, "HH:MM" (Asia/Seoul); null when not recorded. */
   times: Record<MealKey, string | null>;
@@ -56,17 +55,6 @@ type MealDay = {
 
 const pathOf = (date: string) => `/api/meals/${date}`;
 const keyOf = (date: string) => apiKey(pathOf(date));
-
-/**
- * A change to one day's meals. Every change answers with the whole day, which goes into the cache even after the card
- * is gone. The add sends its Idempotency-Key in the request's headers (#196, project-standards#979).
- */
-function useMealWrite(date: string) {
-  const client = useQueryClient();
-  return useApiMutation<MealDay, ApiRequest>(asRequest, {
-    onSuccess: (data) => putAnswer(client, keyOf(date), data),
-  });
-}
 
 // Calories read like every other calorie amount, rounded and grouped (#281); the gram and
 // milligram totals keep the API's value.
@@ -201,11 +189,7 @@ function EntryRow({
 export function MealCard({ date }: { date: string }) {
   const [moveFocus, setMoveFocus] = useState(0);
   const heading = useRef<HTMLDivElement>(null);
-  const live = useRef(true);
-  // An add sent again after no answer reuses its key, so the server does not record it twice (#196).
-  const [retryKeys] = useState(() => createRetryKeys());
-  const write = useMealWrite(date);
-  const adding = write.isPending && write.variables?.method === 'POST';
+  const { write, adding, add, live } = useMealAdd(date);
   // A meal added before leaving this day may still be on its way; read after it lands.
   const ready = useReadAfterWrites(pathOf(date));
   const query = useApiQuery<MealDay>(keyOf(date), pathOf(date), { enabled: ready });
@@ -218,50 +202,12 @@ export function MealCard({ date }: { date: string }) {
   /** One read at a time: pressing again while it is on its way does not start another. Resolves to whether it read. */
   const load = async () => !(await query.refetch({ cancelRefetch: false })).isError;
 
-  useEffect(() => {
-    live.current = true;
-    return () => {
-      live.current = false;
-    };
-  }, []);
-
   // The delete button is gone by now, and a closing dialog restores focus on a timer first.
   useEffect(() => {
     if (!moveFocus) return;
     const timer = setTimeout(() => heading.current?.focus(), 0);
     return () => clearTimeout(timer);
   }, [moveFocus]);
-
-  /** Resolves to whether it was added; a failure rejects so the form can show it next to its fields. */
-  const add = async (body: object, path = '') => {
-    const target = `${pathOf(date)}${path}`;
-    const key = retryKeys.keyFor(JSON.stringify([target, body]));
-    try {
-      await write.mutateAsync({
-        path: target,
-        method: 'POST',
-        body,
-        headers: { 'Idempotency-Key': key },
-      });
-      retryKeys.answered();
-      if (!live.current) {
-        toast.success(`Meal recorded for ${date}`);
-        return false;
-      }
-      toast.success('Recorded');
-      return true;
-    } catch (cause) {
-      // With no answer the server may still have saved it: the same request again keeps its key.
-      const unanswered = cause instanceof RequestError && cause.status === undefined;
-      if (!unanswered) retryKeys.answered();
-      if (live.current) throw cause;
-      // Moving to another day removes the form.
-      toast.error(
-        `Could not ${unanswered ? 'confirm that the meal was recorded' : 'record the meal'} for ${date}: ${errorText(cause)}`,
-      );
-      return false;
-    }
-  };
 
   const remove = async (id: number) => {
     try {

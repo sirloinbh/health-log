@@ -13,8 +13,15 @@ export type OnAdd = (body: object, path?: string) => Promise<boolean>;
  * The state the meal add forms share (#210): the chosen meal and quantity, the waiting button,
  * each form's message, and the recently eaten foods.
  */
-export function useAddEntry({ onAdd }: { onAdd: OnAdd }) {
-  const [meal, setMeal] = useState<MealKey>('breakfast');
+export function useAddEntry({
+  onAdd,
+  initialMeal = 'breakfast',
+}: {
+  onAdd: OnAdd;
+  /** The meal chosen at first; the quick entry page picks it from the time of day (#329). */
+  initialMeal?: MealKey;
+}) {
+  const [meal, setMeal] = useState<MealKey>(initialMeal);
   const [servings, setServings] = useState('1');
   const [pending, setPending] = useState<Pending | null>(null);
   // A long result list sits between the forms, so each shows its errors next to its own buttons.

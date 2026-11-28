@@ -1,6 +1,6 @@
 // Reminders as the API sends them (#48), and how they read on screen.
+import { plural } from './lib/format';
 import { medicationsPagePath } from './med-text';
-import { count } from './plural';
 import { clinicText, visitsPagePath } from './visit-text';
 
 type Due = {
@@ -39,8 +39,8 @@ export const whenText = (daysLeft: number) =>
     : daysLeft === 1
       ? 'Tomorrow'
       : daysLeft < 0
-        ? `Overdue by ${count(-daysLeft, 'day')}`
-        : `In ${count(daysLeft, 'day')}`;
+        ? `Overdue by ${plural(-daysLeft, 'day')}`
+        : `In ${plural(daysLeft, 'day')}`;
 
 /** "Sample Clinic · Dermatology appointment", "Sample tablet ends". */
 export const reminderTitle = (item: Reminder) =>

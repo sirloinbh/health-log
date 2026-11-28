@@ -13,9 +13,9 @@ import { DailyBars } from './daily-bars';
 import { dailyRangeText, earliestDate, inDailyRange, isValidDate, latestDate } from './daily-date';
 import { type Health, healthText } from './health';
 import { type RequestError, requestJson } from './lib/api';
+import { plural } from './lib/format';
 import { apiKey } from './lib/query';
 import { errorText, type NoticeValue } from './lib/use-notice';
-import { count } from './plural';
 import { RemindersCard } from './reminders';
 import { ConditionAfter } from './report-condition';
 import { initialReportFocus, reportFocus } from './report-focus';
@@ -98,7 +98,7 @@ function Stats({
         sample={
           daysText(current.calories.days) +
           (current.calories.incompleteDays
-            ? ` (excludes ${count(current.calories.incompleteDays, 'day')} with unknown calories)`
+            ? ` (excludes ${plural(current.calories.incompleteDays, 'day')} with unknown calories)`
             : '')
         }
         change={changeText(
@@ -114,7 +114,7 @@ function Stats({
         value={
           drinking === null
             ? 'No records'
-            : `${count(current.drinking.drinkingDays, 'day')} (${drinking}%)`
+            : `${plural(current.drinking.drinkingDays, 'day')} (${drinking}%)`
         }
         sample={daysText(current.drinking.days)}
         // Periods with different numbers of recorded days compare by share, not by count.
@@ -131,32 +131,32 @@ function Stats({
         value={
           current.smoking.averagePerDay === null
             ? 'No records'
-            : count(current.smoking.averagePerDay, 'cigarette')
+            : plural(current.smoking.averagePerDay, 'cigarette')
         }
         sample={
           daysText(current.smoking.days) +
           (current.smoking.cigarettes === null
             ? ''
-            : ` · total ${count(current.smoking.cigarettes, 'cigarette')}`)
+            : ` · total ${plural(current.smoking.cigarettes, 'cigarette')}`)
         }
         change={changeText(
           current.smoking.averagePerDay,
           previous.smoking.averagePerDay,
           previous.smoking.days,
           words,
-          (value) => count(Number(value.toFixed(1)), 'cigarette'),
+          (value) => plural(Number(value.toFixed(1)), 'cigarette'),
         )}
       />
       <Stat
         label="Diet kept"
         value={diet === null ? 'No records' : `${diet}%`}
-        sample={`${count(current.diet.days, 'day')} checked`}
+        sample={`${plural(current.diet.days, 'day')} checked`}
         change={changeText(diet, shareOf(previous.diet), previous.diet.days, words, points)}
       />
       <Stat
         label="Sleep good"
         value={sleepGood === null ? 'No records' : `${sleepGood}%`}
-        sample={`${count(current.sleepGood.days, 'day')} checked`}
+        sample={`${plural(current.sleepGood.days, 'day')} checked`}
         change={changeText(
           sleepGood,
           shareOf(previous.sleepGood),
@@ -203,7 +203,7 @@ function SleepComparison({
               <dt className="flex flex-wrap justify-between gap-2 text-body-sm">
                 <span>{label}</span>
                 <span className="text-muted-foreground">
-                  Sample: {count(group.nights, 'night')}
+                  Sample: {plural(group.nights, 'night')}
                 </span>
               </dt>
               <dd className="flex items-center gap-2 text-body-sm">

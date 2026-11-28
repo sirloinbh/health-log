@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 
-import { BusyButton } from './busy-button';
+import { BusyButton } from './components/busy-button/busy-button';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';

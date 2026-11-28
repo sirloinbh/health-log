@@ -22,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from './components/ui/select';
-import { serviceToday } from './daily-date';
 import {
   bodyOf,
   emptyForm,
@@ -35,6 +34,7 @@ import {
   type SourceType,
   unreadableField,
 } from './food-form';
+import { serviceToday } from './lib/format';
 import { apiKey, type ApiRequest, useApiMutation } from './lib/query';
 import { useNotice } from './lib/use-notice';
 import { MfdsLookup } from './mfds-lookup';

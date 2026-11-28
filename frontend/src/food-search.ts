@@ -2,12 +2,12 @@ import { isCancelledError, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { requestJson } from './lib/api';
+import { plural } from './lib/format';
 import { apiKey } from './lib/query';
-import { count } from './plural';
 
 /** The status line for a result list; it says when more results are waiting behind the button. */
 export const resultText = (n: number, more: boolean) =>
-  more ? `Showing ${count(n, 'result')}, more are available` : count(n, 'result');
+  more ? `Showing ${plural(n, 'result')}, more are available` : plural(n, 'result');
 
 /** One page of `GET /api/foods`. `nextOffset` is null on the last page. */
 type FoodPage<T> = { foods: T[]; nextOffset: number | null };

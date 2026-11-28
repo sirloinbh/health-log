@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
-import { count } from './plural';
+import { plural } from './lib/format';
 import {
   type ConditionGroup,
   type ConditionSplit,
@@ -29,7 +29,7 @@ function GroupRow({ label, group }: { label: string; group: ConditionGroup }) {
   return (
     <tr className="border-t">
       <th scope="row" className="py-1 pr-2 text-left font-normal">
-        {label} <span className="text-muted-foreground">({count(group.days, 'day')})</span>
+        {label} <span className="text-muted-foreground">({plural(group.days, 'day')})</span>
       </th>
       {columns.map(({ key }) => (
         <td key={key} className="py-1 text-right tabular-nums">
@@ -57,7 +57,7 @@ function Comparison({
       <h3 className="font-medium">{title}</h3>
       {thin ? (
         <p className="text-muted-foreground">
-          Too few days to compare. It needs at least {count(fewConditionDays, 'day')} with a score
+          Too few days to compare. It needs at least {plural(fewConditionDays, 'day')} with a score
           on each side; there are {split.with.days} and {split.without.days} so far.
         </p>
       ) : (

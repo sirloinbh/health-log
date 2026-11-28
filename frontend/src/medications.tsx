@@ -20,15 +20,9 @@ import { Input } from './components/ui/input';
 import { Label } from './components/ui/label';
 import { Notice } from './components/ui/notice';
 import { toast } from './components/ui/sonner';
-import {
-  dailyRangeText,
-  earliestDate,
-  inDailyRange,
-  isValidDate,
-  latestDate,
-  serviceToday,
-} from './daily-date';
+import { dailyRangeText, earliestDate, inDailyRange, isValidDate, latestDate } from './daily-date';
 import { RequestError } from './lib/api';
+import { serviceToday } from './lib/format';
 import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
 import { usedValues } from './lib/used-values';

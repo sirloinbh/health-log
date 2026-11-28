@@ -1,6 +1,6 @@
-import { BusyButton } from './busy-button';
 import { calorieText } from './calorie-text';
 import { fullName } from './combo-text';
+import { BusyButton } from './components/busy-button/busy-button';
 import { Badge } from './components/ui/badge';
 import { Spinner } from './components/ui/spinner';
 import type { FoodOption } from './meal-entry';

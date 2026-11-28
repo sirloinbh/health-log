@@ -2,8 +2,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
-import { BusyButton } from './busy-button';
 import { answerText, questions } from './check-text';
+import { BusyButton } from './components/busy-button/busy-button';
+import { addDays } from './components/period-nav/periods';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
@@ -14,7 +15,7 @@ import { Notice } from './components/ui/notice';
 import { SkeletonText } from './components/ui/skeleton';
 import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
-import { earliestDate, inDailyRange, isValidDate, latestDate, shiftDate } from './daily-date';
+import { earliestDate, inDailyRange, isValidDate, latestDate } from './daily-date';
 import {
   actualText,
   changeText,
@@ -467,7 +468,7 @@ const judgedPaths = (date: string) => {
   const sinceMonday = (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
   const week = Array.from(
     { length: 7 },
-    (_, day) => `/api/habits/${shiftDate(date, day - sinceMonday)}`,
+    (_, day) => `/api/habits/${addDays(date, day - sinceMonday)}`,
   );
   return [`/api/meals/${date}`, `/api/sleep/${date}`, `/api/checks/${date}`, ...week, goalsPath];
 };

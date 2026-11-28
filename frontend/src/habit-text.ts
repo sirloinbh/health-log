@@ -1,5 +1,5 @@
 import { shortMonthDay } from './daily-date';
-import { count } from './plural';
+import { plural } from './lib/format';
 
 export const drinkKinds = {
   soju: 'Soju',
@@ -42,7 +42,7 @@ export const smokingText = (cigarettes: number | null) =>
     ? 'Not recorded'
     : cigarettes === 0
       ? 'No smoking'
-      : count(cigarettes, 'cigarette');
+      : plural(cigarettes, 'cigarette');
 
 export const drinkingText = (drinks: Drink[] | null) =>
   drinks === null ? 'Not recorded' : drinks.length === 0 ? 'No drinking' : drinksText(drinks);
@@ -56,10 +56,10 @@ export const summaryLines = ({ smoking, drinking }: HabitSummary) => ({
   smoking:
     smoking.days === 0
       ? 'No records'
-      : `${count(smoking.cigarettes ?? 0, 'cigarette')} (${count(smoking.days, 'day')} recorded)`,
+      : `${plural(smoking.cigarettes ?? 0, 'cigarette')} (${plural(smoking.days, 'day')} recorded)`,
   drinking:
     drinking.days === 0
       ? 'No records'
-      : `Drank on ${count(drinking.drinkingDays, 'day')} / ${count(drinking.days, 'day')} recorded` +
+      : `Drank on ${plural(drinking.drinkingDays, 'day')} / ${plural(drinking.days, 'day')} recorded` +
         (drinking.totals.length ? ` · ${drinksText(drinking.totals)}` : ''),
 });

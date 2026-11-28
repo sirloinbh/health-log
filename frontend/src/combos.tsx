@@ -23,11 +23,11 @@ import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
 import { resultText, useFoodSearch } from './food-search';
 import { RequestError, requestJson } from './lib/api';
+import { plural } from './lib/format';
 import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
 import { MoreFoodsButton } from './more-foods-button';
 import { hasTwoDecimalsAtMost, parseAmount, unreadableAmount } from './number-input';
-import { count } from './plural';
 import { useReturnFocus } from './return-focus';
 import { asRequest } from './writes';
 
@@ -360,7 +360,7 @@ function ComboCard({
           <ul className="flex flex-col gap-1 text-body-sm">
             {combo.items.map((item) => (
               <li key={item.foodId} className="wrap-anywhere">
-                {fullName(item)} · {count(item.servings, 'serving')} · {calorieText(item.calories)}
+                {fullName(item)} · {plural(item.servings, 'serving')} · {calorieText(item.calories)}
               </li>
             ))}
           </ul>

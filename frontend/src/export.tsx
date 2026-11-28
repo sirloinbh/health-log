@@ -1,21 +1,23 @@
 import { Download } from 'lucide-react';
 import { useState } from 'react';
 
+import { addDays } from './components/period-nav/periods';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Input } from './components/ui/input';
 import { Label } from './components/ui/label';
 import { Notice } from './components/ui/notice';
 import { toast } from './components/ui/sonner';
-import { earliestDate, latestDate, serviceToday, shiftDate } from './daily-date';
+import { earliestDate, latestDate } from './daily-date';
 import { downloadExport, type ExportKind, exportKinds, rangeProblem } from './export-text';
+import { serviceToday } from './lib/format';
 import { useNotice } from './lib/use-notice';
 
 /** Download my records for a date range, as one CSV file per kind or every kind in one zip. */
 export function ExportCard() {
   // The last 30 days, by this device's clock in the service time zone; both dates stay editable.
   const [to, setTo] = useState(() => serviceToday());
-  const [from, setFrom] = useState(() => shiftDate(serviceToday(), -29));
+  const [from, setFrom] = useState(() => addDays(serviceToday(), -29));
   const [busy, setBusy] = useState<ExportKind | null>(null);
   const { notice, status, error, clear } = useNotice();
 

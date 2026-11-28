@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Plus, X } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 
-import { BusyButton } from './busy-button';
+import { BusyButton } from './components/busy-button/busy-button';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { ConfirmDialog } from './components/ui/confirm-dialog';

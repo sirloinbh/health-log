@@ -4,6 +4,7 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router';
 
 import { BodyCard } from './body';
 import { ChecksCard } from './checks';
+import { addDays } from './components/period-nav/periods';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Notice } from './components/ui/notice';
@@ -14,7 +15,6 @@ import {
   inDailyRange,
   isValidDate,
   latestDate,
-  shiftDate,
 } from './daily-date';
 import { GoalsCard } from './goals';
 import { HabitsCard } from './habits';
@@ -153,7 +153,7 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
       <nav aria-label="Date navigation" className="flex flex-wrap items-center gap-2">
         <DayLink
           label="Previous day"
-          to={date > earliestDate ? pathOf(shiftDate(date, -1)) : null}
+          to={date > earliestDate ? pathOf(addDays(date, -1)) : null}
           here={pathOf(date)}
           icon={<ChevronLeft aria-hidden />}
         />
@@ -184,7 +184,7 @@ export function DailyPage({ basePath, health }: { basePath: string; health: Heal
         />
         <DayLink
           label="Next day"
-          to={date < latestDate ? pathOf(shiftDate(date, 1)) : null}
+          to={date < latestDate ? pathOf(addDays(date, 1)) : null}
           here={pathOf(date)}
           icon={<ChevronRight aria-hidden />}
         />

@@ -1,4 +1,4 @@
-import { shiftDate } from './daily-date';
+import { addDays } from './components/period-nav/periods';
 
 // Sleep is filed under the day of waking and typed as two clock times, so the bed date is inferred:
 // a bed time later on the clock than the wake time means the night before.
@@ -12,7 +12,7 @@ const inService = (instant: string) =>
 export const isOvernight = (bed: string, wake: string) => bed > wake;
 
 export const toInstants = (date: string, bed: string, wake: string) => ({
-  bedAt: `${isOvernight(bed, wake) ? shiftDate(date, -1) : date}T${bed}:00${serviceOffset}`,
+  bedAt: `${isOvernight(bed, wake) ? addDays(date, -1) : date}T${bed}:00${serviceOffset}`,
   wakeAt: `${date}T${wake}:00${serviceOffset}`,
 });
 

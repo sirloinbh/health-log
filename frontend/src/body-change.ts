@@ -1,4 +1,4 @@
-import { shiftDate } from './daily-date';
+import { addDays } from './components/period-nav/periods';
 
 export type BodyRecord = {
   date: string;
@@ -26,7 +26,7 @@ export function changeOver(
   date: string,
   days: number,
 ): Change | null {
-  const start = shiftDate(date, 1 - days);
+  const start = addDays(date, 1 - days);
   const measured = records
     .filter((record) => record.date >= start && record.date <= date && record[key] !== null)
     .sort((a, b) => a.date.localeCompare(b.date));

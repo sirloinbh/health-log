@@ -1,5 +1,5 @@
 import { shortMonthDay } from './daily-date';
-import { count } from './plural';
+import { plural } from './lib/format';
 
 export type Period = 'week' | 'month' | 'weeks12';
 
@@ -75,7 +75,7 @@ export const changeText = (
   if (current === null) return null;
   if (previous === null) return `No records ${words.previous}`;
   // The earlier period's day count, so a change against one recorded day reads as thin as it is.
-  const earlier = `${words.previous} (${count(previousDays, 'day')})`;
+  const earlier = `${words.previous} (${plural(previousDays, 'day')})`;
   const change = current - previous;
   if (change === 0) return `Same as ${earlier}`;
   return `${signed(change, format(Math.abs(change)))} vs ${earlier}`;
@@ -83,7 +83,7 @@ export const changeText = (
 
 export const shareOf = ({ days, yes }: Count) => (days ? Math.round((yes / days) * 100) : null);
 
-export const daysText = (days: number) => `${count(days, 'day')} recorded`;
+export const daysText = (days: number) => `${plural(days, 'day')} recorded`;
 
 /** Fewer nights than this in either group make the comparison too thin to lean on. */
 export const fewNights = 5;

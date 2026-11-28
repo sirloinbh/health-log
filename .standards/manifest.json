@@ -1,5 +1,5 @@
 {
-  "centralSha": "060599f47f79aa3d9048fe6312c79ec24cd74121",
+  "centralSha": "4af4527703831288bdf052947c29aff01a8126f8",
   "profile": "app",
   "project": "health-log",
   "files": {
@@ -1216,7 +1216,7 @@
     },
     "frontend/src/lib/apps.ts": {
       "mode": "full",
-      "sha256": "1c232df7d861b2da33d8f7b21aaa1a0a3a3a06611aa4ab9a7d2a951417aa2ec6",
+      "sha256": "ed1cb1fabb4815e1ccdbc88bb21262a96e3e7753de3f508f0ac5f66f79ef1c41",
       "source": "design-system/delivery/ui/frontend/src/lib/apps.ts.tmpl"
     },
     "frontend/src/lib/auth-config.ts": {
@@ -1306,7 +1306,7 @@
     },
     "frontend/src/sign-in.tsx": {
       "mode": "full",
-      "sha256": "3e1b2f7cc17dd1932df480e3a8b81f940044009c55e94e261e92cec88b36a7d5",
+      "sha256": "06b7e1665e933cffbe232fe75fe73390d99a8c193ab1c5d8b2b430bb07c311a4",
       "source": "templates/ui/frontend/src/sign-in.tsx"
     },
     "frontend/src/test/standard-setup.ts": {

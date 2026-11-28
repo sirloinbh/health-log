@@ -65,6 +65,10 @@ A second review checked the round 1 fixes: they hold (the name cut counts code p
 
 Left as it is: a search that failed with an HTTP error (no data) can still be asked again when the window gets focus back, because the shared `useApiQuery` (a centrally managed file) does not pass `refetchOnWindowFocus`. That asks the same thing again (a 400 stays a 400, a network failure may recover), so it is harmless here.
 
+## CI fix (knip)
+
+CI `verify` failed on the first run of the final head: `npm run knip` (not part of the local `npm run check`) reported two unused exports, `mfdsPageSize` in `backend/src/mfds.ts` and the type `MfdsDraft` in `frontend/src/mfds.ts`. Both are no longer exported. Locally: `E2E_DATABASE_URL=<dummy> npm run knip` passes (only the three configuration hints CI showed before this change); typecheck passed; backend `test/mfds.test.ts` + `test/openapi.test.ts` 15 passed; frontend `src/mfds-lookup.test.tsx` 10 passed.
+
 ## Limits
 
 - One page of 20 records per search; the screen says when the database has more and asks for a longer name or the maker.

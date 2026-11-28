@@ -13,7 +13,7 @@ const endpoint = 'https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo03/getFoodNtr
 const detailPage = 'https://various.foodsafetykorea.go.kr/nutrient/general/food/detail.do';
 const timeoutMs = 8000;
 /** How many matches one search shows; the answer says how many there are in all. */
-export const mfdsPageSize = 20;
+const mfdsPageSize = 20;
 
 export const mfdsQuery = z.object({
   q: z

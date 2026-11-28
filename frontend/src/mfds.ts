@@ -4,7 +4,7 @@
 import type { Form } from './food-form';
 
 /** A match's food draft, already converted to the total content by the API. */
-export type MfdsDraft = {
+type MfdsDraft = {
   name: string;
   brand: string | null;
   servingSize: number;

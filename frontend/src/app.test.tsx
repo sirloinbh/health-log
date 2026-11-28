@@ -115,7 +115,7 @@ test('each page has its own address and is marked in the main menu', async () =>
   expect(await screen.findByRole('heading', { level: 2, name: 'Goals' })).toBeInTheDocument();
 });
 
-test('the main menu follows the shared order: day log, Quick entry, Week, 12 weeks, ..., Dashboard, Settings', async () => {
+test('the main menu follows the shared order: day log, Quick entry, ..., Dashboard, Settings, with no Week or 12 weeks', async () => {
   health({ today: '2026-10-26' });
   render(<App />);
   const menu = screen.getByRole('navigation', { name: 'Main menu' });
@@ -125,8 +125,6 @@ test('the main menu follows the shared order: day log, Quick entry, Week, 12 wee
   expect(names).toEqual([
     'Daily record',
     'Quick entry',
-    'Week',
-    '12 weeks',
     'Foods',
     'Combos',
     'Clinic',
@@ -189,16 +187,17 @@ test('an old dashboard link at "/" goes to the dashboard with its period and dat
   expect(window.location.search).toBe('?period=week&date=2026-10-20');
 });
 
-test('Week and 12 weeks are pages of their own, without period buttons', async () => {
+test('the old Week and 12-week addresses open the Dashboard on that period', async () => {
   health({ today: '2026-10-26' });
   window.history.replaceState(null, '', '/week');
+  const { unmount } = render(<App />);
+  expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
+  expect(window.location.pathname + window.location.search).toBe('/dashboard?period=week');
+  unmount();
+  window.history.replaceState(null, '', '/weeks');
   render(<App />);
-  expect(await screen.findByRole('heading', { level: 1, name: 'Week' })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Monthly' })).not.toBeInTheDocument();
-  const menu = screen.getByRole('navigation', { name: 'Main menu' });
-  fireEvent.click(within(menu).getByRole('link', { name: '12 weeks' }));
-  expect(await screen.findByRole('heading', { level: 1, name: '12 weeks' })).toBeInTheDocument();
-  expect(window.location.pathname).toBe('/weeks');
+  expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
+  expect(window.location.pathname + window.location.search).toBe('/dashboard?period=weeks12');
 });
 
 test('the installed app opened at another address stays there', async () => {

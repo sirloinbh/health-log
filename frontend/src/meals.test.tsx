@@ -420,9 +420,6 @@ test('a junk food mark changed while waiting belongs to the next entry', async (
     target: { value: '300' },
   });
   const mark = screen.getByRole('checkbox', { name: 'Junk food' });
-  expect(mark).toHaveAccessibleDescription(
-    'Counts toward the junk food times for this week and this month above.',
-  );
   const save = screen.getByRole('button', { name: /Record now/ });
   fireEvent.click(save);
   await waitFor(() => expect(save).toHaveAttribute('aria-disabled', 'true'));
@@ -966,7 +963,6 @@ test('while a copy is on its way the button says so and cannot copy twice', asyn
   renderWithQuery(<MealCard date={date} />);
   await screen.findByLabelText('Food name');
   const button = within(copyForm()).getByRole('button', { name: 'Copy breakfast' });
-  expect(button).toHaveAccessibleDescription(/as they are/);
   fireEvent.click(button);
 
   await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'true'));

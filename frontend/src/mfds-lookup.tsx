@@ -87,7 +87,6 @@ export function MfdsLookup({
             id="mfds-name"
             autoComplete="off"
             readOnly={locked}
-            aria-describedby="mfds-help"
             value={name}
             onChange={(event) => setName(event.target.value)}
             onKeyDown={onEnter}
@@ -105,10 +104,6 @@ export function MfdsLookup({
           />
         </div>
       </div>
-      <p id="mfds-help" className="text-caption break-keep text-muted-foreground">
-        Searches the Ministry of Food and Drug Safety nutrition database by name, in Korean as the
-        product shows it. Picking a match fills the fields below; nothing is saved until Save.
-      </p>
       <Button
         type="button"
         variant="outline"

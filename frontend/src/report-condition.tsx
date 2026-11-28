@@ -98,10 +98,6 @@ export function ConditionAfter({ report }: { report: Report }) {
         {comparisons.map(({ key, ...words }) => (
           <Comparison key={key} {...words} split={report.conditionAfter[key]} />
         ))}
-        <p className="text-caption break-keep text-muted-foreground">
-          Sleep is compared with the condition of the day you woke up. Drinking and junk food are
-          compared with the next day. Days without a record of that input are left out.
-        </p>
       </CardContent>
     </Card>
   );

@@ -95,7 +95,7 @@ function Page({
   children,
 }: {
   title: string;
-  description: string;
+  description?: string;
   health: Health;
   children?: ReactNode;
 }) {
@@ -103,7 +103,7 @@ function Page({
     <section aria-labelledby="page-title" className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
         <h1 id="page-title">{title}</h1>
-        <p className="text-body text-muted-foreground">{description}</p>
+        {description ? <p className="text-body text-muted-foreground">{description}</p> : null}
         {health.state === 'error' ? (
           <p role="alert" className="text-body-sm text-destructive">
             {healthText(health)}
@@ -188,11 +188,7 @@ function Routed() {
             <Route
               path={pages.settings}
               element={
-                <Page
-                  title="Settings"
-                  description="App preferences and data management"
-                  health={health}
-                >
+                <Page title="Settings" health={health}>
                   <GoalsSettings />
                   <ExportCard />
                 </Page>

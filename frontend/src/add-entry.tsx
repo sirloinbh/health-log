@@ -131,7 +131,6 @@ function FoodSearch({ entry, adding, onAddFood }: FormProps & { onAddFood: OnAdd
           ref={entry.searchInput}
           type="search"
           aria-label="Search foods"
-          placeholder="Name or brand"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -238,9 +237,6 @@ function ComboPicker({ entry, adding }: FormProps) {
         </p>
       ) : (
         <>
-          <p className="text-caption break-keep text-muted-foreground">
-            Records the chosen meal with the quantities saved in the combo.
-          </p>
           <ul aria-label="Combo list" className="flex max-h-80 flex-col divide-y overflow-y-auto">
             {combos.map((combo) => (
               <li key={combo.id} className="flex items-center justify-between gap-3 py-2">
@@ -316,10 +312,6 @@ function CopyMealForm({ date, entry, adding }: FormProps & { date: string }) {
       className="flex flex-col gap-3"
     >
       <p className="text-body-sm font-medium">Copy from another day</p>
-      <p id="meal-copy-help" className="text-caption break-keep text-muted-foreground">
-        Adds the chosen day's {meal} records to this day's {meal} as they are. Nutrition values stay
-        as recorded that day.
-      </p>
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="meal-copy-from">Date to copy from</Label>
@@ -336,7 +328,6 @@ function CopyMealForm({ date, entry, adding }: FormProps & { date: string }) {
           variant="outline"
           busy={adding}
           aria-busy={entry.pending?.kind === 'copy' || undefined}
-          aria-describedby="meal-copy-help"
         >
           {entry.pending?.kind === 'copy' ? <Spinner size="sm" label="Copying" /> : null}
           Copy {meal}
@@ -409,14 +400,10 @@ function TypedFoodForm({ entry, adding }: FormProps) {
         <Checkbox
           id="meal-typed-junk"
           checked={isJunk}
-          aria-describedby="meal-typed-junk-help"
           onCheckedChange={(checked) => setIsJunk(checked === true)}
         />
         <Label htmlFor="meal-typed-junk">Junk food</Label>
       </div>
-      <p id="meal-typed-junk-help" className="-mt-2 text-caption break-keep text-muted-foreground">
-        Counts toward the junk food times for this week and this month above.
-      </p>
       <Notice notice={notice.notice} />
       <BusyButton
         type="submit"

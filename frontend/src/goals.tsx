@@ -184,7 +184,6 @@ function GoalForm({
               type={isTime ? 'time' : undefined}
               inputMode={isTime ? undefined : isSleep ? 'numeric' : 'decimal'}
               autoComplete="off"
-              placeholder={isTime ? undefined : `e.g. ${field.example}`}
               readOnly={saving}
               value={value}
               onChange={(event) => setValue(event.target.value)}
@@ -199,7 +198,6 @@ function GoalForm({
                 aria-label={`${field.label} (minutes)`}
                 inputMode="numeric"
                 autoComplete="off"
-                placeholder="e.g. 30"
                 readOnly={saving}
                 value={minutes}
                 onChange={(event) => setMinutes(event.target.value)}
@@ -220,11 +218,6 @@ function GoalForm({
           />
         </div>
       </div>
-      <p className="text-caption text-muted-foreground">
-        {item === 'sober_days'
-          ? 'Judged by week (Monday to Sunday). Changing it mid-week judges that whole week by the new goal; earlier weeks keep the goal they had.'
-          : 'Days before the start date are judged by the goal they had.'}
-      </p>
       <Notice notice={notice} />
       <div className="flex flex-wrap gap-2">
         <BusyButton type="submit" busy={saving} aria-busy={saving || undefined}>
@@ -352,10 +345,6 @@ export function GoalsSettings() {
         >
           Goals
         </h2>
-        <p className="text-body-sm text-muted-foreground">
-          Whether you kept your goals is judged automatically from the daily record. Changing a goal
-          keeps earlier dates judged by the goal they had.
-        </p>
       </div>
       <Notice notice={notice} />
       {/* A failed read after a delete keeps the goals on screen, and can be tried again too. */}

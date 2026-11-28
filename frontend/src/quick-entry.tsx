@@ -135,9 +135,6 @@ function QuickMeal({ date, dailyPath }: { date: string; dailyPath: string }) {
             </Button>
           ))}
         </div>
-        <p className="text-body-sm break-keep text-muted-foreground">
-          A tap records one serving in {entry.mealLabel.toLowerCase()} for today.
-        </p>
         {recentFailure ? (
           <>
             <Notice

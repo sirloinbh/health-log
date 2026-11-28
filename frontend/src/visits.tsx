@@ -277,9 +277,6 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
         >
           Clinic
         </h1>
-        <p className="text-body text-muted-foreground">
-          Record clinic visits and the procedures you had, and look them up again.
-        </p>
       </header>
       <div className="flex flex-wrap items-center gap-2">
         <form
@@ -294,7 +291,6 @@ export function VisitsPage({ today }: { today: string | null | undefined }) {
           <Input
             type="search"
             aria-label="Search clinic records"
-            placeholder="Clinic or procedure name"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />

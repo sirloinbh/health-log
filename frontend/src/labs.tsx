@@ -426,9 +426,6 @@ export function LabsPage() {
         >
           Lab results
         </h1>
-        <p className="text-body text-muted-foreground">
-          Keep checkup and blood test values with their unit and reference range, newest first.
-        </p>
       </header>
       <div className="flex flex-wrap items-end gap-3">
         <Button

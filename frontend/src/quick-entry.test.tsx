@@ -126,7 +126,7 @@ test('another meal can be chosen before the tap', async () => {
   renderPage();
   expect(screen.getByRole('button', { name: 'Snack' })).toHaveAttribute('aria-pressed', 'true');
   fireEvent.click(screen.getByRole('button', { name: 'Dinner' }));
-  expect(screen.getByText('A tap records one serving in dinner for today.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Dinner' })).toHaveAttribute('aria-pressed', 'true');
   fireEvent.click(await screen.findByRole('button', { name: 'Add Ramen to dinner' }));
   await waitFor(() =>
     expect(

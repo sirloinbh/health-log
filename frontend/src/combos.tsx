@@ -181,11 +181,7 @@ function ComboDialog({
             <p className="text-body-sm font-medium">
               Foods added {items.length}/{maxItems}
             </p>
-            {items.length === 0 ? (
-              <p className="text-body-sm text-muted-foreground">
-                Search for foods below and add them.
-              </p>
-            ) : (
+            {items.length === 0 ? null : (
               <ul className="flex flex-col divide-y">
                 {items.map((item) => (
                   <li key={item.foodId} className="flex items-center gap-2 py-2">
@@ -233,7 +229,6 @@ function ComboDialog({
             <Input
               type="search"
               aria-label="Search foods to add"
-              placeholder="Name or brand"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -477,10 +472,6 @@ export function CombosPage() {
         >
           Combos
         </h1>
-        <p className="text-body text-muted-foreground">
-          Group foods you often eat together and record them in one step from the diet card in the
-          daily record.
-        </p>
       </header>
       <div>
         <Button onClick={(event) => openDialog(event.currentTarget, 'new')}>

@@ -55,6 +55,10 @@ const shinCup = {
   },
 };
 
+/** Waits until the dialog's status region says this (it says "Searching…" first). */
+const statusSays = (dialog: HTMLElement, text: string) =>
+  vi.waitFor(() => expect(getLive('status', dialog)).toHaveTextContent(text));
+
 const mfdsCalls = (fetchMock: ReturnType<typeof serve>) =>
   fetchMock.mock.calls.filter(([url]) => url.startsWith('/api/foods/mfds'));
 const posts = (fetchMock: ReturnType<typeof serve>) =>
@@ -128,12 +132,47 @@ test('Enter in the search field searches and does not save the food', async () =
   const field = within(dialog).getByLabelText('MFDS food name');
   fireEvent.change(field, { target: { value: 'zzqq' } });
   fireEvent.keyDown(field, { key: 'Enter' });
-  expect(await findLive('status', dialog)).toHaveTextContent(
-    'No food in the MFDS database matches',
-  );
+  await statusSays(dialog, 'No food in the MFDS database matches');
   expect(mfdsCalls(fetchMock).at(-1)?.[0]).toBe('/api/foods/mfds?q=zzqq');
   expect(posts(fetchMock)).toHaveLength(0);
   expect(queryLive('alert', dialog)).toBeNull();
+});
+
+test('Enter that ends a Korean composition does not search', async () => {
+  const fetchMock = serve(() => json({ state: 'ok', total: 0, read: 0, results: [] }));
+  const dialog = await openAdd();
+  const field = within(dialog).getByLabelText('MFDS food name');
+  fireEvent.change(field, { target: { value: '우유' } });
+  fireEvent.keyDown(field, { key: 'Enter', isComposing: true });
+  expect(mfdsCalls(fetchMock)).toHaveLength(0);
+  expect(posts(fetchMock)).toHaveLength(0);
+});
+
+test('a search is not repeated on its own, and the same words searched again ask again', async () => {
+  const fetchMock = serve(() => json({ state: 'ok', total: 0, read: 0, results: [] }));
+  const dialog = await openAdd();
+  const field = within(dialog).getByLabelText('MFDS food name');
+  const press = () => fireEvent.click(within(dialog).getByRole('button', { name: 'Search MFDS' }));
+  fireEvent.change(field, { target: { value: '우유' } });
+  press();
+  await statusSays(dialog, 'No food in the MFDS database matches');
+  fireEvent.change(field, { target: { value: '두유' } });
+  press();
+  await statusSays(dialog, 'No food in the MFDS database matches');
+  fireEvent.change(field, { target: { value: '우유' } });
+  press();
+  await statusSays(dialog, 'No food in the MFDS database matches');
+  // 우유 a second time is asked again, not taken from the first answer.
+  expect(mfdsCalls(fetchMock).map(([url]) => url)).toEqual([
+    `/api/foods/mfds?q=${encodeURIComponent('우유')}`,
+    `/api/foods/mfds?q=${encodeURIComponent('두유')}`,
+    `/api/foods/mfds?q=${encodeURIComponent('우유')}`,
+  ]);
+  // Focus coming back to the window does not ask the portal again.
+  window.dispatchEvent(new Event('focus'));
+  document.dispatchEvent(new Event('visibilitychange'));
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(mfdsCalls(fetchMock)).toHaveLength(3);
 });
 
 test('an empty search term asks for a name and calls nothing', async () => {
@@ -149,7 +188,7 @@ test('without a server key the lookup says it is not set up', async () => {
   const dialog = await openAdd();
   fireEvent.change(within(dialog).getByLabelText('MFDS food name'), { target: { value: '우유' } });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Search MFDS' }));
-  expect(await findLive('status', dialog)).toHaveTextContent('The MFDS lookup is not set up');
+  await statusSays(dialog, 'The MFDS lookup is not set up');
 });
 
 test('when the portal cannot answer it says so, and the same search again asks again', async () => {
@@ -158,9 +197,7 @@ test('when the portal cannot answer it says so, and the same search again asks a
   const dialog = await openAdd();
   fireEvent.change(within(dialog).getByLabelText('MFDS food name'), { target: { value: '우유' } });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Search MFDS' }));
-  expect(await findLive('status', dialog)).toHaveTextContent(
-    'The MFDS database cannot be reached right now',
-  );
+  await statusSays(dialog, 'The MFDS database cannot be reached right now');
   answer = { state: 'ok', total: 1, read: 1, results: [shinCup] };
   fireEvent.click(within(dialog).getByRole('button', { name: 'Search MFDS' }));
   expect(await within(dialog).findByRole('list', { name: 'MFDS matches' })).toBeInTheDocument();

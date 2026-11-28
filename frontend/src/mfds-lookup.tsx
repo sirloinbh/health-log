@@ -34,36 +34,40 @@ export function MfdsLookup({
 }) {
   const [name, setName] = useState('');
   const [maker, setMaker] = useState('');
-  const [path, setPath] = useState<string | null>(null);
+  // Each press is its own search (`count` is in the query key), so pressing again always asks the
+  // portal again, even for words searched before: it may answer now after failing. An answer never
+  // goes stale, so a window that gets focus back does not search again on its own.
+  const [search, setSearch] = useState<{ path: string; count: number } | null>(null);
   const [missingName, setMissingName] = useState(false);
-  // `reads` counts picks: a new key remounts the message, so picking again reads it out again.
-  const [filled, setFilled] = useState<{ lines: string[]; reads: number } | null>(null);
-  const query = useApiQuery<MfdsAnswer>(apiKey(path ?? ''), path ?? '', { enabled: path !== null });
-  const answer = path !== null ? query.data : undefined;
-  const searching = path !== null && query.isFetching;
+  const [filled, setFilled] = useState<string[] | null>(null);
+  const query = useApiQuery<MfdsAnswer>(
+    apiKey(search?.path ?? '', search?.count),
+    search?.path ?? '',
+    { enabled: search !== null, staleTime: Infinity },
+  );
+  const answer = search !== null ? query.data : undefined;
+  const searching = search !== null && query.isFetching;
 
-  const search = () => {
+  const run = () => {
     const q = name.trim();
     setMissingName(q === '');
     if (!q) return;
-    const next = mfdsPath(q, maker.trim());
     setFilled(null);
-    // The same words again ask again: the portal may answer now after failing before.
-    if (next === path) void query.refetch({ cancelRefetch: false });
-    else setPath(next);
+    setSearch((current) => ({ path: mfdsPath(q, maker.trim()), count: (current?.count ?? 0) + 1 }));
   };
-  // The fields sit inside the food form: Enter here searches instead of saving the food.
+  // The fields sit inside the food form: Enter here searches instead of saving the food. Enter that
+  // ends a Korean input composition only finishes the word.
   const onEnter = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== 'Enter') return;
+    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
     event.preventDefault();
-    if (!locked) search();
+    if (!locked) run();
   };
 
   const results = answer?.state === 'ok' ? answer.results : [];
   const more = answer?.state === 'ok' ? moreText(answer.read, answer.total) : null;
   const problem = missingName
     ? emptyText
-    : query.isError && path !== null && !searching
+    : query.isError && search !== null && !searching
       ? query.error.message
       : null;
 
@@ -106,21 +110,18 @@ export function MfdsLookup({
         className="self-start"
         disabled={locked}
         aria-busy={searching || undefined}
-        onClick={search}
+        onClick={run}
       >
         {searching ? 'Searching…' : 'Search MFDS'}
       </Button>
-      {/* One region for what the search and the pick did; a new pick remounts it to be read again. */}
-      <div
-        key={filled?.reads ?? 0}
-        role="status"
-        className="flex flex-col gap-1 text-body-sm break-keep"
-      >
+      {/* One region that stays in the page for what the search and the pick did, so its text is read out. */}
+      <div role="status" className="flex flex-col gap-1 text-body-sm break-keep">
+        {searching ? <p>Searching the MFDS database…</p> : null}
         {!searching && answer?.state === 'off' ? <p>{offText}</p> : null}
         {!searching && answer?.state === 'unavailable' ? <p>{unavailableText}</p> : null}
         {!searching && answer?.state === 'ok' && results.length === 0 ? <p>{noMatchText}</p> : null}
         {!searching && more ? <p>{more}</p> : null}
-        {filled?.lines.map((line) => (
+        {filled?.map((line) => (
           <p key={line}>{line}</p>
         ))}
       </div>
@@ -152,7 +153,7 @@ export function MfdsLookup({
                 onClick={() => {
                   const fill = fillFromMfds(form, result, serviceToday());
                   onFill(fill.form);
-                  setFilled({ lines: fill.lines, reads: (filled?.reads ?? 0) + 1 });
+                  setFilled(fill.lines);
                 }}
               >
                 Use

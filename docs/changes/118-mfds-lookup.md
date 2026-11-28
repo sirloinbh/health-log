@@ -16,7 +16,7 @@ The user applied for the API and confirmed the key on 2026-11-28. The open choic
 - **Several records:** every match is listed with its maker, group, amount and main values, and the person picks one. Records that are the same product with the same values under different codes show once, as the most recently updated one (the rules' "newest first"). Records with the same name but other values stay separate, so each row shows carbs, protein and fat too.
 - **No match:** the screen says so and points to pasting the label table (#35) or entering the values by hand.
 - **Source:** `public`, with the MFDS detail page of the food code as the source URL (the page the rules already name) and today (Asia/Seoul) as the verified date.
-- **Names stay in Korean** as the database has them; the person can edit them before saving. The brand is the maker without company markers such as `(주)`. The category is left as it was, so the person picks one of the categories already used.
+- **Names stay in Korean** as the database has them; the person can edit them before saving. This is an exception to the English-name rule of #351 (which the seeded foods follow, with the Korean in `search_alias`): the screen cannot fill the alias, and a Korean name is still found by a Korean search. `docs/food-data.md` says so. The brand is the maker without company markers such as `(주)`. The category is left as it was, so the person picks one of the categories already used.
 - **No key:** the API answers `{ state: 'off' }` and the screen says the lookup is not set up (the done criterion allows a message instead of hiding it). The portal failing, a refused key, an error code, or an unexpected answer give `{ state: 'unavailable' }` and one log line that never holds the key.
 - The lookup is offered only when adding a food, not when editing one.
 
@@ -35,11 +35,25 @@ The user applied for the API and confirmed the key on 2026-11-28. The open choic
 
 ## Verification
 
-- `node node_modules/tsx/dist/cli.mjs --test test/mfds.test.ts test/openapi.test.ts` (backend): 13 passed.
-- `node node_modules/vitest/vitest.mjs run src/mfds-lookup.test.tsx src/foods.test.tsx` (frontend): 52 passed before the last text change; `src/mfds-lookup.test.tsx` 7 passed after it.
+- First commit: backend `test/mfds.test.ts` + `test/openapi.test.ts` 13 passed; frontend `src/mfds-lookup.test.tsx` 7 passed, `src/foods.test.tsx` still passing.
+- After review round 1: backend `test/mfds.test.ts` 10 passed; frontend `src/mfds-lookup.test.tsx` 9 passed.
 - Live portal call with the key from SSM (value never printed): `신라면` answers 53 matches; `신라면건면` answers 5 records, shown as 3 after merging repeats (two 97 g records differ in fat and carbs, so both stay).
 - Browser (local API with the real key and no database, Vite): searching `신라면건면` and picking the first match filled `신라면건면사발 77g`, serving 77, the detail page URL and today's date. Checked at 390×844 and 1440×900: no sideways scroll, the match list scrolls inside the dialog. The food list behind it shows "Server error" only because there was no local database.
-- `npm run check` steps, with `TEST_DATABASE_URL` empty (it points at another project's DB here): Prettier on every tracked and new file of this change passed (`prettier --check .` also flags the user's untracked `docs/reviews/` file, which this change does not touch); lint, contract check, typecheck, tests, skill tests and build passed. Backend 363 tests: 198 passed, 165 skipped (DB integration tests, no local test DB; CI runs them), 0 failed. Frontend 904 passed, 3 skipped.
+- `npm run check` steps, with `TEST_DATABASE_URL` empty (it points at another project's DB here): Prettier on every tracked and new file of this change passed (`prettier --check .` also flags the user's untracked `docs/reviews/` file, which this change does not touch); lint, contract check, typecheck, tests, skill tests and build passed. On the final code: backend 365 tests, 200 passed, 165 skipped (DB integration tests, no local test DB; CI runs them), 0 failed; frontend 906 passed, 3 skipped.
+
+## Review round 1 (PR #365)
+
+A separate review agent found no blocking problem. Fixed in the second commit, with tests:
+
+- A draft could fail the save limits: a name over 100 characters now loses the total, then is cut; a maker over 50 characters leaves the brand empty; a total above the API's amount limit keeps the basis.
+- A record whose basis amount (`SERVING_SIZE`) cannot be read was treated as per 100 g; it is now left out (`read` still counts it).
+- The log redaction now also cuts the key as encoded in an address (`%2B`, `%2F`, `%3D`); the test key has those characters.
+- Enter that ends a Korean input composition no longer searches.
+- Searches: every press is its own query (a count in the key) and an answer never goes stale, so the same words searched again ask the portal again (the old code could show a cached "cannot be reached"), and window focus does not search again on its own.
+- The status region stays in the page (no remount) and says "Searching the MFDS database…" while a search runs.
+- `docs/food-data.md` states the Korean-name exception instead of saying the draft follows every rule above.
+
+Not changed: paging past the first 20 records and a per-route limit on the shared 10,000 calls a day (the general API rate limit applies). Neither is needed for one person's use; no issue was filed.
 
 ## Limits
 

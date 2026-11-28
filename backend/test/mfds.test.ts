@@ -4,12 +4,13 @@ import { test } from 'node:test';
 import type { Pool } from 'pg';
 
 import { createApp } from '../src/app.js';
-import { amountOf, brandOf, resultOf, sizeOf, withoutRepeats } from '../src/mfds.js';
+import { amountOf, brandOf, nameOf, resultOf, sizeOf, withoutRepeats } from '../src/mfds.js';
 import { listenForFetch } from './helpers.js';
 
 // This route never touches the database.
 const pool = {} as unknown as Pool;
-const key = 'test-portal-key';
+// A decoding key has characters an address encodes, so the log check covers both spellings.
+const key = 'test+portal/key==';
 
 type Fetch = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -42,6 +43,13 @@ const shinCup = {
   AMT_NUM13: '2,117.000',
   ITEM_REPORT_NO: '2007014900270',
   UPDATE_DATE: '2026-05-14',
+};
+
+/** resultOf for a record whose basis can be read. */
+const draftOf = (row: typeof shinCup) => {
+  const result = resultOf(row);
+  assert.ok(result);
+  return result;
 };
 
 const reply = (items: unknown[] | undefined, totalCount = items?.length ?? 0) =>
@@ -167,6 +175,11 @@ test('a refused key, an error code, a strange answer or a network failure is "un
       () => Promise.resolve(new Response('<xml>not json</xml>')),
       () => Promise.resolve(new Response(JSON.stringify({ header: { resultCode: '00' } }))),
       () => Promise.reject(new Error(`fetch failed for ${key}`)),
+      () => Promise.reject(new Error(`fetch failed for ?serviceKey=${encodeURIComponent(key)}`)),
+      () =>
+        Promise.reject(
+          new Error(`fetch failed for ?${new URLSearchParams({ serviceKey: key }).toString()}`),
+        ),
     ];
     for (const failure of failures) {
       const { status, data } = await call(failure, 'q=milk');
@@ -176,9 +189,11 @@ test('a refused key, an error code, a strange answer or a network failure is "un
   } finally {
     console.warn = warn;
   }
-  assert.equal(logged.length, 5);
+  assert.equal(logged.length, 7);
   assert.ok(logged.every((line) => JSON.parse(line).event === 'mfds_unavailable'));
-  assert.equal(logged.join('\n').includes(key), false);
+  for (const form of [key, 'test%2Bportal%2Fkey%3D%3D', 'test%2Bportal/key==']) {
+    assert.equal(logged.join('\n').includes(form), false);
+  }
 });
 
 test('values are read from the database text: commas, blanks and dashes', () => {
@@ -200,23 +215,23 @@ test('values are read from the database text: commas, blanks and dashes', () => 
 });
 
 test('a total equal to the basis, missing, or in another unit keeps the per-100 values', () => {
-  const same = resultOf({ ...shinCup, Z10500: '100g' });
+  const same = draftOf({ ...shinCup, Z10500: '100g' });
   assert.deepEqual(
     [same.food.name, same.food.servingSize, same.food.calories, same.total],
     ['신라면건면사발', 100, 370, '100g'],
   );
-  const none = resultOf({ ...shinCup, Z10500: '' });
+  const none = draftOf({ ...shinCup, Z10500: '' });
   assert.deepEqual(
     [none.food.name, none.food.servingSize, none.total],
     ['신라면건면사발', 100, null],
   );
-  const otherUnit = resultOf({ ...shinCup, SERVING_SIZE: '100mL', Z10500: '500g' });
+  const otherUnit = draftOf({ ...shinCup, SERVING_SIZE: '100mL', Z10500: '500g' });
   assert.deepEqual(
     [otherUnit.food.servingSize, otherUnit.food.servingUnit, otherUnit.food.calories],
     [100, 'mL', 370],
   );
   // A blank value stays unknown after the conversion, not 0.
-  assert.equal(resultOf({ ...shinCup, AMT_NUM7: '' }).food.sugars, null);
+  assert.equal(draftOf({ ...shinCup, AMT_NUM7: '' }).food.sugars, null);
 });
 
 test('the same product under several codes shows once, as its newest record, in the first place', () => {
@@ -229,10 +244,42 @@ test('the same product under several codes shows once, as its newest record, in 
       { ...dry, FOOD_CD: 'P-0032', UPDATE_DATE: '2026-05-07' },
       // Other values are another match, even under the same name.
       { ...dry, FOOD_CD: 'P-0200', AMT_NUM1: '400.000' },
-    ].map(resultOf),
+    ].map(draftOf),
   );
   assert.deepEqual(
     results.map((result) => result.code),
     ['P-0159', 'P108-001000300-0738', 'P-0200'],
+  );
+});
+
+test('a draft always fits what POST /api/foods accepts', () => {
+  // A long name loses the total, then is cut to 100 characters.
+  assert.equal(nameOf('가'.repeat(97), '77g'), '가'.repeat(97));
+  assert.equal(nameOf('가'.repeat(96), '77g'), `${'가'.repeat(96)} 77g`);
+  assert.equal(nameOf('가'.repeat(120), '77g'), '가'.repeat(100));
+  assert.equal(draftOf({ ...shinCup, FOOD_NM_KR: '가'.repeat(120) }).food.name, '가'.repeat(100));
+  // A maker too long for a brand leaves the brand empty.
+  assert.equal(brandOf('가'.repeat(50)), '가'.repeat(50));
+  assert.equal(brandOf('가'.repeat(51)), null);
+  // A total above the API's limit keeps the basis; a value above it after converting is unknown.
+  const huge = draftOf({ ...shinCup, Z10500: '150,000g' });
+  assert.deepEqual([huge.food.servingSize, huge.food.calories], [100, 370]);
+  assert.equal(
+    draftOf({ ...shinCup, Z10500: '10,000g', AMT_NUM13: '2,117.000' }).food.sodium,
+    null,
+  );
+});
+
+test('a record whose basis cannot be read is not offered', async () => {
+  assert.equal(resultOf({ ...shinCup, SERVING_SIZE: '1회 제공량' }), null);
+  assert.equal(resultOf({ ...shinCup, SERVING_SIZE: '' }), null);
+  const { data } = await call(
+    () => Promise.resolve(reply([{ ...shinCup, SERVING_SIZE: '1개' }, shinCup], 2)),
+    'q=milk',
+  );
+  assert.equal(data.read, 2);
+  assert.deepEqual(
+    (data.results as { code: string }[]).map((result) => result.code),
+    ['P108-001000300-0738'],
   );
 });

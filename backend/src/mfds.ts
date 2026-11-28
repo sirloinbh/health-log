@@ -69,13 +69,24 @@ export const sizeOf = (value: string | null | undefined) => {
 
 const twoDecimals = (value: number) => Math.round(value * 100) / 100;
 
-/** "(주)농심" and "농심 주식회사" are the brand 농심. */
+// The limits of POST /api/foods (foods.ts), so a picked draft can be saved as it is.
+const nameLimit = 100;
+const brandLimit = 50;
+
+/** The draft name: the total goes at the end (docs/food-data.md) when it fits; a long name is cut. */
+export const nameOf = (name: string, total: string | null) => {
+  const withTotal = total ? `${name} ${total}` : name;
+  if (charCount(withTotal) <= nameLimit) return withTotal;
+  return [...name].slice(0, nameLimit).join('').trim();
+};
+
+/** "(주)농심" and "농심 주식회사" are the brand 농심. A maker too long for a brand is left out. */
 export const brandOf = (maker: string | null | undefined) => {
   const brand = (maker ?? '')
     .replace(/\((주|유|사)\)|㈜|주식회사|유한회사/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-  return brand || null;
+  return brand && charCount(brand) <= brandLimit ? brand : null;
 };
 
 const amountKeys = {
@@ -90,13 +101,19 @@ const amountKeys = {
 /**
  * One match as the screen shows it, with the food draft it fills. The values are converted from the
  * basis (100 g) to the total content when the total is in the same unit and differs from the basis;
- * otherwise the draft keeps the basis as its serving. A converted value outside the API's range is
- * left blank, as an unknown value is.
+ * otherwise the draft keeps the basis as its serving. A total larger than the API accepts is not used.
+ * A converted value outside the API's range is left blank, as an unknown value is. A record whose
+ * basis cannot be read is null: its values would be for an amount nobody knows.
  */
 export function resultOf(row: Item) {
-  const basis = sizeOf(row.SERVING_SIZE) ?? { size: 100, unit: 'g' };
+  const basis = sizeOf(row.SERVING_SIZE);
+  if (!basis || basis.size > maxAmount) return null;
   const total = sizeOf(row.Z10500);
-  const usesTotal = total !== null && total.unit === basis.unit && total.size !== basis.size;
+  const usesTotal =
+    total !== null &&
+    total.unit === basis.unit &&
+    total.size !== basis.size &&
+    twoDecimals(total.size) <= maxAmount;
   const serving = usesTotal ? total : basis;
   const scale = serving.size / basis.size;
   const values = Object.fromEntries(
@@ -120,8 +137,7 @@ export function resultOf(row: Item) {
     total: totalText,
     updatedOn: /^\d{4}-\d{2}-\d{2}$/.test(row.UPDATE_DATE ?? '') ? row.UPDATE_DATE! : null,
     food: {
-      // A packaged product carries its total content at the end of its name (docs/food-data.md).
-      name: usesTotal && totalText ? `${row.FOOD_NM_KR} ${totalText}` : row.FOOD_NM_KR,
+      name: nameOf(row.FOOD_NM_KR, usesTotal ? totalText : null),
       brand: brandOf(row.MAKER_NM),
       servingSize: twoDecimals(serving.size),
       servingUnit: serving.unit,
@@ -132,7 +148,7 @@ export function resultOf(row: Item) {
   };
 }
 
-type Result = ReturnType<typeof resultOf>;
+type Result = NonNullable<ReturnType<typeof resultOf>>;
 
 /**
  * The database holds the same product more than once under different codes, with the same values.
@@ -188,7 +204,9 @@ export function mfdsLookup(
         state: 'ok',
         total: parsed.body.totalCount,
         read: items.length,
-        results: withoutRepeats(items.map(resultOf)),
+        results: withoutRepeats(
+          items.map(resultOf).filter((result): result is Result => result !== null),
+        ),
       });
     } catch (error) {
       // The log names the status or the result code; the key is cut out in case a message ever holds it.
@@ -196,7 +214,13 @@ export function mfdsLookup(
         error instanceof z.ZodError
           ? 'the answer had an unexpected shape'
           : (error as Error).message;
-      const message = reason.split(serviceKey).join('<key>');
+      // The key as written and as encoded in the address, in case a message ever quotes the request.
+      const forms = [
+        serviceKey,
+        encodeURIComponent(serviceKey),
+        new URLSearchParams({ k: serviceKey }).toString().slice(2),
+      ];
+      const message = forms.reduce((text, form) => text.split(form).join('<key>'), reason);
       console.warn(JSON.stringify({ event: 'mfds_unavailable', message }));
       res.json({ state: 'unavailable' });
     }

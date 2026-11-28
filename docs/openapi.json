@@ -1857,6 +1857,65 @@
         }
       }
     },
+    "/api/foods/mfds": {
+      "get": {
+        "summary": "Look a food up in the MFDS food nutrition database (read-only, nothing is saved). The answer is { state: 'ok', total, results } with a food draft per match converted to the total content, { state: 'off' } when no key is set, or { state: 'unavailable' } when the portal cannot answer",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "maker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": "",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign-in required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/foods/recent": {
       "get": {
         "summary": "List stored foods by when they were last recorded",

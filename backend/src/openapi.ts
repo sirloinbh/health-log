@@ -13,6 +13,7 @@ import { intakeInput } from './intake.js';
 import { labInput, labListQuery, trendQuery } from './labs.js';
 import { comboUse, entryInput, mealCopy, mealTimeInput } from './meals.js';
 import { dayQuery, medicationInput } from './medications.js';
+import { mfdsQuery } from './mfds.js';
 import { doneInput } from './reminders.js';
 import { reportQuery } from './report.js';
 import { requestKeyHeader, requestKeySchema } from './request-keys.js';
@@ -46,6 +47,12 @@ export const operations: Record<string, Operation> = {
   'GET /api/foods/recent': {
     summary: 'List stored foods by when they were last recorded',
     status: [200],
+  },
+  'GET /api/foods/mfds': {
+    summary:
+      "Look a food up in the MFDS food nutrition database (read-only, nothing is saved). The answer is { state: 'ok', total, results } with a food draft per match converted to the total content, { state: 'off' } when no key is set, or { state: 'unavailable' } when the portal cannot answer",
+    query: mfdsQuery,
+    status: [200, 400],
   },
   'POST /api/foods': {
     summary: 'Add a food',

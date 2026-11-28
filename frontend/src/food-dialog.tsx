@@ -37,6 +37,7 @@ import {
 } from './food-form';
 import { apiKey, type ApiRequest, useApiMutation } from './lib/query';
 import { useNotice } from './lib/use-notice';
+import { MfdsLookup } from './mfds-lookup';
 import { unreadableAmount } from './number-input';
 import { isCoupangUrl, readNutritionLabel } from './nutrition-label';
 import { asRequest } from './writes';
@@ -387,6 +388,8 @@ export function FoodDialog({
         </DialogHeader>
         <form onSubmit={submit} noValidate className="flex flex-col gap-4">
           {/* Read-only while saving: a change after Save would not be in the save on its way. */}
+          {/* #118: a new food can start from the MFDS database. */}
+          {food ? null : <MfdsLookup form={form} locked={saving} onFill={setForm} />}
           <LabelReader form={form} locked={saving} onFill={setForm} />
           <FoodFields form={form} locked={saving} update={update} set={set} choices={choices} />
           <SourceFields form={form} locked={saving} update={update} set={set} />

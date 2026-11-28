@@ -12,6 +12,7 @@ const server = createApp(pool, {
   auth,
   toolsPublicKey: process.env.AI_TOOLS_PUBLIC_KEY,
   workoutMemoUrl: process.env.WORKOUT_MEMO_URL,
+  mfdsServiceKey: process.env.FOOD_NTR_SERVICE_KEY,
 }).listen(port, listenHost(auth !== undefined), () => console.log(`API http://localhost:${port}`));
 process.on('SIGTERM', () =>
   server.close(() => {

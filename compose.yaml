@@ -32,6 +32,8 @@ services:
       # #333: the daily screen reads a day's workouts from workout-memo (read-only, with the user's session cookie) on the
       # shared-ai network, where its api has the alias workout-memo-api. Empty: the screen says workout-memo cannot be reached.
       WORKOUT_MEMO_URL: ${WORKOUT_MEMO_URL:-http://workout-memo-api:3101}
+      # #118: the Public Data Portal key for the MFDS food lookup, read from SSM on deploy. Empty: the lookup is off.
+      FOOD_NTR_SERVICE_KEY: ${FOOD_NTR_SERVICE_KEY:-}
     networks:
       default: {}
       shared-auth: {}

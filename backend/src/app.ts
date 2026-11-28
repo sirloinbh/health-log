@@ -15,6 +15,7 @@ import { intakeRouter } from './intake.js';
 import { labsRouter } from './labs.js';
 import { mealsRouter } from './meals.js';
 import { medicationsRouter } from './medications.js';
+import { mfdsLookup } from './mfds.js';
 import { remindersRouter } from './reminders.js';
 import { reportRouter } from './report.js';
 import { sleepRouter } from './sleep.js';
@@ -42,6 +43,9 @@ export function createApp(
     /** workout-memo's API address (WORKOUT_MEMO_URL); without it the daily screen says workout-memo cannot be reached (#333). */
     workoutMemoUrl?: string;
     workoutMemoFetch?: Parameters<typeof workoutMemoRouter>[1];
+    /** The Public Data Portal key (FOOD_NTR_SERVICE_KEY); without it the MFDS lookup answers "off" (#118). */
+    mfdsServiceKey?: string;
+    mfdsFetch?: Parameters<typeof mfdsLookup>[1];
   } = {},
 ) {
   // "Today" follows the service time zone (Asia/Seoul), not the server clock's zone.
@@ -60,6 +64,8 @@ export function createApp(
     await pool.query('SELECT 1');
     res.json({ ok: true, service: 'health-log', today: today() });
   });
+  // #118: a lookup in the MFDS database; it saves nothing.
+  app.get('/api/foods/mfds', mfdsLookup(options.mfdsServiceKey, options.mfdsFetch));
   app.use('/api/foods', foodsRouter(pool, today));
   app.use('/api/meals', mealsRouter(pool));
   app.use('/api/combos', combosRouter(pool));

@@ -277,28 +277,14 @@ const periods: { value: Period; label: string }[] = [
   { value: 'weeks12', label: '12 weeks' },
 ];
 
-/** What each fixed page (Week, 12 weeks) is called and says; the dashboard picks its period itself. */
-const fixedPages: Partial<Record<Period, { title: string; description: string }>> = {
-  week: {
-    title: 'Week',
-    description: 'Sleep, diet, alcohol and tobacco, and daily checks of one week.',
-  },
-  weeks12: {
-    title: '12 weeks',
-    description: 'The same records over 12 weeks, to see slower changes.',
-  },
-};
-
 /**
- * `fixed` makes a page of one period (Week, 12 weeks): no period buttons, and the page is named
- * after it. Without it this is the dashboard, which picks its period from the address (#350).
+ * The dashboard: it picks its period from the address (?period=week|month|weeks12, #350). The old
+ * Week and 12 weeks pages redirect here (#384).
  */
-export function ReportPage({ health, fixed }: { health: Health; fixed?: Period }) {
+export function ReportPage({ health }: { health: Health }) {
   const [params, setParams] = useSearchParams();
   const asPeriod = params.get('period');
-  const period: Period =
-    fixed ?? (asPeriod === 'month' || asPeriod === 'weeks12' ? asPeriod : 'week');
-  const page = fixed ? fixedPages[fixed] : undefined;
+  const period: Period = asPeriod === 'month' || asPeriod === 'weeks12' ? asPeriod : 'week';
   const asked = params.get('date');
   // The last date the server gave. One failed health poll must not blank a report already shown.
   const [lastToday, setLastToday] = useState<string | null>(null);
@@ -401,10 +387,11 @@ export function ReportPage({ health, fixed }: { health: Health; fixed?: Period }
   return (
     <section aria-labelledby="page-title" className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
-        <h1 id="page-title">{page?.title ?? 'Dashboard'}</h1>
+        <h1 id="page-title">Dashboard</h1>
         <p className="text-body text-muted-foreground">
-          {page?.description ??
-            'View weekly, monthly and 12-week changes in sleep, diet, alcohol and tobacco, and daily checks.'}
+          {
+            'View weekly, monthly and 12-week changes in sleep, diet, alcohol and tobacco, and daily checks.'
+          }
         </p>
         {health.state === 'error' ? (
           <p role="alert" className="text-body-sm text-destructive">
@@ -417,23 +404,21 @@ export function ReportPage({ health, fixed }: { health: Health; fixed?: Period }
         )}
       </header>
       {/* Keyed by the service day, so an open dashboard moves on at midnight (#48). */}
-      {today && !fixed ? <RemindersCard key={today} /> : null}
+      {today ? <RemindersCard key={today} /> : null}
       <nav aria-label="Choose period" className="flex flex-wrap items-center gap-2">
-        {fixed ? null : (
-          <div role="group" aria-label="Period unit" className="flex gap-2">
-            {periods.map(({ value, label }) => (
-              <Button
-                key={value}
-                size="sm"
-                variant={period === value ? 'default' : 'outline'}
-                aria-pressed={period === value}
-                onClick={() => go({ period: value })}
-              >
-                {label}
-              </Button>
-            ))}
-          </div>
-        )}
+        <div role="group" aria-label="Period unit" className="flex gap-2">
+          {periods.map(({ value, label }) => (
+            <Button
+              key={value}
+              size="sm"
+              variant={period === value ? 'default' : 'outline'}
+              aria-pressed={period === value}
+              onClick={() => go({ period: value })}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
         {shown ? (
           <div className="flex items-center gap-2">
             {/* aria-disabled, not disabled: a disabled button drops the focus of whoever pressed

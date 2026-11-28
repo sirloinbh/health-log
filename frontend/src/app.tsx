@@ -1,7 +1,6 @@
 import { type QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import {
   CalendarDays,
-  CalendarRange,
   FlaskConical,
   Layers,
   LayoutDashboard,
@@ -41,8 +40,6 @@ const pages = {
   start: '/',
   quick: '/quick',
   daily: '/daily',
-  week: '/week',
-  weeks12: '/weeks',
   dashboard: '/dashboard',
   foods: '/foods',
   combos: '/combos',
@@ -53,13 +50,11 @@ const pages = {
 } as const;
 
 // Main menu (LNB) items, in display order.
-// Order (project-standards#1128, health-log#350): day log, Week, 12 weeks, the other pages, Dashboard,
-// Settings. Quick entry follows the day log by the user's decision on #350.
+// Order (project-standards#1128, health-log#350): day log, the other pages, Dashboard, Settings. The
+// Week and 12-week views are periods of the Dashboard (#384). Quick entry follows the day log by the user's decision on #350.
 const nav: NavItem[] = [
   { to: pages.daily, label: 'Daily record', icon: CalendarDays },
   { to: pages.quick, label: 'Quick entry', icon: Zap },
-  { to: pages.week, label: 'Week', icon: CalendarRange },
-  { to: pages.weeks12, label: '12 weeks', icon: CalendarRange },
   { to: pages.foods, label: 'Foods', icon: Utensils },
   { to: pages.combos, label: 'Combos', icon: Layers },
   { to: pages.visits, label: 'Clinic', icon: Stethoscope },
@@ -176,8 +171,14 @@ function Routed() {
               path={`${pages.daily}/:date`}
               element={<DailyPage basePath={pages.daily} health={health} />}
             />
-            <Route path={pages.week} element={<ReportPage health={health} fixed="week" />} />
-            <Route path={pages.weeks12} element={<ReportPage health={health} fixed="weeks12" />} />
+            <Route
+              path="/week"
+              element={<Navigate to={`${pages.dashboard}?period=week`} replace />}
+            />
+            <Route
+              path="/weeks"
+              element={<Navigate to={`${pages.dashboard}?period=weeks12`} replace />}
+            />
             <Route path={pages.dashboard} element={<ReportPage health={health} />} />
             <Route path={pages.foods} element={<FoodsPage />} />
             <Route path={pages.combos} element={<CombosPage />} />

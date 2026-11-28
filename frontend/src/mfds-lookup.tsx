@@ -19,6 +19,10 @@ import {
 
 const emptyText = 'Enter a food name to search for';
 
+// Counts every search on the page, not per dialog: the dialog unmounts on close, and a count that
+// started again would meet the answers cached by the dialog opened before.
+let searches = 0;
+
 /**
  * #118: search the MFDS food nutrition database and fill the form from a match. Only the app's API is
  * called; it holds the portal key. Picking a match fills the fields; nothing is saved until Save.
@@ -53,12 +57,14 @@ export function MfdsLookup({
     setMissingName(q === '');
     if (!q) return;
     setFilled(null);
-    setSearch((current) => ({ path: mfdsPath(q, maker.trim()), count: (current?.count ?? 0) + 1 }));
+    searches += 1;
+    setSearch({ path: mfdsPath(q, maker.trim()), count: searches });
   };
   // The fields sit inside the food form: Enter here searches instead of saving the food. Enter that
-  // ends a Korean input composition only finishes the word.
+  // ends a Korean input composition only finishes the word (Safari reports that Enter as key code 229).
   const onEnter = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+    const composing = event.nativeEvent.isComposing || event.keyCode === 229;
+    if (event.key !== 'Enter' || composing) return;
     event.preventDefault();
     if (!locked) run();
   };

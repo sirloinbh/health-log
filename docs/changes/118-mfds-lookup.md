@@ -37,9 +37,10 @@ The user applied for the API and confirmed the key on 2026-11-28. The open choic
 
 - First commit: backend `test/mfds.test.ts` + `test/openapi.test.ts` 13 passed; frontend `src/mfds-lookup.test.tsx` 7 passed, `src/foods.test.tsx` still passing.
 - After review round 1: backend `test/mfds.test.ts` 10 passed; frontend `src/mfds-lookup.test.tsx` 9 passed.
+- After review round 2: frontend `src/mfds-lookup.test.tsx` 10 passed.
 - Live portal call with the key from SSM (value never printed): `신라면` answers 53 matches; `신라면건면` answers 5 records, shown as 3 after merging repeats (two 97 g records differ in fat and carbs, so both stay).
 - Browser (local API with the real key and no database, Vite): searching `신라면건면` and picking the first match filled `신라면건면사발 77g`, serving 77, the detail page URL and today's date. Checked at 390×844 and 1440×900: no sideways scroll, the match list scrolls inside the dialog. The food list behind it shows "Server error" only because there was no local database.
-- `npm run check` steps, with `TEST_DATABASE_URL` empty (it points at another project's DB here): Prettier on every tracked and new file of this change passed (`prettier --check .` also flags the user's untracked `docs/reviews/` file, which this change does not touch); lint, contract check, typecheck, tests, skill tests and build passed. On the final code: backend 365 tests, 200 passed, 165 skipped (DB integration tests, no local test DB; CI runs them), 0 failed; frontend 906 passed, 3 skipped.
+- `npm run check` steps, with `TEST_DATABASE_URL` empty (it points at another project's DB here): Prettier on every tracked and new file of this change passed (`prettier --check .` also flags the user's untracked `docs/reviews/` file, which this change does not touch); lint, contract check, typecheck, tests, skill tests and build passed. On the final code: backend 365 tests, 200 passed, 165 skipped (DB integration tests, no local test DB; CI runs them), 0 failed; frontend 907 passed, 3 skipped (after round 2).
 
 ## Review round 1 (PR #365)
 
@@ -54,6 +55,15 @@ A separate review agent found no blocking problem. Fixed in the second commit, w
 - `docs/food-data.md` states the Korean-name exception instead of saying the draft follows every rule above.
 
 Not changed: paging past the first 20 records and a per-route limit on the shared 10,000 calls a day (the general API rate limit applies). Neither is needed for one person's use; no issue was filed.
+
+## Review round 2 (PR #365)
+
+A second review checked the round 1 fixes: they hold (the name cut counts code points as `charCount` does, `read` is counted before records are left out, old query keys are dropped after React Query's 5-minute gcTime). No blocking problem. Fixed in the third commit, with tests:
+
+- The search count restarted with each dialog, so a dialog opened again within 5 minutes could show the earlier dialog's cached "cannot be reached" for the same words without asking the portal. The count is now kept for the page. Test: a dialog opened again asks again.
+- The composition test now waits and checks that nothing starts, and Safari's form of that Enter (key code 229) is ignored too.
+
+Left as it is: a search that failed with an HTTP error (no data) can still be asked again when the window gets focus back, because the shared `useApiQuery` (a centrally managed file) does not pass `refetchOnWindowFocus`. That asks the same thing again (a 400 stays a 400, a network failure may recover), so it is harmless here.
 
 ## Limits
 

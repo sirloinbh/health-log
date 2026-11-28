@@ -144,8 +144,32 @@ test('Enter that ends a Korean composition does not search', async () => {
   const field = within(dialog).getByLabelText('MFDS food name');
   fireEvent.change(field, { target: { value: '우유' } });
   fireEvent.keyDown(field, { key: 'Enter', isComposing: true });
+  // Safari's form of the same Enter.
+  fireEvent.keyDown(field, { key: 'Enter', keyCode: 229 });
+  // Nothing starts: no "Searching…", and no request even after a moment.
+  expect(queryLive('status', dialog)).toBeNull();
+  await new Promise((resolve) => setTimeout(resolve, 50));
   expect(mfdsCalls(fetchMock)).toHaveLength(0);
   expect(posts(fetchMock)).toHaveLength(0);
+});
+
+test('a dialog opened again asks again instead of showing the earlier dialog’s answer', async () => {
+  let answer: object = { state: 'unavailable' };
+  const fetchMock = serve(() => json(answer));
+  const dialog = await openAdd();
+  fireEvent.change(within(dialog).getByLabelText('MFDS food name'), { target: { value: '우유' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Search MFDS' }));
+  await statusSays(dialog, 'The MFDS database cannot be reached right now');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+  answer = { state: 'ok', total: 1, read: 1, results: [shinCup] };
+  fireEvent.click(screen.getByRole('button', { name: 'Add food' }));
+  const again = await screen.findByRole('dialog');
+  fireEvent.change(within(again).getByLabelText('MFDS food name'), { target: { value: '우유' } });
+  fireEvent.click(within(again).getByRole('button', { name: 'Search MFDS' }));
+  expect(await within(again).findByRole('list', { name: 'MFDS matches' })).toBeInTheDocument();
+  expect(mfdsCalls(fetchMock)).toHaveLength(2);
 });
 
 test('a search is not repeated on its own, and the same words searched again ask again', async () => {

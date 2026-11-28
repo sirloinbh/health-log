@@ -530,7 +530,6 @@ test('a food can be marked junk food, shown on its card, and the edit starts fro
   let dialog = await screen.findByRole('dialog');
   const mark = within(dialog).getByRole('checkbox', { name: 'Junk food' });
   expect(mark).not.toBeChecked();
-  expect(mark).toHaveAccessibleDescription(/meals already recorded as they are/);
   fireEvent.click(mark);
   fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
@@ -678,23 +677,6 @@ test('text without a table says so and changes nothing', async () => {
   expect(getLive('alert', dialog)).toHaveTextContent('Could not find a nutrition table');
   expect(within(dialog).getByLabelText('Serving size')).toHaveValue('');
   expect(within(dialog).getByRole('combobox', { name: 'Source type' })).toHaveTextContent('Manual');
-});
-
-test('a Coupang source link explains that the app never opens it', async () => {
-  serve(() => json({ foods: [] }));
-  open();
-  const { dialog } = await openWith('Add food');
-  const url = within(dialog).getByLabelText('Source URL');
-  expect(
-    within(dialog).queryByText(/Coupang links are saved only as the source/),
-  ).not.toBeInTheDocument();
-  fireEvent.change(url, { target: { value: 'https://link.coupang.com/a/abc' } });
-  const help = within(dialog).getByText(/Coupang links are saved only as the source/);
-  expect(url).toHaveAttribute('aria-describedby', help.id);
-  fireEvent.change(url, { target: { value: 'https://example.com/menu' } });
-  expect(
-    within(dialog).queryByText(/Coupang links are saved only as the source/),
-  ).not.toBeInTheDocument();
 });
 
 test('reading a table into a published food clears stale values and marks it as the label', async () => {

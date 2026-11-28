@@ -123,7 +123,6 @@ export function FoodsPage() {
         >
           Foods
         </h1>
-        <p className="text-body text-muted-foreground">Manage nutrition values and sources.</p>
       </header>
       <div className="flex flex-wrap items-center gap-2">
         <form
@@ -137,7 +136,6 @@ export function FoodsPage() {
           <Input
             type="search"
             aria-label="Search foods"
-            placeholder="Name or brand"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />

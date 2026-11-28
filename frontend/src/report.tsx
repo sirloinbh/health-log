@@ -6,7 +6,7 @@ import { useSearchParams } from 'react-router';
 import { periodsOf } from '../../shared/contract';
 import { kcalText } from './calorie-text';
 import { Button } from './components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Notice } from './components/ui/notice';
 import { SkeletonText } from './components/ui/skeleton';
 import { DailyBars } from './daily-bars';
@@ -177,24 +177,13 @@ const lessBar = 'bg-[#f2a65a] dark:bg-[#c9813b]';
 const noneBar = 'bg-[#2a78d6] dark:bg-[#3987e5]';
 
 /** Average sleep of the night after each group of days, with each group's sample. */
-function SleepComparison({
-  title,
-  groups,
-  note,
-}: {
-  title: string;
-  groups: NightGroup[];
-  note: string;
-}) {
+function SleepComparison({ title, groups }: { title: string; groups: NightGroup[] }) {
   const longest = Math.max(...groups.map(({ group }) => group.averageMinutes ?? 0), 1);
   const thin = groups.some(({ group }) => group.nights < fewNights);
   return (
     <Card>
       <CardHeader>
         <CardTitle asHeading="h2">{title}</CardTitle>
-        <CardDescription className="break-keep">
-          This shows a relationship only; it does not establish a cause.
-        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <dl className="flex flex-col gap-3">
@@ -228,7 +217,6 @@ function SleepComparison({
             again once more records build up.
           </p>
         ) : null}
-        <p className="text-caption break-keep text-muted-foreground">{note}</p>
       </CardContent>
     </Card>
   );
@@ -243,7 +231,6 @@ function SleepAfterDrinking({ report }: { report: Report }) {
         { label: 'Nights after drinking', group: afterDrinking, bar: moreBar },
         { label: 'Nights without drinking', group: afterNoDrinking, bar: noneBar },
       ]}
-      note="Compares sleep from nights after a recorded drinking day to the next morning. Sleep is recorded by the day you wake up, so it is the next date's sleep. Nights after days without a drinking record are left out."
     />
   );
 }
@@ -258,7 +245,6 @@ function SleepAfterCaffeine({ report }: { report: Report }) {
         { label: `Nights after ${highCaffeineMg} mg or less`, group: low, bar: lessBar },
         { label: 'Nights without caffeine', group: none, bar: noneBar },
       ]}
-      note="Groups days by their total caffeine and compares sleep the night after. Sleep is recorded by the day you wake up, so it is the next date's sleep. Days without any water or caffeine record are left out."
     />
   );
 }
@@ -388,11 +374,6 @@ export function ReportPage({ health }: { health: Health }) {
     <section aria-labelledby="page-title" className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
         <h1 id="page-title">Dashboard</h1>
-        <p className="text-body text-muted-foreground">
-          {
-            'View weekly, monthly and 12-week changes in sleep, diet, alcohol and tobacco, and daily checks.'
-          }
-        </p>
         {health.state === 'error' ? (
           <p role="alert" className="text-body-sm text-destructive">
             {healthText(health)}
@@ -535,9 +516,6 @@ export function ReportPage({ health }: { health: Health }) {
           <Card>
             <CardHeader>
               <CardTitle asHeading="h2">Records by day</CardTitle>
-              <CardDescription className="break-keep">
-                Days without a record are left blank. Hover or tap a bar to see its value.
-              </CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <DailyBars

@@ -54,10 +54,6 @@ export function ExportCard() {
     <Card>
       <CardHeader>
         <CardTitle asHeading="h2">Download my records</CardTitle>
-        <p className="text-body-sm text-muted-foreground">
-          Save your records for a date range as CSV files to show a doctor or keep a copy. They open
-          in a spreadsheet app with Korean text intact and include your notes.
-        </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="grid max-w-md gap-4 sm:grid-cols-2">

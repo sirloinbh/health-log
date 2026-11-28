@@ -113,7 +113,6 @@ test('the main menu opens the medicine page, split into taken now and finished',
   expect(within(past).getByText('2026-02-01 ~ 2026-02-07')).toBeInTheDocument();
   // Nothing starting later, so that list is left out.
   expect(screen.queryByRole('region', { name: /Starting soon/ })).not.toBeInTheDocument();
-  expect(screen.getByText(/as of today \(2026-03-15\)/)).toBeInTheDocument();
 });
 
 test('a new medicine starts today, can be linked to a visit, and is sent as typed', async () => {

@@ -181,15 +181,11 @@ function CheckForm({
           id="check-memo"
           autoComplete="off"
           // No maxLength: it counts UTF-16 units and would stop at 100 emoji, half of what is allowed.
-          aria-describedby="check-memo-hint"
           // Read-only, not disabled: a disabled field drops the focus of someone who pressed Enter in it.
           readOnly={saving}
           value={form.memo}
           onChange={(event) => setForm((current) => ({ ...current, memo: event.target.value }))}
         />
-        <p id="check-memo-hint" className="text-caption text-muted-foreground">
-          Up to {maxMemo} characters.
-        </p>
       </div>
       <Notice notice={notice} />
       <div className="flex flex-wrap gap-2">

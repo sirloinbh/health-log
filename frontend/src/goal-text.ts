@@ -41,7 +41,7 @@ export type GoalDay = {
 /** What the person types, and what it becomes for the API. Sleep is typed in hours and minutes. */
 export const goalFields: Record<
   GoalItem,
-  { title: string; label: string; unit: string; min: number; max: number; example: string }
+  { title: string; label: string; unit: string; min: number; max: number }
 > = {
   calories: {
     title: 'Calories',
@@ -49,7 +49,6 @@ export const goalFields: Record<
     unit: 'kcal',
     min: 100,
     max: 10_000,
-    example: '2000',
   },
   protein: {
     title: 'Protein',
@@ -57,7 +56,6 @@ export const goalFields: Record<
     unit: 'g',
     min: 1,
     max: 1000,
-    example: '100',
   },
   sleep: {
     title: 'Sleep',
@@ -65,7 +63,6 @@ export const goalFields: Record<
     unit: 'hours',
     min: 1,
     max: 24,
-    example: '7',
   },
   sober_days: {
     title: 'Alcohol-free',
@@ -73,7 +70,6 @@ export const goalFields: Record<
     unit: 'days',
     min: 1,
     max: 7,
-    example: '5',
   },
   // Typed as a clock time and kept as minutes from midnight (21:00 is 1260).
   last_meal: {
@@ -82,7 +78,6 @@ export const goalFields: Record<
     unit: 'time',
     min: 1,
     max: 1439,
-    example: '21:00',
   },
 };
 

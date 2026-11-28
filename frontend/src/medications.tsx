@@ -461,11 +461,6 @@ export function MedicationsPage() {
         >
           Medication
         </h1>
-        <p className="text-body text-muted-foreground">
-          Record medications you were prescribed or bought and how long you take them. Current and
-          past medications are split as of today
-          {lists ? ` (${lists.today})` : ''}.
-        </p>
       </header>
       <div>
         <Button onClick={(event) => openDialog(event.currentTarget, null)}>

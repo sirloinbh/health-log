@@ -158,9 +158,6 @@ test('the drinking comparison shows how many nights each side has, and warns whe
   const card = (
     await screen.findByRole('heading', { name: 'Drinking and sleep that night' })
   ).closest<HTMLElement>('[data-slot=card]')!;
-  expect(
-    within(card).getByText('This shows a relationship only; it does not establish a cause.'),
-  ).toBeInTheDocument();
   const drank = within(card).getByText('Nights after drinking').closest('div')!;
   expect(drank).toHaveTextContent('Sample: 2 nights');
   expect(drank).toHaveTextContent('6 h');
@@ -202,7 +199,6 @@ test('the caffeine comparison shows three groups with their nights and average s
   expect(row('Nights without caffeine')).toHaveTextContent('Sample: 4 nights');
   expect(row('Nights without caffeine')).toHaveTextContent('7 h 50 min');
   expect(within(card).getByText(/One sample has fewer than 5 nights/)).toBeInTheDocument();
-  expect(within(card).getByText(/without any water or caffeine record/)).toBeInTheDocument();
 });
 
 test('a caffeine group with no nights says no records', async () => {

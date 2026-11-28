@@ -295,11 +295,11 @@ test('while saving, the answers and the memo cannot change under the save', asyn
   expect(screen.getByLabelText('Note')).not.toHaveAttribute('readonly');
 });
 
-test('the memo field says how long it may be', async () => {
+test('the memo field has no length hint and no maxLength', async () => {
   server({ body: dayOf(null) });
   renderWithQuery(<ChecksCard date={date} />);
   const memo = await screen.findByLabelText('Note');
-  expect(memo).toHaveAccessibleDescription('Up to 200 characters.');
+  expect(memo).not.toHaveAccessibleDescription();
   // A maxLength would count an emoji twice and stop typing at 100 of them.
   expect(memo).not.toHaveAttribute('maxLength');
 });

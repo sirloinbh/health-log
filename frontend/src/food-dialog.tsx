@@ -39,7 +39,7 @@ import { apiKey, type ApiRequest, useApiMutation } from './lib/query';
 import { useNotice } from './lib/use-notice';
 import { MfdsLookup } from './mfds-lookup';
 import { unreadableAmount } from './number-input';
-import { isCoupangUrl, readNutritionLabel } from './nutrition-label';
+import { readNutritionLabel } from './nutrition-label';
 import { asRequest } from './writes';
 
 type Change = (key: keyof Form) => (event: { target: { value: string } }) => void;
@@ -95,7 +95,6 @@ function LabelReader({
       <Label htmlFor="food-label-text">Paste a nutrition table</Label>
       <textarea
         id="food-label-text"
-        aria-describedby="food-label-text-help"
         rows={4}
         readOnly={locked}
         value={pasted}
@@ -105,12 +104,7 @@ function LabelReader({
           setFilled((current) => (current?.kind === 'error' ? null : current));
         }}
         className="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-body-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
-        placeholder="Paste the nutrition table text here"
       />
-      <p id="food-label-text-help" className="text-caption break-keep text-muted-foreground">
-        Copy the nutrition table text (in Korean, as on the product page) and paste it to fill the
-        fields below. The app does not open the product page.
-      </p>
       <Button
         type="button"
         variant="outline"
@@ -256,18 +250,10 @@ function SourceFields({
           id="food-source-url"
           type="url"
           readOnly={locked}
-          aria-describedby={isCoupangUrl(form.sourceUrl) ? 'food-source-url-help' : undefined}
           value={form.sourceUrl}
           onChange={update('sourceUrl')}
         />
         {/* #34: shop pages are never read by the app; the link only says where the values came from. */}
-        {isCoupangUrl(form.sourceUrl) ? (
-          <p id="food-source-url-help" className="text-caption break-keep text-muted-foreground">
-            Coupang links are saved only as the source. The app does not open the page, so paste the
-            nutrition table text above or enter the values by hand. If the table is only an image,
-            enter them by hand.
-          </p>
-        ) : null}
       </Field>
       <Field id="food-checked-on" label="Verified date">
         <Input
@@ -285,15 +271,10 @@ function SourceFields({
             id="food-is-junk"
             disabled={locked}
             checked={form.isJunk}
-            aria-describedby="food-is-junk-help"
             onCheckedChange={(checked) => set({ isJunk: checked === true })}
           />
           <Label htmlFor="food-is-junk">Junk food</Label>
         </div>
-        <p id="food-is-junk-help" className="text-caption break-keep text-muted-foreground">
-          Counts toward junk food times in the diet. Changing the flag leaves meals already recorded
-          as they are.
-        </p>
       </div>
     </>
   );

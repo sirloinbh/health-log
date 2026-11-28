@@ -267,15 +267,11 @@ function HabitForm({
           className="w-28"
           inputMode="numeric"
           autoComplete="off"
-          aria-describedby="habit-cigarettes-hint"
           value={form.cigarettes}
           onChange={(event) =>
             setForm((current) => ({ ...current, cigarettes: event.target.value }))
           }
         />
-        <p id="habit-cigarettes-hint" className="text-caption break-keep text-muted-foreground">
-          Enter 0 if you did not smoke; leave blank to skip recording.
-        </p>
       </div>
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-2 text-body-sm font-medium">Drinks</legend>

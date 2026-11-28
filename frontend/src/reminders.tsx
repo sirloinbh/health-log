@@ -9,10 +9,10 @@ import { Notice } from './components/ui/notice';
 import { SkeletonText } from './components/ui/skeleton';
 import { formatDate } from './daily-date';
 import { RequestError } from './lib/api';
+import { plural as countText } from './lib/format';
 import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
 import { medicationsPath } from './med-text';
-import { plural as countText } from './lib/format';
 import {
   type Reminder,
   reminderDetail,

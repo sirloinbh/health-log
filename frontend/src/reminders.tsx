@@ -12,7 +12,7 @@ import { RequestError } from './lib/api';
 import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
 import { medicationsPath } from './med-text';
-import { count as countText } from './plural';
+import { plural as countText } from './lib/format';
 import {
   type Reminder,
   reminderDetail,

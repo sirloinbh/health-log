@@ -1,5 +1,5 @@
 import { kcalText } from './calorie-text';
-import { count } from './plural';
+import { plural } from './lib/format';
 // What the API answers for a combo (#46), and how the combo and meal screens describe it.
 
 export type ComboItem = {
@@ -31,7 +31,7 @@ export function comboSummary(combo: Combo) {
   const calories = value === null ? 'No calorie value' : kcalText(value);
   const unknown =
     missing > 0 && value !== null
-      ? ` (excludes ${count(missing, 'food')} with unknown calories)`
+      ? ` (excludes ${plural(missing, 'food')} with unknown calories)`
       : '';
-  return `${count(combo.items.length, 'food')} · ${calories}${unknown}`;
+  return `${plural(combo.items.length, 'food')} · ${calories}${unknown}`;
 }

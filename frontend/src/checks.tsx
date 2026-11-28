@@ -1,7 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 
-import { BusyButton } from './busy-button';
 import {
   answerText,
   charCount,
@@ -16,6 +15,7 @@ import {
   scoreValues,
   unchecked,
 } from './check-text';
+import { BusyButton } from './components/busy-button/busy-button';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { ConfirmDialog } from './components/ui/confirm-dialog';

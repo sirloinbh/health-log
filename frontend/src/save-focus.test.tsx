@@ -3,8 +3,8 @@ import type { ReactElement } from 'react';
 import { expect, test, vi } from 'vitest';
 
 import { BodyCard } from './body';
-import { BusyButton } from './busy-button';
 import { ChecksCard } from './checks';
+import { BusyButton } from './components/busy-button/busy-button';
 import { GoalsSettings } from './goals';
 import { HabitsCard } from './habits';
 import { MealCard } from './meals';
@@ -203,7 +203,7 @@ test('a busy button ignores presses and does not submit its form', () => {
       </BusyButton>
     </form>,
   );
-  const button = screen.getByRole('button', { name: 'Save' });
+  const button = screen.getByRole('button', { name: /Save/ });
   fireEvent.click(button);
   expect(pressed).not.toHaveBeenCalled();
   expect(submitted).not.toHaveBeenCalled();

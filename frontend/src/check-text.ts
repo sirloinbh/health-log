@@ -1,4 +1,4 @@
-import { count } from './plural';
+import { plural } from './lib/format';
 
 /** null: not checked. It is never read as a no. */
 export type DayCheck = {
@@ -62,7 +62,7 @@ export const answerText = (value: boolean | null, yes: string, no: string) =>
 export const rateText = ({ days, yes }: Rate, word: string) =>
   days === 0
     ? 'No records'
-    : `${word} on ${yes}/${count(days, 'day')} (${Math.round((yes / days) * 100)}%)`;
+    : `${word} on ${yes}/${plural(days, 'day')} (${Math.round((yes / days) * 100)}%)`;
 
 // Characters as the server and the database count them, from the shared contract (#215).
 export { charCount } from '../../shared/contract';

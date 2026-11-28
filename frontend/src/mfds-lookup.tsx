@@ -3,8 +3,8 @@ import { type KeyboardEvent, useState } from 'react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Label } from './components/ui/label';
-import { serviceToday } from './daily-date';
 import type { Form } from './food-form';
+import { serviceToday } from './lib/format';
 import { apiKey, useApiQuery } from './lib/query';
 import {
   fillFromMfds,

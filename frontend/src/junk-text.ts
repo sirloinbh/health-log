@@ -1,5 +1,5 @@
 import { kcalText } from './calorie-text';
-import { count } from './plural';
+import { plural } from './lib/format';
 
 /** Junk food of a week or a month, as the meals API answers it (#38). */
 export type JunkPeriod = {
@@ -23,7 +23,7 @@ export function junkText({ times, days, calories }: JunkPeriod) {
     calories.value === null
       ? 'No calorie value'
       : calories.missing > 0
-        ? `${kcalText(calories.value)} or more (excludes ${count(calories.missing, 'record')} with unknown calories)`
+        ? `${kcalText(calories.value)} or more (excludes ${plural(calories.missing, 'record')} with unknown calories)`
         : kcalText(calories.value);
-  return `${count(times, 'time')} · ${count(days, 'day')} · ${kcal}`;
+  return `${plural(times, 'time')} · ${plural(days, 'day')} · ${kcal}`;
 }

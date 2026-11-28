@@ -8,8 +8,9 @@ import {
   formatChange,
   formatSpan,
 } from './body-change';
-import { BusyButton } from './busy-button';
 import { charCount } from './check-text';
+import { BusyButton } from './components/busy-button/busy-button';
+import { addDays } from './components/period-nav/periods';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
@@ -19,7 +20,6 @@ import { Notice } from './components/ui/notice';
 import { SkeletonText } from './components/ui/skeleton';
 import { toast } from './components/ui/sonner';
 import { Spinner } from './components/ui/spinner';
-import { shiftDate } from './daily-date';
 import { RequestError } from './lib/api';
 import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue, useNotice } from './lib/use-notice';
@@ -358,7 +358,7 @@ export function BodyCard({ date }: { date: string }) {
   // Kept apart from the record: failing to load the trend must not hide today's form. A save to a day in the window
   // changes the trend; waiting for every body write is simplest.
   const historyReady = useReadAfterWrites(pathOf(''));
-  const from = shiftDate(date, 1 - Math.max(...changeWindows));
+  const from = addDays(date, 1 - Math.max(...changeWindows));
   const historyQuery = useApiQuery<{ records?: BodyRecord[] }>(
     apiKey('/api/body', from, date),
     `/api/body?from=${from}&to=${date}`,

@@ -15,10 +15,10 @@ import { JunkBadge } from './food-choices';
 import { spanText } from './habit-text';
 import { type JunkPeriod, junkText } from './junk-text';
 import { RequestError } from './lib/api';
+import { plural } from './lib/format';
 import { apiKey, useApiQuery } from './lib/query';
 import { errorText, type NoticeValue } from './lib/use-notice';
 import { type MealKey, meals } from './meal-entry';
-import { count } from './plural';
 import { useMealAdd } from './use-meal-add';
 import { useReadAfterWrites } from './writes';
 
@@ -77,7 +77,7 @@ function Totals({ totals }: { totals: MealDay['totals'] }) {
         <p className="text-body-sm break-keep text-muted-foreground">
           Some foods have unknown values, so these totals leave them out:{' '}
           {incomplete
-            .map(({ key, label }) => `${label} ${count(totals[key].missing, 'food')}`)
+            .map(({ key, label }) => `${label} ${plural(totals[key].missing, 'food')}`)
             .join(', ')}
         </p>
       ) : null}
@@ -160,7 +160,7 @@ function EntryRow({
           {entry.isJunk ? <JunkBadge /> : null}
         </span>
         <span className="text-caption text-muted-foreground">
-          {count(entry.servings, 'serving')}
+          {plural(entry.servings, 'serving')}
           {serving} · {calorieText(entry.calories)}
         </span>
       </div>

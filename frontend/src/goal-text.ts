@@ -1,7 +1,7 @@
 import { kcalText } from './calorie-text';
 import { spanText } from './habit-text';
+import { plural } from './lib/format';
 import { meals } from './meal-entry';
-import { count } from './plural';
 import { minutesText } from './report-text';
 
 /** Where goals are set: the same as pages.settings in app.tsx. */
@@ -102,7 +102,7 @@ export function targetText(item: GoalItem, target: number) {
     case 'sleep':
       return `At least ${minutesText(target)}`;
     case 'sober_days':
-      return `At least ${count(target, 'alcohol-free day')} a week`;
+      return `At least ${plural(target, 'alcohol-free day')} a week`;
     case 'last_meal':
       return `No eating after ${clockText(target)}`;
   }
@@ -199,11 +199,11 @@ export function actualText(day: GoalDayItem) {
       const { entries, total, missing } = day.actual;
       if (entries === 0) return 'No meal records';
       // Nothing known to add up is not zero.
-      if (total === null) return `${count(missing, 'food')} with unknown values`;
+      if (total === null) return `${plural(missing, 'food')} with unknown values`;
       // Calories read like every other calorie amount, rounded (#279); protein keeps its decimals,
       // as the meal card shows them.
       const sum = day.item === 'calories' ? kcalText(total) : `${number(total)}g`;
-      return missing ? `${sum} (excludes ${count(missing, 'food')} with unknown values)` : sum;
+      return missing ? `${sum} (excludes ${plural(missing, 'food')} with unknown values)` : sum;
     }
     case 'sleep':
       return day.actual.minutes === null ? 'No sleep record' : minutesText(day.actual.minutes);
@@ -212,7 +212,7 @@ export function actualText(day: GoalDayItem) {
       const span = spanText(day.actual);
       return recordedDays === 0
         ? `This week (${span}): no drink records`
-        : `This week (${span}): ${count(soberDays, 'alcohol-free day')} / ${count(recordedDays, 'day')} recorded`;
+        : `This week (${span}): ${plural(soberDays, 'alcohol-free day')} / ${plural(recordedDays, 'day')} recorded`;
     }
     case 'last_meal': {
       const { slots } = day.actual;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { count } from './plural';
+import { plural } from './lib/format';
 
 type Bar = { date: string; value: number | null };
 
@@ -32,7 +32,7 @@ export function DailyBars({
   const summary =
     recorded === 0
       ? `${title}: no days recorded`
-      : `${title}: ${recorded} of ${count(bars.length, 'day')} recorded, highest day ${format(max)}`;
+      : `${title}: ${recorded} of ${plural(bars.length, 'day')} recorded, highest day ${format(max)}`;
   const shown = active === null ? null : bars[active];
   // The same share of bars counts as an edge on either side.
   const edgeSpan = bars.length / 4;

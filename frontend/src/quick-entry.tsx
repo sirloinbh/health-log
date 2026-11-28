@@ -2,9 +2,9 @@ import { Minus, Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
-import { BusyButton } from './busy-button';
 import { calorieText } from './calorie-text';
 import { fullName } from './combo-text';
+import { BusyButton } from './components/busy-button/busy-button';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Notice } from './components/ui/notice';

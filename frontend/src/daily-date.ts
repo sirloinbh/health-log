@@ -12,12 +12,6 @@ export function isValidDate(value: string) {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-export function shiftDate(value: string, days: number) {
-  const parsed = toDate(value);
-  parsed.setUTCDate(parsed.getUTCDate() + days);
-  return parsed.toISOString().slice(0, 10);
-}
-
 export function formatDate(value: string) {
   return fullDate.format(toDate(value));
 }
@@ -34,19 +28,6 @@ export const latestDate = '2099-12-31';
 export const inDailyRange = (value: string) => value >= earliestDate && value <= latestDate;
 
 export const dailyRangeText = `Records can be kept from ${earliestDate} to ${latestDate}`;
-
-/**
- * Today in the service time zone by this device's clock. The server's today is preferred; this is
- * for when it cannot be asked (a label read now, a start date while the server is unreachable), and
- * for a new medicine's start date, which never waits for the server (#306).
- */
-export const serviceToday = () =>
-  new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
 
 const monthNames = [
   'Jan',

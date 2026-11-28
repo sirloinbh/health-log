@@ -1,15 +1,16 @@
 import { isCancelledError } from '@tanstack/react-query';
 import { type FormEvent, useRef, useState } from 'react';
 
-import { BusyButton } from './busy-button';
 import { type Combo, comboSummary } from './combo-text';
+import { BusyButton } from './components/busy-button/busy-button';
+import { addDays } from './components/period-nav/periods';
 import { Button } from './components/ui/button';
 import { Checkbox } from './components/ui/checkbox';
 import { Input } from './components/ui/input';
 import { Label } from './components/ui/label';
 import { Notice } from './components/ui/notice';
 import { Spinner } from './components/ui/spinner';
-import { formatDate, isValidDate, shiftDate } from './daily-date';
+import { formatDate, isValidDate } from './daily-date';
 import { FoodChoices } from './food-choices';
 import { resultText, useFoodSearch } from './food-search';
 import { RequestError } from './lib/api';
@@ -273,7 +274,7 @@ function ComboPicker({ entry, adding }: FormProps) {
 
 function CopyMealForm({ date, entry, adding }: FormProps & { date: string }) {
   // "The same as yesterday" is the usual copy.
-  const [copyFrom, setCopyFrom] = useState(() => shiftDate(date, -1));
+  const [copyFrom, setCopyFrom] = useState(() => addDays(date, -1));
   const { copy: notice } = entry.notices;
   const meal = entry.mealLabel.toLowerCase();
 
